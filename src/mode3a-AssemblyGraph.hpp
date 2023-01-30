@@ -223,6 +223,7 @@ private:
     void analyzePartialPathsComponent(
         const vector<uint64_t>& component,
         const vector< pair<vertex_descriptor, vertex_descriptor> >& componentPairs,
+        vector<vertex_descriptor>& longestPath,
         ostream& graphOut);
     class AnalyzePartialPathsData {
     public:
@@ -235,7 +236,11 @@ private:
         // This stores indexes in the vertexTable.
         vector< vector<uint64_t> > components;
 
+        // The bidirectional pairs in each connected component.
         vector< vector< pair<vertex_descriptor, vertex_descriptor> > > componentPairs;
+
+        // The compute longest paths for each connected component.
+        vector< vector<vertex_descriptor> > longestPaths;
     };
     AnalyzePartialPathsData analyzePartialPathsData;
 };

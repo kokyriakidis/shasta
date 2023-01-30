@@ -2,6 +2,7 @@
 #include "mode3a-AssemblyGraph.hpp"
 #include "deduplicate.hpp"
 #include "invalid.hpp"
+#include "longestPath.hpp"
 #include "orderPairs.hpp"
 #include "transitiveReduction.hpp"
 using namespace shasta;
@@ -718,6 +719,7 @@ void AssemblyGraph::analyzePartialPaths(uint64_t threadCount)
 
 
     // Process the connected components in parallel.
+    analyzePartialPathsData.longestPaths.resize(components.size());
     setupLoadBalancing(components.size(), 1);
     runThreads(&AssemblyGraph::analyzePartialPathsThreadFunction, threadCount);
 
@@ -764,7 +766,18 @@ void AssemblyGraph::analyzePartialPathsThreadFunction(uint64_t threadId)
             analyzePartialPathsComponent(
                 analyzePartialPathsData.components[i],
                 analyzePartialPathsData.componentPairs[i],
+                analyzePartialPathsData.longestPaths[i],
                 graphOut);
+            graphOut << "}\n";
+
+            // Write out the longest path.
+            graphOut << "digraph AnalyzePartialPathsComponentLongestPath_" << i << " {\n";
+            for(uint64_t j=1; j<analyzePartialPathsData.longestPaths[i].size(); j++) {
+                const vertex_descriptor v0 = analyzePartialPathsData.longestPaths[i][j-1];
+                const vertex_descriptor v1 = analyzePartialPathsData.longestPaths[i][j];
+                graphOut << "\"" << vertexStringId(v0) << "\"->";
+                graphOut << "\"" << vertexStringId(v1) << "\";\n";
+            }
             graphOut << "}\n";
         }
     }
@@ -775,6 +788,7 @@ void AssemblyGraph::analyzePartialPathsThreadFunction(uint64_t threadId)
 void AssemblyGraph::analyzePartialPathsComponent(
     const vector<uint64_t>& component,
     const vector< pair<vertex_descriptor, vertex_descriptor> >& componentPairs,
+    vector<vertex_descriptor>& longestPath,
     ostream& graphOut)
 {
     const vector<vertex_descriptor>& vertexTable = analyzePartialPathsData.vertexTable;
@@ -806,7 +820,7 @@ void AssemblyGraph::analyzePartialPathsComponent(
     }
 
     // Explicitly construct the graph for this component.
-    using Graph = boost::adjacency_list<boost::listS, boost::vecS, boost::directedS>;
+    using Graph = boost::adjacency_list<boost::listS, boost::vecS, boost::bidirectionalS>;
     Graph graph(componentVertexTable.size());
     for(const auto& p: componentPairs) {
         const vertex_descriptor v0 = p.first;
@@ -814,23 +828,32 @@ void AssemblyGraph::analyzePartialPathsComponent(
         add_edge(componentVertexMap[v0], componentVertexMap[v1], graph);
     }
 
-    // Compute the transitive reduction.
-    transitiveReduction(graph);
+    // Since we only cre about the longest path, we don't need to
+    // compute the transitive reduction.
+    // transitiveReduction(graph);
 
     // Write the vertices to graphOut.
     BGL_FORALL_VERTICES(iv, graph, Graph) {
-        const vertex_descriptor v = vertexTable[iv];
+        const vertex_descriptor v = componentVertexTable[iv];
         graphOut << "\"" << vertexStringId(v) << "\";\n";
     }
 
     // Write edges to graphOut.
     BGL_FORALL_EDGES(e, graph, Graph) {
-        const uint64_t iv0 = source(e, graph);
-        const uint64_t iv1 = target(e, graph);
-        const vertex_descriptor v0 = vertexTable[iv0];
-        const vertex_descriptor v1 = vertexTable[iv1];
+        const uint64_t jv0 = source(e, graph);
+        const uint64_t jv1 = target(e, graph);
+        const vertex_descriptor v0 = componentVertexTable[jv0];
+        const vertex_descriptor v1 = componentVertexTable[jv1];
         graphOut << "\"" << vertexStringId(v0) << "\"->";
         graphOut << "\"" << vertexStringId(v1) << "\";\n";
+    }
+
+    // Compute the longest path.
+    vector<uint64_t> componentLongestPath;
+    shasta::longestPath(graph, componentLongestPath);
+    longestPath.clear();
+    for(const uint64_t iv: componentLongestPath) {
+        longestPath.push_back(componentVertexTable[iv]);
     }
 }
 
