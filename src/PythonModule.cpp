@@ -14,6 +14,7 @@
 #include "diploidBayesianPhase.hpp"
 #include "shastaLapack.hpp"
 #include "LongBaseSequence.hpp"
+#include "longestPath.hpp"
 #include "mappedCopy.hpp"
 #include "MedianConsensusCaller.hpp"
 #include "MemoryMappedAllocator.hpp"
@@ -775,6 +776,9 @@ PYBIND11_MODULE(shasta, shastaModule)
         );
     shastaModule.def("testSubsetGraph",
         testSubsetGraph
+        );
+    shastaModule.def("testLongestPath",
+        testLongestPath
         );
 }
 
