@@ -1,4 +1,3 @@
-// Main program for the Shasta static executable.
 // The static executable provides
 // basic functionality and reduced performance.
 // For full functionality use the shared library built
@@ -369,11 +368,12 @@ void shasta::main::assemble(
         assemblerOptions.commandLineOnlyOptions.memoryMode != "filesystem") {
         cout << "This run uses options \"--memoryBacking " << assemblerOptions.commandLineOnlyOptions.memoryBacking <<
             " --memoryMode " << assemblerOptions.commandLineOnlyOptions.memoryMode << "\".\n"
-            "This could result in performance degradation.\n"
-            "For full performance, use \"--memoryBacking 2M --memoryMode filesystem\"\n"
+            "This could result in longer run time.\n"
+            "For faster assembly, use \"--memoryBacking 2M --memoryMode filesystem\"\n"
             "(root privilege via sudo required).\n"
             "Therefore the results of this run should not be used\n"
-            "for benchmarking purposes." << endl;
+            "for the purpose of benchmarking assembly time.\n"
+            "However the memory options don't affect assembly results in any way." << endl;
     }
 
     // Create the Assembler.
@@ -390,11 +390,12 @@ void shasta::main::assemble(
         assemblerOptions.commandLineOnlyOptions.memoryMode != "filesystem") {
         cout << "This run used options \"--memoryBacking " << assemblerOptions.commandLineOnlyOptions.memoryBacking <<
             " --memoryMode " << assemblerOptions.commandLineOnlyOptions.memoryMode << "\".\n"
-            "This could have resulted in performance degradation.\n"
-            "For full performance, use \"--memoryBacking 2M --memoryMode filesystem\"\n"
+            "This could result in longer run time.\n"
+            "For faster assembly, use \"--memoryBacking 2M --memoryMode filesystem\"\n"
             "(root privilege via sudo required).\n"
             "Therefore the results of this run should not be used\n"
-            "for benchmarking purposes." << endl;
+            "for the purpose of benchmarking assembly time.\n"
+            "However the memory options don't affect assembly results in any way." << endl;
     }
 
     // Write out the build id again.
