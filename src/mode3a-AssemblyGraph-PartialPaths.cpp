@@ -559,7 +559,7 @@ void AssemblyGraph::writePartialPaths() const
 
 
 
-void AssemblyGraph::analyzePartialPaths() const
+void AssemblyGraph::analyzePartialPaths(uint64_t threadCount)
 {
     // CONSTANSTS TO EXPOSE WHEN CODE STABILIZES
 
@@ -626,8 +626,10 @@ void AssemblyGraph::analyzePartialPaths() const
     // numbered 0 to vertexCount-1.
     // The data structures below define the correspondence of these vertices with the
     // AssemblyGraph vertices.
-    vector<vertex_descriptor> vertexTable;
-    std::map<vertex_descriptor, uint64_t> vertexMap;
+    vector<vertex_descriptor>& vertexTable = analyzePartialPathsData.vertexTable;
+    vertexTable.clear();
+    std::map<vertex_descriptor, uint64_t>& vertexMap = analyzePartialPathsData.vertexMap;
+    vertexMap.clear();
     uint64_t vertexIndex = 0;
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
         vertexTable.push_back(v);
@@ -680,7 +682,8 @@ void AssemblyGraph::analyzePartialPaths() const
 
 
     // Store the connected components that are sufficiently large.
-    vector< vector<uint64_t> > components;
+    vector< vector<uint64_t> >& components = analyzePartialPathsData.components;
+    components.clear();
     for(const auto & p: connectedComponentMap) {
         const vector<uint64_t>& component = p.second;
         if(component.size() >= minComponentSize) {
@@ -688,8 +691,38 @@ void AssemblyGraph::analyzePartialPaths() const
         }
     }
 
+    // Update the componentTable to reflect the new numbering.
+    fill(componentTable.begin(), componentTable.end(), invalid<uint64_t>);
+    for(uint64_t componentId=0; componentId<components.size(); componentId++) {
+        const vector<uint64_t>& component = components[componentId];
+        for(const uint64_t i: component) {
+            componentTable[i] = componentId;
+        }
+    }
+
+    // Assign the bidirectional pairs to components.
+    vector< vector< pair<vertex_descriptor, vertex_descriptor> > >& componentPairs = analyzePartialPathsData.componentPairs;
+    componentPairs.clear();
+    componentPairs.resize(components.size());
+    for(const auto& p: bidirectionalPairs) {
+        const vertex_descriptor v0 = p.first;
+        const vertex_descriptor v1 = p.second;
+        const uint64_t iv0 = vertexMap[v0];
+        const uint64_t iv1 = vertexMap[v1];
+        const uint64_t componentId = componentTable[iv0];
+        SHASTA_ASSERT(componentId == componentTable[iv1]);
+        if(componentId != invalid<uint64_t>) {
+            componentPairs[componentId].push_back(p);
+        }
+    }
 
 
+    // Process the connected components in parallel.
+    setupLoadBalancing(components.size(), 1);
+    runThreads(&AssemblyGraph::analyzePartialPathsThreadFunction, threadCount);
+
+
+#if 0
     // Create the graph defined by the bidirectional pairs
     // and compute its transitive reduction.
     // This will fail if the graph has cycles.
@@ -715,4 +748,90 @@ void AssemblyGraph::analyzePartialPaths() const
         dot << "\"" << vertexStringId(v1) << "\";\n";
     }
     dot << "}\n";
+#endif
 }
+
+
+
+void AssemblyGraph::analyzePartialPathsThreadFunction(uint64_t threadId)
+{
+    ofstream graphOut("AnalyzePartialPathsThread-" + to_string(threadId) + ".dot");
+
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+        for(uint64_t i=begin; i!=end; i++) {
+            graphOut << "digraph AnalyzePartialPathsComponent_" << i << " {\n";
+            analyzePartialPathsComponent(
+                analyzePartialPathsData.components[i],
+                analyzePartialPathsData.componentPairs[i],
+                graphOut);
+            graphOut << "}\n";
+        }
+    }
+}
+
+
+
+void AssemblyGraph::analyzePartialPathsComponent(
+    const vector<uint64_t>& component,
+    const vector< pair<vertex_descriptor, vertex_descriptor> >& componentPairs,
+    ostream& graphOut)
+{
+    const vector<vertex_descriptor>& vertexTable = analyzePartialPathsData.vertexTable;
+
+#if 0
+    // Write the vertices to graphOut.
+    for(const uint64_t iv: component) {
+        const vertex_descriptor v = vertexTable[iv];
+        graphOut << "\"" << vertexStringId(v) << "\";\n";
+    }
+
+    // Write edges to graphOut.
+    for(const auto& p: componentPairs) {
+        const vertex_descriptor v0 = p.first;
+        const vertex_descriptor v1 = p.second;
+        graphOut << "\"" << vertexStringId(v0) << "\"->";
+        graphOut << "\"" << vertexStringId(v1) << "\";\n";
+    }
+#endif
+
+    // Number the vertices in this component consecutively starting at zero.
+    vector<vertex_descriptor> componentVertexTable;
+    std::map<vertex_descriptor, uint64_t> componentVertexMap;
+    for(uint64_t jv=0; jv<component.size(); jv++) {
+        const uint64_t iv = component[jv];
+        const vertex_descriptor v = vertexTable[iv];
+        componentVertexTable.push_back(v);
+        componentVertexMap.insert(make_pair(v, jv));
+    }
+
+    // Explicitly construct the graph for this component.
+    using Graph = boost::adjacency_list<boost::listS, boost::vecS, boost::directedS>;
+    Graph graph(componentVertexTable.size());
+    for(const auto& p: componentPairs) {
+        const vertex_descriptor v0 = p.first;
+        const vertex_descriptor v1 = p.second;
+        add_edge(componentVertexMap[v0], componentVertexMap[v1], graph);
+    }
+
+    // Compute the transitive reduction.
+    transitiveReduction(graph);
+
+    // Write the vertices to graphOut.
+    BGL_FORALL_VERTICES(iv, graph, Graph) {
+        const vertex_descriptor v = vertexTable[iv];
+        graphOut << "\"" << vertexStringId(v) << "\";\n";
+    }
+
+    // Write edges to graphOut.
+    BGL_FORALL_EDGES(e, graph, Graph) {
+        const uint64_t iv0 = source(e, graph);
+        const uint64_t iv1 = target(e, graph);
+        const vertex_descriptor v0 = vertexTable[iv0];
+        const vertex_descriptor v1 = vertexTable[iv1];
+        graphOut << "\"" << vertexStringId(v0) << "\"->";
+        graphOut << "\"" << vertexStringId(v1) << "\";\n";
+    }
+}
+
+

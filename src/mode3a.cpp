@@ -121,7 +121,7 @@ Assembler::Assembler(
     assemblyGraph.computePartialPaths(threadCount,
         segmentCoverageThreshold1ForPaths, segmentCoverageThreshold2ForPaths, minLinkCoverageForPaths);
     assemblyGraph.writePartialPaths();
-    assemblyGraph.analyzePartialPaths();
+    assemblyGraph.analyzePartialPaths(threadCount);
 #endif
 }
 

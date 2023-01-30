@@ -185,7 +185,6 @@ public:
         uint64_t minLinkCoverage
         );
     void writePartialPaths() const;
-    void analyzePartialPaths() const;
 private:
     void computePartialPathsThreadFunction(uint64_t threadId);
 
@@ -213,6 +212,32 @@ private:
         uint64_t minLinkCoverage;
     };
     ComputePartialPathsData computePartialPathsData;
+
+
+
+    // Analyze partial paths to create assembly paths.
+public:
+    void analyzePartialPaths(uint64_t threadCount);
+private:
+    void analyzePartialPathsThreadFunction(uint64_t threadId);
+    void analyzePartialPathsComponent(
+        const vector<uint64_t>& component,
+        const vector< pair<vertex_descriptor, vertex_descriptor> >& componentPairs,
+        ostream& graphOut);
+    class AnalyzePartialPathsData {
+    public:
+
+        // Contiguous numbering of the vertices of the AssemblyGraph
+        // and the partial paths graph.
+        vector<vertex_descriptor> vertexTable;
+        std::map<vertex_descriptor, uint64_t> vertexMap;
+
+        // This stores indexes in the vertexTable.
+        vector< vector<uint64_t> > components;
+
+        vector< vector< pair<vertex_descriptor, vertex_descriptor> > > componentPairs;
+    };
+    AnalyzePartialPathsData analyzePartialPathsData;
 };
 
 #endif
