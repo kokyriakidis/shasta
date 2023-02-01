@@ -116,13 +116,14 @@ Assembler::Assembler(
     }
 #endif
 
-#if 1
     // Follow reads to compute partial paths.
     assemblyGraph.computePartialPaths(threadCount,
         segmentCoverageThreshold1ForPaths, segmentCoverageThreshold2ForPaths, minLinkCoverageForPaths);
     assemblyGraph.writePartialPaths();
     assemblyGraph.analyzePartialPaths(threadCount);
-#endif
+
+    // Find TangledAssemblyPaths.
+    assemblyGraph.computeTangledAssemblyPaths(threadCount);
 }
 
 

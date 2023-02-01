@@ -239,10 +239,62 @@ private:
         // The bidirectional pairs in each connected component.
         vector< vector< pair<vertex_descriptor, vertex_descriptor> > > componentPairs;
 
-        // The compute longest paths for each connected component.
+        // The computed longest paths for each connected component.
+        // These paths are incomplete as they only include primary vertices.
+        // Secondary vertices will be filled later by computeTangledAssemblyPaths.
         vector< vector<vertex_descriptor> > longestPaths;
     };
     AnalyzePartialPathsData analyzePartialPathsData;
+
+
+
+    // Class TangledAssemblyPath describes a tangled
+    // assembly path ready to be "ripped" from the AssemblyGraph.
+    // Sequence assembly only happens after the "ripping" operation takes place.
+    // At that time the assembly path becomes a linear sequence of vertices in
+    // the AssemblyGraph.
+    // Each TangledAssemblyPath corresponds to one of the longest paths
+    // computed by analyzePartialPaths and stored in
+    // analyzePartialPathsData.longestPaths.
+    class TangledAssemblyPath {
+    public:
+
+        // The primary vertices are the ones that are unique to this path
+        // (that is, they don't belong to any other assembly path).
+        // They are computed by analyzePartialPaths.
+        // All of the oriented reads in the primary vertices participate in the ripping.
+        vector<vertex_descriptor> primaryVertices;
+
+        // For each pair of consecutive primary vertices,
+        // we store a vector of secondary vertices, in the order in which
+        // they appear in the path. For each of the secondary vertices
+        // we also store indices of the vertex journey entries that will
+        // participate in the ripping.
+        // The secondaryVertices vector has size one less than the
+        // primaryVertices vector. Each entry corresponds to the interval
+        // between two consecutive primaryVertices.
+        class SecondaryVertexInfo {
+        public:
+            vertex_descriptor v;
+            vector<uint64_t> journeyEntryIndexes;
+        };
+        vector< vector<SecondaryVertexInfo> > secondaryVertices;
+    };
+    vector<TangledAssemblyPath> tangledAssemblyPaths;
+public:
+    void computeTangledAssemblyPaths(uint64_t threadCount);
+private:
+    void computeTangledAssemblyPathsThreadFunction(uint64_t threadId);
+    void computeTangledAssemblyPath(
+        const vector<vertex_descriptor>& primaryVertices,
+        TangledAssemblyPath&,
+        ostream& debugOut
+        );
+    bool computeSecondaryVertices(
+        vertex_descriptor v0,
+        vertex_descriptor v1,
+        vector<TangledAssemblyPath::SecondaryVertexInfo>&,
+        ostream& debugOut);
 };
 
 #endif
