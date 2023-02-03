@@ -235,7 +235,11 @@ bool AssemblyGraph::computeSecondaryVertices(
             debugOut <<
                 "\"" << vertexStringId(v0) << "\"->\"" <<
                 vertexStringId(v1) << "\" [label=\"" << frequency <<
-                    "\"];\n";
+                    "\"";
+            if(not segmentsAreAdjacent(v0, v1)) {
+                debugOut << " style=dotted";
+            }
+            debugOut << "];\n";
         }
         debugOut << "}\n";
     }
