@@ -310,28 +310,55 @@ private:
     class SecondaryVerticesGraph : public SecondaryVerticesGraphBaseClass {
     public:
         SecondaryVerticesGraph(
+            const AssemblyGraph& assemblyGraph,
             const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
             const vector<uint64_t>& vertexFrequency,
             const vector< pair<AssemblyGraph::vertex_descriptor, AssemblyGraph::vertex_descriptor> >&
                 transitionsEncountered,
             const vector<uint64_t>& transitionFrequency);
-        SecondaryVerticesGraph(uint64_t n) : SecondaryVerticesGraphBaseClass(n) {}
+        SecondaryVerticesGraph(
+            const AssemblyGraph& assemblyGraph,
+            const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
+            uint64_t n);
         bool isLinear(
             vertex_descriptor v0,
             vertex_descriptor v1
         ) const;
         void write(
             ostream&,
-            const AssemblyGraph&,
-            const string& graphName,
-            const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered
+            const string& graphName
             ) const;
 
+        const AssemblyGraph& assemblyGraph;
+        const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered;
+
         // Handle dotted edges that "skip" a vertex.
-        void handleDottedEdges1(
-            const AssemblyGraph&,
-            const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
-            ostream& debugOut);
+        void handleDottedEdges1(ostream& debugOut);
+        class HandleDottedEdges1Callback {
+        public:
+            const AssemblyGraph& assemblyGraph;
+            const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered;
+            const SecondaryVerticesGraph& smallGraph;
+            const SecondaryVerticesGraph& graph;
+            ostream& debugOut;
+
+            HandleDottedEdges1Callback(
+                const AssemblyGraph& assemblyGraph,
+                const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
+                const SecondaryVerticesGraph& smallGraph,
+                const SecondaryVerticesGraph& graph,
+                ostream& debugOut) :
+                assemblyGraph(assemblyGraph),
+                verticesEncountered(verticesEncountered),
+                smallGraph(smallGraph),
+                graph(graph),
+                debugOut(debugOut) {}
+
+            template <typename CorrespondenceMap1To2, typename CorrespondenceMap2To1>
+            bool operator()(
+                const CorrespondenceMap1To2& f,
+                const CorrespondenceMap2To1& g) const;
+        };
     };
 };
 

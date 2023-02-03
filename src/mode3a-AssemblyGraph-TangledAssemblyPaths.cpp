@@ -231,6 +231,7 @@ bool AssemblyGraph::computeSecondaryVertices(
     // The edge stores transitionFrequency.
     using Graph = SecondaryVerticesGraph;
     Graph graph(
+        assemblyGraph,
         verticesEncountered,
         vertexFrequency,
         transitionsEncountered,
@@ -240,7 +241,7 @@ bool AssemblyGraph::computeSecondaryVertices(
     if(debug and debugOut) {
         const string graphName = "ComputeSecondaryVerticesGraph" +
             vertexStringId(v0) + "_" + vertexStringId(v1);
-        graph.write(debugOut, assemblyGraph, graphName, verticesEncountered);
+        graph.write(debugOut, graphName);
     }
 
     // Figure out if the graph is linear.
@@ -252,10 +253,7 @@ bool AssemblyGraph::computeSecondaryVertices(
     }
 
     if(debug and debugOut) {
-        const string graphName = "ComputeSecondaryVerticesGraph" +
-            vertexStringId(v0) + "_" + vertexStringId(v1);
-        cout << "handleDottedEdges1: " << graphName << endl;
-        graph.handleDottedEdges1(assemblyGraph, verticesEncountered, debugOut);
+        graph.handleDottedEdges1(debugOut);
     }
 
     return isLinear;
@@ -264,12 +262,15 @@ bool AssemblyGraph::computeSecondaryVertices(
 
 
 AssemblyGraph::SecondaryVerticesGraph::SecondaryVerticesGraph(
+    const AssemblyGraph& assemblyGraph,
     const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
     const vector<uint64_t>& vertexFrequency,
     const vector< pair<AssemblyGraph::vertex_descriptor, AssemblyGraph::vertex_descriptor> >&
         transitionsEncountered,
     const vector<uint64_t>& transitionFrequency) :
-    SecondaryVerticesGraphBaseClass(verticesEncountered.size())
+    SecondaryVerticesGraphBaseClass(verticesEncountered.size()),
+    assemblyGraph(assemblyGraph),
+    verticesEncountered(verticesEncountered)
 {
     SHASTA_ASSERT(vertexFrequency.size() == verticesEncountered.size());
     SHASTA_ASSERT(transitionFrequency.size() == transitionsEncountered.size());
@@ -299,11 +300,21 @@ AssemblyGraph::SecondaryVerticesGraph::SecondaryVerticesGraph(
 
 
 
+AssemblyGraph::SecondaryVerticesGraph::SecondaryVerticesGraph(
+    const AssemblyGraph& assemblyGraph,
+    const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
+    uint64_t n) :
+    SecondaryVerticesGraphBaseClass(n),
+    assemblyGraph(assemblyGraph),
+    verticesEncountered(verticesEncountered)
+{
+}
+
+
+
 void AssemblyGraph::SecondaryVerticesGraph::write(
     ostream& graphOut,
-    const AssemblyGraph& assemblyGraph,
-    const string& graphName,
-    const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered) const
+    const string& graphName) const
 {
     using Graph = SecondaryVerticesGraph;
     const Graph& graph = *this;
@@ -383,23 +394,46 @@ bool AssemblyGraph::SecondaryVerticesGraph::isLinear(
 
 
 
+template <typename CorrespondenceMap1To2, typename CorrespondenceMap2To1>
+bool AssemblyGraph::SecondaryVerticesGraph::HandleDottedEdges1Callback::operator()(
+    const CorrespondenceMap1To2& vertexMap,
+    const CorrespondenceMap2To1&) const
+{
+
+    if(debugOut) {
+        BGL_FORALL_VERTICES_T(v, smallGraph, SecondaryVerticesGraph) {
+            const uint64_t iv = get(vertexMap, v);
+            const AssemblyGraph::vertex_descriptor u = verticesEncountered[iv];
+            debugOut << '(' << v << ", " <<
+                assemblyGraph.vertexStringId(u) << ") ";
+        }
+        debugOut << "\n";
+
+        debugOut << "Edge " <<
+            assemblyGraph.vertexStringId(verticesEncountered[get(vertexMap, 0)]) << "->" <<
+            assemblyGraph.vertexStringId(verticesEncountered[get(vertexMap, 2)]) << " skips vertex " <<
+            assemblyGraph.vertexStringId(verticesEncountered[get(vertexMap, 1)]) << "\n";
+    }
+
+    return true;
+}
+
+
+
 // Handle dotted edges that "skip" a vertex.
-void AssemblyGraph::SecondaryVerticesGraph::handleDottedEdges1(
-    const AssemblyGraph& assemblyGraph,
-    const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
-    ostream& debugOut)
+void AssemblyGraph::SecondaryVerticesGraph::handleDottedEdges1(ostream& debugOut)
 {
     using Graph = SecondaryVerticesGraph;
     Graph& graph = *this;
 
     // The small graph that we will look for.
     // Edge 0->2 "skips" vertex 1.
-    Graph graphSmall(3);
+    Graph graphSmall(assemblyGraph, verticesEncountered, 3);
     add_edge(0, 1, graphSmall);
     add_edge(1, 2, graphSmall);
     add_edge(0, 2, graphSmall);
 
-    boost::vf2_print_callback<Graph, Graph> callback(graphSmall, graph);
+    HandleDottedEdges1Callback callback(assemblyGraph, verticesEncountered, graphSmall, graph, debugOut);
     boost::vf2_subgraph_iso(graphSmall, graph, callback);
 }
 
