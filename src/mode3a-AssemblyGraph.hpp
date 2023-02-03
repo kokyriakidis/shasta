@@ -299,6 +299,40 @@ private:
         vertex_descriptor v1,
         vector<TangledAssemblyPath::SecondaryVertexInfo>&,
         ostream& debugOut);
+
+
+
+    // Graph class used by computeSecondaryVertices.
+    // The vertex stores vertexFrequency.
+    // The edge stores transitionFrequency.
+    using SecondaryVerticesGraphBaseClass =
+        boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS, uint64_t, uint64_t>;
+    class SecondaryVerticesGraph : public SecondaryVerticesGraphBaseClass {
+    public:
+        SecondaryVerticesGraph(
+            const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
+            const vector<uint64_t>& vertexFrequency,
+            const vector< pair<AssemblyGraph::vertex_descriptor, AssemblyGraph::vertex_descriptor> >&
+                transitionsEncountered,
+            const vector<uint64_t>& transitionFrequency);
+        SecondaryVerticesGraph(uint64_t n) : SecondaryVerticesGraphBaseClass(n) {}
+        bool isLinear(
+            vertex_descriptor v0,
+            vertex_descriptor v1
+        ) const;
+        void write(
+            ostream&,
+            const AssemblyGraph&,
+            const string& graphName,
+            const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered
+            ) const;
+
+        // Handle dotted edges that "skip" a vertex.
+        void handleDottedEdges1(
+            const AssemblyGraph&,
+            const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
+            ostream& debugOut);
+    };
 };
 
 #endif

@@ -7,6 +7,7 @@ using namespace mode3a;
 
 // Boost lbraries.
 #include <boost/graph/iteration_macros.hpp>
+#include <boost/graph/vf2_sub_graph_iso.hpp>
 
 // Standard library.
 #include "array.hpp"
@@ -209,46 +210,80 @@ bool AssemblyGraph::computeSecondaryVertices(
     vector<uint64_t> vertexFrequency;
     deduplicateAndCount(verticesEncountered, vertexFrequency);
 
+    // Locate v0 and v1 in verticesEncountered.
+    const auto q0 = std::equal_range(verticesEncountered.begin(), verticesEncountered.end(), v0);
+    SHASTA_ASSERT(q0.first != verticesEncountered.end());
+    SHASTA_ASSERT(q0.second - q0.first == 1);
+    const uint64_t iv0 = q0.first - verticesEncountered.begin();
+    const auto q1 = std::equal_range(verticesEncountered.begin(), verticesEncountered.end(), v1);
+    SHASTA_ASSERT(q1.first != verticesEncountered.end());
+    SHASTA_ASSERT(q1.second - q1.first == 1);
+    const uint64_t iv1 = q1.first - verticesEncountered.begin();
+
     // Count how many times we encountered each transition.
     // Keep only the ones that appear at least minLinkCoverage times.
     vector<uint64_t> transitionFrequency;
     deduplicateAndCountWithThreshold(
         transitionsEncountered, transitionFrequency, minLinkCoverage);
 
+    // The transitions we kept define a graph.
+    // The vertex stores vertexFrequency.
+    // The edge stores transitionFrequency.
+    using Graph = SecondaryVerticesGraph;
+    Graph graph(
+        verticesEncountered,
+        vertexFrequency,
+        transitionsEncountered,
+        transitionFrequency);
+
     // Write the graph.
     if(debug and debugOut) {
-        debugOut << "digraph ComputeSecondaryVerticesGraph" <<
-            vertexStringId(v0) << "_" << vertexStringId(v1) <<
-            " {\n";
-        for(uint64_t i=0; i<verticesEncountered.size(); i++) {
-            const vertex_descriptor v = verticesEncountered[i];
-            debugOut << "\"" << vertexStringId(v) << "\" [label=\"" <<
-                vertexStringId(v) << "\\n" << vertexFrequency[i] <<
-                "\"];\n";
-        }
-
-        for(uint64_t i=0; i<transitionsEncountered.size(); i++) {
-            const auto& p = transitionsEncountered[i];
-            const uint64_t frequency = transitionFrequency[i];
-            const vertex_descriptor v0 = p.first;
-            const vertex_descriptor v1 = p.second;
-            debugOut <<
-                "\"" << vertexStringId(v0) << "\"->\"" <<
-                vertexStringId(v1) << "\" [label=\"" << frequency <<
-                    "\"";
-            if(not segmentsAreAdjacent(v0, v1)) {
-                debugOut << " style=dotted";
-            }
-            debugOut << "];\n";
-        }
-        debugOut << "}\n";
+        const string graphName = "ComputeSecondaryVerticesGraph" +
+            vertexStringId(v0) + "_" + vertexStringId(v1);
+        graph.write(debugOut, assemblyGraph, graphName, verticesEncountered);
     }
 
-    // The transitions we kept define a graph.
-    using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS>;
-    Graph graph(verticesEncountered.size());
-    for(const auto& p: transitionsEncountered) {
-        array<vertex_descriptor, 2> v = {p.first, p.second};
+    // Figure out if the graph is linear.
+    const bool isLinear = graph.isLinear(iv0, iv1);
+    if(isLinear) {
+        debugOut << "Graph is linear\n";
+    } else {
+        debugOut << "Graph is not linear\n";
+    }
+
+    if(debug and debugOut) {
+        const string graphName = "ComputeSecondaryVerticesGraph" +
+            vertexStringId(v0) + "_" + vertexStringId(v1);
+        cout << "handleDottedEdges1: " << graphName << endl;
+        graph.handleDottedEdges1(assemblyGraph, verticesEncountered, debugOut);
+    }
+
+    return isLinear;
+}
+
+
+
+AssemblyGraph::SecondaryVerticesGraph::SecondaryVerticesGraph(
+    const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
+    const vector<uint64_t>& vertexFrequency,
+    const vector< pair<AssemblyGraph::vertex_descriptor, AssemblyGraph::vertex_descriptor> >&
+        transitionsEncountered,
+    const vector<uint64_t>& transitionFrequency) :
+    SecondaryVerticesGraphBaseClass(verticesEncountered.size())
+{
+    SHASTA_ASSERT(vertexFrequency.size() == verticesEncountered.size());
+    SHASTA_ASSERT(transitionFrequency.size() == transitionsEncountered.size());
+
+    using Graph = SecondaryVerticesGraph;
+    Graph& graph = *this;
+
+    BGL_FORALL_VERTICES(v, graph, Graph) {
+        graph[v] = vertexFrequency[v];
+    }
+
+    for(uint64_t i=0; i<transitionsEncountered.size(); i++) {
+        const auto& p = transitionsEncountered[i];
+        array<AssemblyGraph::vertex_descriptor, 2> v = {p.first, p.second};
         array<uint64_t, 2> iv;
         for(uint64_t k=0; k<2; k++) {
             const auto q = std::equal_range(verticesEncountered.begin(), verticesEncountered.end(), v[k]);
@@ -256,58 +291,116 @@ bool AssemblyGraph::computeSecondaryVertices(
             SHASTA_ASSERT(q.second - q.first == 1);
             iv[k] = q.first - verticesEncountered.begin();
         }
-        add_edge(iv[0], iv[1], graph);
+        edge_descriptor e;
+        tie(e, ignore) = add_edge(iv[0], iv[1], graph);
+        graph[e] = transitionFrequency[i];
     }
-
-
-    // Figure out if the graph is linear.
-    bool isLinear = true;
-    BGL_FORALL_VERTICES(v, graph, Graph) {
-#if 0
-        if(debug and debugOut) {
-            debugOut << vertexStringId(verticesEncountered[v]) <<
-                " in-degree " << in_degree(v, graph) <<
-                ", out-degree " << out_degree(v, graph) << "\n";
-        }
-#endif
-        if(verticesEncountered[v] == v0) {
-            if(in_degree(v, graph) != 0) {
-                isLinear = false;
-                break;
-            }
-            if(out_degree(v, graph) != 1) {
-                isLinear = false;
-                break;
-            }
-        } else if(verticesEncountered[v] == v1) {
-            if(out_degree(v, graph) != 0) {
-                isLinear = false;
-                break;
-            }
-            if(in_degree(v, graph) != 1) {
-                isLinear = false;
-                break;
-            }
-        } else {
-            if(out_degree(v, graph) != 1) {
-                isLinear = false;
-                break;
-            }
-            if(in_degree(v, graph) != 1) {
-                isLinear = false;
-                break;
-            }
-        }
-    }
-    if(isLinear) {
-        debugOut << "Graph is linear\n";
-    } else {
-        debugOut << "Graph is not linear\n";
-    }
-
-    return isLinear;
 }
 
 
+
+void AssemblyGraph::SecondaryVerticesGraph::write(
+    ostream& graphOut,
+    const AssemblyGraph& assemblyGraph,
+    const string& graphName,
+    const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered) const
+{
+    using Graph = SecondaryVerticesGraph;
+    const Graph& graph = *this;
+
+    graphOut << "digraph " << graphName << " {\n";
+
+    // Write the vertices.
+    BGL_FORALL_VERTICES(v, graph, Graph) {
+        const AssemblyGraph::vertex_descriptor u = verticesEncountered[v];
+        const string vertexStringId = assemblyGraph.vertexStringId(u);
+        graphOut << "\"" << vertexStringId << "\" [label=\"" <<
+            vertexStringId << "\\n" << graph[v] <<
+            "\"];\n";
+    }
+
+    // Write the edges.
+    BGL_FORALL_EDGES(e, graph, Graph) {
+        const AssemblyGraph::vertex_descriptor v0 = verticesEncountered[source(e, graph)];
+        const AssemblyGraph::vertex_descriptor v1 = verticesEncountered[target(e, graph)];
+        graphOut <<
+            "\"" << assemblyGraph.vertexStringId(v0) << "\"->\"" <<
+            assemblyGraph.vertexStringId(v1) << "\" [label=\"" << graph[e] <<
+                "\"";
+        if(not assemblyGraph.segmentsAreAdjacent(v0, v1)) {
+            graphOut << " style=dashed color=red";
+        }
+        graphOut << "];\n";
+    }
+    graphOut << "}\n";
+
+}
+
+
+
+bool AssemblyGraph::SecondaryVerticesGraph::isLinear(
+    vertex_descriptor v0,
+    vertex_descriptor v1
+) const
+{
+    using Graph = SecondaryVerticesGraph;
+    const Graph& graph = *this;
+
+    BGL_FORALL_VERTICES(v, graph, Graph) {
+
+        // Check v0.
+        if(v == v0) {
+            if(in_degree(v, graph) != 0) {
+                return false;
+            }
+            if(out_degree(v, graph) != 1) {
+                return false;
+            }
+
+        // Check v1.
+        } else if(v == v1) {
+            if(out_degree(v, graph) != 0) {
+                return false;
+            }
+            if(in_degree(v, graph) != 1) {
+                return false;
+            }
+
+        // Check the other vertices.
+        } else {
+            if(out_degree(v, graph) != 1) {
+                return false;
+            }
+            if(in_degree(v, graph) != 1) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+
+}
+
+
+
+// Handle dotted edges that "skip" a vertex.
+void AssemblyGraph::SecondaryVerticesGraph::handleDottedEdges1(
+    const AssemblyGraph& assemblyGraph,
+    const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
+    ostream& debugOut)
+{
+    using Graph = SecondaryVerticesGraph;
+    Graph& graph = *this;
+
+    // The small graph that we will look for.
+    // Edge 0->2 "skips" vertex 1.
+    Graph graphSmall(3);
+    add_edge(0, 1, graphSmall);
+    add_edge(1, 2, graphSmall);
+    add_edge(0, 2, graphSmall);
+
+    boost::vf2_print_callback<Graph, Graph> callback(graphSmall, graph);
+    boost::vf2_subgraph_iso(graphSmall, graph, callback);
+}
 
 
