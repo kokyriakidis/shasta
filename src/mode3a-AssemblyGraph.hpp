@@ -138,6 +138,10 @@ private:
     void createSegmentsAndJourneys();
     void createLinks();
 
+    // Find out if two segments are adjacent in the marker graph.
+    bool segmentsAreAdjacent(edge_descriptor e) const;
+    bool segmentsAreAdjacent(vertex_descriptor, vertex_descriptor) const;
+
     // Get the stringId for a given vertex_descriptor, or "None" if v is null_vertex().
     string vertexStringId(vertex_descriptor v) const;
 

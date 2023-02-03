@@ -1,5 +1,6 @@
 // Shasta
 #include "mode3a-AssemblyGraph.hpp"
+#include "MarkerGraph.hpp"
 #include "mode3a-PackedMarkerGraph.hpp"
 #include "deduplicate.hpp"
 using namespace shasta;
@@ -102,6 +103,41 @@ void AssemblyGraph::createLinks()
         const vertex_descriptor v1 = transition.second;
         add_edge(v0, v1, assemblyGraph);
     }
+}
+
+
+
+// Find out if two segments are adjacent in the marker graph.
+bool AssemblyGraph::segmentsAreAdjacent(edge_descriptor e) const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+    return segmentsAreAdjacent(
+        source(e, assemblyGraph),
+        target(e, assemblyGraph));
+}
+
+
+
+bool AssemblyGraph::segmentsAreAdjacent(
+    vertex_descriptor v0,
+    vertex_descriptor v1) const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+    const uint64_t segmentId0 = assemblyGraph[v0].segmentId;
+    const uint64_t segmentId1 = assemblyGraph[v1].segmentId;
+
+    // Get the marker graph paths of these segments.
+    const auto path0 = packedMarkerGraph.segments[segmentId0];
+    const auto path1 = packedMarkerGraph.segments[segmentId1];
+
+    // The the last marker graph edge of path0
+    // and the first marker graph edge of path1.
+    const uint64_t markerGraphEdgeId0 = path0.back();
+    const uint64_t markerGraphEdgeId1 = path1.front();
+    const MarkerGraph::Edge& markerGraphEdge0 = packedMarkerGraph.markerGraph.edges[markerGraphEdgeId0];
+    const MarkerGraph::Edge& markerGraphEdge1 = packedMarkerGraph.markerGraph.edges[markerGraphEdgeId1];
+
+    return markerGraphEdge0.target == markerGraphEdge1.source;
 }
 
 
