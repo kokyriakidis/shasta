@@ -806,7 +806,7 @@ void Assembler::exploreMode3aAssemblyPath(
 
     html <<
         "<td>"
-        "<input type=text required name=pathString size=8 style='text-align:center'"
+        "<input type=text required name=pathString size=60"
         " value='" << pathString <<
         "'>"
 
