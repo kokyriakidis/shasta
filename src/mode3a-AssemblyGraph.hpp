@@ -319,6 +319,7 @@ private:
         SecondaryVerticesGraph(
             const AssemblyGraph& assemblyGraph,
             const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
+            const vector<uint64_t>& vertexFrequency,
             uint64_t n);
         bool isLinear(
             vertex_descriptor v0,
@@ -331,6 +332,7 @@ private:
 
         const AssemblyGraph& assemblyGraph;
         const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered;
+        const vector<uint64_t>& vertexFrequency;
 
         // Handle dotted edges that "skip" a vertex.
         void handleDottedEdges1(ostream& debugOut);
@@ -338,26 +340,36 @@ private:
         public:
             const AssemblyGraph& assemblyGraph;
             const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered;
+            const vector<uint64_t>& vertexFrequency;
             const SecondaryVerticesGraph& smallGraph;
-            const SecondaryVerticesGraph& graph;
+            const SecondaryVerticesGraph& secondaryVerticesGraph;
             ostream& debugOut;
 
             HandleDottedEdges1Callback(
                 const AssemblyGraph& assemblyGraph,
                 const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
+                const vector<uint64_t>& vertexFrequency,
                 const SecondaryVerticesGraph& smallGraph,
-                const SecondaryVerticesGraph& graph,
+                const SecondaryVerticesGraph& secondaryVerticesGraph,
+                vector<edge_descriptor>& edgesToBeRemoved,
                 ostream& debugOut) :
                 assemblyGraph(assemblyGraph),
                 verticesEncountered(verticesEncountered),
+                vertexFrequency(vertexFrequency),
                 smallGraph(smallGraph),
-                graph(graph),
-                debugOut(debugOut) {}
+                secondaryVerticesGraph(secondaryVerticesGraph),
+                debugOut(debugOut),
+                edgesToBeRemoved(edgesToBeRemoved)
+                {}
 
             template <typename CorrespondenceMap1To2, typename CorrespondenceMap2To1>
             bool operator()(
-                const CorrespondenceMap1To2& f,
-                const CorrespondenceMap2To1& g) const;
+                const CorrespondenceMap1To2&,
+                const CorrespondenceMap2To1&);
+
+            // The edges that wil be removed.
+            // These are edge descriptors in the secondaryVerticesGraph.
+            vector<edge_descriptor>& edgesToBeRemoved;
         };
     };
 };
