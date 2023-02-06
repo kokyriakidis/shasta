@@ -342,9 +342,40 @@ private:
         vertex_descriptor iv0;
         vertex_descriptor iv1;
 
+        bool segmentsAreAdjacent(edge_descriptor e) const
+        {
+            const SecondaryVerticesGraph& graph = *this;
+            const vertex_descriptor v0 = source(e, graph);
+            const vertex_descriptor v1 = target(e, graph);
+            const AssemblyGraph::vertex_descriptor u0 = verticesEncountered[v0];
+            const AssemblyGraph::vertex_descriptor u1 = verticesEncountered[v1];
+            return assemblyGraph.segmentsAreAdjacent(u0, u1);
+        }
+
         // The path on the dominator tree from iv0 to iv1.
         vector<vertex_descriptor> dominatorTreePath;
         void computeDominatorTreePath();
+
+        // Compute the "best" path between iv0 and iv1.
+        vector<edge_descriptor> bestPath;
+        void computeBestPath(ostream& debugOut);
+
+        // An edge predicate the retursn true for edges that are not dotted.
+        class EdgePredicate {
+        public:
+            EdgePredicate(const SecondaryVerticesGraph* secondaryVerticesGraph = 0) :
+                secondaryVerticesGraph(secondaryVerticesGraph) {}
+            const SecondaryVerticesGraph* secondaryVerticesGraph;
+            bool operator()(const edge_descriptor e) const
+            {
+                const vertex_descriptor u0 = source(e, *secondaryVerticesGraph);
+                const vertex_descriptor u1 = target(e, *secondaryVerticesGraph);
+                const AssemblyGraph::vertex_descriptor v0 = secondaryVerticesGraph->verticesEncountered[u0];
+                const AssemblyGraph::vertex_descriptor v1 = secondaryVerticesGraph->verticesEncountered[u1];
+                return secondaryVerticesGraph->assemblyGraph.segmentsAreAdjacent(v0, v1);
+            }
+
+        };
 
         // Handle dotted edges that "skip" a vertex.
         void handleDottedEdges1(ostream& debugOut);
