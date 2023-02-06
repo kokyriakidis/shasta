@@ -294,7 +294,7 @@ private:
         TangledAssemblyPath&,
         ostream& debugOut
         );
-    bool computeSecondaryVertices(
+    void computeSecondaryVertices(
         vertex_descriptor v0,
         vertex_descriptor v1,
         vector<TangledAssemblyPath::SecondaryVertexInfo>&,
@@ -315,7 +315,9 @@ private:
             const vector<uint64_t>& vertexFrequency,
             const vector< pair<AssemblyGraph::vertex_descriptor, AssemblyGraph::vertex_descriptor> >&
                 transitionsEncountered,
-            const vector<uint64_t>& transitionFrequency);
+            const vector<uint64_t>& transitionFrequency,
+            vertex_descriptor iv0,
+            vertex_descriptor iv1);
         SecondaryVerticesGraph(
             const AssemblyGraph& assemblyGraph,
             const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered,
@@ -325,6 +327,10 @@ private:
             vertex_descriptor v0,
             vertex_descriptor v1
         ) const;
+        string vertexStringId(vertex_descriptor v) const
+        {
+            return assemblyGraph.vertexStringId(verticesEncountered[v]);
+        }
         void write(
             ostream&,
             const string& graphName
@@ -333,6 +339,12 @@ private:
         const AssemblyGraph& assemblyGraph;
         const vector<AssemblyGraph::vertex_descriptor>& verticesEncountered;
         const vector<uint64_t>& vertexFrequency;
+        vertex_descriptor iv0;
+        vertex_descriptor iv1;
+
+        // The path on the dominator tree from iv0 to iv1.
+        vector<vertex_descriptor> dominatorTreePath;
+        void computeDominatorTreePath();
 
         // Handle dotted edges that "skip" a vertex.
         void handleDottedEdges1(ostream& debugOut);
