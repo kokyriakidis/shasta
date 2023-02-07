@@ -244,7 +244,7 @@ void AssemblyGraph::computeSecondaryVertices(
 
     // Compute the path v0...v1 on the dominator tree.
     graph.computeDominatorTreePath();
-    if(debug and debugOut) {
+    if(false) {
         debugOut << "Dominator tree path:";
         for(const Graph::vertex_descriptor v: graph.dominatorTreePath) {
             debugOut << " " << graph.vertexStringId(v);
@@ -579,17 +579,17 @@ void AssemblyGraph::SecondaryVerticesGraph::computeBestPath(ostream& debugOut)
         // Enumerate paths u0->...->u1 on the graph.
         // I was not able to get path enumeration to work on a filtered
         // graph.
-        vector< vector<edge_descriptor> > paths;
-        enumerateSelfAvoidingPaths(graph, u0, u1, paths);
-        if(debugOut) {
+        vector< vector<edge_descriptor> > allPaths;
+        enumerateSelfAvoidingPaths(graph, u0, u1, allPaths);
+        if(false) {
             debugOut << "Looking for paths " <<
                 vertexStringId(u0) << "->...->" << vertexStringId(u1) << "\n";
-            debugOut << "Found " << paths.size() << " possible paths.\n";
+            debugOut << "Found " << allPaths.size() << " paths.\n";
         }
 
         // Find the paths that only use solid edges.
         vector< vector<edge_descriptor> > solidPaths;
-        for(const auto& path: paths) {
+        for(const auto& path: allPaths) {
             bool hasDottedEdges = false;
             for(const edge_descriptor e: path) {
                 if(not segmentsAreAdjacent(e)) {
@@ -601,10 +601,62 @@ void AssemblyGraph::SecondaryVerticesGraph::computeBestPath(ostream& debugOut)
                 solidPaths.push_back(path);
             }
         }
-        if(debugOut) {
+        if(false) {
             debugOut << solidPaths.size() << " paths use only solid edges.\n";
         }
 
+        // If paths that only uses solid edges are present, choose among those.
+        const vector< vector<edge_descriptor> >& pathsToChooseFrom =
+            solidPaths.empty() ? allPaths : solidPaths;
 
+        // We hope this never happens but this is not guaranteed,
+        // so we will have to behave better eventually.
+        SHASTA_ASSERT(not pathsToChooseFrom.empty());
+
+        // If there is only one path to choose from, pick that one and we are done.
+        if(pathsToChooseFrom.size() == 1) {
+            copy(pathsToChooseFrom.front().begin(), pathsToChooseFrom.front().end(),
+                back_inserter(bestPath));
+            continue;
+        }
+
+
+
+        // There is more than one path to choose from for this leg of the dominator tree.
+        // Find the "best" one. Pick the one with the highest minimum edge coverage.
+        const vector<edge_descriptor>* bestLegPath = 0;
+        uint64_t highestMinimumEdgeCoverage = 0;
+        for(const vector<edge_descriptor>& path: pathsToChooseFrom) {
+
+            // Find minimum edge coverage for this one.
+            uint64_t minimumEdgeCoverage = std::numeric_limits<uint64_t>::max();
+            for(const edge_descriptor e: path) {
+                minimumEdgeCoverage = min(minimumEdgeCoverage, graph[e]);
+            }
+            if(minimumEdgeCoverage > highestMinimumEdgeCoverage) {
+                highestMinimumEdgeCoverage = minimumEdgeCoverage;
+                bestLegPath = &path;
+            }
+
+        }
+        SHASTA_ASSERT(bestLegPath);
+        copy(bestLegPath->begin(), bestLegPath->end(),
+            back_inserter(bestPath));
+    }
+
+    // Write out the best path.
+    if(debugOut) {
+        debugOut << "Best path:";
+        for(uint64_t i=0; i<bestPath.size(); i++) {
+            const edge_descriptor e = bestPath[i];
+            const vertex_descriptor v0 = source(e, graph);
+            const vertex_descriptor v1 = target(e, graph);
+
+            if(i == 0) {
+                debugOut << " " << vertexStringId(v0);
+            }
+            debugOut << " " << vertexStringId(v1);
+        }
+        debugOut << "\n";
     }
 }
