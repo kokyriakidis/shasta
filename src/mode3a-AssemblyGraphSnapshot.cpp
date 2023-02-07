@@ -1259,7 +1259,7 @@ void AssemblyGraphSnapshot::writeAssemblyPath(
 
     vector<Base> assembledSequence;
     assemblyPath.getAssembledSequence(packedMarkerGraph, assembledSequence);
-    html << "<h4>Assembled sequence </h4>"
+    html << "<h4>Assembled sequence </h4>" << assembledSequence.size() << " bases.<p>"
         "<div style='max-width:600px;overflow-wrap:break-word;font-family:courier'>";
     copy(assembledSequence.begin(), assembledSequence.end(),
         ostream_iterator<Base>(html));
