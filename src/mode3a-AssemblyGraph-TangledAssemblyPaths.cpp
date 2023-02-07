@@ -86,6 +86,7 @@ void AssemblyGraph::computeTangledAssemblyPath(
                 debugOut << vertexStringId(secondaryVertex.v) << " ";
             }
         }
+        debugOut << "\n";
     }
 
 }
