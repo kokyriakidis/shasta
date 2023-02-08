@@ -279,6 +279,17 @@ private:
             // The secondary vertices between these two primary vertices,
             // stored in the order in which they appear in the path.
             vector<vertex_descriptor> secondaryVertices;
+
+            // The journey intervals for these secondary vertices.
+            // This are the ones corresponding to the entries that will be
+            // "ripped" during path ripping.
+            class JourneyInterval {
+            public:
+                OrientedReadId orientedReadId;
+                uint64_t begin;
+                uint64_t end;
+            };
+            vector<JourneyInterval> journeyIntervals;
         };
         vector<SecondaryVertexInfo> secondaryVerticesInfos;
     };

@@ -186,6 +186,8 @@ void AssemblyGraph::computeSecondaryVertices(
 
             // Consider all journey entries in [position0, position1]
             // for this oriented read.
+            secondaryVerticesInfo.journeyIntervals.push_back(
+                {orientedReadId, position0, position1-1});
 
             // Store the vertices encountered in this journey portion
             const auto journey = journeys[orientedReadId.getValue()];
