@@ -61,14 +61,14 @@ void AssemblyGraph::computeTangledAssemblyPath(
     tangledAssemblyPath.primaryVertices = primaryVertices;
 
     // Compute the secondary vertices for each pair of primary vertices.
-    tangledAssemblyPath.secondaryVertices.clear();
-    tangledAssemblyPath.secondaryVertices.resize(tangledAssemblyPath.primaryVertices.size() - 1);
+    tangledAssemblyPath.secondaryVerticesInfos.clear();
+    tangledAssemblyPath.secondaryVerticesInfos.resize(tangledAssemblyPath.primaryVertices.size() - 1);
 
-    for(uint64_t i=0; i<tangledAssemblyPath.secondaryVertices.size(); i++) {
+    for(uint64_t i=0; i<tangledAssemblyPath.secondaryVerticesInfos.size(); i++) {
         computeSecondaryVertices(
             tangledAssemblyPath.primaryVertices[i],
             tangledAssemblyPath.primaryVertices[i+1],
-            tangledAssemblyPath.secondaryVertices[i],
+            tangledAssemblyPath.secondaryVerticesInfos[i],
             debugOut);
     }
     if(debugOut) {
@@ -82,8 +82,8 @@ void AssemblyGraph::computeTangledAssemblyPath(
                 break;
             }
 
-            for(const auto& secondaryVertex: tangledAssemblyPath.secondaryVertices[i]) {
-                debugOut << vertexStringId(secondaryVertex.v) << " ";
+            for(const vertex_descriptor v: tangledAssemblyPath.secondaryVerticesInfos[i].secondaryVertices) {
+                debugOut << vertexStringId(v) << " ";
             }
         }
         debugOut << "\n";
@@ -101,7 +101,7 @@ void AssemblyGraph::computeTangledAssemblyPath(
 void AssemblyGraph::computeSecondaryVertices(
     vertex_descriptor v0,
     vertex_descriptor v1,
-    vector<TangledAssemblyPath::SecondaryVertexInfo>& secondaryVertices,
+    TangledAssemblyPath::SecondaryVertexInfo& secondaryVerticesInfo,
     ostream& debugOut)
 {
     // EXPOSE WHEN CODE STABILIZES.
@@ -266,16 +266,12 @@ void AssemblyGraph::computeSecondaryVertices(
 
     // Use the best path stored in the graph to fill in the secondary
     // vertices between this pair of primary vertices.
-    secondaryVertices.clear();
+    secondaryVerticesInfo.secondaryVertices.clear();
     for(uint64_t i=1; i<graph.bestPath.size(); i++) {
         const Graph::edge_descriptor e = graph.bestPath[i];
         const Graph::vertex_descriptor v = source(e, graph);
         const vertex_descriptor u = verticesEncountered[v];
-        TangledAssemblyPath::SecondaryVertexInfo secondaryVertexInfo;
-        secondaryVertexInfo.v = u;
-        // ***** WE ALSO NEED TO FILL IN THE journeyEntryIndexes,
-        // ***** WHICH ARE NEEDED LATER FOR PATH RIPPING.
-        secondaryVertices.push_back(secondaryVertexInfo);
+        secondaryVerticesInfo.secondaryVertices.push_back(u);
     }
 
 #if 0

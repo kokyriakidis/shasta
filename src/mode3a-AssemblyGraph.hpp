@@ -269,20 +269,18 @@ private:
         // All of the oriented reads in the primary vertices participate in the ripping.
         vector<vertex_descriptor> primaryVertices;
 
-        // For each pair of consecutive primary vertices,
-        // we store a vector of secondary vertices, in the order in which
-        // they appear in the path. For each of the secondary vertices
-        // we also store indices of the vertex journey entries that will
-        // participate in the ripping.
-        // The secondaryVertices vector has size one less than the
+        // For each pair of consecutive primary vertices.
+        // The secondaryVerticesInfos vector has size one less than the
         // primaryVertices vector. Each entry corresponds to the interval
         // between two consecutive primaryVertices.
         class SecondaryVertexInfo {
         public:
-            vertex_descriptor v;
-            vector<uint64_t> journeyEntryIndexes;
+
+            // The secondary vertices between these two primary vertices,
+            // stored in the order in which they appear in the path.
+            vector<vertex_descriptor> secondaryVertices;
         };
-        vector< vector<SecondaryVertexInfo> > secondaryVertices;
+        vector<SecondaryVertexInfo> secondaryVerticesInfos;
     };
     vector<TangledAssemblyPath> tangledAssemblyPaths;
 public:
@@ -297,7 +295,7 @@ private:
     void computeSecondaryVertices(
         vertex_descriptor v0,
         vertex_descriptor v1,
-        vector<TangledAssemblyPath::SecondaryVertexInfo>&,
+        TangledAssemblyPath::SecondaryVertexInfo&,
         ostream& debugOut);
 
 
