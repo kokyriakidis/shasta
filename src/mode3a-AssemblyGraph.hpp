@@ -290,8 +290,20 @@ private:
                 uint64_t end;
             };
             vector<JourneyInterval> journeyIntervals;
+
+            // The fraction of graph vertices that become secondary vertices.
+            double efficiency = 0.;
         };
         vector<SecondaryVertexInfo> secondaryVerticesInfos;
+
+        double efficiency() const
+        {
+            double sum = 0.;
+            for(const SecondaryVertexInfo& secondaryVertexInfo : secondaryVerticesInfos) {
+                sum += secondaryVertexInfo.efficiency;
+            }
+            return sum /double(secondaryVerticesInfos.size());
+        }
     };
     vector<TangledAssemblyPath> tangledAssemblyPaths;
 public:

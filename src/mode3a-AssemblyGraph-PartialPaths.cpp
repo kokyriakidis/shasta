@@ -517,6 +517,14 @@ void AssemblyGraph::computePartialPath2(
         }
         debugOut << "}\n";
     }
+
+    // Compute the fraction of graph vertices that end up in the partial paths.
+    if(debugOut) {
+        const uint64_t totalPartialPathLength = forwardPartialPath.size() + backwardPartialPath.size() + 1;
+        const double partialPathEfficiency = double(totalPartialPathLength) / double(num_vertices(graph));
+        debugOut << "Partial path efficiency for " << vertexStringId(vStart) << " " <<
+            partialPathEfficiency << "\n";
+    }
 }
 
 

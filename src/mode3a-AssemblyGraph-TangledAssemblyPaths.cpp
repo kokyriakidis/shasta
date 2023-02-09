@@ -29,6 +29,32 @@ void AssemblyGraph::computeTangledAssemblyPaths(uint64_t threadCount)
     // Compute the TangledAssemblyPaths in parallel.
     setupLoadBalancing(tangledAssemblyPaths.size(), 1);
     runThreads(&AssemblyGraph::computeTangledAssemblyPathsThreadFunction, threadCount);
+
+    ofstream csv("TangledAssemblyPaths.csv");
+    csv << "Path,Path efficiency,Position,v0,v1,Efficiency,\n";
+    for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
+        const TangledAssemblyPath& path = tangledAssemblyPaths[pathId];
+        const double pathEfficiency = path.efficiency();
+        SHASTA_ASSERT(path.secondaryVerticesInfos.size() == path.primaryVertices.size() - 1);
+
+        for(uint64_t position=0; position<path.secondaryVerticesInfos.size(); position++) {
+            const auto& secondaryVertexInfo = path.secondaryVerticesInfos[position];
+            const vertex_descriptor v0 = path.primaryVertices[position];
+            const vertex_descriptor v1 = path.primaryVertices[position+1];
+            csv << pathId << ",";
+            csv << pathEfficiency << ",";
+            csv << position << ",";
+            csv << vertexStringId(v0) << ",";
+            csv << vertexStringId(v1) << ",";
+            csv << secondaryVertexInfo.efficiency << ",";
+
+            for(const vertex_descriptor v: secondaryVertexInfo.secondaryVertices) {
+                csv << vertexStringId(v) << ",";
+            }
+            csv << "\n";
+        }
+    }
+
 }
 
 
@@ -74,10 +100,12 @@ void AssemblyGraph::computeTangledAssemblyPath(
     if(debugOut) {
         debugOut << "Tangled assembly path " <<
             vertexStringId(primaryVertices.front()) << "..." <<
-            vertexStringId(primaryVertices.back()) << "\n";
+            vertexStringId(primaryVertices.back()) <<
+            " with efficiency " << tangledAssemblyPath.efficiency() <<
+            "\n";
         for(uint64_t i=0; /* Check later */ ; i++) {
 
-            debugOut << vertexStringId(primaryVertices[i]) << " ";
+            debugOut << "P" << vertexStringId(primaryVertices[i]) << " ";
             if(i == primaryVertices.size() - 1) {
                 break;
             }
@@ -274,6 +302,29 @@ void AssemblyGraph::computeSecondaryVertices(
         const Graph::vertex_descriptor v = source(e, graph);
         const vertex_descriptor u = verticesEncountered[v];
         secondaryVerticesInfo.secondaryVertices.push_back(u);
+    }
+
+
+
+    // Compute the efficiency of the secondary vertices as ratio of total vertex coverage
+    // on the best path (including the primary vertices) over total vertex coverage on the entire graph.
+    uint64_t sum1 = vertexFrequency[iv0] + vertexFrequency[iv1];
+    for(uint64_t i=1; i<graph.bestPath.size(); i++) {
+        const Graph::edge_descriptor e = graph.bestPath[i];
+        const Graph::vertex_descriptor v = source(e, graph);
+        sum1 += vertexFrequency[v];
+    }
+    uint64_t sum2 = 0;
+    BGL_FORALL_VERTICES(v, graph, Graph) {
+        sum2 += vertexFrequency[v];
+    }
+    secondaryVerticesInfo.efficiency = double(sum1) / double(sum2);
+    if(debug and debugOut) {
+        debugOut << "Secondary vertices efficiency for " <<
+            vertexStringId(v0) << " " << vertexStringId(v1) << " " <<
+            secondaryVerticesInfo.efficiency <<
+            " " << sum1 << " " << sum2 <<
+            "\n";
     }
 
 #if 0
