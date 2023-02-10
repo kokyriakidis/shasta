@@ -137,6 +137,35 @@ void AssemblyGraph::writeTangledAssemblyPaths() const
         }
     }
 
+
+    // Histogram of the number of vertices by number of primary/secondary vertices.
+    vector< vector<uint64_t> > histogram;
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        const AssemblyGraphVertex& vertex = assemblyGraph[v];
+        const uint64_t primaryCount = vertex.tangledPathInformation.primaryInfos.size();
+        const uint64_t secondaryCount = vertex.tangledPathInformation.secondaryInfos.size();
+        if(histogram.size() <= primaryCount) {
+            histogram.resize(primaryCount + 1);
+        }
+        vector<uint64_t>& histogramRow = histogram[primaryCount];
+        if(histogramRow.size() <= secondaryCount) {
+            histogramRow.resize(secondaryCount + 1);
+        }
+        ++histogramRow[secondaryCount];
+    }
+
+    cout << "Histogram of number of vertices by number of appearances in paths." << endl;
+    cout << "PrimaryCount,SecondaryCount,VertexCount" << endl;
+    for(uint64_t primaryCount=0; primaryCount<histogram.size(); primaryCount++) {
+        const vector<uint64_t>& histogramRow = histogram[primaryCount];
+        for(uint64_t secondaryCount=0; secondaryCount<histogramRow.size(); secondaryCount++) {
+            const uint64_t vertexCount = histogramRow[secondaryCount];
+            cout << primaryCount << ",";
+            cout << secondaryCount << ",";
+            cout << vertexCount << endl;
+        }
+    }
+
 }
 
 
