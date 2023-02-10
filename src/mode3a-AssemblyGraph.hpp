@@ -12,6 +12,7 @@
 
 // Standard library.
 #include <list>
+#include "memory.hpp"
 #include "tuple.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
@@ -28,6 +29,7 @@ namespace shasta {
 
         class JourneyEntry;
         class Transition;
+        class TangledPathInformation;
 
         class PackedMarkerGraph;
     }
@@ -42,6 +44,39 @@ public:
 
     // The position in the journey for this oriented read.
     uint64_t position;
+};
+
+
+
+// Class used to store information about the tangled paths that a vertex
+// appears in.
+class shasta::mode3a::TangledPathInformation {
+public:
+
+    // Information about appearances of this vertex as a primary vertex
+    // in tangled paths.
+    class PrimaryInfo {
+    public:
+        uint64_t pathId;
+        uint64_t positionInPath;
+    };
+    vector<PrimaryInfo> primaryInfos;
+
+    // Information about appearances of this vertex as a secondary vertex
+    // in tangled paths.
+    class SecondaryInfo {
+    public:
+        uint64_t pathId;
+        uint64_t positionInPath;
+        uint64_t positionInLeg;
+    };
+    vector<SecondaryInfo> secondaryInfos;
+
+    void clear()
+    {
+        primaryInfos.clear();
+        secondaryInfos.clear();
+    }
 };
 
 
@@ -78,6 +113,9 @@ public:
     // the start vertex first.
     vector<AssemblyGraphBaseClass::vertex_descriptor> forwardPartialPath;
     vector<AssemblyGraphBaseClass::vertex_descriptor> backwardPartialPath;
+
+    // Information about the tangled paths that this vertex appears in.
+    TangledPathInformation tangledPathInformation;
 };
 
 
@@ -296,16 +334,30 @@ private:
         };
         vector<SecondaryVertexInfo> secondaryVerticesInfos;
 
-        double efficiency() const
+        double efficiency;
+        void computeEfficiency()
         {
             double sum = 0.;
             for(const SecondaryVertexInfo& secondaryVertexInfo : secondaryVerticesInfos) {
                 sum += secondaryVertexInfo.efficiency;
             }
-            return sum /double(secondaryVerticesInfos.size());
+            efficiency = sum /double(secondaryVerticesInfos.size());
         }
     };
-    vector<TangledAssemblyPath> tangledAssemblyPaths;
+    vector<shared_ptr<TangledAssemblyPath> > tangledAssemblyPaths;
+
+    // Class used to sort TangledAssemblyPaths by decreasing efficiency.
+    class OrderTangledAssemblyPath {
+    public:
+        bool operator()(
+            const shared_ptr<TangledAssemblyPath>& x,
+            const shared_ptr<TangledAssemblyPath>& y
+            ) const
+        {
+            return x->efficiency > y->efficiency;
+        }
+
+    };
 public:
     void computeTangledAssemblyPaths(uint64_t threadCount);
 private:
@@ -320,6 +372,7 @@ private:
         vertex_descriptor v1,
         TangledAssemblyPath::SecondaryVertexInfo&,
         ostream& debugOut);
+    void writeTangledAssemblyPaths() const;
 
 
 

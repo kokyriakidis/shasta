@@ -19,6 +19,7 @@ using namespace mode3a;
 
 void AssemblyGraph::computeTangledAssemblyPaths(uint64_t threadCount)
 {
+    AssemblyGraph& assemblyGraph = *this;
     cout << "computeTangledAssemblyPaths begins." << endl;
 
     // Initialize a TangledAssemblyPath for each of the
@@ -30,28 +31,109 @@ void AssemblyGraph::computeTangledAssemblyPaths(uint64_t threadCount)
     setupLoadBalancing(tangledAssemblyPaths.size(), 1);
     runThreads(&AssemblyGraph::computeTangledAssemblyPathsThreadFunction, threadCount);
 
-    ofstream csv("TangledAssemblyPaths.csv");
-    csv << "Path,Path efficiency,Position,v0,v1,Efficiency,\n";
+    // Sort them by decreasing efficiency.
+    sort(tangledAssemblyPaths.begin(), tangledAssemblyPaths.end(),
+        OrderTangledAssemblyPath());
+
+
+
+    // Store tangled path information in vertices.
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        assemblyGraph[v].tangledPathInformation.clear();
+    }
     for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
-        const TangledAssemblyPath& path = tangledAssemblyPaths[pathId];
-        const double pathEfficiency = path.efficiency();
+        const TangledAssemblyPath& path = *tangledAssemblyPaths[pathId];
         SHASTA_ASSERT(path.secondaryVerticesInfos.size() == path.primaryVertices.size() - 1);
 
-        for(uint64_t position=0; position<path.secondaryVerticesInfos.size(); position++) {
-            const auto& secondaryVertexInfo = path.secondaryVerticesInfos[position];
-            const vertex_descriptor v0 = path.primaryVertices[position];
-            const vertex_descriptor v1 = path.primaryVertices[position+1];
-            csv << pathId << ",";
-            csv << pathEfficiency << ",";
-            csv << position << ",";
-            csv << vertexStringId(v0) << ",";
-            csv << vertexStringId(v1) << ",";
-            csv << secondaryVertexInfo.efficiency << ",";
+        // Information for primary vertices of this path.
+        for(uint64_t positionInPath=0; positionInPath<path.primaryVertices.size(); positionInPath++) {
+            const vertex_descriptor v = path.primaryVertices[positionInPath];
+            assemblyGraph[v].tangledPathInformation.primaryInfos.push_back({pathId, positionInPath});
+        }
 
-            for(const vertex_descriptor v: secondaryVertexInfo.secondaryVertices) {
-                csv << vertexStringId(v) << ",";
+        // Information for secondary vertices of this path.
+        for(uint64_t positionInPath=0; positionInPath<path.secondaryVerticesInfos.size(); positionInPath++) {
+            const auto& secondaryVertexInfo = path.secondaryVerticesInfos[positionInPath];
+
+            for(uint64_t positionInLeg=0; positionInLeg<secondaryVertexInfo.secondaryVertices.size(); positionInLeg++) {
+                const vertex_descriptor v = secondaryVertexInfo.secondaryVertices[positionInLeg];
+                assemblyGraph[v].tangledPathInformation.secondaryInfos.push_back({pathId, positionInPath, positionInLeg});
             }
-            csv << "\n";
+        }
+    }
+
+
+
+    writeTangledAssemblyPaths();
+}
+
+
+
+void AssemblyGraph::writeTangledAssemblyPaths() const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+
+    {
+        ofstream csv("TangledAssemblyPaths.csv");
+        csv << "Path,Path efficiency,Position,v0,v1,Efficiency,\n";
+        for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
+            const TangledAssemblyPath& path = *tangledAssemblyPaths[pathId];
+            SHASTA_ASSERT(path.secondaryVerticesInfos.size() == path.primaryVertices.size() - 1);
+
+            for(uint64_t position=0; position<path.secondaryVerticesInfos.size(); position++) {
+                const auto& secondaryVertexInfo = path.secondaryVerticesInfos[position];
+                const vertex_descriptor v0 = path.primaryVertices[position];
+                const vertex_descriptor v1 = path.primaryVertices[position+1];
+                csv << pathId << ",";
+                csv << path.efficiency << ",";
+                csv << position << ",";
+                csv << vertexStringId(v0) << ",";
+                csv << vertexStringId(v1) << ",";
+                csv << secondaryVertexInfo.efficiency << ",";
+
+                for(const vertex_descriptor v: secondaryVertexInfo.secondaryVertices) {
+                    csv << vertexStringId(v) << ",";
+                }
+                csv << "\n";
+            }
+        }
+    }
+
+
+
+    {
+        ofstream csv("TangledAssemblyPathsVertexSummary.csv");
+        csv << "Vertex,PrimaryCount,SecondaryCount\n";
+        BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+            const AssemblyGraphVertex& vertex = assemblyGraph[v];
+            csv << vertex.stringId() << ",";
+            csv << vertex.tangledPathInformation.primaryInfos.size() << ",";
+            csv << vertex.tangledPathInformation.secondaryInfos.size() << "\n";
+        }
+    }
+
+
+
+    {
+        ofstream csv("TangledAssemblyPathsVertexInfo.csv");
+        csv << "Vertex,Type,PathId,PositionInPath,PositionInLeg\n";
+        BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+            const AssemblyGraphVertex& vertex = assemblyGraph[v];
+
+            for(const auto& info: vertex.tangledPathInformation.primaryInfos) {
+                csv << vertex.stringId() << ",";
+                csv << "Primary,";
+                csv << info.pathId << ",";
+                csv << info.positionInPath << "\n";
+            }
+
+            for(const auto& info: vertex.tangledPathInformation.secondaryInfos) {
+                csv << vertex.stringId() << ",";
+                csv << "Secondary,";
+                csv << info.pathId << ",";
+                csv << info.positionInPath << ",";
+                csv << info.positionInLeg << "\n";
+            }
         }
     }
 
@@ -66,9 +148,10 @@ void AssemblyGraph::computeTangledAssemblyPathsThreadFunction(uint64_t threadId)
     uint64_t begin, end;
     while(getNextBatch(begin, end)) {
         for(uint64_t i=begin; i!=end; ++i) {
+            tangledAssemblyPaths[i] = make_shared<TangledAssemblyPath>();
             computeTangledAssemblyPath(
                 analyzePartialPathsData.longestPaths[i],
-                tangledAssemblyPaths[i],
+                *tangledAssemblyPaths[i],
                 debugOut);
         }
     }
@@ -97,11 +180,12 @@ void AssemblyGraph::computeTangledAssemblyPath(
             tangledAssemblyPath.secondaryVerticesInfos[i],
             debugOut);
     }
+    tangledAssemblyPath.computeEfficiency();
     if(debugOut) {
         debugOut << "Tangled assembly path " <<
             vertexStringId(primaryVertices.front()) << "..." <<
             vertexStringId(primaryVertices.back()) <<
-            " with efficiency " << tangledAssemblyPath.efficiency() <<
+            " with efficiency " << tangledAssemblyPath.efficiency <<
             "\n";
         for(uint64_t i=0; /* Check later */ ; i++) {
 
