@@ -65,80 +65,93 @@ void AssemblyGraph::computeTangledAssemblyPaths(uint64_t threadCount)
 
 
     writeTangledAssemblyPaths();
+    writeTangledAssemblyPathsVertexSummary();
+    writeTangledAssemblyPathsVertexInfo();
+    writeTangledAssemblyPathsVertexHistogram();
 }
 
 
 
 void AssemblyGraph::writeTangledAssemblyPaths() const
 {
+
+    ofstream csv("TangledAssemblyPaths.csv");
+    csv << "Path,Path efficiency,Position,v0,v1,Efficiency,\n";
+
+    for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
+        const TangledAssemblyPath& path = *tangledAssemblyPaths[pathId];
+        SHASTA_ASSERT(path.secondaryVerticesInfos.size() == path.primaryVertices.size() - 1);
+
+        for(uint64_t position=0; position<path.secondaryVerticesInfos.size(); position++) {
+            const auto& secondaryVertexInfo = path.secondaryVerticesInfos[position];
+            const vertex_descriptor v0 = path.primaryVertices[position];
+            const vertex_descriptor v1 = path.primaryVertices[position+1];
+            csv << pathId << ",";
+            csv << path.efficiency << ",";
+            csv << position << ",";
+            csv << vertexStringId(v0) << ",";
+            csv << vertexStringId(v1) << ",";
+            csv << secondaryVertexInfo.efficiency << ",";
+
+            for(const vertex_descriptor v: secondaryVertexInfo.secondaryVertices) {
+                csv << vertexStringId(v) << ",";
+            }
+            csv << "\n";
+        }
+    }
+}
+
+
+
+void AssemblyGraph::writeTangledAssemblyPathsVertexSummary() const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+    ofstream csv("TangledAssemblyPathsVertexSummary.csv");
+    csv << "Vertex,PrimaryCount,SecondaryCount\n";
+
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        const AssemblyGraphVertex& vertex = assemblyGraph[v];
+        csv << vertex.stringId() << ",";
+        csv << vertex.tangledPathInformation.primaryInfos.size() << ",";
+        csv << vertex.tangledPathInformation.secondaryInfos.size() << "\n";
+    }
+}
+
+
+
+void AssemblyGraph::writeTangledAssemblyPathsVertexInfo() const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+    ofstream csv("TangledAssemblyPathsVertexInfo.csv");
+    csv << "Vertex,Type,PathId,PositionInPath,PositionInLeg\n";
+
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        const AssemblyGraphVertex& vertex = assemblyGraph[v];
+
+        for(const auto& info: vertex.tangledPathInformation.primaryInfos) {
+            csv << vertex.stringId() << ",";
+            csv << "Primary,";
+            csv << info.pathId << ",";
+            csv << info.positionInPath << "\n";
+        }
+
+        for(const auto& info: vertex.tangledPathInformation.secondaryInfos) {
+            csv << vertex.stringId() << ",";
+            csv << "Secondary,";
+            csv << info.pathId << ",";
+            csv << info.positionInPath << ",";
+            csv << info.positionInLeg << "\n";
+        }
+    }
+}
+
+
+
+// Histogram of the number of vertices by number of primary/secondary paths.
+void AssemblyGraph::writeTangledAssemblyPathsVertexHistogram() const
+{
     const AssemblyGraph& assemblyGraph = *this;
 
-    {
-        ofstream csv("TangledAssemblyPaths.csv");
-        csv << "Path,Path efficiency,Position,v0,v1,Efficiency,\n";
-        for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
-            const TangledAssemblyPath& path = *tangledAssemblyPaths[pathId];
-            SHASTA_ASSERT(path.secondaryVerticesInfos.size() == path.primaryVertices.size() - 1);
-
-            for(uint64_t position=0; position<path.secondaryVerticesInfos.size(); position++) {
-                const auto& secondaryVertexInfo = path.secondaryVerticesInfos[position];
-                const vertex_descriptor v0 = path.primaryVertices[position];
-                const vertex_descriptor v1 = path.primaryVertices[position+1];
-                csv << pathId << ",";
-                csv << path.efficiency << ",";
-                csv << position << ",";
-                csv << vertexStringId(v0) << ",";
-                csv << vertexStringId(v1) << ",";
-                csv << secondaryVertexInfo.efficiency << ",";
-
-                for(const vertex_descriptor v: secondaryVertexInfo.secondaryVertices) {
-                    csv << vertexStringId(v) << ",";
-                }
-                csv << "\n";
-            }
-        }
-    }
-
-
-
-    {
-        ofstream csv("TangledAssemblyPathsVertexSummary.csv");
-        csv << "Vertex,PrimaryCount,SecondaryCount\n";
-        BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
-            const AssemblyGraphVertex& vertex = assemblyGraph[v];
-            csv << vertex.stringId() << ",";
-            csv << vertex.tangledPathInformation.primaryInfos.size() << ",";
-            csv << vertex.tangledPathInformation.secondaryInfos.size() << "\n";
-        }
-    }
-
-
-
-    {
-        ofstream csv("TangledAssemblyPathsVertexInfo.csv");
-        csv << "Vertex,Type,PathId,PositionInPath,PositionInLeg\n";
-        BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
-            const AssemblyGraphVertex& vertex = assemblyGraph[v];
-
-            for(const auto& info: vertex.tangledPathInformation.primaryInfos) {
-                csv << vertex.stringId() << ",";
-                csv << "Primary,";
-                csv << info.pathId << ",";
-                csv << info.positionInPath << "\n";
-            }
-
-            for(const auto& info: vertex.tangledPathInformation.secondaryInfos) {
-                csv << vertex.stringId() << ",";
-                csv << "Secondary,";
-                csv << info.pathId << ",";
-                csv << info.positionInPath << ",";
-                csv << info.positionInLeg << "\n";
-            }
-        }
-    }
-
-
-    // Histogram of the number of vertices by number of primary/secondary vertices.
     vector< vector<uint64_t> > histogram;
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
         const AssemblyGraphVertex& vertex = assemblyGraph[v];
@@ -165,7 +178,6 @@ void AssemblyGraph::writeTangledAssemblyPaths() const
             cout << vertexCount << endl;
         }
     }
-
 }
 
 
