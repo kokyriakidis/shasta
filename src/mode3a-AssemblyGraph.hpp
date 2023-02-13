@@ -329,6 +329,13 @@ private:
             };
             vector<JourneyInterval> journeyIntervals;
 
+            // Given a vertex, find which journey entries in the vertex
+            // are in one of the above journey intervals for this SecondaryVertexInfo.
+            void getVertexJourneys(
+                const AssemblyGraphVertex&,
+                vector<bool>&   // True of false for each of the journey entries in the vertex.
+            ) const;
+
             // The fraction of graph vertices that become secondary vertices.
             double efficiency = 0.;
         };
@@ -376,6 +383,8 @@ private:
     void writeTangledAssemblyPathsVertexSummary() const;
     void writeTangledAssemblyPathsVertexInfo() const;
     void writeTangledAssemblyPathsVertexHistogram() const;
+    void writeTangledAssemblyPathsJourneyInfo() const;
+    void writeTangledAssemblyPathsJourneyIntervals() const;
 
 
 

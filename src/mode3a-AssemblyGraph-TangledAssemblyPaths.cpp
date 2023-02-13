@@ -68,6 +68,8 @@ void AssemblyGraph::computeTangledAssemblyPaths(uint64_t threadCount)
     writeTangledAssemblyPathsVertexSummary();
     writeTangledAssemblyPathsVertexInfo();
     writeTangledAssemblyPathsVertexHistogram();
+    writeTangledAssemblyPathsJourneyIntervals();
+    writeTangledAssemblyPathsJourneyInfo();
 }
 
 
@@ -122,6 +124,7 @@ void AssemblyGraph::writeTangledAssemblyPathsVertexSummary() const
 void AssemblyGraph::writeTangledAssemblyPathsVertexInfo() const
 {
     const AssemblyGraph& assemblyGraph = *this;
+
     ofstream csv("TangledAssemblyPathsVertexInfo.csv");
     csv << "Vertex,Type,PathId,PositionInPath,PositionInLeg\n";
 
@@ -177,6 +180,179 @@ void AssemblyGraph::writeTangledAssemblyPathsVertexHistogram() const
             cout << secondaryCount << ",";
             cout << vertexCount << endl;
         }
+    }
+}
+
+
+
+void AssemblyGraph::writeTangledAssemblyPathsJourneyInfo() const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+
+    ofstream csv("TangledAssemblyPathsJourneyInfo.csv");
+
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        const AssemblyGraphVertex& vertex = assemblyGraph[v];
+
+        // For each of the paths that this vertex is a secondary vertex of,
+        // find the journey entries that belong to that path.
+        vector< vector<bool> > journeyEntryFlags(vertex.tangledPathInformation.secondaryInfos.size());
+        for(uint64_t i=0; i<journeyEntryFlags.size(); i++) {
+            const auto& secondaryInfo = vertex.tangledPathInformation.secondaryInfos[i];
+            const TangledAssemblyPath& path = *tangledAssemblyPaths[secondaryInfo.pathId];
+            path.secondaryVerticesInfos[secondaryInfo.positionInPath].getVertexJourneys(
+                vertex, journeyEntryFlags[i]);
+        }
+
+
+        csv << "Vertex," << vertexStringId(v) << "\n";
+
+        // Write the header for this vertex.
+        csv << "OrientedReadId,PositionInJourney,";
+        for(const auto& info: vertex.tangledPathInformation.primaryInfos) {
+            csv << "P-";
+            csv << info.pathId << "-";
+            csv << info.positionInPath << ",";
+        }
+        for(const auto& info: vertex.tangledPathInformation.secondaryInfos) {
+            csv << "S-";
+            csv << info.pathId << "-";
+            csv << info.positionInPath << "-";
+            csv << info.positionInLeg << ",";
+        }
+        csv << "\n";
+
+        // Write one row for each journey entry in this vertex.
+        for(uint64_t i=0; i<vertex.journeyEntries.size(); i++) {
+            const JourneyEntry& journeyEntry = vertex.journeyEntries[i];
+            csv << journeyEntry.orientedReadId << ",";
+            csv << journeyEntry.position << ",";
+
+            // If this is a primary vertex of a path, all journey entries are in the path.
+            for(uint64_t j=0; j<vertex.tangledPathInformation.primaryInfos.size(); j++) {
+                csv << "1,";
+            }
+
+            // Write the journey entry flags for the paths that his vertex is a secondary vertex of.
+            for(uint64_t j=0; j<journeyEntryFlags.size(); j++) {
+                csv << int(journeyEntryFlags[j][i]) << ",";
+            }
+
+            csv << "\n";
+        }
+     }
+
+}
+
+
+
+void AssemblyGraph::writeTangledAssemblyPathsJourneyIntervals() const
+{
+    ofstream csv("TangledAssemblyPathsJourneyIntervals.csv");
+    csv << "PathId,Position,OrientedReadId,Begin,End\n";
+
+    for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
+        const TangledAssemblyPath& path = *tangledAssemblyPaths[pathId];
+        SHASTA_ASSERT(path.secondaryVerticesInfos.size() == path.primaryVertices.size() - 1);
+
+        for(uint64_t position=0; position<path.secondaryVerticesInfos.size(); position++) {
+            const auto& secondaryVertexInfo = path.secondaryVerticesInfos[position];
+            for(const auto& journeyInterval: secondaryVertexInfo.journeyIntervals) {
+                csv << pathId << ",";
+                csv << position << ",";
+                csv << journeyInterval.orientedReadId << ",";
+                csv << journeyInterval.begin << ",";
+                csv << journeyInterval.end << "\n";
+            }
+        }
+    }
+
+}
+
+
+
+// Given a vertex, find which journey entries in the vertex
+// are in one of the journey intervals for this SecondaryVertexInfo.
+void AssemblyGraph::TangledAssemblyPath::SecondaryVertexInfo::getVertexJourneys(
+    const AssemblyGraphVertex& vertex,
+    vector<bool>& flags   // True of false for each of the journey entries in the vertex.
+) const
+{
+    const bool debug = false; // (vertex.segmentId == 14598);
+    if(debug) {
+        cout << " getVertexJourneys called for vertex " << vertex.stringId() << "\n";
+    }
+
+    const vector<JourneyEntry>& journeyEntries = vertex.journeyEntries;
+    flags.clear();
+    flags.resize(journeyEntries.size(), false);
+
+    // Joint loop over the journey entries of the vertex and the
+    // journeyIntervals of the SecondaryVertexInfo.
+    // Iterators on journeyEntries are prefixed with "it".
+    // Iterators on journeyIntervals are prefixed with "jt".
+    const auto itBegin = journeyEntries.begin();
+    const auto itEnd = journeyEntries.end();
+    auto it = itBegin;
+    auto jt = journeyIntervals.begin();
+    const auto jtEnd = journeyIntervals.end();
+
+    while(it!=itEnd and jt!=jtEnd) {
+        if(it->orientedReadId < jt->orientedReadId) {
+            ++it;
+            continue;
+        }
+        if(jt->orientedReadId < it->orientedReadId) {
+            ++jt;
+            continue;
+        }
+        const OrientedReadId orientedReadId = it->orientedReadId;
+        SHASTA_ASSERT(orientedReadId == jt->orientedReadId);
+        if(debug) {
+            cout << "Found common oriented read id " << orientedReadId << endl;
+        }
+
+        // journeyEntries and journeyIntervals can both contain more than one
+        // entry for this OrientedReadId, although they will in most cases
+        // contain only one.
+        // Find the streak for this OrientedReadId in both journeyEntries and journeyIntervals.
+        auto itStreakBegin = it;
+        auto itStreakEnd = itStreakBegin;
+        while(itStreakEnd != itEnd and itStreakEnd->orientedReadId == orientedReadId) {
+            ++itStreakEnd;
+        }
+        auto jtStreakBegin = jt;
+        auto jtStreakEnd = jtStreakBegin;
+        while(jtStreakEnd != jtEnd and jtStreakEnd->orientedReadId == orientedReadId) {
+            ++jtStreakEnd;
+        }
+
+
+
+        // Loop over journeyEntries in this streak.
+        for(auto itStreak=itStreakBegin; itStreak!=itStreakEnd; ++itStreak) {
+            const uint64_t entryPosition = itStreak->position;
+
+            // See if we have a journey interval containing this position.
+            bool found = false;
+            for(auto jtStreak=jtStreakBegin; jtStreak!=jtStreakEnd; ++jtStreak) {
+                if(entryPosition >= jtStreak->begin and entryPosition < jtStreak->end) {
+                    found = true;
+                    break;
+                }
+
+            }
+            if(found) {
+                flags[itStreak - itBegin] = true;
+            }
+
+        }
+
+
+
+        // Prepare for the next loop iteration.
+        it = itStreakEnd;
+        jt = jtStreakEnd;
     }
 }
 
@@ -340,7 +516,10 @@ void AssemblyGraph::computeSecondaryVertices(
             // Consider all journey entries in [position0, position1]
             // for this oriented read.
             secondaryVerticesInfo.journeyIntervals.push_back(
-                {orientedReadId, position0, position1-1});
+                {orientedReadId, position0, position1+1});
+            if(debug and debugOut) {
+                debugOut << "Added " << orientedReadId << " " << position0 << " " << position1+1 << "\n";
+            }
 
             // Store the vertices encountered in this journey portion
             const auto journey = journeys[orientedReadId.getValue()];
