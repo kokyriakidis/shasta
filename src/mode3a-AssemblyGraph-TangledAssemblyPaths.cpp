@@ -1,5 +1,6 @@
 // Shasta.
 #include "mode3a-AssemblyGraph.hpp"
+#include "mode3a-PackedMarkerGraph.hpp"
 #include "deduplicate.hpp"
 #include "enumeratePaths.hpp"
 #include "invalid.hpp"
@@ -1037,4 +1038,122 @@ void AssemblyGraph::SecondaryVerticesGraph::computeBestPath(ostream& debugOut)
         }
         debugOut << "\n";
     }
+}
+
+
+
+AssemblyGraph::AssemblyGraph(
+    const PackedMarkerGraph& packedMarkerGraph,
+    const AssemblyGraph& oldAssemblyGraph) :
+    MultithreadedObject<AssemblyGraph>(*this),
+    packedMarkerGraph(packedMarkerGraph)
+{
+    createFromTangledAssemblyPaths(oldAssemblyGraph);
+}
+
+
+
+void AssemblyGraph::createFromTangledAssemblyPaths(
+    const AssemblyGraph& oldAssemblyGraph)
+{
+    const bool debug = false;
+    AssemblyGraph& newAssemblyGraph = *this;
+
+    // Initialize verticesBySegment.
+    verticesBySegment.clear();
+    verticesBySegment.resize(packedMarkerGraph.segments.size());
+
+    // Initialize  oriented reads journeys.
+    journeys.clear();
+    journeys.resize(packedMarkerGraph.journeys.size());
+    for(uint64_t i=0; i<journeys.size(); i++) {
+        const auto packedMarkerGraphJourney = packedMarkerGraph.journeys[i];
+        journeys[i].resize(packedMarkerGraphJourney.size(), null_vertex());
+    }
+
+
+    // Loop over vertices of the old AssemblyGraph.
+    BGL_FORALL_VERTICES(vOld, oldAssemblyGraph, AssemblyGraph) {
+        const AssemblyGraphVertex& oldVertex = oldAssemblyGraph[vOld];
+        const uint64_t segmentId = oldVertex.segmentId;
+
+        // For each of the paths that this vertex is a secondary vertex of,
+        // find the journey entries that belong to that path.
+        vector< vector<bool> > journeyEntryFlags(oldVertex.tangledPathInformation.secondaryInfos.size());
+        for(uint64_t i=0; i<journeyEntryFlags.size(); i++) {
+            const auto& secondaryInfo = oldVertex.tangledPathInformation.secondaryInfos[i];
+            const TangledAssemblyPath& path = *(oldAssemblyGraph.tangledAssemblyPaths[secondaryInfo.pathId]);
+            path.secondaryVerticesInfos[secondaryInfo.positionInPath].getVertexJourneys(
+                oldVertex, journeyEntryFlags[i]);
+        }
+
+        // Group the journey entries with identical journeyEntryFlags.
+        // For each of the journey entries we construct a binary code
+        // based on its journeyEntryFlags.
+        SHASTA_ASSERT(journeyEntryFlags.size() < 64);
+        std::map<uint64_t, vector<uint64_t> > journeyEntryMap;
+        for(uint64_t i=0; i<oldVertex.journeyEntries.size(); i++) {
+            uint64_t binaryCode = 0;
+            for(uint64_t j=0; j<journeyEntryFlags.size(); j++) {
+                if(journeyEntryFlags[j][i]) {
+                    binaryCode |= 1;
+                }
+                binaryCode <<= 1;
+            }
+            journeyEntryMap[binaryCode].push_back(i);
+        }
+
+        if(debug) {
+            cout << "Journey entry groups for vertex " << oldVertex.stringId() << "\n";
+            for(const auto& p: journeyEntryMap) {
+                cout << "Binary code " << p.first << ":\n";
+                const vector<uint64_t>& journeyEntryGroup = p.second;
+                for(const uint64_t i: journeyEntryGroup) {
+                    const JourneyEntry& journeyEntry = oldVertex.journeyEntries[i];
+                    cout << "(" << journeyEntry.orientedReadId << "," <<
+                        journeyEntry.position << ") ";
+                }
+                cout << "\n";
+            }
+        }
+
+
+
+        // Each group with identical journey entry flags generates a new vertex
+        // in the new assembly graph.
+        for(const auto& p: journeyEntryMap) {
+            const vertex_descriptor vNew = boost::add_vertex(
+                AssemblyGraphVertex(segmentId, verticesBySegment[segmentId].size()),
+                newAssemblyGraph);
+            verticesBySegment[segmentId].push_back(vNew);
+            AssemblyGraphVertex& newVertex = newAssemblyGraph[vNew];
+
+            const vector<uint64_t>& journeyEntryGroup = p.second;
+            for(const uint64_t i: journeyEntryGroup) {
+                const JourneyEntry& journeyEntry = oldVertex.journeyEntries[i];
+                newVertex.journeyEntries.push_back(journeyEntry);
+
+                // Update the journey for this oriented read.
+                const OrientedReadId orientedReadId = journeyEntry.orientedReadId;
+                const uint64_t position = journeyEntry.position;
+                vector<vertex_descriptor>& orientedReadJourney = journeys[orientedReadId.getValue()];
+                SHASTA_ASSERT(orientedReadJourney[position] == null_vertex());
+                orientedReadJourney[position] = vNew;
+            }
+        }
+    }
+    createLinks();
+
+    if(true) {
+        cout << "The new assembly graph created by "
+            "AssemblyGraph::createFromTangledAssemblyPaths has " <<
+            num_vertices(newAssemblyGraph) << " segments and " <<
+            num_edges(newAssemblyGraph) << " links." << endl;
+    }
+
+    // Check that the journeys have been completely filled in.
+    for(const auto& journey: journeys) {
+        SHASTA_ASSERT(find(journey.begin(), journey.end(), null_vertex()) == journey.end());
+    }
+
 }

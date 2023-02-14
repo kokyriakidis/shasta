@@ -124,6 +124,13 @@ Assembler::Assembler(
 
     // Find TangledAssemblyPaths.
     assemblyGraph.computeTangledAssemblyPaths(threadCount);
+
+    // Create a new AssemblyGraph using the TangledAssemblyPaths.
+    AssemblyGraph newAssemblyGraph(*packedMarkerGraph, assemblyGraph);
+
+    // Create a snapshot.
+    AssemblyGraphSnapshot snapshot1(newAssemblyGraph, "Mode3a-AssemblyGraphSnapshot-1", *this);
+    snapshot1.write();
 }
 
 

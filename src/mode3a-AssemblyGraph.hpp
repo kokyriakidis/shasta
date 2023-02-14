@@ -388,6 +388,18 @@ private:
 
 
 
+    // Create a detangled AssemblyGraph using the TangledAssemblyPaths
+    // of another AssemblyGraph.
+public:
+    AssemblyGraph(
+        const PackedMarkerGraph&,
+        const AssemblyGraph& oldAssemblyGraph);
+private:
+    void createFromTangledAssemblyPaths(const AssemblyGraph& oldAssemblyGraph);
+
+
+
+
     // Graph class used by computeSecondaryVertices.
     // The vertex stores vertexFrequency.
     // The edge stores transitionFrequency.
