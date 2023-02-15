@@ -1258,7 +1258,7 @@ void AssemblyGraphSnapshot::writeAssemblyPath(
         assemblyPath.edges.size() << " links</h3>";
 
     vector<Base> assembledSequence;
-    assemblyPath.getAssembledSequence(packedMarkerGraph, assembledSequence);
+    assemblyPath.getAssembledSequence(packedMarkerGraph, *this, assembledSequence);
     html << "<h4>Assembled sequence </h4>" << assembledSequence.size() << " bases.<p>"
         "<div style='max-width:600px;overflow-wrap:break-word;font-family:courier'>";
     copy(assembledSequence.begin(), assembledSequence.end(),
@@ -1304,7 +1304,8 @@ void AssemblyGraphSnapshot::writeAssemblyPath(
     html << "<td>";
     for(uint64_t i=0; /* Check later */; i++) {
         const AssemblyPath::Vertex& vertex = assemblyPath.vertices[i];
-        const auto vertexSequence = packedMarkerGraph.segmentSequences[vertex.id];
+        const uint64_t segmentId = vertexVector[vertex.id].segmentId;
+        const auto vertexSequence = packedMarkerGraph.segmentSequences[segmentId];
         html << "<span style='font-family:courier;color:Green'>";
         copy(vertexSequence.begin() + vertex.sequenceBegin, vertexSequence.begin() + vertex.sequenceEnd,
             ostream_iterator<Base>(html));
@@ -1363,6 +1364,7 @@ void AssemblyGraphSnapshot::writeAssemblyPath(
 
         // Write the vertex (segment).
         const AssemblyPath::Vertex& vertex = assemblyPath.vertices[i];
+        const uint64_t segmentId = vertexVector[vertex.id].segmentId;
 
         html << "<tr>"
             "<td class=centered>" << vertexStringId(vertex.id) <<
@@ -1374,7 +1376,7 @@ void AssemblyGraphSnapshot::writeAssemblyPath(
             "<td class=centered>" << vertex.pathPosition <<
             "<td class=centered>" << vertex.pathPosition + vertex.sequenceEnd - vertex.sequenceBegin <<
             "<td class=centered style='max-width:400px;overflow-wrap:break-word;font-family:courier'>";
-        const auto vertexSequence = packedMarkerGraph.segmentSequences[vertex.id];
+        const auto vertexSequence = packedMarkerGraph.segmentSequences[segmentId];
         html << "<span style='background-color:LightGrey'>";
         copy(vertexSequence.begin(), vertexSequence.begin() + vertex.sequenceBegin,
             ostream_iterator<Base>(html));
@@ -1431,12 +1433,14 @@ void AssemblyGraphSnapshot::AssemblyPath::clear()
 
 void AssemblyGraphSnapshot::AssemblyPath::getAssembledSequence(
     const PackedMarkerGraph& packedMarkerGraph,
+    const AssemblyGraphSnapshot& snapshot,
     vector<Base>& sequence) const
 {
     sequence.clear();
     for(uint64_t i=0; /* Check later */; i++) {
         const AssemblyPath::Vertex& vertex = vertices[i];
-        const auto vertexSequence = packedMarkerGraph.segmentSequences[vertex.id];
+        const uint64_t segmentId = snapshot.vertexVector[vertex.id].segmentId;
+        const auto vertexSequence = packedMarkerGraph.segmentSequences[segmentId];
         copy(vertexSequence.begin() + vertex.sequenceBegin, vertexSequence.begin() + vertex.sequenceEnd,
             back_inserter(sequence));
         if(i == vertices.size() -1) {

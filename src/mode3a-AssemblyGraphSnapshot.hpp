@@ -247,6 +247,7 @@ public:
         vector<Edge> edges;
         void getAssembledSequence(
             const PackedMarkerGraph&,
+            const AssemblyGraphSnapshot&,
             vector<Base>&) const;
     };
     void createAssemblyPath(
