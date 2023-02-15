@@ -600,6 +600,15 @@ void LocalAssemblyGraph::writeSvg(
             "</marker>\n"
             "</defs>\n";
 
+        const double thickness =
+            options.minimumSegmentThickness +
+            averageEdgeCoverage *
+            options.additionalSegmentThicknessPerUnitCoverage +
+            double(assemblyGraphSnapshot.vertexJourneyEntries[localAssemblyGraphVertex.vertexId].size()) *
+            options.additionalSegmentThicknessPerJourneyEntry;
+        cout << averageEdgeCoverage << " " << thickness << " " <<
+            assemblyGraphSnapshot.vertexJourneyEntries[localAssemblyGraphVertex.vertexId].size() << endl;
+
         // Add this segment to the svg.
         const auto oldPrecision = svg.precision(1);
         const auto oldFlags = svg.setf(std::ios_base::fixed, std::ios_base::floatfield);
@@ -614,7 +623,8 @@ void LocalAssemblyGraph::writeSvg(
             p2.x() << " " << p2.y() << "'" <<
             " stroke='" << color << "'"
             " stroke-width='" <<
-            options.minimumSegmentThickness + averageEdgeCoverage * options.additionalSegmentThicknessPerUnitCoverage << "'"
+            thickness
+            << "'"
             " fill='none'"
             " marker-end='url(#" <<
             arrowMarkerName <<
@@ -921,6 +931,7 @@ LocalAssemblyGraph::SvgOptions::SvgOptions(const vector<string>& request)
     HttpServer::getParameterValue(request, "additionalSegmentLengthPerBase", additionalSegmentLengthPerBase);
     HttpServer::getParameterValue(request, "minimumSegmentThickness", minimumSegmentThickness);
     HttpServer::getParameterValue(request, "additionalSegmentThicknessPerUnitCoverage", additionalSegmentThicknessPerUnitCoverage);
+    HttpServer::getParameterValue(request, "additionalSegmentThicknessPerJourneyEntry", additionalSegmentThicknessPerJourneyEntry);
     HttpServer::getParameterValue(request, "auxiliaryVertexCountPerSegment", auxiliaryVertexCountPerSegment);
 
     // Segment coloring
@@ -998,9 +1009,14 @@ void LocalAssemblyGraph::SvgOptions::addFormRows(ostream& html)
         " value='" << minimumSegmentThickness <<
         "'>"
         "<tr>"
-        "<td class=left>Additional thickness per unit coverage"
+        "<td class=left>Additional thickness per unit of marker graph edge coverage"
         "<td class=centered><input type=text name=additionalSegmentThicknessPerUnitCoverage size=8 style='text-align:center'"
         " value='" << additionalSegmentThicknessPerUnitCoverage <<
+        "'>"
+        "<tr>"
+        "<td class=left>Additional thickness per journey entry"
+        "<td class=centered><input type=text name=additionalSegmentThicknessPerJourneyEntry size=8 style='text-align:center'"
+        " value='" << additionalSegmentThicknessPerJourneyEntry <<
         "'>"
         "<tr>"
         "<td class=left>Auxiliary vertices per segment"

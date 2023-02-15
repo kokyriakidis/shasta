@@ -116,7 +116,8 @@ public:
         // minimumSegmentThickness + coverage * additionalSegmentThicknessPerUnitCoverage
         // where coverage is average marker graph edge coverage on the segment path.
         double minimumSegmentThickness = 0.3;
-        double additionalSegmentThicknessPerUnitCoverage = 0.005;
+        double additionalSegmentThicknessPerUnitCoverage = 0.000;
+        double additionalSegmentThicknessPerJourneyEntry = 0.000;
         uint64_t auxiliaryVertexCountPerSegment = 2;
 
         // Segment coloring
