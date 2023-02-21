@@ -338,6 +338,8 @@ private:
 
             // The fraction of graph vertices that become secondary vertices.
             double efficiency = 0.;
+
+            bool failed = false;
         };
         vector<SecondaryVertexInfo> secondaryVerticesInfos;
 
@@ -452,7 +454,7 @@ private:
 
         // The path on the dominator tree from iv0 to iv1.
         vector<vertex_descriptor> dominatorTreePath;
-        void computeDominatorTreePath();
+        bool computeDominatorTreePath();
 
         // Compute the "best" path between iv0 and iv1.
         vector<edge_descriptor> bestPath;

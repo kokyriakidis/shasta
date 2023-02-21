@@ -121,7 +121,8 @@ void Assembler::exploreMode3aAssemblyGraph(
     SHASTA_ASSERT(startVertex.segmentId == startSegmentId);
     SHASTA_ASSERT(startVertex.segmentReplicaIndex == startSegmentReplicaIndex);
 
-    html << "<h1>Local assembly graph near segment " << startSegmentId <<
+    html << "<h1>Local assembly graph for snapshot " << snapshotIndex <<
+        " near segment " << startSegmentId <<
         " replica " << startSegmentReplicaIndex << "</h1>";
 
     // Create this local assembly graph.
@@ -135,6 +136,9 @@ void Assembler::exploreMode3aAssemblyGraph(
     if(options.layoutMethod == "detailed" or options.layoutMethod == "detailedLimited") {
         localAssemblyGraph.writeDetailedHtml(html, timeout, options.layoutMethod == "detailedLimited");
     } else {
+
+        html << "The local assembly graph has " << num_vertices(localAssemblyGraph) <<
+            " segments and " << num_edges(localAssemblyGraph) << " links.<br>";
 
         // Compute its layout.
         localAssemblyGraph.computeLayout(options, timeout);

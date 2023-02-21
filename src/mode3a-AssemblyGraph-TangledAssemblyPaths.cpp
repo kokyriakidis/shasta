@@ -387,6 +387,17 @@ void AssemblyGraph::computeTangledAssemblyPath(
     // Store the primary vertices.
     tangledAssemblyPath.primaryVertices = primaryVertices;
 
+    if(debugOut) {
+        debugOut << "Computing secondary vertices for tangled assembly path " <<
+            vertexStringId(primaryVertices.front()) << "..." <<
+            vertexStringId(primaryVertices.back()) <<
+            " with primary vertices:\n";
+        for(uint64_t i=0; i<primaryVertices.size() ; i++) {
+            debugOut << vertexStringId(primaryVertices[i]) << " ";
+        }
+        debugOut << "\n";
+    }
+
     // Compute the secondary vertices for each pair of primary vertices.
     tangledAssemblyPath.secondaryVerticesInfos.clear();
     tangledAssemblyPath.secondaryVerticesInfos.resize(tangledAssemblyPath.primaryVertices.size() - 1);
@@ -588,8 +599,11 @@ void AssemblyGraph::computeSecondaryVertices(
     }
 
     // Compute the path v0...v1 on the dominator tree.
-    graph.computeDominatorTreePath();
-    if(false) {
+    if(not graph.computeDominatorTreePath()) {
+        secondaryVerticesInfo.secondaryVertices.clear();
+        secondaryVerticesInfo.failed = true;
+    }
+    if(debug and debugOut) {
         debugOut << "Dominator tree path:";
         for(const Graph::vertex_descriptor v: graph.dominatorTreePath) {
             debugOut << " " << graph.vertexStringId(v);
@@ -908,7 +922,7 @@ void AssemblyGraph::SecondaryVerticesGraph::handleDottedEdges1(ostream& debugOut
 
 
 
-void AssemblyGraph::SecondaryVerticesGraph::computeDominatorTreePath()
+bool AssemblyGraph::SecondaryVerticesGraph::computeDominatorTreePath()
 {
     SecondaryVerticesGraph& graph = *this;
 
@@ -927,7 +941,7 @@ void AssemblyGraph::SecondaryVerticesGraph::computeDominatorTreePath()
     while(true) {
         auto it = predecessorMap.find(iv);
         if(it == predecessorMap.end()) {
-            SHASTA_ASSERT(0);   // v1 is not reachable from v0.
+            return false;   // v1 is not reachable from v0.
         }
         iv = it->second;
         dominatorTreePath.push_back(iv);
@@ -937,6 +951,7 @@ void AssemblyGraph::SecondaryVerticesGraph::computeDominatorTreePath()
     }
     std::reverse(dominatorTreePath.begin(), dominatorTreePath.end());
 
+    return true;
 }
 
 
