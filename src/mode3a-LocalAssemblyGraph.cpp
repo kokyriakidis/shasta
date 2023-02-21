@@ -606,8 +606,6 @@ void LocalAssemblyGraph::writeSvg(
             options.additionalSegmentThicknessPerUnitCoverage +
             double(assemblyGraphSnapshot.vertexJourneyEntries[localAssemblyGraphVertex.vertexId].size()) *
             options.additionalSegmentThicknessPerJourneyEntry;
-        cout << averageEdgeCoverage << " " << thickness << " " <<
-            assemblyGraphSnapshot.vertexJourneyEntries[localAssemblyGraphVertex.vertexId].size() << endl;
 
         // Add this segment to the svg.
         const auto oldPrecision = svg.precision(1);
