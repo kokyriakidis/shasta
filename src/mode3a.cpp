@@ -96,11 +96,6 @@ Assembler::Assembler(
         num_vertices(*assemblyGraph) << " segments and " <<
         num_edges(*assemblyGraph) << " links." << endl;
 
-    // Create an initial snapshot.
-    AssemblyGraphSnapshot snapshot0(*assemblyGraph, "Mode3a-AssemblyGraphSnapshot-0", *this);
-    snapshot0.write();
-
-
 
     // Detangle iterations.
     for(uint64_t detangleIteration=0; detangleIteration<detangleIterationCount; detangleIteration++) {
@@ -117,6 +112,12 @@ Assembler::Assembler(
         // Find TangledAssemblyPaths.
         assemblyGraph->computeTangledAssemblyPaths(threadCount);
 
+        // Create a snapshot of the assembly graph.
+        AssemblyGraphSnapshot snapshot(
+            *assemblyGraph,
+            "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIteration), *this);
+        snapshot.write();
+
         // Create a new AssemblyGraph using the TangledAssemblyPaths.
         shared_ptr<AssemblyGraph> newAssemblyGraph =
             make_shared<AssemblyGraph>(*packedMarkerGraph, *assemblyGraph);
@@ -124,12 +125,13 @@ Assembler::Assembler(
         // Replace the old AssemblyGraph with the new.
         // This also destroys the old AssemblyGraph.
         assemblyGraph = newAssemblyGraph;
-
-        // Create a snapshot.
-        AssemblyGraphSnapshot snapshot(*assemblyGraph,
-            "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIteration + 1), *this);
-        snapshot.write();
     }
+
+    // Create a final snapshot of the assembly graph.
+    AssemblyGraphSnapshot snapshot(
+        *assemblyGraph,
+        "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIterationCount), *this);
+    snapshot.write();
 }
 
 
