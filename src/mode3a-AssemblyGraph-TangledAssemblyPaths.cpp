@@ -65,7 +65,8 @@ void AssemblyGraph::computeTangledAssemblyPaths(uint64_t threadCount)
 
 
 
-    writeTangledAssemblyPaths();
+    writeTangledAssemblyPaths1();
+    writeTangledAssemblyPaths2();
     writeTangledAssemblyPathsVertexSummary();
     writeTangledAssemblyPathsVertexInfo();
     writeTangledAssemblyPathsVertexHistogram();
@@ -75,10 +76,10 @@ void AssemblyGraph::computeTangledAssemblyPaths(uint64_t threadCount)
 
 
 
-void AssemblyGraph::writeTangledAssemblyPaths() const
+void AssemblyGraph::writeTangledAssemblyPaths1() const
 {
 
-    ofstream csv(debugOutputPrefix + "TangledAssemblyPaths.csv");
+    ofstream csv(debugOutputPrefix + "TangledAssemblyPaths1.csv");
     csv << "Path,Path efficiency,Position,v0,v1,Efficiency,\n";
 
     for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
@@ -101,6 +102,38 @@ void AssemblyGraph::writeTangledAssemblyPaths() const
             }
             csv << "\n";
         }
+    }
+}
+
+
+
+void AssemblyGraph::writeTangledAssemblyPaths2() const
+{
+
+    ofstream csv(debugOutputPrefix + "TangledAssemblyPaths2.csv");
+    csv << "Path,Vertices\n";
+
+    for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
+        const TangledAssemblyPath& path = *tangledAssemblyPaths[pathId];
+        SHASTA_ASSERT(path.secondaryVerticesInfos.size() == path.primaryVertices.size() - 1);
+
+        csv << pathId << ",";
+        for(uint64_t position=0; /* Check later */ ; position++) {
+            const auto& secondaryVertexInfo = path.secondaryVerticesInfos[position];
+            const vertex_descriptor vPrimary = path.primaryVertices[position];
+            csv << vertexStringId(vPrimary) << ",";
+
+            // If this is the last primary vertex, there are no secondary vertices.
+            if(position == path.secondaryVerticesInfos.size()) {
+                break;
+            }
+
+            // Write the secondary vertices between this primary vertex and the next.
+            for(const vertex_descriptor vSecondary: secondaryVertexInfo.secondaryVertices) {
+                csv << vertexStringId(vSecondary) << ",";
+            }
+        }
+        csv << "\n";
     }
 }
 

@@ -389,7 +389,8 @@ private:
         vertex_descriptor v1,
         TangledAssemblyPath::SecondaryVertexInfo&,
         ostream& debugOut);
-    void writeTangledAssemblyPaths() const;
+    void writeTangledAssemblyPaths1() const;
+    void writeTangledAssemblyPaths2() const;
     void writeTangledAssemblyPathsVertexSummary() const;
     void writeTangledAssemblyPathsVertexInfo() const;
     void writeTangledAssemblyPathsVertexHistogram() const;
