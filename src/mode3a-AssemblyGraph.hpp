@@ -191,6 +191,14 @@ private:
     void writeLinkCoverageHistogram(const string& name) const;
     void writeJourneys(const string& name) const;
 
+    // Filename prefix for debug output.
+    string debugOutputPrefix = "Mode3a-";
+public:
+    void setDebugOutputPrefix(const string& prefix) {
+        debugOutputPrefix = prefix;
+    }
+private:
+
     // Simple detangling, one vertex at a time, looking only
     // at immediate parent and children.
 public:

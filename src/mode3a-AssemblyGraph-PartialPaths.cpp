@@ -46,7 +46,7 @@ void AssemblyGraph::computePartialPaths(
 void AssemblyGraph::computePartialPathsThreadFunction(uint64_t threadId)
 {
     ofstream debugOut;
-    debugOut.open("ComputePartialPathsDebug-Thread-" + to_string(threadId));
+    debugOut.open(debugOutputPrefix + "ComputePartialPathsDebug-Thread-" + to_string(threadId));
 
     const uint64_t segmentCoverageThreshold1 = computePartialPathsData.segmentCoverageThreshold1;
     const uint64_t segmentCoverageThreshold2 = computePartialPathsData.segmentCoverageThreshold2;
@@ -534,11 +534,11 @@ void AssemblyGraph::writePartialPaths() const
     const AssemblyGraph& assemblyGraph = *this;
 
     // One line for each partial path entry.
-    ofstream csv1("PartialPaths1.csv");
+    ofstream csv1(debugOutputPrefix + "PartialPaths1.csv");
     csv1 << "Start,Direction,Position,Vertex\n";
 
     // One line for each partial path.
-    ofstream csv2("PartialPaths2.csv");
+    ofstream csv2(debugOutputPrefix + "PartialPaths2.csv");
     csv1 << "Start,Direction,Vertices\n";
 
     BGL_FORALL_VERTICES(v0, assemblyGraph, AssemblyGraph) {
@@ -765,7 +765,7 @@ void AssemblyGraph::analyzePartialPaths(uint64_t threadCount)
 
 void AssemblyGraph::analyzePartialPathsThreadFunction(uint64_t threadId)
 {
-    ofstream graphOut("AnalyzePartialPathsThread-" + to_string(threadId) + ".dot");
+    ofstream graphOut(debugOutputPrefix + "AnalyzePartialPathsThread-" + to_string(threadId) + ".dot");
 
     uint64_t begin, end;
     while(getNextBatch(begin, end)) {

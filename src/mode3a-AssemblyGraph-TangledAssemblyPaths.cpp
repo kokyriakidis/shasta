@@ -78,7 +78,7 @@ void AssemblyGraph::computeTangledAssemblyPaths(uint64_t threadCount)
 void AssemblyGraph::writeTangledAssemblyPaths() const
 {
 
-    ofstream csv("TangledAssemblyPaths.csv");
+    ofstream csv(debugOutputPrefix + "TangledAssemblyPaths.csv");
     csv << "Path,Path efficiency,Position,v0,v1,Efficiency,\n";
 
     for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
@@ -109,7 +109,7 @@ void AssemblyGraph::writeTangledAssemblyPaths() const
 void AssemblyGraph::writeTangledAssemblyPathsVertexSummary() const
 {
     const AssemblyGraph& assemblyGraph = *this;
-    ofstream csv("TangledAssemblyPathsVertexSummary.csv");
+    ofstream csv(debugOutputPrefix + "TangledAssemblyPathsVertexSummary.csv");
     csv << "Vertex,PrimaryCount,SecondaryCount\n";
 
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
@@ -126,7 +126,7 @@ void AssemblyGraph::writeTangledAssemblyPathsVertexInfo() const
 {
     const AssemblyGraph& assemblyGraph = *this;
 
-    ofstream csv("TangledAssemblyPathsVertexInfo.csv");
+    ofstream csv(debugOutputPrefix + "TangledAssemblyPathsVertexInfo.csv");
     csv << "Vertex,Type,PathId,PositionInPath,PositionInLeg\n";
 
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
@@ -190,7 +190,7 @@ void AssemblyGraph::writeTangledAssemblyPathsJourneyInfo() const
 {
     const AssemblyGraph& assemblyGraph = *this;
 
-    ofstream csv("TangledAssemblyPathsJourneyInfo.csv");
+    ofstream csv(debugOutputPrefix + "TangledAssemblyPathsJourneyInfo.csv");
 
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
         const AssemblyGraphVertex& vertex = assemblyGraph[v];
@@ -249,7 +249,7 @@ void AssemblyGraph::writeTangledAssemblyPathsJourneyInfo() const
 
 void AssemblyGraph::writeTangledAssemblyPathsJourneyIntervals() const
 {
-    ofstream csv("TangledAssemblyPathsJourneyIntervals.csv");
+    ofstream csv(debugOutputPrefix + "TangledAssemblyPathsJourneyIntervals.csv");
     csv << "PathId,Position,OrientedReadId,Begin,End\n";
 
     for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
@@ -361,7 +361,7 @@ void AssemblyGraph::TangledAssemblyPath::SecondaryVertexInfo::getVertexJourneys(
 
 void AssemblyGraph::computeTangledAssemblyPathsThreadFunction(uint64_t threadId)
 {
-    ofstream debugOut("ComputeTangledAssemblyPaths-Thread" + to_string(threadId) + ".txt");
+    ofstream debugOut(debugOutputPrefix + "ComputeTangledAssemblyPaths-Thread" + to_string(threadId) + ".txt");
 
     uint64_t begin, end;
     while(getNextBatch(begin, end)) {

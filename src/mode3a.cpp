@@ -37,7 +37,7 @@ Assembler::Assembler(
     const uint64_t segmentCoverageThreshold2ForPaths = 6;
     const uint64_t minLinkCoverageForPaths = 3;
 
-    const uint64_t detangleIterationCount = 1;
+    const uint64_t detangleIterationCount = 2;
 
 
     // This requires the marker length k to be even.
@@ -106,6 +106,7 @@ Assembler::Assembler(
     for(uint64_t detangleIteration=0; detangleIteration<detangleIterationCount; detangleIteration++) {
         performanceLog << timestamp << "Starting detangle iteration " << detangleIterationCount << endl;
         cout << "Starting detangle iteration " << detangleIteration << endl;
+        assemblyGraph->setDebugOutputPrefix("Mode3a-Iteration-" + to_string(detangleIteration) + "-");
 
         // Follow reads to compute partial paths.
         assemblyGraph->computePartialPaths(threadCount,

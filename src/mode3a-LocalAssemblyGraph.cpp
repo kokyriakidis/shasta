@@ -1118,7 +1118,7 @@ void LocalAssemblyGraph::writeDetailedHtml(ostream& html, double timeout, bool l
             ". The failing Command was: <code>" << command << "</code>";
         return;
     }
-    // std::filesystem::remove(dotFileName);
+    std::filesystem::remove(dotFileName);
 
     // Tooltip for vertex annotations.
     writeInformationIcon(html,
