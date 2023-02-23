@@ -31,11 +31,15 @@ using namespace mode3a;
 // Create the LocalAssemblyGraph using a BFS
 // that starts at the specified vertex and moves away
 // (in both directions) up to the specified distance.
+// If dontDisconnect is true, minLinkCoverage is locally reduced
+// where necessary to avoid the creation of vertices with
+// no incoming or outgoing edges.
 LocalAssemblyGraph::LocalAssemblyGraph(
     const AssemblyGraphSnapshot& assemblyGraphSnapshot,
     uint64_t startVertexId,
     uint64_t maxDistance,
-    uint64_t minLinkCoverage) :
+    uint64_t minLinkCoverage,
+    bool dontDisconnect) :
     assemblyGraphSnapshot(assemblyGraphSnapshot),
     maxDistance(maxDistance)
 {
@@ -68,9 +72,22 @@ LocalAssemblyGraph::LocalAssemblyGraph(
 
         // Loop over children.
         for(const uint64_t linkId: assemblyGraphSnapshot.edgesBySource[vertexId0]) {
-            if(assemblyGraphSnapshot.getEdgeCoverage(linkId) < minLinkCoverage) {
-                continue;
+            if(dontDisconnect) {
+                // dontDisconnect is true.
+                // Discard the edge if coverage is less than minLinkCoverage,
+                // and it is not a maximal edge.
+                if(assemblyGraphSnapshot.getEdgeCoverage(linkId) < minLinkCoverage and
+                    not assemblyGraphSnapshot.isMaximalCoverageEdge(linkId)) {
+                    continue;
+                }
+            } else {
+                // dontDisconnect is false.
+                // Discard the edge if coverage is less than minLinkCoverage.
+                if(assemblyGraphSnapshot.getEdgeCoverage(linkId) < minLinkCoverage) {
+                    continue;
+                }
             }
+
             const AssemblyGraphSnapshot::Edge& link = assemblyGraphSnapshot.edgeVector[linkId];
             const uint64_t vertexId1 = link.vertexId1;
             if(vertexMap.find(vertexId1) != vertexMap.end()) {
@@ -86,9 +103,22 @@ LocalAssemblyGraph::LocalAssemblyGraph(
 
         // Loop over parents.
         for(const uint64_t linkId: assemblyGraphSnapshot.edgesByTarget[vertexId0]) {
-            if(assemblyGraphSnapshot.getEdgeCoverage(linkId) < minLinkCoverage) {
-                continue;
+            if(dontDisconnect) {
+                // dontDisconnect is true.
+                // Discard the edge if coverage is less than minLinkCoverage,
+                // and it is not a maximal edge.
+                if(assemblyGraphSnapshot.getEdgeCoverage(linkId) < minLinkCoverage and
+                    not assemblyGraphSnapshot.isMaximalCoverageEdge(linkId)) {
+                    continue;
+                }
+            } else {
+                // dontDisconnect is false.
+                // Discard the edge if coverage is less than minLinkCoverage.
+                if(assemblyGraphSnapshot.getEdgeCoverage(linkId) < minLinkCoverage) {
+                    continue;
+                }
             }
+
             const AssemblyGraphSnapshot::Edge& link = assemblyGraphSnapshot.edgeVector[linkId];
             const uint64_t vertexId1 = link.vertexId0;
             if(vertexMap.find(vertexId1) != vertexMap.end()) {
@@ -111,9 +141,22 @@ LocalAssemblyGraph::LocalAssemblyGraph(
         const vertex_descriptor v0 = p.second;
 
         for(const uint64_t edgeId: assemblyGraphSnapshot.edgesBySource[vertexId0]) {
-            if(assemblyGraphSnapshot.getEdgeCoverage(edgeId) < minLinkCoverage) {
-                continue;
+            if(dontDisconnect) {
+                // dontDisconnect is true.
+                // Discard the edge if coverage is less than minLinkCoverage,
+                // and it is not a maximal edge.
+                if(assemblyGraphSnapshot.getEdgeCoverage(edgeId) < minLinkCoverage and
+                    not assemblyGraphSnapshot.isMaximalCoverageEdge(edgeId)) {
+                    continue;
+                }
+            } else {
+                // dontDisconnect is false.
+                // Discard the edge if coverage is less than minLinkCoverage.
+                if(assemblyGraphSnapshot.getEdgeCoverage(edgeId) < minLinkCoverage) {
+                    continue;
+                }
             }
+
             const AssemblyGraphSnapshot::Edge& edge = assemblyGraphSnapshot.edgeVector[edgeId];
             const uint64_t vertexId1 = edge.vertexId1;
             const auto it1 = vertexMap.find(vertexId1);

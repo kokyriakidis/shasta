@@ -1451,3 +1451,46 @@ void AssemblyGraphSnapshot::AssemblyPath::getAssembledSequence(
             back_inserter(sequence));
     }
 }
+
+
+// Return true if the specified edge edgeId = v0->v1
+// satisfies both of the following two conditions:
+// - It has maximum coverage among the out-edges of v0.
+// - It has maximum coverage among the in-edges of v1.
+// This could be slow because of repeated calls to getEdgeCoverage.
+// If this becomes a problem, store edge coverage in the AssemblyGraphSnapshot::Edge.
+bool AssemblyGraphSnapshot::isMaximalCoverageEdge(uint64_t edgeId) const
+{
+    const Edge& edge = edgeVector[edgeId];
+    const uint64_t coverage = getEdgeCoverage(edgeId);
+    const uint64_t vertexId0 = edge.vertexId0;
+    const uint64_t vertexId1 = edge.vertexId1;
+    const auto outEdges0 = edgesBySource[vertexId0];
+    const auto inEdges1  = edgesByTarget[vertexId1];
+
+    // Check the out-edges of vertexId0.
+    uint64_t maxCoverage0 = 0;
+    for(const uint64_t edgeId0: outEdges0) {
+        const uint64_t coverage0 = getEdgeCoverage(edgeId0);
+        maxCoverage0 = max(maxCoverage0, coverage0);
+    }
+    SHASTA_ASSERT(maxCoverage0 > 0);
+    if(coverage < maxCoverage0) {
+        // edgeId is not one of the outEdges0 with maximum coverage.
+        return false;
+    }
+
+    // Check the in-edges of vertexId10.
+    uint64_t maxCoverage1 = 0;
+    for(const uint64_t edgeId1: inEdges1) {
+        const uint64_t coverage1 = getEdgeCoverage(edgeId1);
+        maxCoverage1 = max(maxCoverage1, coverage1);
+    }
+    SHASTA_ASSERT(maxCoverage1 > 0);
+    if(coverage < maxCoverage1) {
+        // edgeId is not one of the inEdges1 with maximum coverage.
+        return false;
+    }
+
+    return true;
+}

@@ -72,11 +72,15 @@ class shasta::mode3a::LocalAssemblyGraph :
     LocalAssemblyGraphVertex, LocalAssemblyGraphEdge> {
 public:
 
+    // If dontDisconnect is true, minLinkCoverage is locally reduced
+    // where necessary to avoid the creation of vertices with
+    // no incoming or outgoing edges.
     LocalAssemblyGraph(
         const AssemblyGraphSnapshot&,
         uint64_t startVertexId,
         uint64_t maxDistance,
-        uint64_t minLinkCoverage);
+        uint64_t minLinkCoverage,
+        bool dontDisconnect);
 
     // This constructor creates the limited detailed representation
     // of the LocalAssemblyGraph.

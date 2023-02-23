@@ -109,6 +109,12 @@ public:
     MemoryMapped::VectorOfVectors<uint64_t, uint64_t> edgesBySource;
     MemoryMapped::VectorOfVectors<uint64_t, uint64_t> edgesByTarget;
 
+    // Return true if the specified edge edgeId = v0->v1
+    // satisfies both of the following two conditions:
+    // - It has maximum coverage among the out-edges of v0.
+    // - It has maximum coverage among the in-edges of v1.
+    bool isMaximalCoverageEdge(uint64_t edgeId) const;
+
     // A data structure that allows to get a vertexId (index in vertexVector)
     // given a segmentId and segmentReplicaIndex.
     // Indexed by segmentId.

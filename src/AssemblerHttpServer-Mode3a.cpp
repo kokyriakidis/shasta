@@ -29,6 +29,10 @@ void Assembler::exploreMode3aAssemblyGraph(
     uint64_t minLinkCoverage = 4;
     getParameterValue(request, "minLinkCoverage", minLinkCoverage);
 
+    string dontDisconnectString;
+    const bool dontDisconnect = HttpServer::getParameterValue(request,
+        "dontDisconnect", dontDisconnectString);
+
     uint64_t startSegmentId;
     const bool startSegmentIdIsPresent = getParameterValue(request, "startSegmentId", startSegmentId);
 
@@ -74,6 +78,18 @@ void Assembler::exploreMode3aAssemblyGraph(
         "<td class=centered><input type=text name=minLinkCoverage size=8 style='text-align:center'"
         " value='" << minLinkCoverage <<
         "'>"
+
+        "<tr>"
+        "<td>Don't disconnect ";
+    writeInformationIcon(html,
+        "If checked, minLinkCoverage is locally reduced "
+        "where necessary to avoid the creation of vertices with "
+        "no incoming or outgoing edges.");
+
+    html <<
+        "<td class=centered> <input type=checkbox name=dontDisconnect" <<
+        (dontDisconnect ? " checked=checked" : "") <<
+        ">"
 
         "<tr>"
         "<td>Timeout for layout (seconds)"
@@ -129,7 +145,7 @@ void Assembler::exploreMode3aAssemblyGraph(
     mode3a::LocalAssemblyGraph localAssemblyGraph =
         (options.layoutMethod == "detailedLimited") ?
         mode3a::LocalAssemblyGraph(snapshot, startVertexId) :
-        mode3a::LocalAssemblyGraph(snapshot, startVertexId, maxDistance, minLinkCoverage);
+        mode3a::LocalAssemblyGraph(snapshot, startVertexId, maxDistance, minLinkCoverage, dontDisconnect);
 
 
     // Display it.
