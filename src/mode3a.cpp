@@ -39,7 +39,7 @@ Assembler::Assembler(
     const uint64_t minLinkCoverageForPaths = 3;
 #endif
 
-    const uint64_t detangleIterationCount = 6;
+    const uint64_t detangleIterationCount = 3;
     const uint64_t minDetangleCoverage = 2;
 
 
