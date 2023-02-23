@@ -32,12 +32,15 @@ Assembler::Assembler(
 {
     // EXPOSE WHEN CODE STABILIZES.
 
+#if 0
     // These are used to compute partial paths.
     const uint64_t segmentCoverageThreshold1ForPaths = 3;
     const uint64_t segmentCoverageThreshold2ForPaths = 6;
     const uint64_t minLinkCoverageForPaths = 3;
+#endif
 
-    const uint64_t detangleIterationCount = 2;
+    const uint64_t detangleIterationCount = 6;
+    const uint64_t minDetangleCoverage = 2;
 
 
     // This requires the marker length k to be even.
@@ -92,17 +95,17 @@ Assembler::Assembler(
 
     // Create the AssemblyGraph.
     shared_ptr<AssemblyGraph> assemblyGraph = make_shared<AssemblyGraph>(*packedMarkerGraph);
-     cout << "The initial AssemblyGraph has " <<
-        num_vertices(*assemblyGraph) << " segments and " <<
-        num_edges(*assemblyGraph) << " links." << endl;
 
 
     // Detangle iterations.
     for(uint64_t detangleIteration=0; detangleIteration<detangleIterationCount; detangleIteration++) {
         performanceLog << timestamp << "Starting detangle iteration " << detangleIterationCount << endl;
-        cout << "Starting detangle iteration " << detangleIteration << endl;
         assemblyGraph->setDebugOutputPrefix("Mode3a-Iteration-" + to_string(detangleIteration) + "-");
 
+        cout << "Before detangle iteration " << detangleIteration << " the AssemblyGraph has " <<
+           num_vertices(*assemblyGraph) << " segments and " <<
+           num_edges(*assemblyGraph) << " links." << endl;
+#if 0
         // Follow reads to compute partial paths.
         assemblyGraph->computePartialPaths(threadCount,
             segmentCoverageThreshold1ForPaths, segmentCoverageThreshold2ForPaths, minLinkCoverageForPaths);
@@ -111,6 +114,7 @@ Assembler::Assembler(
 
         // Find TangledAssemblyPaths.
         assemblyGraph->computeTangledAssemblyPaths(threadCount);
+#endif
 
         // Create a snapshot of the assembly graph.
         AssemblyGraphSnapshot snapshot(
@@ -118,16 +122,25 @@ Assembler::Assembler(
             "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIteration), *this);
         snapshot.write();
 
+#if 0
         // Create a new AssemblyGraph using the TangledAssemblyPaths.
         shared_ptr<AssemblyGraph> newAssemblyGraph =
             make_shared<AssemblyGraph>(*packedMarkerGraph, *assemblyGraph);
+#endif
+        // Create a new AssemblyGraph using tangle matrices of the current AssemblyGraph.
+        shared_ptr<AssemblyGraph> newAssemblyGraph =
+            make_shared<AssemblyGraph>(*packedMarkerGraph, *assemblyGraph, minDetangleCoverage);
 
         // Replace the old AssemblyGraph with the new.
         // This also destroys the old AssemblyGraph.
         assemblyGraph = newAssemblyGraph;
+
     }
 
     // Create a final snapshot of the assembly graph.
+    cout << "The final AssemblyGraph has " <<
+       num_vertices(*assemblyGraph) << " segments and " <<
+       num_edges(*assemblyGraph) << " links." << endl;
     AssemblyGraphSnapshot snapshot(
         *assemblyGraph,
         "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIterationCount), *this);

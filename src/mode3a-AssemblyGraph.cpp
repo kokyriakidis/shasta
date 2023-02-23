@@ -88,11 +88,13 @@ void AssemblyGraph::createLinks()
         for(uint64_t position1=1; position1<journey.size(); position1++) {
             const uint64_t position0 = position1 - 1;
             const vertex_descriptor v0 = journey[position0];
+            if(v0 == null_vertex()) {
+                continue;
+            }
             const vertex_descriptor v1 = journey[position1];
-            // This should be done at the beginning, when the journeys
-            // don't contain any null vertices.
-            SHASTA_ASSERT(v0 != null_vertex());
-            SHASTA_ASSERT(v1 != null_vertex());
+            if(v1 == null_vertex()) {
+                continue;
+            }
             transitions.push_back({v0, v1});
         }
     }
@@ -548,6 +550,116 @@ void AssemblyGraph::findAdjacentVertices(
         // Store this pair of adjacent vertices.
         adjacentVertices.push_back({v0, v2});
     }
+}
+
+
+
+// Create a detangled AssemblyGraph using tangle matrices to split vertices
+// of another AssemblyGraph.
+// Only tangle matrix entries that are at least equal to minCoverage as used.
+// As a result, the new AssemblyGraph can have missing journey entries.
+// That is, some journey entries will remain set to null_vertex().
+AssemblyGraph::AssemblyGraph(
+    const PackedMarkerGraph& packedMarkerGraph,
+    const AssemblyGraph& oldAssemblyGraph,
+    uint64_t minCoverage) :
+    MultithreadedObject<AssemblyGraph>(*this),
+    packedMarkerGraph(packedMarkerGraph)
+{
+    createFromTangledMatrices(oldAssemblyGraph, minCoverage);
+
+}
+void AssemblyGraph::createFromTangledMatrices(
+    const AssemblyGraph& oldAssemblyGraph,
+    uint64_t minCoverage)
+{
+    AssemblyGraph& newAssemblyGraph = *this;
+
+    // Initialize verticesBySegment.
+    verticesBySegment.clear();
+    verticesBySegment.resize(packedMarkerGraph.segments.size());
+
+    // Initialize  oriented reads journeys.
+    journeys.clear();
+    journeys.resize(packedMarkerGraph.journeys.size());
+    for(uint64_t i=0; i<journeys.size(); i++) {
+        const auto packedMarkerGraphJourney = packedMarkerGraph.journeys[i];
+        journeys[i].resize(packedMarkerGraphJourney.size(), null_vertex());
+    }
+
+
+
+    // Loop over vertices of the old assembly graph.
+    // Each of them can create one or more vertices in the new assembly graph.
+    BGL_FORALL_VERTICES(vOld, oldAssemblyGraph, AssemblyGraph) {
+        const AssemblyGraphVertex& oldVertex = oldAssemblyGraph[vOld];
+        const uint64_t segmentId = oldVertex.segmentId;
+
+        // The tangle matrix contains journey entries index for each pair
+        // (previous vertex, next vertex).
+        std::map< pair<vertex_descriptor, vertex_descriptor>, vector<uint64_t> > tangleMatrix;
+
+        // To construct the tangle matrix,
+        // loop over journey entries of this vertex of the old assembly graph.
+        for(uint64_t journeyEntryIndex=0; journeyEntryIndex<oldVertex.journeyEntries.size(); journeyEntryIndex++) {
+            const JourneyEntry& journeyEntry = oldVertex.journeyEntries[journeyEntryIndex];
+            const OrientedReadId orientedReadId = journeyEntry.orientedReadId;
+            const uint64_t position = journeyEntry.position;
+
+            // Access the journey of this oriented read.
+            const vector<vertex_descriptor>& journey = oldAssemblyGraph.journeys[orientedReadId.getValue()];
+
+            // Find the previous vertex in the journey.
+            vertex_descriptor vPrevious = null_vertex();
+            if(position > 0) {
+                vPrevious = journey[position - 1];
+            };
+
+            // Find the next vertex in the journey.
+            vertex_descriptor vNext = null_vertex();
+            if(position < journey.size() - 1) {
+                vNext = journey[position + 1];
+            };
+
+            // Update the tangle matrix.
+            tangleMatrix[make_pair(vPrevious, vNext)].push_back(journeyEntryIndex);
+        }
+
+
+
+        // Each tangle matrix entry at least equal to minCoverage generates a vertex
+        // in the new AssemblyGraph.
+        for(const auto& p: tangleMatrix) {
+            const vector<uint64_t>& journeyEntryIndexes = p.second;
+            if(journeyEntryIndexes.size() < minCoverage) {
+                continue;
+            }
+
+            // This tangle matrix entry is large enough.
+            // Create a new vertex.
+            const vertex_descriptor vNew = boost::add_vertex(
+                AssemblyGraphVertex(segmentId, verticesBySegment[segmentId].size()),
+                newAssemblyGraph);
+            verticesBySegment[segmentId].push_back(vNew);
+            AssemblyGraphVertex& newVertex = newAssemblyGraph[vNew];
+
+            // Add these journey entries to the vertex.
+            for(const uint64_t journeyEntryIndex: journeyEntryIndexes) {
+                const JourneyEntry& journeyEntry = oldVertex.journeyEntries[journeyEntryIndex];
+                newVertex.journeyEntries.push_back(journeyEntry);
+
+                // Update the journey for this oriented read.
+                const OrientedReadId orientedReadId = journeyEntry.orientedReadId;
+                const uint64_t position = journeyEntry.position;
+                vector<vertex_descriptor>& orientedReadJourney = journeys[orientedReadId.getValue()];
+                SHASTA_ASSERT(orientedReadJourney[position] == null_vertex());
+                orientedReadJourney[position] = vNew;
+            }
+        }
+
+    }
+
+    createLinks();
 }
 
 

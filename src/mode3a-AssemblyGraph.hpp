@@ -410,6 +410,22 @@ private:
 
 
 
+    // Create a detangled AssemblyGraph using tangle matrices to split vertices
+    // of another AssemblyGraph.
+    // Only tangle matrix entries that are at least equal to minCoverage as used.
+    // As a result, the new AssemblyGraph can have missing journey entries.
+    // That is, some journey entries will remain set to null_vertex().
+public:
+    AssemblyGraph(
+        const PackedMarkerGraph&,
+        const AssemblyGraph& oldAssemblyGraph,
+        uint64_t minCoverage);
+private:
+    void createFromTangledMatrices(
+        const AssemblyGraph& oldAssemblyGraph,
+        uint64_t minCoverage);
+
+
 
     // Graph class used by computeSecondaryVertices.
     // The vertex stores vertexFrequency.
