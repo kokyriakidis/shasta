@@ -560,6 +560,7 @@ void AssemblyGraph::findAdjacentVertices(
 // As a result, the new AssemblyGraph can have missing journey entries.
 // That is, some journey entries will remain set to null_vertex().
 AssemblyGraph::AssemblyGraph(
+    DetangleUsingTangleMatrices,
     const PackedMarkerGraph& packedMarkerGraph,
     const AssemblyGraph& oldAssemblyGraph,
     uint64_t minCoverage) :

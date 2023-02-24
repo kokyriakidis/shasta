@@ -397,12 +397,17 @@ private:
     void writeTangledAssemblyPathsJourneyInfo() const;
     void writeTangledAssemblyPathsJourneyIntervals() const;
 
+    // Classes used to define detangling constructors.
+public:
+    class DetangleUsingTangledAssemblyPaths {};
+    class DetangleUsingTangleMatrices {};
+
 
 
     // Create a detangled AssemblyGraph using the TangledAssemblyPaths
     // of another AssemblyGraph.
-public:
     AssemblyGraph(
+        DetangleUsingTangledAssemblyPaths,
         const PackedMarkerGraph&,
         const AssemblyGraph& oldAssemblyGraph);
 private:
@@ -417,6 +422,7 @@ private:
     // That is, some journey entries will remain set to null_vertex().
 public:
     AssemblyGraph(
+        DetangleUsingTangleMatrices,
         const PackedMarkerGraph&,
         const AssemblyGraph& oldAssemblyGraph,
         uint64_t minCoverage);

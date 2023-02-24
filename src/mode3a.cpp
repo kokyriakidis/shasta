@@ -125,11 +125,15 @@ Assembler::Assembler(
 #if 0
         // Create a new AssemblyGraph using the TangledAssemblyPaths.
         shared_ptr<AssemblyGraph> newAssemblyGraph =
-            make_shared<AssemblyGraph>(*packedMarkerGraph, *assemblyGraph);
+            make_shared<AssemblyGraph>(
+                AssemblyGraph::DetangleUsingTangledAssemblyPaths(),
+                *packedMarkerGraph, *assemblyGraph);
 #endif
         // Create a new AssemblyGraph using tangle matrices of the current AssemblyGraph.
         shared_ptr<AssemblyGraph> newAssemblyGraph =
-            make_shared<AssemblyGraph>(*packedMarkerGraph, *assemblyGraph, minDetangleCoverage);
+            make_shared<AssemblyGraph>(
+                AssemblyGraph::DetangleUsingTangleMatrices(),
+                *packedMarkerGraph, *assemblyGraph, minDetangleCoverage);
 
         // Replace the old AssemblyGraph with the new.
         // This also destroys the old AssemblyGraph.
