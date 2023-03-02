@@ -191,6 +191,16 @@ private:
     void writeLinkCoverageHistogram(const string& name) const;
     void writeJourneys(const string& name) const;
 
+    // Find descendants/ancestors of a given vertex up to a specified distance.
+    // This is done by following the journeys.
+    void findDescendants(
+        vertex_descriptor, uint64_t distance,
+        vector<vertex_descriptor>&) const;
+    void findAncestors(
+        vertex_descriptor, uint64_t distance,
+        vector<vertex_descriptor>&) const;
+
+
     // Filename prefix for debug output.
     string debugOutputPrefix = "Mode3a-";
 public:
@@ -401,6 +411,7 @@ private:
 public:
     class DetangleUsingTangledAssemblyPaths {};
     class DetangleUsingTangleMatrices {};
+    class DetangleUsingLocalClustering {};
 
 
 
@@ -408,7 +419,6 @@ public:
     // of another AssemblyGraph.
     AssemblyGraph(
         DetangleUsingTangledAssemblyPaths,
-        const PackedMarkerGraph&,
         const AssemblyGraph& oldAssemblyGraph);
 private:
     void createFromTangledAssemblyPaths(const AssemblyGraph& oldAssemblyGraph);
@@ -423,13 +433,24 @@ private:
 public:
     AssemblyGraph(
         DetangleUsingTangleMatrices,
-        const PackedMarkerGraph&,
         const AssemblyGraph& oldAssemblyGraph,
         uint64_t minCoverage);
 private:
     void createFromTangledMatrices(
         const AssemblyGraph& oldAssemblyGraph,
         uint64_t minCoverage);
+
+
+
+    // Detangle by local clustering.
+    // Create a detangled AssemblyGraph using clustering on another AssemblyGraph.
+public:
+    AssemblyGraph(
+        DetangleUsingLocalClustering,
+        const AssemblyGraph& oldAssemblyGraph);
+private:
+    void createByLocalClustering(
+        const AssemblyGraph& oldAssemblyGraph);
 
 
 

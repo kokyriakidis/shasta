@@ -1092,10 +1092,9 @@ void AssemblyGraph::SecondaryVerticesGraph::computeBestPath(ostream& debugOut)
 
 AssemblyGraph::AssemblyGraph(
     DetangleUsingTangledAssemblyPaths,
-    const PackedMarkerGraph& packedMarkerGraph,
     const AssemblyGraph& oldAssemblyGraph) :
     MultithreadedObject<AssemblyGraph>(*this),
-    packedMarkerGraph(packedMarkerGraph)
+    packedMarkerGraph(oldAssemblyGraph.packedMarkerGraph)
 {
     createFromTangledAssemblyPaths(oldAssemblyGraph);
 }

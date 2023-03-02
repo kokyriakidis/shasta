@@ -3,6 +3,7 @@
 #include "MarkerGraph.hpp"
 #include "mode3a-PackedMarkerGraph.hpp"
 #include "deduplicate.hpp"
+#include "shastaLapack.hpp"
 using namespace shasta;
 using namespace mode3a;
 
@@ -554,6 +555,69 @@ void AssemblyGraph::findAdjacentVertices(
 
 
 
+// Find descendants of a given vertex up to a specified distance.
+// This is done by following the journeys.
+void AssemblyGraph::findDescendants(
+    vertex_descriptor v,
+    uint64_t distance,
+    vector<vertex_descriptor>& descendants) const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+
+    descendants.clear();
+    const AssemblyGraphVertex& vertex = assemblyGraph[v];
+
+    for(const JourneyEntry& journeyEntry: vertex.journeyEntries) {
+        const OrientedReadId orientedReadId = journeyEntry.orientedReadId;
+        const vector<vertex_descriptor>& journey = journeys[orientedReadId.getValue()];
+
+        const uint64_t firstPosition = journeyEntry.position + 1;
+        const uint64_t lastPosition  = min(journeyEntry.position + distance, journey.size() - 1);
+
+        for(uint64_t position=firstPosition; position<=lastPosition; position++) {
+            const vertex_descriptor u = journey[position];
+            if(u != null_vertex()) {
+                descendants.push_back(journey[position]);
+            }
+        }
+    }
+    deduplicate(descendants);
+}
+
+
+
+// Find ancestors of a given vertex up to a specified distance.
+// This is done by following the journeys.
+void AssemblyGraph::findAncestors(
+    vertex_descriptor v,
+    uint64_t distance,
+    vector<vertex_descriptor>& ancestors) const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+
+    ancestors.clear();
+    const AssemblyGraphVertex& vertex = assemblyGraph[v];
+
+    for(const JourneyEntry& journeyEntry: vertex.journeyEntries) {
+        const OrientedReadId orientedReadId = journeyEntry.orientedReadId;
+        const vector<vertex_descriptor>& journey = journeys[orientedReadId.getValue()];
+        const int64_t vPosition = int64_t(journeyEntry.position);
+
+        const int64_t firstPosition = max(vPosition - int64_t(distance), 0L);
+        const int64_t lastPosition  = vPosition - 1;
+
+        for(int64_t position=firstPosition; position<=lastPosition; position++) {
+            const vertex_descriptor u = journey[position];
+            if(u != null_vertex()) {
+                ancestors.push_back(journey[position]);
+            }
+        }
+    }
+    deduplicate(ancestors);
+}
+
+
+
 // Create a detangled AssemblyGraph using tangle matrices to split vertices
 // of another AssemblyGraph.
 // Only tangle matrix entries that are at least equal to minCoverage as used.
@@ -561,11 +625,10 @@ void AssemblyGraph::findAdjacentVertices(
 // That is, some journey entries will remain set to null_vertex().
 AssemblyGraph::AssemblyGraph(
     DetangleUsingTangleMatrices,
-    const PackedMarkerGraph& packedMarkerGraph,
     const AssemblyGraph& oldAssemblyGraph,
     uint64_t minCoverage) :
     MultithreadedObject<AssemblyGraph>(*this),
-    packedMarkerGraph(packedMarkerGraph)
+    packedMarkerGraph(oldAssemblyGraph.packedMarkerGraph)
 {
     createFromTangledMatrices(oldAssemblyGraph, minCoverage);
 
@@ -665,3 +728,272 @@ void AssemblyGraph::createFromTangledMatrices(
 
 
 
+// Detangle by local clustering.
+// Create a detangled AssemblyGraph using clustering on another AssemblyGraph.
+AssemblyGraph::AssemblyGraph(
+    DetangleUsingLocalClustering,
+    const AssemblyGraph& oldAssemblyGraph) :
+    MultithreadedObject<AssemblyGraph>(*this),
+    packedMarkerGraph(oldAssemblyGraph.packedMarkerGraph)
+{
+    createByLocalClustering(oldAssemblyGraph);
+}
+void AssemblyGraph::createByLocalClustering(
+    const AssemblyGraph& oldAssemblyGraph)
+{
+    // EXPOSE WHEN CODE STABILIZES
+    const uint64_t distance = 2;
+    const double singularValueThreshold = 5.;
+    const double scaledFiedlerComponentThreshold = 0.2;
+
+    AssemblyGraph& newAssemblyGraph = *this;
+    const bool debug = true;
+
+    // Initialize verticesBySegment.
+    verticesBySegment.clear();
+    verticesBySegment.resize(packedMarkerGraph.segments.size());
+
+    // Work vectors used below.
+    vector<vertex_descriptor> descendants;
+    vector<vertex_descriptor> ancestors;
+    vector<vertex_descriptor> neighbors;
+
+    // Loop over vertices of the old AssemblyGraph.
+    uint64_t splitCount = 0;
+    BGL_FORALL_VERTICES(vOld, oldAssemblyGraph, AssemblyGraph) {
+        const AssemblyGraphVertex& oldVertex = oldAssemblyGraph[vOld];
+        const uint64_t segmentId = oldVertex.segmentId;
+        if(debug) {
+            cout << "Local clustering on " << oldVertex.stringId() << endl;
+        }
+
+        // To create the neighborhood of this vertex on which we will do
+        // clustering, we need the descendants and ancestors.
+        oldAssemblyGraph.findDescendants(vOld, distance, descendants);
+        oldAssemblyGraph.findAncestors(vOld, distance, ancestors);
+
+        // Combine descendants and ancestors to create the neighborhood.
+        neighbors.clear();
+        set_union(
+            descendants.begin(), descendants.end(),
+            ancestors.begin(), ancestors.end(),
+            back_inserter(neighbors));
+
+        // For each of the journey entries in oldVertex, follow the journey
+        // until we exit it. Keep track of the neighborhood vertices we encounter.
+        // Matrix m is indexed by [journeyEntryIndex][neighborIndex].
+        vector< vector<bool> > m(
+            oldVertex.journeyEntries.size(),
+            vector<bool>(neighbors.size(), false));
+        for(uint64_t journeyEntryIndex=0; journeyEntryIndex<oldVertex.journeyEntries.size();
+            journeyEntryIndex++) {
+            const JourneyEntry& journeyEntry = oldVertex.journeyEntries[journeyEntryIndex];
+            const OrientedReadId orientedReadId = journeyEntry.orientedReadId;
+            const vector<vertex_descriptor>& journey = oldAssemblyGraph.journeys[orientedReadId.getValue()];
+
+            // Follow the journey forward until we leave the neighborhood.
+            for(uint64_t position=journeyEntry.position+1; position<journey.size(); position++) {
+                const vertex_descriptor u = journey[position];
+
+                // Look it up in the neighborhood.
+                auto it = lower_bound(neighbors.begin(), neighbors.end(), u);
+                if(it == neighbors.end() or *it != u) {
+                    // Not found.
+                    break;
+                }
+
+                // We found it. Update the matrix.
+                const uint64_t neighborIndex = it - neighbors.begin();
+                m[journeyEntryIndex][neighborIndex] = true;
+            }
+
+            // Follow the journey backward until we leave the neighborhood.
+            for(int64_t position=int64_t(journeyEntry.position)-1L; position>=0; position--) {
+                const vertex_descriptor u = journey[position];
+
+                // Look it up in the neighborhood.
+                auto it = lower_bound(neighbors.begin(), neighbors.end(), u);
+                if(it == neighbors.end() or *it != u) {
+                    // Not found.
+                    break;
+                }
+
+                // We found it. Update the matrix.
+                const uint64_t neighborIndex = it - neighbors.begin();
+                m[journeyEntryIndex][neighborIndex] = true;
+            }
+        }
+
+
+
+        // Compute a singular value decomposition of this matrix.
+        const int M = int(m.size());
+        const int N = int(m.front().size());
+        vector<double> A(M*N);
+        for(uint64_t journeyEntryIndex=0; journeyEntryIndex<m.size(); journeyEntryIndex++) {
+            for(uint64_t neighborIndex=0; neighborIndex<neighbors.size(); neighborIndex++) {
+                A[journeyEntryIndex + M * neighborIndex] = double(int(m[journeyEntryIndex][neighborIndex]));
+            }
+        }
+        const string JOBU = "A";
+        const string JOBVT = "A";
+        const int LDA = M;
+        vector<double> S(min(M, N));
+        vector<double> U(M*M);
+        const int LDU = M;
+        vector<double> VT(N*N);
+        const int LDVT = N;
+        const int LWORK = 10 * max(M, N);
+        vector<double> WORK(LWORK);
+        int INFO = 0;
+        dgesvd_(
+            JOBU.data(), JOBVT.data(),
+            M, N,
+            &A[0], LDA, &S[0], &U[0], LDU, &VT[0], LDVT, &WORK[0], LWORK, INFO);
+        if(INFO != 0) {
+            throw runtime_error("Error " + to_string(INFO) +
+                " computing SVD decomposition in createByLocalClustering.");
+        }
+
+        // See how many large singular values we have.
+        uint64_t nLarge = 0;
+        for(; nLarge<S.size(); nLarge++) {
+            SHASTA_ASSERT(S[nLarge] >= 0.);
+            if(S[nLarge] < singularValueThreshold) {
+                break;
+            }
+        }
+
+        if(debug) {
+            cout << "Singular values:";
+            for(const double s: S) {
+                cout << " " << s;
+            }
+            cout << "\n";
+            cout << "Number of large singular values is " << nLarge << "\n";
+            cout << "OrientedReadId,Position,";
+            for(uint64_t i=0; i<nLarge; i++) {
+                cout << "U" << i << ",";
+            }
+            for(const vertex_descriptor u: neighbors) {
+                cout << oldAssemblyGraph.vertexStringId(u) << ",";
+            }
+            cout << "\n";
+            for(uint64_t journeyEntryIndex=0; journeyEntryIndex<m.size(); journeyEntryIndex++) {
+                const JourneyEntry& journeyEntry = oldVertex.journeyEntries[journeyEntryIndex];
+                const vector<bool>& row = m[journeyEntryIndex];
+                cout << journeyEntry.orientedReadId << ",";
+                cout << journeyEntry.position << ",";
+                for(uint64_t i=0; i<nLarge; i++) {
+                    cout << U[journeyEntryIndex + i * m.size()] << ",";
+                }
+                for(uint64_t neighborIndex=0; neighborIndex<neighbors.size(); neighborIndex++) {
+                    cout << int(row[neighborIndex]) << ",";
+                }
+                cout << endl;
+            }
+
+        }
+
+        // If the number of large singular values is 1, don't split this vertex.
+        // Create a vertex in the new assembly graph, with the same journey entries.
+        if(nLarge == 1) {
+            if(debug) {
+                cout << "This vertex will not be split.\n";
+            }
+            const vertex_descriptor vNew = boost::add_vertex(
+                AssemblyGraphVertex(segmentId, verticesBySegment[segmentId].size()),
+                newAssemblyGraph);
+            verticesBySegment[segmentId].push_back(vNew);
+            AssemblyGraphVertex& newVertex = newAssemblyGraph[vNew];
+            newVertex.journeyEntries = oldVertex.journeyEntries;
+            continue;
+        }
+
+        // If getting here, the number of large singular values is greater than one,
+        // and we will split this old vertex into two.
+        // Each journey entry gets assigned to a new vertex based on the sign
+        // of the Fiedler vector component for that entry.
+        // The Fiedler vector is the left eigenvector corresponding to the second
+        // highest singular value.
+        // For the case of two clusters, the sign of its components
+        // determines the cluster each journey entry belongs to.
+        ++splitCount;
+        const double* fiedlerVector = U.data() + m.size();
+
+
+        // Create the two new vertices.
+        const vertex_descriptor v0New = boost::add_vertex(
+            AssemblyGraphVertex(segmentId, verticesBySegment[segmentId].size()),
+            newAssemblyGraph);
+        verticesBySegment[segmentId].push_back(v0New);
+        AssemblyGraphVertex& newVertex0 = newAssemblyGraph[v0New];
+
+        const vertex_descriptor v1New = boost::add_vertex(
+            AssemblyGraphVertex(segmentId, verticesBySegment[segmentId].size()),
+            newAssemblyGraph);
+        verticesBySegment[segmentId].push_back(v1New);
+        AssemblyGraphVertex& newVertex1 = newAssemblyGraph[v1New];
+
+        // Assign journey entries to the new vertices.
+        const double fiedlerComponentThreshold = scaledFiedlerComponentThreshold / sqrt(double(m.size()));
+        uint64_t n0 = 0;
+        uint64_t n1 = 0;
+        uint64_t nOther = 0;
+        for(uint64_t journeyEntryIndex=0; journeyEntryIndex<m.size(); journeyEntryIndex++) {
+            const JourneyEntry& journeyEntry = oldVertex.journeyEntries[journeyEntryIndex];
+            const double fiedlerComponent = fiedlerVector[journeyEntryIndex];
+
+            if(fiedlerComponent > fiedlerComponentThreshold) {
+                newVertex0.journeyEntries.push_back(journeyEntry);
+                ++n0;
+            } else if(fiedlerComponent < -fiedlerComponentThreshold) {
+                newVertex1.journeyEntries.push_back(journeyEntry);
+                ++n1;
+            } else {
+                ++nOther;
+            }
+        }
+        if(debug) {
+            cout << "Vertex split: n0 " << n0 << ", n1 " << n1 <<
+                ", other " << nOther <<
+                ", total " << m.size() << "\n";
+        }
+
+    }
+
+
+
+    // Initialize  oriented reads journeys.
+    journeys.clear();
+    journeys.resize(packedMarkerGraph.journeys.size());
+    for(uint64_t i=0; i<journeys.size(); i++) {
+        const auto packedMarkerGraphJourney = packedMarkerGraph.journeys[i];
+        journeys[i].resize(packedMarkerGraphJourney.size(), null_vertex());
+    }
+
+
+    // Construct oriented read journeys from the journey entries
+    // stored in the vertices we created.
+    BGL_FORALL_VERTICES(v, newAssemblyGraph, AssemblyGraph) {
+        const AssemblyGraphVertex& vertex = newAssemblyGraph[v];
+
+        for(const JourneyEntry& journeyEntry: vertex.journeyEntries) {
+            const OrientedReadId orientedReadId = journeyEntry.orientedReadId;
+            const uint64_t position = journeyEntry.position;
+
+            vector<vertex_descriptor>& journey = journeys[orientedReadId.getValue()];
+            journey[position] = v;
+        }
+    }
+
+    if(debug) {
+        cout << splitCount << " vertices of the old assembly graph were split, "
+            "out of " << num_vertices(oldAssemblyGraph) << " total." << endl;
+        cout << "The new assembly graph has " << num_vertices(newAssemblyGraph) <<
+            " vertices." << endl;
+    }
+
+    // Now that we have the vertices and the journeys we can create the links.
+    createLinks();
+}

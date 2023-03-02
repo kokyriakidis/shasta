@@ -39,7 +39,7 @@ Assembler::Assembler(
     const uint64_t minLinkCoverageForPaths = 3;
 #endif
 
-    const uint64_t detangleIterationCount = 3;
+    const uint64_t detangleIterationCount = 1;
     const uint64_t minDetangleCoverage = 2;
 
 
@@ -127,13 +127,20 @@ Assembler::Assembler(
         shared_ptr<AssemblyGraph> newAssemblyGraph =
             make_shared<AssemblyGraph>(
                 AssemblyGraph::DetangleUsingTangledAssemblyPaths(),
-                *packedMarkerGraph, *assemblyGraph);
+                *assemblyGraph);
 #endif
         // Create a new AssemblyGraph using tangle matrices of the current AssemblyGraph.
         shared_ptr<AssemblyGraph> newAssemblyGraph =
             make_shared<AssemblyGraph>(
                 AssemblyGraph::DetangleUsingTangleMatrices(),
-                *packedMarkerGraph, *assemblyGraph, minDetangleCoverage);
+                *assemblyGraph, minDetangleCoverage);
+#if 0
+        // Create a new AssemblyGraph by local clustering on the current AssemblyGraph.
+        shared_ptr<AssemblyGraph> newAssemblyGraph =
+            make_shared<AssemblyGraph>(
+                AssemblyGraph::DetangleUsingLocalClustering(),
+                *assemblyGraph);
+#endif
 
         // Replace the old AssemblyGraph with the new.
         // This also destroys the old AssemblyGraph.
