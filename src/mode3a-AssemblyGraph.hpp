@@ -180,12 +180,14 @@ private:
     bool segmentsAreAdjacent(edge_descriptor e) const;
     bool segmentsAreAdjacent(vertex_descriptor, vertex_descriptor) const;
 
+public:
     // Get the stringId for a given vertex_descriptor, or "None" if v is null_vertex().
     string vertexStringId(vertex_descriptor v) const;
 
     // Get the transitions for an edge.
     void getEdgeTransitions(edge_descriptor, vector<Transition>&) const;
     uint64_t edgeCoverage(edge_descriptor) const;
+private:
 
     void writeGfa(const string& name, uint64_t minLinkCoverage) const;
     void writeLinkCoverageHistogram(const string& name) const;

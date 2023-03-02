@@ -4,6 +4,7 @@
 #include "mode3a-AssemblyGraph.hpp"
 #include "mode3a-AssemblyGraphSnapshot.hpp"
 #include "mode3a-BubbleCleaner.hpp"
+#include "mode3a-PackedAssemblyGraph.hpp"
 #include "mode3a-PackedMarkerGraph.hpp"
 #include "performanceLog.hpp"
 #include "Reads.hpp"
@@ -41,6 +42,7 @@ Assembler::Assembler(
 
     const uint64_t detangleIterationCount = 1;
     const uint64_t minDetangleCoverage = 2;
+    const uint64_t minLinkCoverageForPackedAssemblyGraph = 6;
 
 
     // This requires the marker length k to be even.
@@ -156,6 +158,9 @@ Assembler::Assembler(
         *assemblyGraph,
         "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIterationCount), *this);
     snapshot.write();
+
+    // Create the PackedAssemblyGraph.
+    PackedAssemblyGraph packedAssemblyGraph(*assemblyGraph, minLinkCoverageForPackedAssemblyGraph);
 }
 
 
