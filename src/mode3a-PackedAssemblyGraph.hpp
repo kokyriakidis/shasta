@@ -18,6 +18,7 @@ namespace shasta {
         class PackedAssemblyGraph;
         class PackedAssemblyGraphVertex;
         class PackedAssemblyGraphEdge;
+        class PackedAssemblyGraphJourneyEntry;
 
         using PackedAssemblyGraphBaseClass = boost::adjacency_list<
             boost::listS, boost::listS, boost::bidirectionalS,
@@ -30,6 +31,7 @@ namespace shasta {
         using AssemblyGraphBaseClass = boost::adjacency_list<
             boost::listS, boost::listS, boost::bidirectionalS,
             AssemblyGraphVertex, AssemblyGraphEdge>;
+        class JourneyEntry;
     }
 }
 
@@ -37,7 +39,8 @@ namespace shasta {
 
 class shasta::mode3a::PackedAssemblyGraphVertex {
 public:
-    vector<AssemblyGraphBaseClass::vertex_descriptor> path;
+    vector<AssemblyGraphBaseClass::vertex_descriptor> assemblyGraphVertices;
+    vector<JourneyEntry> journeyEntries;
 };
 
 
@@ -52,7 +55,14 @@ class shasta::mode3a::PackedAssemblyGraph : public PackedAssemblyGraphBaseClass 
 public:
     PackedAssemblyGraph(const AssemblyGraph&, uint64_t minLinkCoverage);
 private:
-    void createVertices(const AssemblyGraph&, uint64_t minLinkCoverage);
+    void createVertices(uint64_t minLinkCoverage);
+
+    const AssemblyGraph& assemblyGraph;
+
+    // Oriented read journeys on the PackedAssemblyGraph.
+    // Indexed by OrientedReadId.getValue();
+    vector< vector<vertex_descriptor> > journeys;
+    void computeJourneys();
 
 };
 

@@ -16,10 +16,12 @@ using namespace mode3a;
 
 PackedAssemblyGraph::PackedAssemblyGraph(
     const AssemblyGraph& assemblyGraph,
-    uint64_t minLinkCoverage)
+    uint64_t minLinkCoverage) :
+    assemblyGraph(assemblyGraph)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
-    createVertices(assemblyGraph, minLinkCoverage);
+    createVertices( minLinkCoverage);
+    computeJourneys();
 
     cout << "The PackedAssemblyGraph has " << num_vertices(packedAssemblyGraph) <<
         " vertices and " << num_edges(packedAssemblyGraph) << " edges." << endl;
@@ -27,9 +29,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
 
 
 
-void PackedAssemblyGraph::createVertices(
-        const AssemblyGraph& assemblyGraph,
-        uint64_t minLinkCoverage)
+void PackedAssemblyGraph::createVertices(uint64_t minLinkCoverage)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
 
@@ -105,7 +105,7 @@ void PackedAssemblyGraph::createVertices(
         /// If getting here, a linear chain begins at v.
         vertex_descriptor pv = add_vertex(packedAssemblyGraph);
         PackedAssemblyGraphVertex& vertex = packedAssemblyGraph[pv];
-        vertex.path.push_back(v);
+        vertex.assemblyGraphVertices.push_back(v);
         AssemblyGraph::vertex_descriptor u = p.second.second;
         while(true) {
             const auto it = vertexMap.find(u);
@@ -113,7 +113,7 @@ void PackedAssemblyGraph::createVertices(
                 // u is not in our vertexMap, so it cannot be part of a linear chain.
                 break;
             }
-            vertex.path.push_back(u);
+            vertex.assemblyGraphVertices.push_back(u);
             u = it->second.second;
         }
 #if 0
@@ -125,3 +125,56 @@ void PackedAssemblyGraph::createVertices(
 #endif
     }
 }
+
+
+
+void PackedAssemblyGraph::computeJourneys()
+{
+    PackedAssemblyGraph& packedAssemblyGraph = *this;
+
+    journeys.resize(assemblyGraph.journeys.size());
+    for(uint64_t i=0; i<journeys.size(); i++) {
+        journeys[i].resize(assemblyGraph.journeys[i].size(), null_vertex());
+    }
+
+    BGL_FORALL_VERTICES(pv, packedAssemblyGraph, PackedAssemblyGraph) {
+        const auto& assemblyGraphVertices = packedAssemblyGraph[pv].assemblyGraphVertices;
+        for(const auto av: assemblyGraphVertices) {
+            const auto& assemblyGraphVertex = assemblyGraph[av];
+            for(const JourneyEntry& journeyEntry: assemblyGraphVertex.journeyEntries) {
+                const OrientedReadId orientedReadId = journeyEntry.orientedReadId;
+                const uint64_t position = journeyEntry.position;
+                journeys[orientedReadId.getValue()][position] = pv;
+            }
+        }
+    }
+
+    // Remove from the journeys:
+    // - Entries equal to null_vertex.
+    // - Duplicate entries.
+    for(auto& journey: journeys) {
+        vector<vertex_descriptor> newJourney;
+        for(const vertex_descriptor v: journey) {
+            if(v == null_vertex()) {
+                continue;
+            }
+            if(newJourney.empty() or v != newJourney.back()) {
+                newJourney.push_back(v);
+            }
+        }
+        journey.swap(newJourney);
+    }
+
+
+    // Store journey entries in the vertices.
+    for(ReadId i=0; i<journeys.size(); i++) {
+        const auto& journey = journeys[i];
+        const OrientedReadId orientedReadId = OrientedReadId::fromValue(i);
+        for(uint64_t position=0; position<journey.size(); position++) {
+            const vertex_descriptor v = journey[position];
+            packedAssemblyGraph[v].journeyEntries.push_back({orientedReadId, position});
+        }
+    }
+
+}
+
