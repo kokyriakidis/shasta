@@ -450,7 +450,7 @@ void AssemblyGraph::computePartialPath2(
         // Find the in-vertices and sort them by decreasing vertex frequency.
         vector< pair<uint64_t, uint64_t> > inVertices;
         BGL_FORALL_INEDGES(iv, e, backwardTree, Graph) {
-            const uint64_t iv1 = source(e, forwardTree);
+            const uint64_t iv1 = source(e, backwardTree);
             inVertices.push_back(make_pair(iv1, vertexFrequency[iv1]));
         }
         sort(inVertices.begin(), inVertices.end(), OrderPairsBySecondOnlyGreater<uint64_t, uint64_t >());

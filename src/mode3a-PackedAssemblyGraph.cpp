@@ -10,6 +10,7 @@ using namespace mode3a;
 
 // Boost libraries.
 #include <boost/graph/iteration_macros.hpp>
+#include <boost/graph/reverse_graph.hpp>
 #include "dominatorTree.hpp"
 
 // Standard library.
@@ -396,7 +397,6 @@ void PackedAssemblyGraph::computePartialPath(
         }
         add_edge(iv[0], iv[1], graph);
     }
-    removeReciprocalEdges(graph);
 
 
 
@@ -527,6 +527,113 @@ void PackedAssemblyGraph::computePartialPath(
     if(debugOut) {
         debugOut << "Forward partial path for P" << startVertex.id << ":\n";
         for(const vertex_descriptor v: forwardPartialPath) {
+            debugOut << "P" << packedAssemblyGraph[v].id << " ";
+        }
+        debugOut << "\n";
+    }
+
+
+
+    // To compute the backward partial path, compute the dominator tree of the reversed graph,
+    // with the start vertex as the entrance.
+    predecessorMap.clear();
+    shasta::lengauer_tarjan_dominator_tree(
+        boost::make_reverse_graph(graph),
+        ivStart,
+        boost::make_assoc_property_map(predecessorMap));
+
+
+
+    // Explicitly construct the backward dominator tree.
+    Graph backwardTree(verticesEncountered.size());
+    for(const auto& p: predecessorMap) {
+        const uint64_t iv0 = p.second;
+        const uint64_t iv1 = p.first;
+        add_edge(iv0, iv1, backwardTree);
+    }
+
+
+
+    // Write the backward dominator tree.
+    if(debugOut) {
+        debugOut << "digraph Backward_Tree_P" << startVertex.id << " {\n";
+
+        // Gather the vertices of the dominator tree.
+        vector<vertex_descriptor> dominatorTreeVertices;
+        for(const auto& p: predecessorMap) {
+            // In the predecessor map, the key is the target vertex and the value is the source vertex.
+            const uint64_t iv0 = p.second;
+            const uint64_t iv1 = p.first;
+            const vertex_descriptor v0 = verticesEncountered[iv0];
+            const vertex_descriptor v1 = verticesEncountered[iv1];
+            dominatorTreeVertices.push_back(v0);
+            dominatorTreeVertices.push_back(v1);
+        }
+        deduplicate(dominatorTreeVertices);
+
+        for(const vertex_descriptor v: dominatorTreeVertices) {
+            const uint64_t iv = std::equal_range(verticesEncountered.begin(), verticesEncountered.end(), v).first -
+                verticesEncountered.begin();
+            const vertex_descriptor pv = verticesEncountered[iv];
+            debugOut << "P" << packedAssemblyGraph[pv].id <<
+                " [label=\"P" << packedAssemblyGraph[pv].id << "\\n" << vertexFrequency[iv] << "\"]"
+                ";\n";
+
+        }
+        for(const auto& p: predecessorMap) {
+            // In the predecessor map, the key is the target vertex and the value is the source vertex.
+            const uint64_t iv0 = p.second;
+            const uint64_t iv1 = p.first;
+            const vertex_descriptor pv0 = verticesEncountered[iv0];
+            const vertex_descriptor pv1 = verticesEncountered[iv1];
+            debugOut <<
+                "P" << packedAssemblyGraph[pv0].id << "->" <<
+                "P" << packedAssemblyGraph[pv1].id << ";\n";
+        }
+        debugOut << "}\n";
+    }
+
+
+
+    // To compute the backward partial path, follow the backward dominator tree.
+    vector<vertex_descriptor> backwardPartialPath;
+    iv = ivStart;
+    while(true) {
+
+        // Find the out-vertices and sort them by decreasing vertex frequency.
+        vector< pair<uint64_t, uint64_t> > outVertices;
+        BGL_FORALL_OUTEDGES(iv, e, backwardTree, Graph) {
+            const uint64_t iv1 = target(e, backwardTree);
+            outVertices.push_back(make_pair(iv1, vertexFrequency[iv1]));
+        }
+        sort(outVertices.begin(), outVertices.end(), OrderPairsBySecondOnlyGreater<uint64_t, uint64_t >());
+
+        // If there are no out-vertices, the backward path ends here.
+        if(outVertices.empty()) {
+            break;
+        }
+
+        // If the strongest out-vertex is too weak, the backward path ends here.
+        if(outVertices.front().second < segmentCoverageThreshold1) {
+            break;
+        }
+
+        // If the strongest in-vertex loses too much coverage compared to iv, the backward path ends here.
+        const uint64_t coverageLoss =
+            (outVertices.front().second >= vertexFrequency[iv]) ? 0 :
+            (vertexFrequency[iv] - outVertices.front().second);
+        if(coverageLoss > segmentCoverageThreshold2) {
+            break;
+        }
+
+        // In all other cases, we add the strongest out-vertex to the forward path.
+        iv = outVertices.front().first;
+        backwardPartialPath.push_back(verticesEncountered[iv]);
+    }
+
+    if(debugOut) {
+        debugOut << "Backward partial path for P" << startVertex.id << ":\n";
+        for(const vertex_descriptor v: backwardPartialPath) {
             debugOut << "P" << packedAssemblyGraph[v].id << " ";
         }
         debugOut << "\n";
