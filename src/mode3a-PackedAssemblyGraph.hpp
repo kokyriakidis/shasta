@@ -81,8 +81,6 @@ private:
 
     void createEdges(uint64_t minLinkCoverage2);
 
-    void removeRoundTripEdges();
-
     // Partial paths.
     // The partial path for a vertex is obtained by following
     // the oriented reads in that vertex.

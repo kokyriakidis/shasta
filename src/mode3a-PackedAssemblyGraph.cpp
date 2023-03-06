@@ -4,6 +4,7 @@
 #include "mode3a-PackedMarkerGraph.hpp"
 #include "deduplicate.hpp"
 #include "orderPairs.hpp"
+#include "removeReciprocalEdges.hpp"
 using namespace shasta;
 using namespace mode3a;
 
@@ -32,7 +33,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
     createVertices(minLinkCoverage1, minMarkerCount);
     computeJourneys();
     createEdges(minLinkCoverage2);
-    removeRoundTripEdges();
+    removeReciprocalEdges(packedAssemblyGraph);
     writeGraphviz();
     writeJourneys();
     computePartialPaths(
@@ -305,29 +306,6 @@ void PackedAssemblyGraph::writeJourneys() const
 
 
 
-void PackedAssemblyGraph::removeRoundTripEdges()
-{
-    PackedAssemblyGraph& packedAssemblyGraph = *this;
-    vector<edge_descriptor> edgesTobeRemoved;
-    BGL_FORALL_EDGES(e, packedAssemblyGraph, PackedAssemblyGraph) {
-        const vertex_descriptor v0 = source(e, packedAssemblyGraph);
-        const vertex_descriptor v1 = target(e, packedAssemblyGraph);
-
-        bool reverseEdgeExists = false;
-        tie(ignore, reverseEdgeExists) = boost::edge(v1, v0, packedAssemblyGraph);
-        if(reverseEdgeExists) {
-            edgesTobeRemoved.push_back(e);
-        }
-    }
-
-    for(const edge_descriptor e: edgesTobeRemoved) {
-        boost::remove_edge(e, packedAssemblyGraph);
-    }
-
-}
-
-
-
 void PackedAssemblyGraph::computePartialPaths(
     uint64_t minLinkCoverage,
     uint64_t segmentCoverageThreshold1,
@@ -416,6 +394,7 @@ void PackedAssemblyGraph::computePartialPath(
         }
         add_edge(iv[0], iv[1], graph);
     }
+    removeReciprocalEdges(graph);
 
 
 
@@ -546,7 +525,7 @@ void PackedAssemblyGraph::computePartialPath(
     if(debugOut) {
         debugOut << "Forward partial path for P" << startVertex.id << ":\n";
         for(const vertex_descriptor v: forwardPartialPath) {
-            debugOut << packedAssemblyGraph[v].id << " ";
+            debugOut << "P" << packedAssemblyGraph[v].id << " ";
         }
         debugOut << "\n";
     }
