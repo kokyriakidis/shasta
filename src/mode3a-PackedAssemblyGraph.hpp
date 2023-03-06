@@ -40,6 +40,7 @@ namespace shasta {
 
 class shasta::mode3a::PackedAssemblyGraphVertex {
 public:
+    uint64_t id;
     vector<AssemblyGraphBaseClass::vertex_descriptor> assemblyGraphVertices;
     vector<JourneyEntry> journeyEntries;
 };
@@ -79,6 +80,7 @@ private:
     void removeRoundTripEdges();
 
     void writeGraphviz() const;
+    void writeJourneys() const;
 };
 
 

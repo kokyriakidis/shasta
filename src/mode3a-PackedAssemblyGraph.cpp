@@ -29,6 +29,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
     createEdges(minLinkCoverage2);
     removeRoundTripEdges();
     writeGraphviz();
+    writeJourneys();
 
     cout << "The PackedAssemblyGraph has " << num_vertices(packedAssemblyGraph) <<
         " vertices and " << num_edges(packedAssemblyGraph) << " edges." << endl;
@@ -103,6 +104,7 @@ void PackedAssemblyGraph::createVertices(
     // Each sufficiently long linear chain generates a vertex of the PackedAssemblyGraph,
     // We are not interested in circular chains, so
     // each linear sequence begins at a vertex whose parent does not appear in the vertex map.
+    uint64_t nextVertexId = 0;
     for(const auto& p: vertexMap) {
         const AssemblyGraph::vertex_descriptor v = p.first;
         const AssemblyGraph::vertex_descriptor v0 = p.second.first;
@@ -134,6 +136,7 @@ void PackedAssemblyGraph::createVertices(
 #endif
 
         // If the chain is too short, remove the vertex.
+        // Otherwise, keep it and assign it an id.
         uint64_t totalMarkerCount = 0;
         for(const AssemblyGraph::vertex_descriptor v: vertex.assemblyGraphVertices) {
             const AssemblyGraphVertex& aVertex = assemblyGraph[v];
@@ -143,6 +146,8 @@ void PackedAssemblyGraph::createVertices(
         }
         if(totalMarkerCount < minMarkerCount) {
             remove_vertex(pv, packedAssemblyGraph);
+        } else {
+            vertex.id = nextVertexId++;
         }
     }
 }
@@ -244,21 +249,51 @@ void PackedAssemblyGraph::writeGraphviz() const
     ofstream dot("PackedAssemblyGraph.dot");
     dot << "digraph PackedAssemblyGraph {\n";
 
-    BGL_FORALL_VERTICES(v, packedAssemblyGraph, PackedAssemblyGraph) {
-        dot << "\"" << vertexStringId(v)<< "\";\n";
+    BGL_FORALL_VERTICES(pv, packedAssemblyGraph, PackedAssemblyGraph) {
+        const PackedAssemblyGraphVertex& pVertex = packedAssemblyGraph[pv];
+        const AssemblyGraph::vertex_descriptor av0 = pVertex.assemblyGraphVertices.front();
+        const AssemblyGraph::vertex_descriptor av1 = pVertex.assemblyGraphVertices.back();
+        dot << pVertex.id;
+        dot << " [label=\"P" <<
+            pVertex.id << "\\n" <<
+            assemblyGraph.vertexStringId(av0) << "\\n" <<
+            assemblyGraph.vertexStringId(av1) << "\"]";
+        dot << ";\n";
     }
 
     BGL_FORALL_EDGES(e, packedAssemblyGraph, PackedAssemblyGraph) {
-        const vertex_descriptor v0 = source(e, packedAssemblyGraph);
-        const vertex_descriptor v1 = target(e, packedAssemblyGraph);
-        dot << "\"" << vertexStringId(v0)<< "\"->\"" <<
-            vertexStringId(v1) << "\""
+        const vertex_descriptor pv0 = source(e, packedAssemblyGraph);
+        const vertex_descriptor pv1 = target(e, packedAssemblyGraph);
+        dot <<
+            packedAssemblyGraph[pv0].id << "->" <<
+            packedAssemblyGraph[pv1].id <<
             " [label=" << packedAssemblyGraph[e].coverage << "]"
             ";\n";
     }
 
     dot << "}\n";
 }
+
+
+
+void PackedAssemblyGraph::writeJourneys() const
+{
+    const PackedAssemblyGraph& packedAssemblyGraph = *this;
+
+    ofstream csv("PackedAssemblyGraphJourneys.csv");
+
+    for(uint64_t i=0; i<journeys.size(); i++) {
+        const vector<vertex_descriptor>& journey = journeys[i];
+        const OrientedReadId orientedReadId = OrientedReadId::fromValue(ReadId(i));
+        csv << orientedReadId << ",";
+        for(const vertex_descriptor v: journey) {
+            csv << "P" << packedAssemblyGraph[v].id << ",";
+        }
+        csv << "\n";
+    }
+
+}
+
 
 
 void PackedAssemblyGraph::removeRoundTripEdges()
