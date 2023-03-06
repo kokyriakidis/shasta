@@ -267,7 +267,9 @@ void PackedAssemblyGraph::writeGraphviz() const
         dot << " [label=\"P" <<
             pVertex.id << "\\n" <<
             assemblyGraph.vertexStringId(av0) << "\\n" <<
-            assemblyGraph.vertexStringId(av1) << "\"]";
+            assemblyGraph.vertexStringId(av1) << "\\n" <<
+            pVertex.journeyEntries.size() <<
+            "\"]";
         dot << ";\n";
     }
 
