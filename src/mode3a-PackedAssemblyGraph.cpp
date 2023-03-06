@@ -41,6 +41,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
         minLinkCoverage3,
         segmentCoverageThreshold1,
         segmentCoverageThreshold2);
+    writePartialPaths();
 
     cout << "The PackedAssemblyGraph has " << num_vertices(packedAssemblyGraph) <<
         " vertices and " << num_edges(packedAssemblyGraph) << " edges." << endl;
@@ -309,6 +310,31 @@ void PackedAssemblyGraph::writeJourneys() const
 
 
 
+void PackedAssemblyGraph::writePartialPaths() const
+{
+    const PackedAssemblyGraph& packedAssemblyGraph = *this;
+
+    ofstream csv("PackedAssemblyGraphPartialPaths.csv");
+
+    BGL_FORALL_VERTICES(v, packedAssemblyGraph, PackedAssemblyGraph) {
+        const PackedAssemblyGraphVertex& vertex = packedAssemblyGraph[v];
+
+        csv << "P" << vertex.id << ",Forward,";
+        for(const vertex_descriptor u: vertex.forwardPartialPath) {
+            csv << "P" << packedAssemblyGraph[u].id << ",";
+        }
+        csv << "\n";
+
+        csv << "P" << vertex.id << ",Backward,";
+        for(const vertex_descriptor u: vertex.backwardPartialPath) {
+            csv << "P" << packedAssemblyGraph[u].id << ",";
+        }
+        csv << "\n";
+    }
+}
+
+
+
 void PackedAssemblyGraph::computePartialPaths(
     uint64_t minLinkCoverage,
     uint64_t segmentCoverageThreshold1,
@@ -317,7 +343,7 @@ void PackedAssemblyGraph::computePartialPaths(
     PackedAssemblyGraph& packedAssemblyGraph = *this;
 
     ofstream debugOut;
-    debugOut.open("PackedAssemblyGraph-computePartialPath.txt");
+    // debugOut.open("PackedAssemblyGraph-computePartialPath.txt");
     BGL_FORALL_VERTICES(v, packedAssemblyGraph, PackedAssemblyGraph) {
         computePartialPath(
             v,
@@ -338,7 +364,7 @@ void PackedAssemblyGraph::computePartialPath(
     ostream& debugOut)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
-    const PackedAssemblyGraphVertex& startVertex = packedAssemblyGraph[vStart];
+    PackedAssemblyGraphVertex& startVertex = packedAssemblyGraph[vStart];
 
     if(debugOut) {
         debugOut << "Partial path computation for P" << startVertex.id << "\n";
@@ -489,7 +515,7 @@ void PackedAssemblyGraph::computePartialPath(
 
 
     // To compute the forward partial path, follow the forward dominator tree.
-    vector<vertex_descriptor> forwardPartialPath;
+    startVertex.forwardPartialPath.clear();
     uint64_t iv = ivStart;
     while(true) {
 
@@ -521,12 +547,12 @@ void PackedAssemblyGraph::computePartialPath(
 
         // In all other cases, we add the strongest out-vertex to the forward path.
         iv = outVertices.front().first;
-        forwardPartialPath.push_back(verticesEncountered[iv]);
+        startVertex.forwardPartialPath.push_back(verticesEncountered[iv]);
     }
 
     if(debugOut) {
         debugOut << "Forward partial path for P" << startVertex.id << ":\n";
-        for(const vertex_descriptor v: forwardPartialPath) {
+        for(const vertex_descriptor v: startVertex.forwardPartialPath) {
             debugOut << "P" << packedAssemblyGraph[v].id << " ";
         }
         debugOut << "\n";
@@ -596,7 +622,7 @@ void PackedAssemblyGraph::computePartialPath(
 
 
     // To compute the backward partial path, follow the backward dominator tree.
-    vector<vertex_descriptor> backwardPartialPath;
+    startVertex.backwardPartialPath.clear();
     iv = ivStart;
     while(true) {
 
@@ -628,12 +654,12 @@ void PackedAssemblyGraph::computePartialPath(
 
         // In all other cases, we add the strongest out-vertex to the forward path.
         iv = outVertices.front().first;
-        backwardPartialPath.push_back(verticesEncountered[iv]);
+        startVertex.backwardPartialPath.push_back(verticesEncountered[iv]);
     }
 
     if(debugOut) {
         debugOut << "Backward partial path for P" << startVertex.id << ":\n";
-        for(const vertex_descriptor v: backwardPartialPath) {
+        for(const vertex_descriptor v: startVertex.backwardPartialPath) {
             debugOut << "P" << packedAssemblyGraph[v].id << " ";
         }
         debugOut << "\n";

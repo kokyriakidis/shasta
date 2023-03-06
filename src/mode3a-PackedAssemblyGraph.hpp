@@ -44,6 +44,9 @@ public:
     uint64_t id;
     vector<AssemblyGraphBaseClass::vertex_descriptor> assemblyGraphVertices;
     vector<JourneyEntry> journeyEntries;
+
+    vector<PackedAssemblyGraphBaseClass::vertex_descriptor> forwardPartialPath;
+    vector<PackedAssemblyGraphBaseClass::vertex_descriptor> backwardPartialPath;
 };
 
 
@@ -94,6 +97,7 @@ private:
         uint64_t segmentCoverageThreshold1,
         uint64_t segmentCoverageThreshold2,
         ostream& debugOut);
+    void writePartialPaths() const;
 
     void writeGraphviz() const;
     void writeJourneys() const;
