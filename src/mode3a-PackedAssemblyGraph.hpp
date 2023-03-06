@@ -11,6 +11,7 @@
 #include <boost/graph/adjacency_list.hpp>
 
 // Standard library.
+#include "iosfwd.hpp"
 #include "string.hpp"
 #include "vector.hpp"
 
@@ -60,6 +61,9 @@ public:
         const AssemblyGraph&,
         uint64_t minLinkCoverage1,
         uint64_t minLinkCoverage2,
+        uint64_t minLinkCoverage3,
+        uint64_t segmentCoverageThreshold1,
+        uint64_t segmentCoverageThreshold2,
         uint64_t minMarkerCount);
 private:
     const AssemblyGraph& assemblyGraph;
@@ -78,6 +82,20 @@ private:
     void createEdges(uint64_t minLinkCoverage2);
 
     void removeRoundTripEdges();
+
+    // Partial paths.
+    // The partial path for a vertex is obtained by following
+    // the oriented reads in that vertex.
+    void computePartialPaths(
+        uint64_t minLinkCoverage,
+        uint64_t segmentCoverageThreshold1,
+        uint64_t segmentCoverageThreshold2);
+    void computePartialPath(
+        vertex_descriptor,
+        uint64_t minLinkCoverage,
+        uint64_t segmentCoverageThreshold1,
+        uint64_t segmentCoverageThreshold2,
+        ostream& debugOut);
 
     void writeGraphviz() const;
     void writeJourneys() const;

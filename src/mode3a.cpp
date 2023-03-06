@@ -33,17 +33,15 @@ Assembler::Assembler(
 {
     // EXPOSE WHEN CODE STABILIZES.
 
-#if 0
     // These are used to compute partial paths.
     const uint64_t segmentCoverageThreshold1ForPaths = 3;
     const uint64_t segmentCoverageThreshold2ForPaths = 6;
-    const uint64_t minLinkCoverageForPaths = 3;
-#endif
 
     const uint64_t detangleIterationCount = 1;
     const uint64_t minDetangleCoverage = 3;
     const uint64_t minLinkCoverage1ForPackedAssemblyGraph = 6;
     const uint64_t minLinkCoverage2ForPackedAssemblyGraph = 6;
+    const uint64_t minLinkCoverage3ForPackedAssemblyGraph = 3;
     const uint64_t minMarkerCountForPackedAssemblyGraph = 100;
 
 
@@ -166,6 +164,9 @@ Assembler::Assembler(
         *assemblyGraph,
         minLinkCoverage1ForPackedAssemblyGraph,
         minLinkCoverage2ForPackedAssemblyGraph,
+        minLinkCoverage3ForPackedAssemblyGraph,
+        segmentCoverageThreshold1ForPaths,
+        segmentCoverageThreshold2ForPaths,
         minMarkerCountForPackedAssemblyGraph);
 }
 

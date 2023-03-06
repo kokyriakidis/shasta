@@ -3,11 +3,13 @@
 #include "mode3a-AssemblyGraph.hpp"
 #include "mode3a-PackedMarkerGraph.hpp"
 #include "deduplicate.hpp"
+#include "orderPairs.hpp"
 using namespace shasta;
 using namespace mode3a;
 
 // Boost libraries.
 #include <boost/graph/iteration_macros.hpp>
+#include "dominatorTree.hpp"
 
 // Standard library.
 #include "fstream.hpp"
@@ -20,6 +22,9 @@ PackedAssemblyGraph::PackedAssemblyGraph(
     const AssemblyGraph& assemblyGraph,
     uint64_t minLinkCoverage1,
     uint64_t minLinkCoverage2,
+    uint64_t minLinkCoverage3,
+    uint64_t segmentCoverageThreshold1,
+    uint64_t segmentCoverageThreshold2,
     uint64_t minMarkerCount) :
     assemblyGraph(assemblyGraph)
 {
@@ -30,6 +35,10 @@ PackedAssemblyGraph::PackedAssemblyGraph(
     removeRoundTripEdges();
     writeGraphviz();
     writeJourneys();
+    computePartialPaths(
+        minLinkCoverage3,
+        segmentCoverageThreshold1,
+        segmentCoverageThreshold2);
 
     cout << "The PackedAssemblyGraph has " << num_vertices(packedAssemblyGraph) <<
         " vertices and " << num_edges(packedAssemblyGraph) << " edges." << endl;
@@ -316,3 +325,231 @@ void PackedAssemblyGraph::removeRoundTripEdges()
     }
 
 }
+
+
+
+void PackedAssemblyGraph::computePartialPaths(
+    uint64_t minLinkCoverage,
+    uint64_t segmentCoverageThreshold1,
+    uint64_t segmentCoverageThreshold2)
+{
+    PackedAssemblyGraph& packedAssemblyGraph = *this;
+
+    ofstream debugOut;
+    debugOut.open("PackedAssemblyGraph-computePartialPath.txt");
+    BGL_FORALL_VERTICES(v, packedAssemblyGraph, PackedAssemblyGraph) {
+        computePartialPath(
+            v,
+            minLinkCoverage,
+            segmentCoverageThreshold1,
+            segmentCoverageThreshold2,
+            debugOut);
+    }
+}
+
+
+
+void PackedAssemblyGraph::computePartialPath(
+    vertex_descriptor vStart,
+    uint64_t minLinkCoverage,
+    uint64_t segmentCoverageThreshold1,
+    uint64_t segmentCoverageThreshold2,
+    ostream& debugOut)
+{
+    PackedAssemblyGraph& packedAssemblyGraph = *this;
+    const PackedAssemblyGraphVertex& startVertex = packedAssemblyGraph[vStart];
+
+    if(debugOut) {
+        debugOut << "Partial path computation for P" << startVertex.id << "\n";
+    }
+
+    // The vertices we encounter when following the reads.
+    vector<vertex_descriptor> verticesEncountered;
+
+    // The transitions we encounter when following the reads.
+    vector< pair<vertex_descriptor, vertex_descriptor> > transitionsEncountered;
+
+    // Loop over JourneyEntry's of the start vertex.
+    for(const JourneyEntry& journeyEntry: startVertex.journeyEntries) {
+        const OrientedReadId orientedReadId = journeyEntry.orientedReadId;
+
+        // Store the vertices encountered in the journey of this read.
+        const auto journey = journeys[orientedReadId.getValue()];
+        for(uint64_t position=0; position<journey.size(); position++) {
+            const vertex_descriptor v = journey[position];
+            if(v != null_vertex()) {
+                verticesEncountered.push_back(v);
+            }
+        }
+
+        // Also store the transitions.
+        for(uint64_t position=1; position<journey.size(); position++) {
+            const vertex_descriptor v0 = journey[position-1];
+            const vertex_descriptor v1 = journey[position];
+            if(v0 != null_vertex() and v1 != null_vertex()) {
+                transitionsEncountered.push_back(make_pair(v0, v1));
+            }
+        }
+    }
+
+    // Count how many times we encountered each vertex.
+    vector<uint64_t> vertexFrequency;
+    deduplicateAndCount(verticesEncountered, vertexFrequency);
+
+    // Count how many times we encountered each transition.
+    // Keep only the ones that appear at least minLinkCoverage times.
+    vector<uint64_t> transitionFrequency;
+    deduplicateAndCountWithThreshold(
+        transitionsEncountered, transitionFrequency, minLinkCoverage);
+
+    // The transitions we kept define a graph.
+    using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS>;
+    Graph graph(verticesEncountered.size());
+    for(const auto& p: transitionsEncountered) {
+        array<vertex_descriptor, 2> v = {p.first, p.second};
+        array<uint64_t, 2> iv;
+        for(uint64_t k=0; k<2; k++) {
+            const auto q = std::equal_range(verticesEncountered.begin(), verticesEncountered.end(), v[k]);
+            SHASTA_ASSERT(q.first != verticesEncountered.end());
+            SHASTA_ASSERT(q.second - q.first == 1);
+            iv[k] = q.first - verticesEncountered.begin();
+        }
+        add_edge(iv[0], iv[1], graph);
+    }
+
+
+
+    // Write the graph.
+    if(debugOut) {
+        debugOut << "digraph PartialPathGraph_P" << startVertex.id << " {\n";
+        BGL_FORALL_VERTICES(iv, graph, Graph) {
+            const vertex_descriptor pv = verticesEncountered[iv];
+            debugOut << "P" << packedAssemblyGraph[pv].id <<
+                " [label=\"P" << packedAssemblyGraph[pv].id << "\\n" << vertexFrequency[iv] << "\"]"
+                ";\n";
+        }
+        BGL_FORALL_EDGES(e, graph, Graph) {
+            const Graph::vertex_descriptor iv0 = source(e, graph);
+            const Graph::vertex_descriptor iv1 = target(e, graph);
+            const vertex_descriptor pv0 = verticesEncountered[iv0];
+            const vertex_descriptor pv1 = verticesEncountered[iv1];
+            debugOut <<
+                "P" << packedAssemblyGraph[pv0].id << "->"
+                "P" << packedAssemblyGraph[pv1].id << ";\n";
+        }
+        debugOut << "}\n";
+    }
+
+
+
+    // To compute the forward partial path, compute the dominator tree of the graph,
+    // with the start vertex as the entrance.
+    const auto q = std::equal_range(verticesEncountered.begin(), verticesEncountered.end(), vStart);
+    SHASTA_ASSERT(q.first != verticesEncountered.end());
+    SHASTA_ASSERT(q.second - q.first == 1);
+    const uint64_t ivStart = q.first - verticesEncountered.begin();
+    std::map<uint64_t, uint64_t> predecessorMap;
+    shasta::lengauer_tarjan_dominator_tree(
+        graph,
+        ivStart,
+        boost::make_assoc_property_map(predecessorMap));
+
+
+
+    // Explicitly construct the forward dominator tree.
+    Graph forwardTree(verticesEncountered.size());
+    for(const auto& p: predecessorMap) {
+        const uint64_t iv0 = p.second;
+        const uint64_t iv1 = p.first;
+        add_edge(iv0, iv1, forwardTree);
+    }
+
+
+
+    // Write the forward dominator tree.
+    if(debugOut) {
+        debugOut << "digraph Forward_Tree_P" << startVertex.id << " {\n";
+
+        // Gather the vertices of the dominator tree.
+        vector<vertex_descriptor> dominatorTreeVertices;
+        for(const auto& p: predecessorMap) {
+            // In the predecessor map, the key is the target vertex and the value is the source vertex.
+            const uint64_t iv0 = p.second;
+            const uint64_t iv1 = p.first;
+            const vertex_descriptor v0 = verticesEncountered[iv0];
+            const vertex_descriptor v1 = verticesEncountered[iv1];
+            dominatorTreeVertices.push_back(v0);
+            dominatorTreeVertices.push_back(v1);
+        }
+        deduplicate(dominatorTreeVertices);
+
+        for(const vertex_descriptor v: dominatorTreeVertices) {
+            const uint64_t iv = std::equal_range(verticesEncountered.begin(), verticesEncountered.end(), v).first -
+                verticesEncountered.begin();
+            const vertex_descriptor pv = verticesEncountered[iv];
+            debugOut << "P" << packedAssemblyGraph[pv].id <<
+                " [label=\"P" << packedAssemblyGraph[pv].id << "\\n" << vertexFrequency[iv] << "\"]"
+                ";\n";
+
+        }
+        for(const auto& p: predecessorMap) {
+            // In the predecessor map, the key is the target vertex and the value is the source vertex.
+            const uint64_t iv0 = p.second;
+            const uint64_t iv1 = p.first;
+            const vertex_descriptor pv0 = verticesEncountered[iv0];
+            const vertex_descriptor pv1 = verticesEncountered[iv1];
+            debugOut <<
+                "P" << packedAssemblyGraph[pv0].id << "->" <<
+                "P" << packedAssemblyGraph[pv1].id << ";\n";
+        }
+        debugOut << "}\n";
+    }
+
+
+
+    // To compute the forward partial path, follow the forward dominator tree.
+    vector<vertex_descriptor> forwardPartialPath;
+    uint64_t iv = ivStart;
+    while(true) {
+
+        // Find the out-vertices and sort them by decreasing vertex frequency.
+        vector< pair<uint64_t, uint64_t> > outVertices;
+        BGL_FORALL_OUTEDGES(iv, e, forwardTree, Graph) {
+            const uint64_t iv1 = target(e, forwardTree);
+            outVertices.push_back(make_pair(iv1, vertexFrequency[iv1]));
+        }
+        sort(outVertices.begin(), outVertices.end(), OrderPairsBySecondOnlyGreater<uint64_t, uint64_t >());
+
+        // If there are no out-vertices, the forward path ends here.
+        if(outVertices.empty()) {
+            break;
+        }
+
+        // If the strongest out-vertex is too weak, the forward path ends here.
+        if(outVertices.front().second < segmentCoverageThreshold1) {
+            break;
+        }
+
+        // If the strongest in-vertex loses too much coverage compared to iv, the backward path ends here.
+        const uint64_t coverageLoss =
+            (outVertices.front().second >= vertexFrequency[iv]) ? 0 :
+            (vertexFrequency[iv] - outVertices.front().second);
+        if(coverageLoss > segmentCoverageThreshold2) {
+            break;
+        }
+
+        // In all other cases, we add the strongest out-vertex to the forward path.
+        iv = outVertices.front().first;
+        forwardPartialPath.push_back(verticesEncountered[iv]);
+    }
+
+    if(debugOut) {
+        debugOut << "Forward partial path for P" << startVertex.id << ":\n";
+        for(const vertex_descriptor v: forwardPartialPath) {
+            debugOut << packedAssemblyGraph[v].id << " ";
+        }
+        debugOut << "\n";
+    }
+}
+
+
