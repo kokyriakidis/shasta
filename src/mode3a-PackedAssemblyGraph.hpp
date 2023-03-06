@@ -11,6 +11,7 @@
 #include <boost/graph/adjacency_list.hpp>
 
 // Standard library.
+#include "string.hpp"
 #include "vector.hpp"
 
 namespace shasta {
@@ -22,7 +23,7 @@ namespace shasta {
 
         using PackedAssemblyGraphBaseClass = boost::adjacency_list<
             boost::listS, boost::listS, boost::bidirectionalS,
-            PackedAssemblyGraphVertex, PackedAssemblyGraphVertex>;
+            PackedAssemblyGraphVertex, PackedAssemblyGraphEdge>;
 
         // Forward definitions to avoid including AssemblyGraph.hpp here.
         class AssemblyGraph;
@@ -47,23 +48,37 @@ public:
 
 class shasta::mode3a::PackedAssemblyGraphEdge {
 public:
+    uint64_t coverage;
 };
 
 
 
 class shasta::mode3a::PackedAssemblyGraph : public PackedAssemblyGraphBaseClass {
 public:
-    PackedAssemblyGraph(const AssemblyGraph&, uint64_t minLinkCoverage);
+    PackedAssemblyGraph(
+        const AssemblyGraph&,
+        uint64_t minLinkCoverage1,
+        uint64_t minLinkCoverage2,
+        uint64_t minMarkerCount);
 private:
-    void createVertices(uint64_t minLinkCoverage);
-
     const AssemblyGraph& assemblyGraph;
+
+    void createVertices(
+        uint64_t minLinkCoverage1,
+        uint64_t minMarkerCount);
+
+    string vertexStringId(vertex_descriptor) const;
 
     // Oriented read journeys on the PackedAssemblyGraph.
     // Indexed by OrientedReadId.getValue();
     vector< vector<vertex_descriptor> > journeys;
     void computeJourneys();
 
+    void createEdges(uint64_t minLinkCoverage2);
+
+    void removeRoundTripEdges();
+
+    void writeGraphviz() const;
 };
 
 

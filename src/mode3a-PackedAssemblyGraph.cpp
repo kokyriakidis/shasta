@@ -1,6 +1,8 @@
 // Shasta.
 #include "mode3a-PackedAssemblyGraph.hpp"
 #include "mode3a-AssemblyGraph.hpp"
+#include "mode3a-PackedMarkerGraph.hpp"
+#include "deduplicate.hpp"
 using namespace shasta;
 using namespace mode3a;
 
@@ -16,12 +18,17 @@ using namespace mode3a;
 
 PackedAssemblyGraph::PackedAssemblyGraph(
     const AssemblyGraph& assemblyGraph,
-    uint64_t minLinkCoverage) :
+    uint64_t minLinkCoverage1,
+    uint64_t minLinkCoverage2,
+    uint64_t minMarkerCount) :
     assemblyGraph(assemblyGraph)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
-    createVertices( minLinkCoverage);
+    createVertices(minLinkCoverage1, minMarkerCount);
     computeJourneys();
+    createEdges(minLinkCoverage2);
+    removeRoundTripEdges();
+    writeGraphviz();
 
     cout << "The PackedAssemblyGraph has " << num_vertices(packedAssemblyGraph) <<
         " vertices and " << num_edges(packedAssemblyGraph) << " edges." << endl;
@@ -29,7 +36,9 @@ PackedAssemblyGraph::PackedAssemblyGraph(
 
 
 
-void PackedAssemblyGraph::createVertices(uint64_t minLinkCoverage)
+void PackedAssemblyGraph::createVertices(
+    uint64_t minLinkCoverage1,
+    uint64_t minMarkerCount)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
 
@@ -48,7 +57,7 @@ void PackedAssemblyGraph::createVertices(uint64_t minLinkCoverage)
         // Gather in-edges.
         inEdges.clear();
         BGL_FORALL_INEDGES(v, e, assemblyGraph, AssemblyGraph) {
-            if(assemblyGraph.edgeCoverage(e) >= minLinkCoverage) {
+            if(assemblyGraph.edgeCoverage(e) >= minLinkCoverage1) {
                 inEdges.push_back(e);
             }
         }
@@ -60,7 +69,7 @@ void PackedAssemblyGraph::createVertices(uint64_t minLinkCoverage)
         // Gather out-edges.
         outEdges.clear();
         BGL_FORALL_OUTEDGES(v, e, assemblyGraph, AssemblyGraph) {
-            if(assemblyGraph.edgeCoverage(e) >= minLinkCoverage) {
+            if(assemblyGraph.edgeCoverage(e) >= minLinkCoverage1) {
                 outEdges.push_back(e);
             }
         }
@@ -91,7 +100,7 @@ void PackedAssemblyGraph::createVertices(uint64_t minLinkCoverage)
     }
 #endif
 
-    // Each linear chain generates a vertex of the PackedAssemblyGraph.
+    // Each sufficiently long linear chain generates a vertex of the PackedAssemblyGraph,
     // We are not interested in circular chains, so
     // each linear sequence begins at a vertex whose parent does not appear in the vertex map.
     for(const auto& p: vertexMap) {
@@ -118,11 +127,23 @@ void PackedAssemblyGraph::createVertices(uint64_t minLinkCoverage)
         }
 #if 0
         cout << "Chain:";
-        for(const vertex_descriptor u: vertex.path) {
+        for(const AssemblyGraph::vertex_descriptor u: vertex.path) {
             cout << " " << assemblyGraph.vertexStringId(u);
         }
         cout << "\n";
 #endif
+
+        // If the chain is too short, remove the vertex.
+        uint64_t totalMarkerCount = 0;
+        for(const AssemblyGraph::vertex_descriptor v: vertex.assemblyGraphVertices) {
+            const AssemblyGraphVertex& aVertex = assemblyGraph[v];
+            const uint64_t segmentId = aVertex.segmentId;
+            const uint64_t markerCount = assemblyGraph.packedMarkerGraph.segments[segmentId].size();
+            totalMarkerCount += markerCount;
+        }
+        if(totalMarkerCount < minMarkerCount) {
+            remove_vertex(pv, packedAssemblyGraph);
+        }
     }
 }
 
@@ -178,3 +199,85 @@ void PackedAssemblyGraph::computeJourneys()
 
 }
 
+
+void PackedAssemblyGraph::createEdges(uint64_t minLinkCoverage2)
+{
+    PackedAssemblyGraph& packedAssemblyGraph = *this;
+
+    vector< pair<vertex_descriptor, vertex_descriptor> > transitions;
+    for(const auto& journey: journeys) {
+        for(uint64_t i=1; i<journey.size(); i++) {
+            transitions.push_back({journey[i-1], journey[i]});
+        }
+    }
+
+    vector<uint64_t> frequency;
+    deduplicateAndCount(transitions, frequency);
+
+    for(uint64_t i=0; i<transitions.size(); i++) {
+        if(frequency[i] >= minLinkCoverage2) {
+            const auto& transition = transitions[i];
+            edge_descriptor e;
+            tie(e, ignore) = add_edge(transition.first, transition.second, {frequency[i]}, packedAssemblyGraph);
+        }
+    }
+}
+
+
+
+string PackedAssemblyGraph::vertexStringId(vertex_descriptor pv) const
+{
+    const PackedAssemblyGraph& packedAssemblyGraph = *this;
+    const PackedAssemblyGraphVertex& packedAssemblyGraphVertex = packedAssemblyGraph[pv];
+    const AssemblyGraph::vertex_descriptor v0 = packedAssemblyGraphVertex.assemblyGraphVertices.front();
+    const AssemblyGraph::vertex_descriptor v1 = packedAssemblyGraphVertex.assemblyGraphVertices.back();
+
+    return assemblyGraph.vertexStringId(v0) + "_" + assemblyGraph.vertexStringId(v1);
+}
+
+
+
+void PackedAssemblyGraph::writeGraphviz() const
+{
+    const PackedAssemblyGraph& packedAssemblyGraph = *this;
+
+    ofstream dot("PackedAssemblyGraph.dot");
+    dot << "digraph PackedAssemblyGraph {\n";
+
+    BGL_FORALL_VERTICES(v, packedAssemblyGraph, PackedAssemblyGraph) {
+        dot << "\"" << vertexStringId(v)<< "\";\n";
+    }
+
+    BGL_FORALL_EDGES(e, packedAssemblyGraph, PackedAssemblyGraph) {
+        const vertex_descriptor v0 = source(e, packedAssemblyGraph);
+        const vertex_descriptor v1 = target(e, packedAssemblyGraph);
+        dot << "\"" << vertexStringId(v0)<< "\"->\"" <<
+            vertexStringId(v1) << "\""
+            " [label=" << packedAssemblyGraph[e].coverage << "]"
+            ";\n";
+    }
+
+    dot << "}\n";
+}
+
+
+void PackedAssemblyGraph::removeRoundTripEdges()
+{
+    PackedAssemblyGraph& packedAssemblyGraph = *this;
+    vector<edge_descriptor> edgesTobeRemoved;
+    BGL_FORALL_EDGES(e, packedAssemblyGraph, PackedAssemblyGraph) {
+        const vertex_descriptor v0 = source(e, packedAssemblyGraph);
+        const vertex_descriptor v1 = target(e, packedAssemblyGraph);
+
+        bool reverseEdgeExists = false;
+        tie(ignore, reverseEdgeExists) = boost::edge(v1, v0, packedAssemblyGraph);
+        if(reverseEdgeExists) {
+            edgesTobeRemoved.push_back(e);
+        }
+    }
+
+    for(const edge_descriptor e: edgesTobeRemoved) {
+        boost::remove_edge(e, packedAssemblyGraph);
+    }
+
+}

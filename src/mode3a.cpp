@@ -41,8 +41,10 @@ Assembler::Assembler(
 #endif
 
     const uint64_t detangleIterationCount = 1;
-    const uint64_t minDetangleCoverage = 2;
-    const uint64_t minLinkCoverageForPackedAssemblyGraph = 6;
+    const uint64_t minDetangleCoverage = 3;
+    const uint64_t minLinkCoverage1ForPackedAssemblyGraph = 6;
+    const uint64_t minLinkCoverage2ForPackedAssemblyGraph = 6;
+    const uint64_t minMarkerCountForPackedAssemblyGraph = 100;
 
 
     // This requires the marker length k to be even.
@@ -160,7 +162,11 @@ Assembler::Assembler(
     snapshot.write();
 
     // Create the PackedAssemblyGraph.
-    PackedAssemblyGraph packedAssemblyGraph(*assemblyGraph, minLinkCoverageForPackedAssemblyGraph);
+    PackedAssemblyGraph packedAssemblyGraph(
+        *assemblyGraph,
+        minLinkCoverage1ForPackedAssemblyGraph,
+        minLinkCoverage2ForPackedAssemblyGraph,
+        minMarkerCountForPackedAssemblyGraph);
 }
 
 
