@@ -42,6 +42,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
         segmentCoverageThreshold1,
         segmentCoverageThreshold2);
     writePartialPaths();
+    analyzePartialPaths();
 
     cout << "The PackedAssemblyGraph has " << num_vertices(packedAssemblyGraph) <<
         " vertices and " << num_edges(packedAssemblyGraph) << " edges." << endl;
@@ -343,7 +344,7 @@ void PackedAssemblyGraph::computePartialPaths(
     PackedAssemblyGraph& packedAssemblyGraph = *this;
 
     ofstream debugOut;
-    // debugOut.open("PackedAssemblyGraph-computePartialPath.txt");
+    debugOut.open("PackedAssemblyGraph-computePartialPath.txt");
     BGL_FORALL_VERTICES(v, packedAssemblyGraph, PackedAssemblyGraph) {
         computePartialPath(
             v,
@@ -667,3 +668,45 @@ void PackedAssemblyGraph::computePartialPath(
 }
 
 
+
+void PackedAssemblyGraph::analyzePartialPaths() const
+{
+    // EXPOSE WHEN CODE STABILIZES.
+    // Control the initial length of partial pats used here.
+    const uint64_t n = 6;
+
+    const PackedAssemblyGraph& packedAssemblyGraph = *this;
+
+    vector<pair<vertex_descriptor, vertex_descriptor> > forwardPairs;
+    vector<pair<vertex_descriptor, vertex_descriptor> > backwardPairs;
+    vector<pair<vertex_descriptor, vertex_descriptor> > bidirectionalPairs;
+
+    BGL_FORALL_VERTICES(v, packedAssemblyGraph, PackedAssemblyGraph) {
+        const PackedAssemblyGraphVertex& vertex = packedAssemblyGraph[v];
+
+        for(uint64_t i=0; i<min(n, vertex.forwardPartialPath.size()); i++) {
+            forwardPairs.push_back(make_pair(v, vertex.forwardPartialPath[i]));
+        }
+        for(uint64_t i=0; i<min(n, vertex.backwardPartialPath.size()); i++) {
+            backwardPairs.push_back(make_pair(vertex.backwardPartialPath[i], v));
+        }
+    }
+
+    sort(forwardPairs.begin(), forwardPairs.end());
+    sort(backwardPairs.begin(), backwardPairs.end());
+    std::set_intersection(
+        forwardPairs.begin(), forwardPairs.end(),
+        backwardPairs.begin(), backwardPairs.end(),
+        back_inserter(bidirectionalPairs));
+
+    ofstream dot("analyzePartialPaths.dot");
+    dot << "digraph analyzePartialPaths {\n";
+    for(const auto& p: bidirectionalPairs) {
+        const vertex_descriptor v0 = p.first;
+        const vertex_descriptor v1 = p.second;
+        dot <<
+            "P" << packedAssemblyGraph[v0].id << "->" <<
+            "P" << packedAssemblyGraph[v1].id << ";\n";
+    }
+    dot << "}\n";
+}

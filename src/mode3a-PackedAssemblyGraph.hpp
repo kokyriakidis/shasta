@@ -98,6 +98,7 @@ private:
         uint64_t segmentCoverageThreshold2,
         ostream& debugOut);
     void writePartialPaths() const;
+    void analyzePartialPaths() const;
 
     void writeGraphviz() const;
     void writeJourneys() const;
