@@ -32,7 +32,7 @@ Assembler::Assembler(
     markerGraph(markerGraph)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    const double minJaccard = 0.5;
+    const double minJaccard = 0.3;
 
 #if 0
     // These are used to compute partial paths.

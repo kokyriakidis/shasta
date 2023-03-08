@@ -65,9 +65,43 @@ void PackedAssemblyGraph::createVertices(
             AssemblyGraphEdgePredicate(assemblyGraph),
             AssemblyGraphVertexPredicate(assemblyGraph));
 
-    // Find linear chains of vertices in this subgraph of the assembly graph.
+
+
+    // Iteratively find linear chains of vertices in this subgraph of the assembly graph,
+    // then filter out vertices in short linear chains.
     vector< vector<AssemblyGraph::vertex_descriptor> > chains;
-    findLinearVertexChains(filteredAssemblyGraph, chains);
+    while(true) {
+        findLinearVertexChains(filteredAssemblyGraph, chains);
+        cout << "Found " << chains.size() << " linear chains." << endl;
+
+        uint64_t shortChainCount = 0;
+        for(const vector<AssemblyGraph::vertex_descriptor>& chain: chains) {
+
+            // See if this chain is sufficiently long.
+            uint64_t totalMarkerCount = 0;
+            for(const AssemblyGraph::vertex_descriptor v: chain) {
+                const uint64_t segmentId = assemblyGraph[v].segmentId;
+                const uint64_t markerCount = assemblyGraph.packedMarkerGraph.segments[segmentId].size();
+                totalMarkerCount += markerCount;
+            }
+            if(totalMarkerCount >= minMarkerCount) {
+                continue;
+            }
+
+            // If getting here, this chain is short. Filter out
+            // all of its vertices.
+            ++shortChainCount;
+            for(const AssemblyGraph::vertex_descriptor v: chain) {
+                assemblyGraph[v].isActive = false;
+            }
+        }
+
+        if(shortChainCount == 0) {
+            break;
+        }
+    }
+
+
 
     // Set back all the isActive flags.
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
@@ -78,20 +112,9 @@ void PackedAssemblyGraph::createVertices(
         assemblyGraph[e].isActive = true;
     }
 
-    // Each sufficiently long linear chain generates a vertex of the PackedAssemblyGraph,
+    // Each linear chain generates a vertex of the PackedAssemblyGraph,
     uint64_t nextVertexId = 0;
     for(const vector<AssemblyGraph::vertex_descriptor>& chain: chains) {
-
-        // See if this chain is sufficiently long.
-        uint64_t totalMarkerCount = 0;
-        for(const AssemblyGraph::vertex_descriptor v: chain) {
-            const uint64_t segmentId = assemblyGraph[v].segmentId;
-            const uint64_t markerCount = assemblyGraph.packedMarkerGraph.segments[segmentId].size();
-            totalMarkerCount += markerCount;
-        }
-        if(totalMarkerCount < minMarkerCount) {
-            continue;
-        }
 
         // Generate a PackedAssemblyGraph vertex corresponding to this linear chain
         // of Assembly graph vertices.
