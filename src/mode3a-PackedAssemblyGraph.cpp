@@ -33,6 +33,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
     createVertices(minLinkCoverage, minMarkerCount);
     computeJourneys();
     createEdges(minJaccard, threadCount);
+    writeVertices();
     writeGraphviz(minJaccard);
 
     cout << "The PackedAssemblyGraph has " << num_vertices(packedAssemblyGraph) <<
@@ -238,3 +239,25 @@ void PackedAssemblyGraph::writeGraphviz(double minJaccard) const
     dot << "}\n";
 }
 
+
+
+void PackedAssemblyGraph::writeVertices() const
+{
+    const PackedAssemblyGraph& packedAssemblyGraph = *this;
+
+    ofstream csv("PackedAssemblyGraphVertices.csv");
+    BGL_FORALL_VERTICES(pv, packedAssemblyGraph, PackedAssemblyGraph) {
+        const PackedAssemblyGraphVertex& pVertex = packedAssemblyGraph[pv];
+
+        for(uint64_t position=0; position<pVertex.assemblyGraphVertices.size(); position++) {
+            const AssemblyGraph::vertex_descriptor av = pVertex.assemblyGraphVertices[position];
+            csv <<
+                "P" << pVertex.id << "," <<
+                position << "," <<
+                assemblyGraph.vertexStringId(av) << "\n";
+        }
+
+    }
+
+
+}

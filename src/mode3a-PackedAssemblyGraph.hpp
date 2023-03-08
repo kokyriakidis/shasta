@@ -76,6 +76,7 @@ private:
 
     void createEdges(double minJaccard, uint64_t threadCount);
 
+    void writeVertices() const;
     void writeGraphviz(double minJaccard) const;
 };
 
