@@ -20,7 +20,6 @@ namespace shasta {
         class PackedAssemblyGraph;
         class PackedAssemblyGraphVertex;
         class PackedAssemblyGraphEdge;
-        class PackedAssemblyGraphJourneyEntry;
 
         using PackedAssemblyGraphBaseClass = boost::adjacency_list<
             boost::listS, boost::listS, boost::bidirectionalS,
@@ -33,7 +32,6 @@ namespace shasta {
         using AssemblyGraphBaseClass = boost::adjacency_list<
             boost::listS, boost::listS, boost::bidirectionalS,
             AssemblyGraphVertex, AssemblyGraphEdge>;
-        class JourneyEntry;
     }
 }
 
@@ -43,17 +41,13 @@ class shasta::mode3a::PackedAssemblyGraphVertex {
 public:
     uint64_t id;
     vector<AssemblyGraphBaseClass::vertex_descriptor> assemblyGraphVertices;
-    vector<JourneyEntry> journeyEntries;
-
-    vector<PackedAssemblyGraphBaseClass::vertex_descriptor> forwardPartialPath;
-    vector<PackedAssemblyGraphBaseClass::vertex_descriptor> backwardPartialPath;
 };
 
 
 
 class shasta::mode3a::PackedAssemblyGraphEdge {
 public:
-    uint64_t coverage;
+    double jaccard;
 };
 
 
@@ -61,18 +55,16 @@ public:
 class shasta::mode3a::PackedAssemblyGraph : public PackedAssemblyGraphBaseClass {
 public:
     PackedAssemblyGraph(
-        const AssemblyGraph&,
-        uint64_t minLinkCoverage1,
-        uint64_t minLinkCoverage2,
-        uint64_t minLinkCoverage3,
-        uint64_t segmentCoverageThreshold1,
-        uint64_t segmentCoverageThreshold2,
-        uint64_t minMarkerCount);
+        AssemblyGraph&,
+        uint64_t minLinkCoverage,
+        uint64_t minMarkerCount,
+        double minJaccard,
+        uint64_t threadCount);
 private:
-    const AssemblyGraph& assemblyGraph;
+    AssemblyGraph& assemblyGraph;
 
     void createVertices(
-        uint64_t minLinkCoverage1,
+        uint64_t minLinkCoverage,
         uint64_t minMarkerCount);
 
     string vertexStringId(vertex_descriptor) const;
@@ -82,26 +74,9 @@ private:
     vector< vector<vertex_descriptor> > journeys;
     void computeJourneys();
 
-    void createEdges(uint64_t minLinkCoverage2);
+    void createEdges(double minJaccard, uint64_t threadCount);
 
-    // Partial paths.
-    // The partial path for a vertex is obtained by following
-    // the oriented reads in that vertex.
-    void computePartialPaths(
-        uint64_t minLinkCoverage,
-        uint64_t segmentCoverageThreshold1,
-        uint64_t segmentCoverageThreshold2);
-    void computePartialPath(
-        vertex_descriptor,
-        uint64_t minLinkCoverage,
-        uint64_t segmentCoverageThreshold1,
-        uint64_t segmentCoverageThreshold2,
-        ostream& debugOut);
-    void writePartialPaths() const;
-    void analyzePartialPaths() const;
-
-    void writeGraphviz() const;
-    void writeJourneys() const;
+    void writeGraphviz(double minJaccard) const;
 };
 
 

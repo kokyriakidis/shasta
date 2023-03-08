@@ -605,9 +605,11 @@ private:
     };
     ComputeJaccardGraphData computeJaccardGraphData;
 
+public:
     void computeVertexOrientedReadIds(uint64_t threadCount);
-    void computeVertexOrientedReadIdsThreadFunction(uint64_t threadId);
     void clearVertexOrientedReadIds();
+private:
+    void computeVertexOrientedReadIdsThreadFunction(uint64_t threadId);
     class ComputeVertexOrientedReadIdsData {
     public:
         vector<vertex_descriptor> allVertices;
@@ -616,6 +618,7 @@ private:
 
     // Compute Jaccard similarity between two vertices.
     // This requires vertex oriented read ids to be available.
+public:
     double computeJaccard(
         vertex_descriptor,
         vertex_descriptor,

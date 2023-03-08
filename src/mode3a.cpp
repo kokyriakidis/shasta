@@ -32,9 +32,7 @@ Assembler::Assembler(
     markerGraph(markerGraph)
 {
     // EXPOSE WHEN CODE STABILIZES.
-#if 0
-    const double minJaccard = 0.7;
-#endif
+    const double minJaccard = 0.5;
 
 #if 0
     // These are used to compute partial paths.
@@ -45,12 +43,8 @@ Assembler::Assembler(
     const uint64_t detangleIterationCount = 1;
     const uint64_t minDetangleCoverage = 3;
 
-#if 0
-    const uint64_t minLinkCoverage1ForPackedAssemblyGraph = 6;
-    const uint64_t minLinkCoverage2ForPackedAssemblyGraph = 6;
-    const uint64_t minLinkCoverage3ForPackedAssemblyGraph = 3;
-    const uint64_t minMarkerCountForPackedAssemblyGraph = 100;
-#endif
+    const uint64_t minLinkCoverageForPackedAssemblyGraph = 6;
+    const uint64_t minMarkerCountForPackedAssemblyGraph = 50;
 
 
     // This requires the marker length k to be even.
@@ -178,17 +172,13 @@ Assembler::Assembler(
         "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIterationCount), *this);
     snapshot.write();
 
-#if 0
     // Create the PackedAssemblyGraph.
     PackedAssemblyGraph packedAssemblyGraph(
         *assemblyGraph,
-        minLinkCoverage1ForPackedAssemblyGraph,
-        minLinkCoverage2ForPackedAssemblyGraph,
-        minLinkCoverage3ForPackedAssemblyGraph,
-        segmentCoverageThreshold1ForPaths,
-        segmentCoverageThreshold2ForPaths,
-        minMarkerCountForPackedAssemblyGraph);
-#endif
+        minLinkCoverageForPackedAssemblyGraph,
+        minMarkerCountForPackedAssemblyGraph,
+        minJaccard,
+        threadCount);
 }
 
 
