@@ -26,6 +26,7 @@ namespace shasta {
         using AssemblyGraphBaseClass = boost::adjacency_list<
             boost::listS, boost::listS, boost::bidirectionalS,
             AssemblyGraphVertex, AssemblyGraphEdge>;
+        class AssemblyGraphEdgePredicate;
 
         class JourneyEntry;
         class Transition;
@@ -110,6 +111,9 @@ public:
     vector<OrientedReadId> orientedReadIds;
     void computeOrientedReadIds();
 
+    // This is used when we want to work with a filtered_graph.
+    bool isActive = true;
+
     // Partial paths for a vertex are computed
     // by following the path entries in this vertex, forward or backward,
     // until we encounter a divergence or low coverage.
@@ -150,6 +154,8 @@ public:
 // Each edge represents a link.
 class shasta::mode3a::AssemblyGraphEdge {
 public:
+    // This is used when we want to work with a filtered_graph.
+    bool isActive = true;
 };
 
 
@@ -623,6 +629,20 @@ public:
         vertex_descriptor,
         vertex_descriptor,
         vector<OrientedReadId>& commonOrientedReadIds) const;
+};
+
+
+
+class shasta::mode3a::AssemblyGraphEdgePredicate {
+public:
+    AssemblyGraphEdgePredicate() : assemblyGraph(0) {}
+    AssemblyGraphEdgePredicate(const AssemblyGraph& assemblyGraph) :
+        assemblyGraph(&assemblyGraph) {}
+    const AssemblyGraph* assemblyGraph;
+    bool operator()(const AssemblyGraph::edge_descriptor e) const
+    {
+        return (*assemblyGraph)[e].isActive;
+    }
 };
 
 #endif

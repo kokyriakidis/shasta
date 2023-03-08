@@ -3,6 +3,7 @@
 #include "mode3a-AssemblyGraph.hpp"
 #include "mode3a-PackedMarkerGraph.hpp"
 #include "deduplicate.hpp"
+#include "findLinearChains.hpp"
 #include "orderPairs.hpp"
 #include "removeReciprocalEdges.hpp"
 #include "timestamp.hpp"
@@ -10,6 +11,7 @@ using namespace shasta;
 using namespace mode3a;
 
 // Boost libraries.
+#include <boost/graph/filtered_graph.hpp>
 #include <boost/graph/iteration_macros.hpp>
 
 // Standard library.
@@ -45,92 +47,41 @@ void PackedAssemblyGraph::createVertices(
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
 
-    // Gather all AssemblyGraph vertices with in-degree and out-degree
-    // equal to 1 when considering only AssemblyGraph edges with coverage
-    // at list equal to minLinkCoverage.
-    // These are the vertices that can be referenced in PackedAssemblyGraph
-    // vertices.
-    // For each of them, store the previous and next vertex.
-    std::map<AssemblyGraph::vertex_descriptor,
-        pair<AssemblyGraph::vertex_descriptor, AssemblyGraph::vertex_descriptor> > vertexMap;
-    vector<AssemblyGraph::edge_descriptor> inEdges;
-    vector<AssemblyGraph::edge_descriptor> outEdges;
-    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+    // Create a subgraph using only edges with coverage at least minCoverage.
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        assemblyGraph[e].isActive = assemblyGraph.edgeCoverage(e) >= minLinkCoverage;
+    }
+    boost::filtered_graph<AssemblyGraph, AssemblyGraphEdgePredicate>
+        filteredAssemblyGraph(assemblyGraph, AssemblyGraphEdgePredicate(assemblyGraph));
 
-        // Gather in-edges.
-        inEdges.clear();
-        BGL_FORALL_INEDGES(v, e, assemblyGraph, AssemblyGraph) {
-            if(assemblyGraph.edgeCoverage(e) >= minLinkCoverage) {
-                inEdges.push_back(e);
-            }
-        }
-        if(inEdges.size() != 1) {
-            // When considering only edges with sufficient coverage, v does not have in-degree 1.
-            continue;
-        }
-
-        // Gather out-edges.
-        outEdges.clear();
-        BGL_FORALL_OUTEDGES(v, e, assemblyGraph, AssemblyGraph) {
-            if(assemblyGraph.edgeCoverage(e) >= minLinkCoverage) {
-                outEdges.push_back(e);
-            }
-        }
-        if(outEdges.size() != 1) {
-            // When considering only edges with sufficient coverage, v does not have in-degree 1.
-            continue;
-        }
-
-        // Add this vertex to our vertexMap.
-        const AssemblyGraph::vertex_descriptor v0 = source(inEdges.front(), assemblyGraph);
-        const AssemblyGraph::vertex_descriptor v1 = target(outEdges.front(), assemblyGraph);
-        vertexMap.insert(make_pair(v, make_pair(v0, v1)));
+    // Find linear chains of vertices in this subgraph of the assembly graph.
+    vector< vector<AssemblyGraph::vertex_descriptor> > chains;
+    findLinearVertexChains(filteredAssemblyGraph, chains);
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        assemblyGraph[e].isActive = true;
     }
 
-
-
-
     // Each sufficiently long linear chain generates a vertex of the PackedAssemblyGraph,
-    // We are not interested in circular chains, so
-    // each linear sequence begins at a vertex whose parent does not appear in the vertex map.
     uint64_t nextVertexId = 0;
-    for(const auto& p: vertexMap) {
-        const AssemblyGraph::vertex_descriptor v = p.first;
-        const AssemblyGraph::vertex_descriptor v0 = p.second.first;
-        if(vertexMap.contains(v0)) {
-            // A linear chain does not begin at v.
-            continue;
-        }
+    for(const vector<AssemblyGraph::vertex_descriptor>& chain: chains) {
 
-        /// If getting here, a linear chain begins at v.
-        vertex_descriptor pv = add_vertex(packedAssemblyGraph);
-        PackedAssemblyGraphVertex& vertex = packedAssemblyGraph[pv];
-        vertex.assemblyGraphVertices.push_back(v);
-        AssemblyGraph::vertex_descriptor u = p.second.second;
-        while(true) {
-            const auto it = vertexMap.find(u);
-            if(it == vertexMap.end()) {
-                // u is not in our vertexMap, so it cannot be part of a linear chain.
-                break;
-            }
-            vertex.assemblyGraphVertices.push_back(u);
-            u = it->second.second;
-        }
-
-        // If the chain is too short, remove the vertex.
-        // Otherwise, keep it and assign it an id.
+        // See if this chain is sufficiently long.
         uint64_t totalMarkerCount = 0;
-        for(const AssemblyGraph::vertex_descriptor v: vertex.assemblyGraphVertices) {
-            const AssemblyGraphVertex& aVertex = assemblyGraph[v];
-            const uint64_t segmentId = aVertex.segmentId;
+        for(const AssemblyGraph::vertex_descriptor v: chain) {
+            const uint64_t segmentId = assemblyGraph[v].segmentId;
             const uint64_t markerCount = assemblyGraph.packedMarkerGraph.segments[segmentId].size();
             totalMarkerCount += markerCount;
         }
         if(totalMarkerCount < minMarkerCount) {
-            remove_vertex(pv, packedAssemblyGraph);
-        } else {
-            vertex.id = nextVertexId++;
+            continue;
         }
+
+        // Generate a PackedAssemblyGraph vertex corresponding to this linear chain
+        // of Assembly graph vertices.
+        const vertex_descriptor v = add_vertex(packedAssemblyGraph);
+        PackedAssemblyGraphVertex& vertex = packedAssemblyGraph[v];
+        vertex.id = nextVertexId++;
+        vertex.assemblyGraphVertices = chain;
     }
 }
 
