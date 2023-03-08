@@ -997,3 +997,224 @@ void AssemblyGraph::createByLocalClustering(
     // Now that we have the vertices and the journeys we can create the links.
     createLinks();
 }
+
+
+
+void AssemblyGraph::computeJaccardGraph(uint64_t threadCount, double minJaccard)
+{
+    // Find candidate pairs.
+    findJaccardGraphCandidatePairs(threadCount);
+
+    // To compute Jaccard similarity, we need to get distinct oriented reads
+    // for each vertex.
+    computeVertexOrientedReadIds(threadCount);
+
+    // Now we can compute Jaccard similarity for all the candidate pairs.
+    computeJaccardPairs(threadCount, minJaccard);
+    computeJaccardGraphData.candidatePairs.clear();
+    computeJaccardGraphData.candidatePairs.shrink_to_fit();
+    clearVertexOrientedReadIds();
+
+    // Write out the pairs.
+    ofstream dot("JaccardGraph.dot");
+    dot << "graph JaccardGraph {\n";
+    for(const auto& p: computeJaccardGraphData.goodPairs) {
+
+        // Color it so jaccard=1 is green, jaccard=minJaccard is red.
+        const double jaccard = p.second;
+        const double ratio = (jaccard - minJaccard) / (1. - minJaccard);
+        const double hue = ratio / 3.;
+
+        dot << vertexStringId(p.first.first) << "--" << vertexStringId(p.first.second) <<
+            " [ color=\"" << hue << ",1,1\"]"
+            ";\n";
+    }
+    dot << "}\n";
+
+    computeJaccardGraphData.goodPairs.clear();
+    computeJaccardGraphData.goodPairs.shrink_to_fit();
+}
+
+
+
+void AssemblyGraph::findJaccardGraphCandidatePairs(uint64_t threadCount)
+{
+    computeJaccardGraphData.threadCandidatePairs.clear();
+    computeJaccardGraphData.threadCandidatePairs.resize(threadCount);
+    setupLoadBalancing(journeys.size(), 1);
+    runThreads(&AssemblyGraph::findJaccardGraphCandidatePairsThreadFunction, threadCount);
+
+    // Consolidate and deduplicate the candidate pairs found by all threads.
+    computeJaccardGraphData.candidatePairs.clear();
+    for(uint64_t threadId=0; threadId<threadCount; threadId++) {
+        const auto& v = computeJaccardGraphData.threadCandidatePairs[threadId];
+        copy(v.begin(), v.end(), back_inserter(computeJaccardGraphData.candidatePairs));
+    }
+    computeJaccardGraphData.threadCandidatePairs.clear();
+    deduplicate(computeJaccardGraphData.candidatePairs);
+    cout << "Found " << computeJaccardGraphData.candidatePairs.size() <<
+        " candidate pairs for the Jaccard graph." << endl;
+}
+
+
+
+void AssemblyGraph::findJaccardGraphCandidatePairsThreadFunction(uint64_t threadId)
+{
+
+    auto& threadCandidatePairs = computeJaccardGraphData.threadCandidatePairs[threadId];
+
+    // Loop over batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over oriented reads assigned to this batch.
+        for(uint64_t orientedReadId=begin; orientedReadId!=end; orientedReadId++) {
+            const vector<vertex_descriptor>& journey = journeys[orientedReadId];
+
+            for(uint64_t i=1; i<journey.size(); i++) {
+                if(journey[i] == null_vertex()) {
+                    continue;
+                }
+                for(uint64_t j=0; j<i; j++) {
+                    if(journey[j] == null_vertex()) {
+                        continue;
+                    }
+                    auto p = make_pair(journey[j], journey[i]);
+                    if(p.first > p.second) {
+                        std::swap(p.first, p.second);
+                    }
+                    threadCandidatePairs.push_back(p);
+                }
+            }
+        }
+    }
+}
+
+
+
+void AssemblyGraph::computeVertexOrientedReadIds(uint64_t threadCount)
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // Find distinct oriented read ids in each vertex.
+    computeVertexOrientedReadIdsData.allVertices.clear();
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        computeVertexOrientedReadIdsData.allVertices.push_back(v);
+    }
+    setupLoadBalancing(computeVertexOrientedReadIdsData.allVertices.size(), 100);
+    runThreads(&AssemblyGraph::computeVertexOrientedReadIdsThreadFunction, threadCount);
+    computeVertexOrientedReadIdsData.allVertices.clear();
+    computeVertexOrientedReadIdsData.allVertices.shrink_to_fit();
+}
+
+
+
+void AssemblyGraph::computeVertexOrientedReadIdsThreadFunction(uint64_t threadId)
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // Loop over batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over vertices assigned to this batch.
+        for(uint64_t i=begin; i!=end; i++) {
+            const vertex_descriptor v = computeVertexOrientedReadIdsData.allVertices[i];
+            assemblyGraph[v].computeOrientedReadIds();
+        }
+    }
+
+}
+
+
+
+// Compute Jaccard similarity between two vertices.
+// This requires vertex oriented read ids to be available.
+double AssemblyGraph::computeJaccard(
+    vertex_descriptor v0,
+    vertex_descriptor v1,
+    vector<OrientedReadId>& commonOrientedReadIds) const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+    const AssemblyGraphVertex& vertex0 = assemblyGraph[v0];
+    const AssemblyGraphVertex& vertex1 = assemblyGraph[v1];;
+
+    commonOrientedReadIds.clear();
+    set_intersection(
+        vertex0.orientedReadIds.begin(), vertex0.orientedReadIds.end(),
+        vertex1.orientedReadIds.begin(), vertex1.orientedReadIds.end(),
+        back_inserter(commonOrientedReadIds));
+
+    const uint64_t intersectionSize = commonOrientedReadIds.size();
+    const uint64_t unionSize =
+        vertex0.orientedReadIds.size() + vertex1.orientedReadIds.size() - intersectionSize;
+
+    return double(intersectionSize) / double(unionSize);
+}
+
+
+
+void AssemblyGraphVertex::computeOrientedReadIds()
+{
+    orientedReadIds.clear();
+    for(const JourneyEntry& journeyEntry: journeyEntries) {
+        const OrientedReadId orientedReadId = journeyEntry.orientedReadId;
+        if(orientedReadIds.empty() or orientedReadId!=orientedReadIds.back()) {
+            orientedReadIds.push_back(orientedReadId);
+        }
+    }
+}
+
+
+
+void AssemblyGraph::clearVertexOrientedReadIds()
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        assemblyGraph[v].orientedReadIds.clear();
+    }
+}
+
+
+
+void AssemblyGraph::computeJaccardPairs(uint64_t threadCount, double minJaccard)
+{
+    computeJaccardGraphData.minJaccard = minJaccard;
+    computeJaccardGraphData.threadGoodPairs.clear();
+    computeJaccardGraphData.threadGoodPairs.resize(threadCount);
+    setupLoadBalancing(computeJaccardGraphData.candidatePairs.size(), 1000);
+    runThreads(&AssemblyGraph::computeJaccardPairsThreadFunction, threadCount);
+
+    // Consolidate the good pairs found by all threads.
+    computeJaccardGraphData.goodPairs.clear();
+    for(uint64_t threadId=0; threadId<threadCount; threadId++) {
+        const auto& v = computeJaccardGraphData.threadGoodPairs[threadId];
+        copy(v.begin(), v.end(), back_inserter(computeJaccardGraphData.goodPairs));
+    }
+    computeJaccardGraphData.threadGoodPairs.clear();
+    cout << "Found " << computeJaccardGraphData.goodPairs.size() <<
+        " good pairs for the Jaccard graph." << endl;
+}
+
+
+
+void AssemblyGraph::computeJaccardPairsThreadFunction(uint64_t threadId)
+{
+    const double minJaccard = computeJaccardGraphData.minJaccard;
+    vector<OrientedReadId> commonOrientedReadIds;
+
+    // Loop over all batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over candidate pairs assigned to this batch.
+        for(uint64_t i=begin; i!=end; i++) {
+            const auto& p = computeJaccardGraphData.candidatePairs[i];
+            const double jaccard = computeJaccard(p.first, p.second, commonOrientedReadIds);
+            if(jaccard >= minJaccard) {
+                computeJaccardGraphData.threadGoodPairs[threadId].push_back(make_pair(p, jaccard));
+            }
+        }
+    }
+}

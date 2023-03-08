@@ -106,6 +106,10 @@ public:
     // The journey entries that go through this vertex.
     vector<JourneyEntry> journeyEntries;
 
+    // The deduplicated oriented reads in this vertex.
+    vector<OrientedReadId> orientedReadIds;
+    void computeOrientedReadIds();
+
     // Partial paths for a vertex are computed
     // by following the path entries in this vertex, forward or backward,
     // until we encounter a divergence or low coverage.
@@ -569,6 +573,53 @@ private:
             vector<edge_descriptor>& edgesToBeRemoved;
         };
     };
+
+
+
+    // Jaccard graph.
+public:
+    void computeJaccardGraph(uint64_t threadCount, double minJaccard);
+private:
+    void findJaccardGraphCandidatePairs(uint64_t threadCount);
+    void findJaccardGraphCandidatePairsThreadFunction(uint64_t threadId);
+    void computeJaccardPairs(uint64_t threadCount, double minJaccard);
+    void computeJaccardPairsThreadFunction(uint64_t threadId);
+    class ComputeJaccardGraphData {
+    public:
+
+        using VertexPair = pair<vertex_descriptor, vertex_descriptor>;
+
+        // The candidate pairs found by each thread.
+        vector< vector<VertexPair> > threadCandidatePairs;
+
+        // The consolidated and deduplicated candidate pairs.
+        vector<VertexPair> candidatePairs;
+
+        // The good pairs found by each thread.
+        vector< vector<pair<VertexPair, double> > > threadGoodPairs;
+
+        // The consolidated and deduplicated good pairs.
+        vector< pair<VertexPair, double> > goodPairs;
+
+        double minJaccard;
+    };
+    ComputeJaccardGraphData computeJaccardGraphData;
+
+    void computeVertexOrientedReadIds(uint64_t threadCount);
+    void computeVertexOrientedReadIdsThreadFunction(uint64_t threadId);
+    void clearVertexOrientedReadIds();
+    class ComputeVertexOrientedReadIdsData {
+    public:
+        vector<vertex_descriptor> allVertices;
+    };
+    ComputeVertexOrientedReadIdsData computeVertexOrientedReadIdsData;
+
+    // Compute Jaccard similarity between two vertices.
+    // This requires vertex oriented read ids to be available.
+    double computeJaccard(
+        vertex_descriptor,
+        vertex_descriptor,
+        vector<OrientedReadId>& commonOrientedReadIds) const;
 };
 
 #endif

@@ -32,17 +32,25 @@ Assembler::Assembler(
     markerGraph(markerGraph)
 {
     // EXPOSE WHEN CODE STABILIZES.
+#if 0
+    const double minJaccard = 0.7;
+#endif
 
+#if 0
     // These are used to compute partial paths.
     const uint64_t segmentCoverageThreshold1ForPaths = 3;
     const uint64_t segmentCoverageThreshold2ForPaths = 6;
+#endif
 
     const uint64_t detangleIterationCount = 1;
     const uint64_t minDetangleCoverage = 3;
+
+#if 0
     const uint64_t minLinkCoverage1ForPackedAssemblyGraph = 6;
     const uint64_t minLinkCoverage2ForPackedAssemblyGraph = 6;
     const uint64_t minLinkCoverage3ForPackedAssemblyGraph = 3;
     const uint64_t minMarkerCountForPackedAssemblyGraph = 100;
+#endif
 
 
     // This requires the marker length k to be even.
@@ -98,6 +106,14 @@ Assembler::Assembler(
     // Create the AssemblyGraph.
     shared_ptr<AssemblyGraph> assemblyGraph = make_shared<AssemblyGraph>(*packedMarkerGraph);
 
+#if 0
+    AssemblyGraphSnapshot snapshot(
+        *assemblyGraph,
+        "Mode3a-AssemblyGraphSnapshot-0", *this);
+    snapshot.write();
+    assemblyGraph->computeJaccardGraph(threadCount, minJaccard);
+#endif
+
 
     // Detangle iterations.
     for(uint64_t detangleIteration=0; detangleIteration<detangleIterationCount; detangleIteration++) {
@@ -107,6 +123,7 @@ Assembler::Assembler(
         cout << "Before detangle iteration " << detangleIteration << " the AssemblyGraph has " <<
            num_vertices(*assemblyGraph) << " segments and " <<
            num_edges(*assemblyGraph) << " links." << endl;
+
 #if 0
         // Follow reads to compute partial paths.
         assemblyGraph->computePartialPaths(threadCount,
@@ -131,11 +148,13 @@ Assembler::Assembler(
                 AssemblyGraph::DetangleUsingTangledAssemblyPaths(),
                 *assemblyGraph);
 #endif
+
         // Create a new AssemblyGraph using tangle matrices of the current AssemblyGraph.
         shared_ptr<AssemblyGraph> newAssemblyGraph =
             make_shared<AssemblyGraph>(
                 AssemblyGraph::DetangleUsingTangleMatrices(),
                 *assemblyGraph, minDetangleCoverage);
+
 #if 0
         // Create a new AssemblyGraph by local clustering on the current AssemblyGraph.
         shared_ptr<AssemblyGraph> newAssemblyGraph =
@@ -159,6 +178,7 @@ Assembler::Assembler(
         "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIterationCount), *this);
     snapshot.write();
 
+#if 0
     // Create the PackedAssemblyGraph.
     PackedAssemblyGraph packedAssemblyGraph(
         *assemblyGraph,
@@ -168,6 +188,7 @@ Assembler::Assembler(
         segmentCoverageThreshold1ForPaths,
         segmentCoverageThreshold2ForPaths,
         minMarkerCountForPackedAssemblyGraph);
+#endif
 }
 
 
