@@ -596,13 +596,14 @@ void LocalAssemblyGraph::writeSvg(
 
         // Decide the color for this segment.
         string color = "Green";
+        double jaccard = invalid<double>;
         if(distance == maxDistance) {
             color = "LightGray";
         } else {
             if(options.segmentColoring == "random") {
                 color = randomSegmentColor(snapshotVertex.segmentId);
             } else {
-                const double jaccard = assemblyGraphSnapshot.jaccard(
+                jaccard = assemblyGraphSnapshot.jaccard(
                     referenceVertexId,
                     localAssemblyGraphVertex.vertexId,
                     orientedReadIds0,
@@ -675,9 +676,17 @@ void LocalAssemblyGraph::writeSvg(
             "snapshotIndex=" << snapshotIndex <<
             "&segmentId=" << snapshotVertex.segmentId <<
             "&segmentReplicaIndex=" << snapshotVertex.segmentReplicaIndex << "\";}'"
-            "><title>" << snapshotVertex.stringId() << "</title></path>\n";
+            "><title>" << snapshotVertex.stringId();
         svg.precision(oldPrecision);
         svg.flags(oldFlags);
+        if(jaccard != invalid<double>) {
+            const auto oldPrecision = svg.precision(2);
+            const auto oldFlags = svg.setf(std::ios_base::fixed, std::ios_base::floatfield);
+            svg << " " << jaccard;
+            svg.precision(oldPrecision);
+            svg.flags(oldFlags);
+        }
+        svg << "</title></path>\n";
     }
 
     // End the group containing segments.
