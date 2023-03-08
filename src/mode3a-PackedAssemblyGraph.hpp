@@ -56,6 +56,7 @@ class shasta::mode3a::PackedAssemblyGraph : public PackedAssemblyGraphBaseClass 
 public:
     PackedAssemblyGraph(
         AssemblyGraph&,
+        uint64_t minSegmentCoverage,
         uint64_t minLinkCoverage,
         uint64_t minMarkerCount,
         double minJaccard,
@@ -64,6 +65,7 @@ private:
     AssemblyGraph& assemblyGraph;
 
     void createVertices(
+        uint64_t minSegmentCoverage,
         uint64_t minLinkCoverage,
         uint64_t minMarkerCount);
 

@@ -43,6 +43,7 @@ Assembler::Assembler(
     const uint64_t detangleIterationCount = 1;
     const uint64_t minDetangleCoverage = 3;
 
+    const uint64_t minSegmentCoverageForPackedAssemblyGraph = 8;
     const uint64_t minLinkCoverageForPackedAssemblyGraph = 6;
     const uint64_t minMarkerCountForPackedAssemblyGraph = 50;
 
@@ -175,6 +176,7 @@ Assembler::Assembler(
     // Create the PackedAssemblyGraph.
     PackedAssemblyGraph packedAssemblyGraph(
         *assemblyGraph,
+        minSegmentCoverageForPackedAssemblyGraph,
         minLinkCoverageForPackedAssemblyGraph,
         minMarkerCountForPackedAssemblyGraph,
         minJaccard,

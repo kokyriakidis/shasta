@@ -26,6 +26,7 @@ namespace shasta {
         using AssemblyGraphBaseClass = boost::adjacency_list<
             boost::listS, boost::listS, boost::bidirectionalS,
             AssemblyGraphVertex, AssemblyGraphEdge>;
+        class AssemblyGraphVertexPredicate;
         class AssemblyGraphEdgePredicate;
 
         class JourneyEntry;
@@ -629,6 +630,20 @@ public:
         vertex_descriptor,
         vertex_descriptor,
         vector<OrientedReadId>& commonOrientedReadIds) const;
+};
+
+
+
+class shasta::mode3a::AssemblyGraphVertexPredicate {
+public:
+    AssemblyGraphVertexPredicate() : assemblyGraph(0) {}
+    AssemblyGraphVertexPredicate(const AssemblyGraph& assemblyGraph) :
+        assemblyGraph(&assemblyGraph) {}
+    const AssemblyGraph* assemblyGraph;
+    bool operator()(const AssemblyGraph::vertex_descriptor v) const
+    {
+        return (*assemblyGraph)[v].isActive;
+    }
 };
 
 

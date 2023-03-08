@@ -23,6 +23,7 @@ using namespace mode3a;
 
 PackedAssemblyGraph::PackedAssemblyGraph(
     AssemblyGraph& assemblyGraph,
+    uint64_t minSegmentCoverage,
     uint64_t minLinkCoverage,
     uint64_t minMarkerCount,
     double minJaccard,
@@ -30,7 +31,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
     assemblyGraph(assemblyGraph)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
-    createVertices(minLinkCoverage, minMarkerCount);
+    createVertices(minSegmentCoverage, minLinkCoverage, minMarkerCount);
     computeJourneys();
     createEdges(minJaccard, threadCount);
     writeVertices();
@@ -43,21 +44,36 @@ PackedAssemblyGraph::PackedAssemblyGraph(
 
 
 void PackedAssemblyGraph::createVertices(
+    uint64_t minSegmentCoverage,
     uint64_t minLinkCoverage,
     uint64_t minMarkerCount)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
 
-    // Create a subgraph using only edges with coverage at least minCoverage.
+    // Create a subgraph using only vertices with
+    // coverage at least minSegmentCoverage and
+    // edges with coverage at least minLinkCoverage.
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        AssemblyGraphVertex& vertex = assemblyGraph[v];
+        vertex.isActive = vertex.journeyEntries.size() >= minSegmentCoverage;
+    }
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
         assemblyGraph[e].isActive = assemblyGraph.edgeCoverage(e) >= minLinkCoverage;
     }
-    boost::filtered_graph<AssemblyGraph, AssemblyGraphEdgePredicate>
-        filteredAssemblyGraph(assemblyGraph, AssemblyGraphEdgePredicate(assemblyGraph));
+    boost::filtered_graph<AssemblyGraph, AssemblyGraphEdgePredicate, AssemblyGraphVertexPredicate>
+        filteredAssemblyGraph(assemblyGraph,
+            AssemblyGraphEdgePredicate(assemblyGraph),
+            AssemblyGraphVertexPredicate(assemblyGraph));
 
     // Find linear chains of vertices in this subgraph of the assembly graph.
     vector< vector<AssemblyGraph::vertex_descriptor> > chains;
     findLinearVertexChains(filteredAssemblyGraph, chains);
+
+    // Set back all the isActive flags.
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        AssemblyGraphVertex& vertex = assemblyGraph[v];
+        vertex.isActive = true;
+    }
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
         assemblyGraph[e].isActive = true;
     }

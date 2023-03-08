@@ -225,7 +225,15 @@ template<class Graph> void shasta::findLinearVertexChains(
 
 
     // Check that all vertices were found.
-    SHASTA_ASSERT(verticesFound.size() == num_vertices(graph));
+    // Just using num_vertices does not work if the graph is a filtered_graph.
+    // SHASTA_ASSERT(verticesFound.size() == num_vertices(graph));
+    uint64_t vertexCount = 0;
+    BGL_FORALL_VERTICES_T(v, graph, Graph) {
+        if(v != Graph::null_vertex()) { // Just to avoid compiler warning.
+            ++vertexCount;
+        }
+    }
+    SHASTA_ASSERT(verticesFound.size() == vertexCount);
 }
 
 
