@@ -163,6 +163,16 @@ void PackedAssemblyGraph::computeJourneys()
         }
         journey.swap(newJourney);
     }
+
+    // Store journey entries in the vertices.
+    for(ReadId i=0; i<journeys.size(); i++) {
+        const auto& journey = journeys[i];
+        const OrientedReadId orientedReadId = OrientedReadId::fromValue(i);
+        for(uint64_t position=0; position<journey.size(); position++) {
+            const vertex_descriptor v = journey[position];
+            packedAssemblyGraph[v].journeyEntries.push_back({orientedReadId, position});
+        }
+    }
 }
 
 

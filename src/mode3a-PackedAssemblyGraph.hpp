@@ -32,6 +32,7 @@ namespace shasta {
         using AssemblyGraphBaseClass = boost::adjacency_list<
             boost::listS, boost::listS, boost::bidirectionalS,
             AssemblyGraphVertex, AssemblyGraphEdge>;
+        class JourneyEntry;
     }
 }
 
@@ -41,6 +42,7 @@ class shasta::mode3a::PackedAssemblyGraphVertex {
 public:
     uint64_t id;
     vector<AssemblyGraphBaseClass::vertex_descriptor> assemblyGraphVertices;
+    vector<JourneyEntry> journeyEntries;
 };
 
 
