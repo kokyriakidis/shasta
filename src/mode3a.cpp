@@ -34,18 +34,17 @@ Assembler::Assembler(
     // EXPOSE WHEN CODE STABILIZES.
     const double minJaccard = 0.3;
 
-#if 0
     // These are used to compute partial paths.
     const uint64_t segmentCoverageThreshold1ForPaths = 3;
     const uint64_t segmentCoverageThreshold2ForPaths = 6;
-#endif
+    const uint64_t minLinkCoverageForPaths = 3;
 
-    const uint64_t detangleIterationCount = 1;
-    const uint64_t minDetangleCoverage = 3;
+    const uint64_t detangleIterationCount = 3;
+    // const uint64_t minDetangleCoverage = 3;
 
     const uint64_t minSegmentCoverageForPackedAssemblyGraph = 8;
     const uint64_t minLinkCoverage1ForPackedAssemblyGraph = 6;
-    const uint64_t minLinkCoverage2ForPackedAssemblyGraph = 3;
+    const uint64_t minLinkCoverage2ForPackedAssemblyGraph = 6;
     const uint64_t minMarkerCountForPackedAssemblyGraph = 50;
 
 
@@ -120,7 +119,7 @@ Assembler::Assembler(
            num_vertices(*assemblyGraph) << " segments and " <<
            num_edges(*assemblyGraph) << " links." << endl;
 
-#if 0
+#if 1
         // Follow reads to compute partial paths.
         assemblyGraph->computePartialPaths(threadCount,
             segmentCoverageThreshold1ForPaths, segmentCoverageThreshold2ForPaths, minLinkCoverageForPaths);
@@ -137,7 +136,7 @@ Assembler::Assembler(
             "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIteration), *this);
         snapshot.write();
 
-#if 0
+#if 1
         // Create a new AssemblyGraph using the TangledAssemblyPaths.
         shared_ptr<AssemblyGraph> newAssemblyGraph =
             make_shared<AssemblyGraph>(
@@ -145,11 +144,13 @@ Assembler::Assembler(
                 *assemblyGraph);
 #endif
 
+#if 0
         // Create a new AssemblyGraph using tangle matrices of the current AssemblyGraph.
         shared_ptr<AssemblyGraph> newAssemblyGraph =
             make_shared<AssemblyGraph>(
                 AssemblyGraph::DetangleUsingTangleMatrices(),
                 *assemblyGraph, minDetangleCoverage);
+#endif
 
 #if 0
         // Create a new AssemblyGraph by local clustering on the current AssemblyGraph.
