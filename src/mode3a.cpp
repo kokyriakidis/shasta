@@ -44,7 +44,8 @@ Assembler::Assembler(
     const uint64_t minDetangleCoverage = 3;
 
     const uint64_t minSegmentCoverageForPackedAssemblyGraph = 8;
-    const uint64_t minLinkCoverageForPackedAssemblyGraph = 6;
+    const uint64_t minLinkCoverage1ForPackedAssemblyGraph = 6;
+    const uint64_t minLinkCoverage2ForPackedAssemblyGraph = 3;
     const uint64_t minMarkerCountForPackedAssemblyGraph = 50;
 
 
@@ -177,7 +178,8 @@ Assembler::Assembler(
     PackedAssemblyGraph packedAssemblyGraph(
         *assemblyGraph,
         minSegmentCoverageForPackedAssemblyGraph,
-        minLinkCoverageForPackedAssemblyGraph,
+        minLinkCoverage1ForPackedAssemblyGraph,
+        minLinkCoverage2ForPackedAssemblyGraph,
         minMarkerCountForPackedAssemblyGraph,
         minJaccard,
         threadCount);

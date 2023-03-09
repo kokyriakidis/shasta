@@ -50,6 +50,7 @@ public:
 class shasta::mode3a::PackedAssemblyGraphEdge {
 public:
     double jaccard;
+    uint64_t coverage;
 };
 
 
@@ -59,7 +60,8 @@ public:
     PackedAssemblyGraph(
         AssemblyGraph&,
         uint64_t minSegmentCoverage,
-        uint64_t minLinkCoverage,
+        uint64_t minLinkCoverage1,
+        uint64_t minLinkCoverage2,
         uint64_t minMarkerCount,
         double minJaccard,
         uint64_t threadCount);
@@ -68,7 +70,7 @@ private:
 
     void createVertices(
         uint64_t minSegmentCoverage,
-        uint64_t minLinkCoverage,
+        uint64_t minLinkCoverage1,
         uint64_t minMarkerCount);
 
     string vertexStringId(vertex_descriptor) const;
@@ -78,10 +80,11 @@ private:
     vector< vector<vertex_descriptor> > journeys;
     void computeJourneys();
 
+    void createEdgesUsingJourneys(uint64_t minLinkCoverage2);
     void createEdgesUsingJaccard(double minJaccard, uint64_t threadCount);
 
     void writeVertices() const;
-    void writeGraphviz(double minJaccard) const;
+    void writeGraphviz() const;
 };
 
 

@@ -24,18 +24,19 @@ using namespace mode3a;
 PackedAssemblyGraph::PackedAssemblyGraph(
     AssemblyGraph& assemblyGraph,
     uint64_t minSegmentCoverage,
-    uint64_t minLinkCoverage,
+    uint64_t minLinkCoverage1,
+    uint64_t minLinkCoverage2,
     uint64_t minMarkerCount,
     double minJaccard,
     uint64_t threadCount) :
     assemblyGraph(assemblyGraph)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
-    createVertices(minSegmentCoverage, minLinkCoverage, minMarkerCount);
+    createVertices(minSegmentCoverage, minLinkCoverage1, minMarkerCount);
     computeJourneys();
-    createEdgesUsingJaccard(minJaccard, threadCount);
+    createEdgesUsingJourneys(minLinkCoverage2);
     writeVertices();
-    writeGraphviz(minJaccard);
+    writeGraphviz();
 
     cout << "The PackedAssemblyGraph has " << num_vertices(packedAssemblyGraph) <<
         " vertices and " << num_edges(packedAssemblyGraph) << " edges." << endl;
@@ -45,7 +46,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
 
 void PackedAssemblyGraph::createVertices(
     uint64_t minSegmentCoverage,
-    uint64_t minLinkCoverage,
+    uint64_t minLinkCoverage1,
     uint64_t minMarkerCount)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
@@ -58,7 +59,7 @@ void PackedAssemblyGraph::createVertices(
         vertex.isActive = vertex.journeyEntries.size() >= minSegmentCoverage;
     }
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
-        assemblyGraph[e].isActive = assemblyGraph.edgeCoverage(e) >= minLinkCoverage;
+        assemblyGraph[e].isActive = assemblyGraph.edgeCoverage(e) >= minLinkCoverage1;
     }
     boost::filtered_graph<AssemblyGraph, AssemblyGraphEdgePredicate, AssemblyGraphVertexPredicate>
         filteredAssemblyGraph(assemblyGraph,
@@ -219,13 +220,40 @@ void PackedAssemblyGraph::createEdgesUsingJaccard(double minJaccard, uint64_t th
         // If the Jaccard similarity is sufficiently high, create an edge.
         const double jaccard = assemblyGraph.computeJaccard(av0, av1, commonOrientedReadIds);
         if(jaccard >= minJaccard) {
-            add_edge(pv0, pv1, PackedAssemblyGraphEdge({jaccard}), packedAssemblyGraph);
+            add_edge(pv0, pv1, PackedAssemblyGraphEdge({jaccard, invalid<uint64_t>}), packedAssemblyGraph);
         }
     }
 
 
     // Cleanup.
     assemblyGraph.clearVertexOrientedReadIds();
+}
+
+
+
+void PackedAssemblyGraph::createEdgesUsingJourneys(uint64_t minLinkCoverage2)
+{
+    PackedAssemblyGraph& packedAssemblyGraph = *this;
+
+    vector< pair<vertex_descriptor, vertex_descriptor> > transitions;
+    for(const auto& journey: journeys) {
+        for(uint64_t i=1; i<journey.size(); i++) {
+            transitions.push_back({journey[i-1], journey[i]});
+        }
+    }
+
+    vector<uint64_t> frequency;
+    deduplicateAndCount(transitions, frequency);
+
+    for(uint64_t i=0; i<transitions.size(); i++) {
+        if(frequency[i] >= minLinkCoverage2) {
+            const auto& transition = transitions[i];
+            edge_descriptor e;
+            tie(e, ignore) = add_edge(transition.first, transition.second,
+                {invalid<double>, frequency[i]}, packedAssemblyGraph);
+        }
+    }
+    removeReciprocalEdges(packedAssemblyGraph);
 }
 
 
@@ -242,7 +270,7 @@ string PackedAssemblyGraph::vertexStringId(vertex_descriptor pv) const
 
 
 
-void PackedAssemblyGraph::writeGraphviz(double minJaccard) const
+void PackedAssemblyGraph::writeGraphviz() const
 {
     const PackedAssemblyGraph& packedAssemblyGraph = *this;
 
@@ -253,11 +281,12 @@ void PackedAssemblyGraph::writeGraphviz(double minJaccard) const
         const PackedAssemblyGraphVertex& pVertex = packedAssemblyGraph[pv];
         const AssemblyGraph::vertex_descriptor av0 = pVertex.assemblyGraphVertices.front();
         const AssemblyGraph::vertex_descriptor av1 = pVertex.assemblyGraphVertices.back();
-        dot << pVertex.id;
+        dot << "P" << pVertex.id;
         dot << " [label=\"P" <<
             pVertex.id << "\\n" <<
             assemblyGraph.vertexStringId(av0) << "\\n" <<
-            assemblyGraph.vertexStringId(av1) <<
+            assemblyGraph.vertexStringId(av1) << "\\n" <<
+            pVertex.journeyEntries.size() <<
             "\"]";
         dot << ";\n";
     }
@@ -266,15 +295,18 @@ void PackedAssemblyGraph::writeGraphviz(double minJaccard) const
         const vertex_descriptor pv0 = source(e, packedAssemblyGraph);
         const vertex_descriptor pv1 = target(e, packedAssemblyGraph);
 
+        /*
         // Color it red if jaccard=minJaccard, green if jaccard=1.
         const double jaccard = packedAssemblyGraph[e].jaccard;
         const double ratio = (jaccard - minJaccard) / (1. - minJaccard);
         const double hue = ratio / 3.;
+        */
 
         dot <<
-            packedAssemblyGraph[pv0].id << "->" <<
-            packedAssemblyGraph[pv1].id <<
-            " [color=\"" << hue << ",1,1\"]"
+            "P" << packedAssemblyGraph[pv0].id << "->" <<
+            "P" << packedAssemblyGraph[pv1].id <<
+            // " [color=\"" << hue << ",1,1\"]"
+            " [label=\"" << packedAssemblyGraph[e].coverage << "\"]"
             ";\n";
     }
 
