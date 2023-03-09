@@ -33,7 +33,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
     PackedAssemblyGraph& packedAssemblyGraph = *this;
     createVertices(minSegmentCoverage, minLinkCoverage, minMarkerCount);
     computeJourneys();
-    createEdges(minJaccard, threadCount);
+    createEdgesUsingJaccard(minJaccard, threadCount);
     writeVertices();
     writeGraphviz(minJaccard);
 
@@ -177,10 +177,9 @@ void PackedAssemblyGraph::computeJourneys()
 
 
 
-void PackedAssemblyGraph::createEdges(double minJaccard, uint64_t threadCount)
+void PackedAssemblyGraph::createEdgesUsingJaccard(double minJaccard, uint64_t threadCount)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
-    cout << timestamp << "PackedAssemblyGraph::createEdges begins." << endl;
 
     // Compute candidate edges by following the journeys.
     vector< pair<vertex_descriptor, vertex_descriptor> > candidateEdges;
@@ -195,11 +194,7 @@ void PackedAssemblyGraph::createEdges(double minJaccard, uint64_t threadCount)
             }
         }
     }
-    cout << "Before deduplication, there are " << candidateEdges.size() <<
-        " candidate edges." << endl;
     deduplicate(candidateEdges);
-    cout << "After deduplication, there are " << candidateEdges.size() <<
-        " candidate edges." << endl;
 
     // To compute Jaccard similarities, we need OrientedReadIds
     // to be available in AssemblyGraph vertices.
@@ -231,8 +226,6 @@ void PackedAssemblyGraph::createEdges(double minJaccard, uint64_t threadCount)
 
     // Cleanup.
     assemblyGraph.clearVertexOrientedReadIds();
-
-    cout << timestamp << "PackedAssemblyGraph::createEdges ends." << endl;
 }
 
 

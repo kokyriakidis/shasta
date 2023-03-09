@@ -78,7 +78,7 @@ private:
     vector< vector<vertex_descriptor> > journeys;
     void computeJourneys();
 
-    void createEdges(double minJaccard, uint64_t threadCount);
+    void createEdgesUsingJaccard(double minJaccard, uint64_t threadCount);
 
     void writeVertices() const;
     void writeGraphviz(double minJaccard) const;
