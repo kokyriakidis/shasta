@@ -688,7 +688,7 @@ void LocalAssemblyGraph::writeSvg(
         }
         if(snapshotVertex.packedAssemblyGraphVertexId != invalid<uint64_t>) {
             svg << " P" << snapshotVertex.packedAssemblyGraphVertexId <<
-                "/" << snapshotVertex.positionInPackedAssemblyGraph;
+                ":" << snapshotVertex.positionInPackedAssemblyGraph;
         }
         svg << "</title></path>\n";
     }
