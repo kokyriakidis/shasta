@@ -80,7 +80,10 @@ private:
     vector< vector<vertex_descriptor> > journeys;
     void computeJourneys();
 
-    void createEdgesUsingJourneys(uint64_t minLinkCoverage2);
+    void createEdgesUsingJourneys(
+        uint64_t minLinkCoverage2,
+        double minJaccard,
+        uint64_t threadCount);
     void createEdgesUsingJaccard(double minJaccard, uint64_t threadCount);
 
     void writeVertices() const;

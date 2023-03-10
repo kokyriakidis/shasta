@@ -34,7 +34,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
     PackedAssemblyGraph& packedAssemblyGraph = *this;
     createVertices(minSegmentCoverage, minLinkCoverage1, minMarkerCount);
     computeJourneys();
-    createEdgesUsingJourneys(minLinkCoverage2);
+    createEdgesUsingJourneys(minLinkCoverage2, minJaccard, threadCount);
     writeVertices();
     writeGraphviz();
 
@@ -231,7 +231,10 @@ void PackedAssemblyGraph::createEdgesUsingJaccard(double minJaccard, uint64_t th
 
 
 
-void PackedAssemblyGraph::createEdgesUsingJourneys(uint64_t minLinkCoverage2)
+void PackedAssemblyGraph::createEdgesUsingJourneys(
+    uint64_t minLinkCoverage2,
+    double minJaccard,
+    uint64_t threadCount)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
 
@@ -253,7 +256,43 @@ void PackedAssemblyGraph::createEdgesUsingJourneys(uint64_t minLinkCoverage2)
                 {invalid<double>, frequency[i]}, packedAssemblyGraph);
         }
     }
-    removeReciprocalEdges(packedAssemblyGraph);
+
+    // To compute Jaccard similarities, we need OrientedReadIds
+    // to be available in AssemblyGraph vertices.
+    assemblyGraph.computeVertexOrientedReadIds(threadCount);
+
+    // Compute Jaccard similarity for all edges.
+    vector<OrientedReadId> commonOrientedReadIds;
+    BGL_FORALL_EDGES(e, packedAssemblyGraph, PackedAssemblyGraph) {
+        PackedAssemblyGraphEdge& edge = packedAssemblyGraph[e];
+        const vertex_descriptor pv0 = source(e, packedAssemblyGraph);
+        const vertex_descriptor pv1 = target(e, packedAssemblyGraph);
+        const PackedAssemblyGraphVertex& pVertex0 = packedAssemblyGraph[pv0];
+        const PackedAssemblyGraphVertex& pVertex1 = packedAssemblyGraph[pv1];
+
+        const AssemblyGraph::vertex_descriptor av0 = pVertex0.assemblyGraphVertices.back();
+        const AssemblyGraph::vertex_descriptor av1 = pVertex1.assemblyGraphVertices.front();
+
+        edge.jaccard = assemblyGraph.computeJaccard(av0, av1, commonOrientedReadIds);
+    }
+
+    // Cleanup.
+    assemblyGraph.clearVertexOrientedReadIds();
+
+
+    // Remove edges with low Jaccard similarity.
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, packedAssemblyGraph, PackedAssemblyGraph) {
+        if(packedAssemblyGraph[e].jaccard < minJaccard) {
+            edgesToBeRemoved.push_back(e);
+        }
+    }
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, packedAssemblyGraph);
+    }
+
+
+    // removeReciprocalEdges(packedAssemblyGraph);
 }
 
 
@@ -295,18 +334,15 @@ void PackedAssemblyGraph::writeGraphviz() const
         const vertex_descriptor pv0 = source(e, packedAssemblyGraph);
         const vertex_descriptor pv1 = target(e, packedAssemblyGraph);
 
-        /*
-        // Color it red if jaccard=minJaccard, green if jaccard=1.
+        // Color it red if jaccard=0, green if jaccard=1.
         const double jaccard = packedAssemblyGraph[e].jaccard;
-        const double ratio = (jaccard - minJaccard) / (1. - minJaccard);
-        const double hue = ratio / 3.;
-        */
+        const double hue = jaccard / 3.;
 
         dot <<
             "P" << packedAssemblyGraph[pv0].id << "->" <<
             "P" << packedAssemblyGraph[pv1].id <<
-            // " [color=\"" << hue << ",1,1\"]"
-            " [label=\"" << packedAssemblyGraph[e].coverage << "\"]"
+            " [color=\"" << hue << ",1,1\"]"
+            // " [label=\"" << packedAssemblyGraph[e].coverage << "\"]"
             ";\n";
     }
 
