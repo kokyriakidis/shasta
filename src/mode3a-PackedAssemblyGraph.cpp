@@ -34,6 +34,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
     PackedAssemblyGraph& packedAssemblyGraph = *this;
     createVertices(minSegmentCoverage, minLinkCoverage1, minMarkerCount);
     computeJourneys();
+    writeJourneys();
     createEdgesUsingJourneys(minLinkCoverage2, minJaccard, threadCount);
     writeVertices();
     writeGraphviz();
@@ -178,6 +179,25 @@ void PackedAssemblyGraph::computeJourneys()
 
 
 
+void PackedAssemblyGraph::writeJourneys() const
+{
+    const PackedAssemblyGraph& packedAssemblyGraph = *this;
+    ofstream csv("PackedAssemblyGraphJourneys.csv");
+
+    for(uint64_t i=0; i<journeys.size(); i++) {
+        const OrientedReadId orientedReadId = OrientedReadId::fromValue(ReadId(i));
+        const auto journey = journeys[orientedReadId.getValue()];
+
+        csv << orientedReadId << ",";
+        for(const vertex_descriptor v: journey) {
+            csv << packedAssemblyGraph.vertexStringId(v) << ",";
+        }
+        csv << "\n";
+    }
+
+}
+
+
 void PackedAssemblyGraph::createEdgesUsingJaccard(double minJaccard, uint64_t threadCount)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
@@ -274,6 +294,7 @@ void PackedAssemblyGraph::createEdgesUsingJourneys(
         const AssemblyGraph::vertex_descriptor av1 = pVertex1.assemblyGraphVertices.front();
 
         edge.jaccard = assemblyGraph.computeJaccard(av0, av1, commonOrientedReadIds);
+
     }
 
     // Cleanup.
@@ -301,10 +322,14 @@ string PackedAssemblyGraph::vertexStringId(vertex_descriptor pv) const
 {
     const PackedAssemblyGraph& packedAssemblyGraph = *this;
     const PackedAssemblyGraphVertex& packedAssemblyGraphVertex = packedAssemblyGraph[pv];
+    return "P" + to_string(packedAssemblyGraphVertex.id);
+
+#if 0
     const AssemblyGraph::vertex_descriptor v0 = packedAssemblyGraphVertex.assemblyGraphVertices.front();
     const AssemblyGraph::vertex_descriptor v1 = packedAssemblyGraphVertex.assemblyGraphVertices.back();
 
     return assemblyGraph.vertexStringId(v0) + "_" + assemblyGraph.vertexStringId(v1);
+#endif
 }
 
 

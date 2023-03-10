@@ -79,6 +79,7 @@ private:
     // Indexed by OrientedReadId.getValue();
     vector< vector<vertex_descriptor> > journeys;
     void computeJourneys();
+    void writeJourneys() const;
 
     void createEdgesUsingJourneys(
         uint64_t minLinkCoverage2,
