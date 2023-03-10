@@ -602,6 +602,14 @@ void LocalAssemblyGraph::writeSvg(
         } else {
             if(options.segmentColoring == "random") {
                 color = randomSegmentColor(snapshotVertex.segmentId);
+            } else if(options.segmentColoring == "byPackedAssemblyGraphVertex") {
+                const uint64_t vertexId = snapshotVertex.packedAssemblyGraphVertexId;
+                if(vertexId == invalid<uint64_t>) {
+                    color = "DimGrey";
+                } else {
+                    const uint32_t hue = MurmurHash2(&vertexId, sizeof(vertexId), 231) % 360;
+                    color = "hsl(" + to_string(hue) + ",100%, 50%)";
+                }
             } else {
                 jaccard = assemblyGraphSnapshot.jaccard(
                     referenceVertexId,
@@ -1109,10 +1117,16 @@ void LocalAssemblyGraph::SvgOptions::addFormRows(ostream& html)
         "<br>Id&nbsp;<input type=text name=referenceSegmentId size=8 style='text-align:center'"
         " value='" << referenceSegmentId << "'>"
         ", replica index&nbsp;<input type=text name=referenceSegmentReplicaIndex size=8 style='text-align:center'"
-        " value='" << referenceSegmentReplicaIndex << "'>";
+        " value='" << referenceSegmentReplicaIndex << "'>"
+
+        // Segment coloring by PackedAssemblyGraph vertex id.
+        "<hr>"
+        "<input type=radio name=segmentColoring value=byPackedAssemblyGraphVertex"
+        << (segmentColoring=="byPackedAssemblyGraphVertex" ? " checked=checked" : "") <<
+        ">By packed assembly graph vertex"
 
         // Finish the table containing segment options.
-        html << "</table>"
+        "</table>"
 
 
 
