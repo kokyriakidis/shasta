@@ -7,6 +7,7 @@
 
 // Shasta.
 #include "mode3a-AssemblyGraph.hpp"
+#include "invalid.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "MemoryMappedVector.hpp"
 #include "MemoryMappedVectorOfVectors.hpp"
@@ -70,6 +71,11 @@ public:
             }
             return s;
         }
+
+        // If this vertex is used somewhere in the PackedAssemblyGraph,
+        // store that information here.
+        uint64_t packedAssemblyGraphVertexId = invalid<uint64_t>;
+        uint64_t positionInPackedAssemblyGraph = invalid<uint64_t>;
     };
     MemoryMapped::Vector<Vertex> vertexVector;  // Can't call it vertices due to boost graph macros.
 

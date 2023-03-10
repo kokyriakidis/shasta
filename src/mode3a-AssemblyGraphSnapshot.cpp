@@ -184,7 +184,9 @@ AssemblyGraphSnapshot::AssemblyGraphSnapshot(
 
 AssemblyGraphSnapshot::Vertex::Vertex(const AssemblyGraphVertex& vertex) :
     segmentId(vertex.segmentId),
-    segmentReplicaIndex(vertex.segmentReplicaIndex)
+    segmentReplicaIndex(vertex.segmentReplicaIndex),
+    packedAssemblyGraphVertexId(vertex.packedAssemblyGraphVertexId),
+    positionInPackedAssemblyGraph(vertex.positionInPackedAssemblyGraph)
 {}
 
 // Get the stringId for a given vertexId, or "None" if vertexId is invalid<uint64_t>.

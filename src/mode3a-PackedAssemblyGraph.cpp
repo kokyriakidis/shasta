@@ -124,6 +124,14 @@ void PackedAssemblyGraph::createVertices(
         PackedAssemblyGraphVertex& vertex = packedAssemblyGraph[v];
         vertex.id = nextVertexId++;
         vertex.assemblyGraphVertices = chain;
+
+        // Store this information in the assembly graph.
+        for(uint64_t position=0; position<chain.size(); position++) {
+            const AssemblyGraph::vertex_descriptor av = chain[position];
+            AssemblyGraphVertex& aVertex = assemblyGraph[av];
+            aVertex.packedAssemblyGraphVertexId = vertex.id;
+            aVertex.positionInPackedAssemblyGraph = position;
+        }
     }
 }
 

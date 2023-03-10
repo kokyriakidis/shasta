@@ -4,6 +4,7 @@
 // See comments in mode3a.hpp.
 
 // Shasta.
+#include "invalid.hpp"
 #include "ReadId.hpp"
 #include "MultithreadedObject.hpp"
 
@@ -92,6 +93,11 @@ public:
 
     // Replica index among all vertices with the same segmentId.
     uint64_t segmentReplicaIndex;
+
+    // If this vertex is used somewhere in the PackedAssemblyGraph,
+    // store that information here.
+    uint64_t packedAssemblyGraphVertexId = invalid<uint64_t>;
+    uint64_t positionInPackedAssemblyGraph = invalid<uint64_t>;
 
     AssemblyGraphVertex(uint64_t segmentId, uint64_t segmentReplicaIndex=0) :
         segmentId(segmentId), segmentReplicaIndex(segmentReplicaIndex) {}

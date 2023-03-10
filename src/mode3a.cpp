@@ -166,16 +166,9 @@ Assembler::Assembler(
 
     }
 
-    // Create a final snapshot of the assembly graph.
-    cout << "The final AssemblyGraph has " <<
-       num_vertices(*assemblyGraph) << " segments and " <<
-       num_edges(*assemblyGraph) << " links." << endl;
-    AssemblyGraphSnapshot snapshot(
-        *assemblyGraph,
-        "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIterationCount), *this);
-    snapshot.write();
-
     // Create the PackedAssemblyGraph.
+    // This also stores information in the Assembly graph,
+    // so the last AssembyGraphSnapshot should be done after this.
     PackedAssemblyGraph packedAssemblyGraph(
         *assemblyGraph,
         minSegmentCoverageForPackedAssemblyGraph,
@@ -184,6 +177,15 @@ Assembler::Assembler(
         minMarkerCountForPackedAssemblyGraph,
         minJaccard,
         threadCount);
+
+    // Create a final snapshot of the assembly graph.
+    cout << "The final AssemblyGraph has " <<
+       num_vertices(*assemblyGraph) << " segments and " <<
+       num_edges(*assemblyGraph) << " links." << endl;
+    AssemblyGraphSnapshot snapshot(
+        *assemblyGraph,
+        "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIterationCount), *this);
+    snapshot.write();
 }
 
 
