@@ -32,7 +32,8 @@ Assembler::Assembler(
     markerGraph(markerGraph)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    const double minJaccard = 0.5;
+    const double minJaccard = 0.4;
+    const uint64_t mForJaccard = 3;
 
     // These are used to compute partial paths.
     const uint64_t segmentCoverageThreshold1ForPaths = 3;
@@ -44,7 +45,7 @@ Assembler::Assembler(
 
     const uint64_t minSegmentCoverageForPackedAssemblyGraph = 8;
     const uint64_t minLinkCoverage1ForPackedAssemblyGraph = 6;
-    const uint64_t minLinkCoverage2ForPackedAssemblyGraph = 6;
+    const uint64_t minLinkCoverage2ForPackedAssemblyGraph = 4;
     const uint64_t minMarkerCountForPackedAssemblyGraph = 50;
 
 
@@ -176,6 +177,7 @@ Assembler::Assembler(
         minLinkCoverage2ForPackedAssemblyGraph,
         minMarkerCountForPackedAssemblyGraph,
         minJaccard,
+        mForJaccard,
         threadCount);
 
     // Create a final snapshot of the assembly graph.

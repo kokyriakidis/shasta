@@ -28,6 +28,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
     uint64_t minLinkCoverage2,
     uint64_t minMarkerCount,
     double minJaccard,
+    uint64_t mForJaccard,
     uint64_t threadCount) :
     assemblyGraph(assemblyGraph)
 {
@@ -35,7 +36,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
     createVertices(minSegmentCoverage, minLinkCoverage1, minMarkerCount);
     computeJourneys();
     writeJourneys();
-    createEdgesUsingJourneys(minLinkCoverage2, minJaccard, threadCount);
+    createEdgesUsingJourneys(minLinkCoverage2, minJaccard, mForJaccard, threadCount);
     writeVertices();
     writeGraphviz();
     writeGfa();
@@ -263,6 +264,7 @@ void PackedAssemblyGraph::createEdgesUsingJaccard(double minJaccard, uint64_t th
 void PackedAssemblyGraph::createEdgesUsingJourneys(
     uint64_t minLinkCoverage2,
     double minJaccard,
+    uint64_t mForJaccard,
     uint64_t threadCount)
 {
     PackedAssemblyGraph& packedAssemblyGraph = *this;
@@ -298,12 +300,23 @@ void PackedAssemblyGraph::createEdgesUsingJourneys(
         const vertex_descriptor pv1 = target(e, packedAssemblyGraph);
         const PackedAssemblyGraphVertex& pVertex0 = packedAssemblyGraph[pv0];
         const PackedAssemblyGraphVertex& pVertex1 = packedAssemblyGraph[pv1];
+        const vector<AssemblyGraph::vertex_descriptor> v0 = pVertex0.assemblyGraphVertices;
+        const vector<AssemblyGraph::vertex_descriptor> v1 = pVertex1.assemblyGraphVertices;
 
-        const AssemblyGraph::vertex_descriptor av0 = pVertex0.assemblyGraphVertices.back();
-        const AssemblyGraph::vertex_descriptor av1 = pVertex1.assemblyGraphVertices.front();
+        // Compute the best Jaccard similarity between
+        // the last mForJaccard assembly graph vertices of pVertex0 and
+        // the first mForJaccard assembly graph vertices of pVertex1.
+        double maxJaccard = 0.;
+        for(uint64_t i=0; i<min(mForJaccard, v0.size()); i++) {
+            const AssemblyGraph::vertex_descriptor av0 = v0[v0.size() -1 - i];
+            for(uint64_t j=0; j<min(mForJaccard, v1.size()); j++) {
+                const AssemblyGraph::vertex_descriptor av1 = v1[j];
+                const double jaccard = assemblyGraph.computeJaccard(av0, av1, commonOrientedReadIds);
+                maxJaccard = max(maxJaccard, jaccard);
+            }
 
-        edge.jaccard = assemblyGraph.computeJaccard(av0, av1, commonOrientedReadIds);
-
+        }
+        edge.jaccard = maxJaccard;
     }
 
     // Cleanup.
@@ -363,6 +376,7 @@ void PackedAssemblyGraph::writeGraphviz() const
         dot << ";\n";
     }
 
+    dot << std::setprecision(3);
     BGL_FORALL_EDGES(e, packedAssemblyGraph, PackedAssemblyGraph) {
         const vertex_descriptor pv0 = source(e, packedAssemblyGraph);
         const vertex_descriptor pv1 = target(e, packedAssemblyGraph);
@@ -375,7 +389,7 @@ void PackedAssemblyGraph::writeGraphviz() const
             "P" << packedAssemblyGraph[pv0].id << "->" <<
             "P" << packedAssemblyGraph[pv1].id <<
             " [color=\"" << hue << ",1,1\"]"
-            // " [label=\"" << packedAssemblyGraph[e].coverage << "\"]"
+            " [label=\"" << jaccard << "/" << packedAssemblyGraph[e].coverage << "\"]"
             ";\n";
     }
 

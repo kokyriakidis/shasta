@@ -64,6 +64,7 @@ public:
         uint64_t minLinkCoverage2,
         uint64_t minMarkerCount,
         double minJaccard,
+        uint64_t mForJaccard,
         uint64_t threadCount);
 private:
     AssemblyGraph& assemblyGraph;
@@ -85,6 +86,7 @@ private:
     void createEdgesUsingJourneys(
         uint64_t minLinkCoverage2,
         double minJaccard,
+        uint64_t mForJaccard,
         uint64_t threadCount);
     void createEdgesUsingJaccard(double minJaccard, uint64_t threadCount);
 
