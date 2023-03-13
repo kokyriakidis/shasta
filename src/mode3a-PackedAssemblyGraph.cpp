@@ -38,6 +38,7 @@ PackedAssemblyGraph::PackedAssemblyGraph(
     createEdgesUsingJourneys(minLinkCoverage2, minJaccard, threadCount);
     writeVertices();
     writeGraphviz();
+    writeGfa();
 
     cout << "The PackedAssemblyGraph has " << num_vertices(packedAssemblyGraph) <<
         " vertices and " << num_edges(packedAssemblyGraph) << " edges." << endl;
@@ -308,7 +309,6 @@ void PackedAssemblyGraph::createEdgesUsingJourneys(
     // Cleanup.
     assemblyGraph.clearVertexOrientedReadIds();
 
-
     // Remove edges with low Jaccard similarity.
     vector<edge_descriptor> edgesToBeRemoved;
     BGL_FORALL_EDGES(e, packedAssemblyGraph, PackedAssemblyGraph) {
@@ -319,7 +319,6 @@ void PackedAssemblyGraph::createEdgesUsingJourneys(
     for(const edge_descriptor e: edgesToBeRemoved) {
         boost::remove_edge(e, packedAssemblyGraph);
     }
-
 
     // removeReciprocalEdges(packedAssemblyGraph);
 }
@@ -346,7 +345,7 @@ void PackedAssemblyGraph::writeGraphviz() const
 {
     const PackedAssemblyGraph& packedAssemblyGraph = *this;
 
-    ofstream dot("PackedAssemblyGraph.dot");
+    ofstream dot("Mode3a-PackedAssemblyGraph.dot");
     dot << "digraph PackedAssemblyGraph {\n";
 
     BGL_FORALL_VERTICES(pv, packedAssemblyGraph, PackedAssemblyGraph) {
@@ -358,7 +357,8 @@ void PackedAssemblyGraph::writeGraphviz() const
             pVertex.id << "\\n" <<
             assemblyGraph.vertexStringId(av0) << "\\n" <<
             assemblyGraph.vertexStringId(av1) << "\\n" <<
-            pVertex.journeyEntries.size() <<
+            pVertex.journeyEntries.size() << "/" <<
+            10 * vertexMarkerCount(pv) <<
             "\"]";
         dot << ";\n";
     }
@@ -384,11 +384,54 @@ void PackedAssemblyGraph::writeGraphviz() const
 
 
 
+void PackedAssemblyGraph::writeGfa() const
+{
+    const PackedAssemblyGraph& packedAssemblyGraph = *this;
+
+    ofstream gfa("Mode3a-PackedAssemblyGraph.gfa");
+    gfa << "H\tVN:Z:1.0\n";
+
+    BGL_FORALL_VERTICES(pv, packedAssemblyGraph, PackedAssemblyGraph) {
+        const PackedAssemblyGraphVertex& pVertex = packedAssemblyGraph[pv];
+        gfa <<"S\tP" << pVertex.id << "\t*\t";
+        gfa << "LN:i:" << 10 * vertexMarkerCount(pv) << "\n";
+    }
+
+    BGL_FORALL_EDGES(e, packedAssemblyGraph, PackedAssemblyGraph) {
+        const vertex_descriptor pv0 = source(e, packedAssemblyGraph);
+        const vertex_descriptor pv1 = target(e, packedAssemblyGraph);
+        gfa << "L\t" <<
+            "P" << packedAssemblyGraph[pv0].id << "\t+\t" <<
+            "P" << packedAssemblyGraph[pv1].id << "\t+\t*\n";
+    }
+}
+
+
+// This computes the total number of markers, counting only the segments
+// of this vertces. Links are not counted.
+uint64_t PackedAssemblyGraph::vertexMarkerCount(vertex_descriptor pv) const
+{
+    const PackedAssemblyGraph& packedAssemblyGraph = *this;
+    const vector<AssemblyGraph::vertex_descriptor>& assemblyGraphVertices =
+        packedAssemblyGraph[pv].assemblyGraphVertices;
+
+    uint64_t totalMarkerCount = 0;
+    for(const AssemblyGraph::vertex_descriptor av: assemblyGraphVertices) {
+        const AssemblyGraphVertex aVertex = assemblyGraph[av];
+        const uint64_t segmentId = aVertex.segmentId;
+        const uint64_t markerCount = assemblyGraph.packedMarkerGraph.segments[segmentId].size();
+        totalMarkerCount += markerCount;
+    }
+    return totalMarkerCount;
+}
+
+
+
 void PackedAssemblyGraph::writeVertices() const
 {
     const PackedAssemblyGraph& packedAssemblyGraph = *this;
 
-    ofstream csv("PackedAssemblyGraphVertices.csv");
+    ofstream csv("Mode3a-PackedAssemblyGraphVertices.csv");
     BGL_FORALL_VERTICES(pv, packedAssemblyGraph, PackedAssemblyGraph) {
         const PackedAssemblyGraphVertex& pVertex = packedAssemblyGraph[pv];
 

@@ -74,6 +74,7 @@ private:
         uint64_t minMarkerCount);
 
     string vertexStringId(vertex_descriptor) const;
+    uint64_t vertexMarkerCount(vertex_descriptor) const;
 
     // Oriented read journeys on the PackedAssemblyGraph.
     // Indexed by OrientedReadId.getValue();
@@ -89,6 +90,7 @@ private:
 
     void writeVertices() const;
     void writeGraphviz() const;
+    void writeGfa() const;
 };
 
 
