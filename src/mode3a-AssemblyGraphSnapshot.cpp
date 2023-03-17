@@ -293,9 +293,11 @@ void AssemblyGraphSnapshot::write() const
     writeJourneyEntries();
     writeTransitions();
 
+#if 0
     for(uint64_t minLinkCoverage=2; minLinkCoverage<=10; minLinkCoverage++) {
         writeGfa(minLinkCoverage);
     }
+#endif
 }
 
 

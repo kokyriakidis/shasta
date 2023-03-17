@@ -32,7 +32,10 @@ Assembler::Assembler(
     markerGraph(markerGraph)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    const double minJaccard = 0.5;
+    const double minJaccard = 0.7;
+    const uint64_t knnJaccard = 1;
+
+#if 0
     const uint64_t mForJaccard = 3;
 
     // These are used to compute partial paths.
@@ -47,7 +50,7 @@ Assembler::Assembler(
     const uint64_t minLinkCoverage1ForPackedAssemblyGraph = 6;
     const uint64_t minLinkCoverage2ForPackedAssemblyGraph = 4;
     const uint64_t minMarkerCountForPackedAssemblyGraph = 1000;
-
+#endif
 
     // This requires the marker length k to be even.
     SHASTA_ASSERT((k % 2) == 0);
@@ -102,15 +105,15 @@ Assembler::Assembler(
     // Create the AssemblyGraph.
     shared_ptr<AssemblyGraph> assemblyGraph = make_shared<AssemblyGraph>(*packedMarkerGraph);
 
-#if 0
     AssemblyGraphSnapshot snapshot(
         *assemblyGraph,
         "Mode3a-AssemblyGraphSnapshot-0", *this);
     snapshot.write();
-    assemblyGraph->computeJaccardGraph(threadCount, minJaccard);
-#endif
+    assemblyGraph->computeJaccardGraph(threadCount, minJaccard, knnJaccard);
 
 
+
+#if 0
     // Detangle iterations.
     for(uint64_t detangleIteration=0; detangleIteration<detangleIterationCount; detangleIteration++) {
         performanceLog << timestamp << "Starting detangle iteration " << detangleIterationCount << endl;
@@ -188,6 +191,7 @@ Assembler::Assembler(
         *assemblyGraph,
         "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIterationCount), *this);
     snapshot.write();
+#endif
 }
 
 

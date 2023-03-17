@@ -1,6 +1,7 @@
 // Shasta
 #include "mode3a-AssemblyGraph.hpp"
 #include "MarkerGraph.hpp"
+#include "mode3a-JaccardGraph.hpp"
 #include "mode3a-PackedMarkerGraph.hpp"
 #include "deduplicate.hpp"
 #include "shastaLapack.hpp"
@@ -1000,8 +1001,10 @@ void AssemblyGraph::createByLocalClustering(
 
 
 
-void AssemblyGraph::computeJaccardGraph(uint64_t threadCount, double minJaccard)
+void AssemblyGraph::computeJaccardGraph(uint64_t threadCount, double minJaccard, uint64_t knnJaccard)
 {
+    AssemblyGraph& assemblyGraph = *this;
+
     // Find candidate pairs.
     findJaccardGraphCandidatePairs(threadCount);
 
@@ -1015,24 +1018,30 @@ void AssemblyGraph::computeJaccardGraph(uint64_t threadCount, double minJaccard)
     computeJaccardGraphData.candidatePairs.shrink_to_fit();
     clearVertexOrientedReadIds();
 
-    // Write out the pairs.
-    ofstream dot("JaccardGraph.dot");
-    dot << "graph JaccardGraph {\n";
-    for(const auto& p: computeJaccardGraphData.goodPairs) {
-
-        // Color it so jaccard=1 is green, jaccard=minJaccard is red.
-        const double jaccard = p.second;
-        const double ratio = (jaccard - minJaccard) / (1. - minJaccard);
-        const double hue = ratio / 3.;
-
-        dot << vertexStringId(p.first.first) << "--" << vertexStringId(p.first.second) <<
-            " [ color=\"" << hue << ",1,1\"]"
-            ";\n";
+    // Create the JaccardGraph.
+    JaccardGraph jaccardGraph(*this);
+    BGL_FORALL_VERTICES(av, assemblyGraph, AssemblyGraph) {
+        jaccardGraph.addVertex(av);
     }
-    dot << "}\n";
+    for(const auto& p: computeJaccardGraphData.goodPairs) {
+        const double jaccard = p.second;
+        jaccardGraph.addEdge(p.first.first,  p.first.second, jaccard);
+    }
+    cout << "The initial Jaccard graph has " << num_vertices(jaccardGraph) <<
+        " vertices and " << num_edges(jaccardGraph) << " edges." << endl;
 
+    // Cleanup.
     computeJaccardGraphData.goodPairs.clear();
     computeJaccardGraphData.goodPairs.shrink_to_fit();
+
+
+    // k-NN.
+    jaccardGraph.makeKnn(knnJaccard);
+    cout << "The final Jaccard graph has " << num_vertices(jaccardGraph) <<
+        " vertices and " << num_edges(jaccardGraph) << " edges." << endl;
+    jaccardGraph.writeGraphviz("JaccardGraph.dot", minJaccard);
+
+
 }
 
 
@@ -1080,10 +1089,9 @@ void AssemblyGraph::findJaccardGraphCandidatePairsThreadFunction(uint64_t thread
                         continue;
                     }
                     auto p = make_pair(journey[j], journey[i]);
-                    if(p.first > p.second) {
-                        std::swap(p.first, p.second);
+                    if(p.first != p.second) {
+                        threadCandidatePairs.push_back(p);
                     }
-                    threadCandidatePairs.push_back(p);
                 }
             }
         }
