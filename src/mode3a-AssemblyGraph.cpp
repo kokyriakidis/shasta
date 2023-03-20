@@ -1039,11 +1039,13 @@ void AssemblyGraph::computeJaccardGraph(
     computeJaccardGraphData.goodPairs.clear();
     computeJaccardGraphData.goodPairs.shrink_to_fit();
 
-    // Only keep edges to the best knnJaccard chldren/parents of each vertex.
+#if 0
+    // Only keep edges to the best knnJaccard children/parents of each vertex.
     jaccardGraph.makeKnn(knnJaccard);
     cout << "The final Jaccard graph has " << num_vertices(jaccardGraph) <<
         " vertices and " << num_edges(jaccardGraph) << " edges." << endl;
-    jaccardGraph.writeGraphviz("JaccardGraph.dot", minJaccard);
+    // jaccardGraph.writeGraphviz("JaccardGraph.dot", minJaccard);
+#endif
 
     // Compute connected components so we can process them one at a time.
     vector< shared_ptr<JaccardGraph> > components;
@@ -1058,12 +1060,13 @@ void AssemblyGraph::computeJaccardGraph(
         }
     }
 
+    /*
     // Write out connected components of the Jaccard graph.
     for(uint64_t componentId=0; componentId<components.size(); componentId++) {
         components[componentId]->writeGraphviz(
             "JaccardGraphComponent-" + to_string(componentId) + ".dot", minJaccard);
     }
-
+    */
 
 }
 

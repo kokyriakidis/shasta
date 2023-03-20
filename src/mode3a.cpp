@@ -32,9 +32,9 @@ Assembler::Assembler(
     markerGraph(markerGraph)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    const double minJaccard = 0.7;
+    const double minJaccard = 0.65;
     const uint64_t knnJaccard = 1;
-    const uint64_t minComponentSizeJaccard = 100;
+    const uint64_t minComponentSizeJaccard = 20;
     const uint64_t minPathLengthJaccard = 10;
 
 #if 0
