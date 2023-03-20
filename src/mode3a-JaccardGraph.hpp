@@ -7,7 +7,9 @@
 // Standard library.
 #include "iosfwd.hpp"
 #include <map>
+#include "memory.hpp"
 #include "string.hpp"
+#include "vector.hpp"
 
 namespace shasta {
     namespace mode3a {
@@ -66,6 +68,14 @@ public:
     string vertexStringId(vertex_descriptor) const;
 
     void makeKnn(uint64_t m);
+
+    // Compute large connected components.
+    // The threshold is total number of bases for all vertices
+    // of a connected component.
+    void computeConnectedComponents(
+        uint64_t minBaseCount,
+        vector< shared_ptr<JaccardGraph> >&
+    );
 
     void writeGraphviz(const string& fileName, double minJaccard) const;
     void writeGraphviz(ostream&, double minJaccard) const;

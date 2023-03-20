@@ -1001,7 +1001,11 @@ void AssemblyGraph::createByLocalClustering(
 
 
 
-void AssemblyGraph::computeJaccardGraph(uint64_t threadCount, double minJaccard, uint64_t knnJaccard)
+void AssemblyGraph::computeJaccardGraph(
+    uint64_t threadCount,
+    double minJaccard,
+    uint64_t knnJaccard,
+    uint64_t minBaseCount)
 {
     AssemblyGraph& assemblyGraph = *this;
 
@@ -1034,12 +1038,21 @@ void AssemblyGraph::computeJaccardGraph(uint64_t threadCount, double minJaccard,
     computeJaccardGraphData.goodPairs.clear();
     computeJaccardGraphData.goodPairs.shrink_to_fit();
 
-
-    // k-NN.
+    // Only keep edges to the best knnJaccard chldren/parents of each vertex.
     jaccardGraph.makeKnn(knnJaccard);
     cout << "The final Jaccard graph has " << num_vertices(jaccardGraph) <<
         " vertices and " << num_edges(jaccardGraph) << " edges." << endl;
     jaccardGraph.writeGraphviz("JaccardGraph.dot", minJaccard);
+
+    // Compute connected components so we can process them one at a time.
+    vector< shared_ptr<JaccardGraph> > components;
+    jaccardGraph.computeConnectedComponents(minBaseCount, components);
+
+    // Write out connected components of the Jaccard graph.
+    for(uint64_t componentId=0; componentId<components.size(); componentId++) {
+        components[componentId]->writeGraphviz(
+            "JaccardGraphComponent-" + to_string(componentId) + ".dot", minJaccard);
+    }
 
 
 }
