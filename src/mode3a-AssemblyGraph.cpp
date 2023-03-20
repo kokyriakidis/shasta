@@ -1005,7 +1005,8 @@ void AssemblyGraph::computeJaccardGraph(
     uint64_t threadCount,
     double minJaccard,
     uint64_t knnJaccard,
-    uint64_t minBaseCount)
+    uint64_t minComponentSize,
+    uint64_t minPathLength)
 {
     AssemblyGraph& assemblyGraph = *this;
 
@@ -1046,7 +1047,16 @@ void AssemblyGraph::computeJaccardGraph(
 
     // Compute connected components so we can process them one at a time.
     vector< shared_ptr<JaccardGraph> > components;
-    jaccardGraph.computeConnectedComponents(minBaseCount, components);
+    jaccardGraph.computeConnectedComponents(minComponentSize, components);
+
+    // Mark edges of long paths in the Jaccard graph.
+    for(uint64_t componentId=0; componentId<components.size(); componentId++) {
+        cout << "Finding long paths for Jaccard graph component " << componentId <<
+            " with " << num_vertices(*components[componentId]) << " vertices." << endl;
+        if(not components[componentId]->markLongPathEdges(minPathLength)) {
+            cout << "Jaccard graph component " << componentId << " is cyclic." << endl;
+        }
+    }
 
     // Write out connected components of the Jaccard graph.
     for(uint64_t componentId=0; componentId<components.size(); componentId++) {

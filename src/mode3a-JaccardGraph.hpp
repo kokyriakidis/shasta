@@ -36,6 +36,9 @@ namespace shasta {
 class shasta::mode3a::JaccardGraphVertex {
 public:
     AssemblyGraphBaseClass::vertex_descriptor av;
+
+    // The length of the longest path ending here.
+    uint64_t longestPathLength;
 };
 
 
@@ -76,7 +79,7 @@ public:
         vector< shared_ptr<JaccardGraph> >&
     );
 
-    void markLongPathEdges(uint64_t minPathLength);
+    bool markLongPathEdges(uint64_t minPathLength);
 
     void writeGraphviz(const string& fileName, double minJaccard) const;
     void writeGraphviz(ostream&, double minJaccard) const;

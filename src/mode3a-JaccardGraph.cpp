@@ -10,6 +10,7 @@ using namespace mode3a;
 // Boost libraries.
 #include <boost/graph/iteration_macros.hpp>
 #include <boost/pending/disjoint_sets.hpp>
+#include <boost/graph/topological_sort.hpp>
 
 // Standard library.
 #include "fstream.hpp"
@@ -229,13 +230,10 @@ void JaccardGraph::computeConnectedComponents(
 
     // Create a JaccardGraph for each of the connected components we want to keep.
     componentGraphs.clear();
-    cout << "Connected components of the Jaccard graph and their sizes." << endl;
     uint64_t newComponentId = 0;
     for(const auto& p: componentTable) {
         const uint64_t oldComponentId = p.first;
         const vector<vertex_descriptor>& component = components[oldComponentId];
-        const uint64_t componentSize = p.second;
-        cout << newComponentId << " " << componentSize << endl;
 
         // Create a new JaccardGraph for this component.
         const shared_ptr<JaccardGraph> componentGraphPointer =
@@ -278,6 +276,94 @@ void JaccardGraph::computeConnectedComponents(
         ++newComponentId;
     }
 
+}
+
+
+
+bool JaccardGraph::markLongPathEdges(uint64_t minPathLength)
+{
+    JaccardGraph& jaccardGraph = *this;
+
+    // Map vertices to integers.
+    std::map<vertex_descriptor, uint64_t> vertexIndexMap;
+    uint64_t vertexIndex = 0;
+    BGL_FORALL_VERTICES(v, jaccardGraph, JaccardGraph) {
+        vertexIndexMap.insert({v, vertexIndex++});
+    }
+
+    // Topological sort.
+    vector<vertex_descriptor> topologicallySortedVertices;
+    try {
+        boost::topological_sort(
+            jaccardGraph,
+            back_inserter(topologicallySortedVertices),
+            boost::vertex_index_map(boost::make_assoc_property_map(vertexIndexMap)));
+    } catch (boost::not_a_dag&) {
+        // Topological sort failed. Do nothing.
+        return false;
+    }
+    std::reverse(topologicallySortedVertices.begin(), topologicallySortedVertices.end());
+
+
+
+    // To compute the longest path, process vertices in topological order.
+    // Set the length of the longest part ending at each vertex.
+    for(const vertex_descriptor v0: topologicallySortedVertices) {
+        uint64_t longestPathLength = 0;
+        BGL_FORALL_INEDGES(v0, e, jaccardGraph, JaccardGraph) {
+            const vertex_descriptor v1 = source(e, jaccardGraph);
+            longestPathLength = max(longestPathLength,
+                jaccardGraph[v1].longestPathLength + 1);
+        }
+        jaccardGraph[v0].longestPathLength = longestPathLength;
+    }
+
+    // Find the vertex with the longest path length.
+    vertex_descriptor vLongest = null_vertex();
+    uint64_t longestPathLength = 0;
+    BGL_FORALL_VERTICES(v, jaccardGraph, JaccardGraph) {
+        if(jaccardGraph[v].longestPathLength > longestPathLength) {
+            vLongest = v;
+            longestPathLength = jaccardGraph[v].longestPathLength;
+        }
+    }
+    cout << "Longest path length is " << longestPathLength <<
+        " at vertex " << vertexStringId(vLongest) << endl;
+
+
+
+
+    // To compute the longest path, walk back starting here.
+    vector<vertex_descriptor> longestPath;
+    vertex_descriptor v0 = vLongest;
+    while(true) {
+        longestPath.push_back(v0);
+
+        // Find the parent with the longest path.
+        uint64_t longestParentLength = 0;
+        vertex_descriptor vLongestParent = null_vertex();
+        BGL_FORALL_INEDGES(v0, e, jaccardGraph, JaccardGraph) {
+            const vertex_descriptor v1 = source(e, jaccardGraph);
+            if(vLongestParent == null_vertex() or jaccardGraph[v1].longestPathLength > longestParentLength) {
+                longestParentLength = jaccardGraph[v1].longestPathLength;
+                vLongestParent = v1;
+            }
+        }
+        if(vLongestParent == null_vertex()) {
+            break;
+        }
+        v0 = vLongestParent;
+    }
+    std::reverse(longestPath.begin(), longestPath.end());
+    SHASTA_ASSERT(longestPath.size() == longestPathLength + 1);
+
+    cout << "Longest path:";
+    for(const vertex_descriptor v: longestPath) {
+        cout << " " << vertexStringId(v);
+    }
+    cout << endl;
+
+    return true;
 }
 
 

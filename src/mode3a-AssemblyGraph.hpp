@@ -595,8 +595,8 @@ public:
         uint64_t threadCount,
         double minJaccard,
         uint64_t knnJaccard,
-        uint64_t minBaseCount   // For a connected component of the Jaccard graph.
-        );
+        uint64_t minComponentSize,
+        uint64_t minPathLength);
 private:
     void findJaccardGraphCandidatePairs(uint64_t threadCount);
     void findJaccardGraphCandidatePairsThreadFunction(uint64_t threadId);
