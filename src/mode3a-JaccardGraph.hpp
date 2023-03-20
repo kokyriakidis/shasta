@@ -44,6 +44,7 @@ class shasta::mode3a::JaccardGraphEdge {
 public:
     double jaccard;
     bool keep;
+    bool isLongPathEdge = false;
 };
 
 
@@ -70,12 +71,12 @@ public:
     void makeKnn(uint64_t m);
 
     // Compute large connected components.
-    // The threshold is total number of bases for all vertices
-    // of a connected component.
     void computeConnectedComponents(
-        uint64_t minBaseCount,
+        uint64_t minComponentSize,
         vector< shared_ptr<JaccardGraph> >&
     );
+
+    void markLongPathEdges(uint64_t minPathLength);
 
     void writeGraphviz(const string& fileName, double minJaccard) const;
     void writeGraphviz(ostream&, double minJaccard) const;

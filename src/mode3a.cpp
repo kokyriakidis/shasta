@@ -34,7 +34,7 @@ Assembler::Assembler(
     // EXPOSE WHEN CODE STABILIZES.
     const double minJaccard = 0.7;
     const uint64_t knnJaccard = 1;
-    const uint64_t minBaseCountJaccard = 50000;
+    const uint64_t minComponentSizeJaccard = 100;
 
 #if 0
     const uint64_t mForJaccard = 3;
@@ -114,7 +114,7 @@ Assembler::Assembler(
         threadCount,
         minJaccard,
         knnJaccard,
-        minBaseCountJaccard);
+        minComponentSizeJaccard);
 
 
 

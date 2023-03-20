@@ -168,10 +168,8 @@ void JaccardGraph::writeGraphviz(ostream& dot, double minJaccard) const
 
 
 // Compute large connected components.
-// The threshold is total number of bases for all vertices
-// of a connected component.
 void JaccardGraph::computeConnectedComponents(
-    uint64_t minBaseCount,
+    uint64_t minComponentSize,
     vector< shared_ptr<JaccardGraph> >& componentGraphs
 )
 {
@@ -216,24 +214,12 @@ void JaccardGraph::computeConnectedComponents(
 
 
     // Get the componentId of the components we want to keep.
-    vector< pair<uint64_t, uint64_t> > componentTable; // (componentId, size in bases)
+    vector< pair<uint64_t, uint64_t> > componentTable; // (componentId, size)
     for(uint64_t componentId=0; componentId<n; componentId++) {
         const vector<vertex_descriptor>& component = components[componentId];
-        if(component.empty()) {
-            continue;
-        }
-
-        // Compute the total number of bases.
-        uint64_t totalBaseCount = 0;
-        for(const vertex_descriptor v: component) {
-            const AssemblyGraph::vertex_descriptor av = jaccardGraph[v].av;
-            const uint64_t segmentId = assemblyGraph[av].segmentId;
-            const uint64_t baseCount = assemblyGraph.packedMarkerGraph.segmentSequences[segmentId].size();
-            totalBaseCount += baseCount;
-        }
-
-        if(totalBaseCount >= minBaseCount) {
-            componentTable.push_back(make_pair(componentId, totalBaseCount));
+        const uint64_t componentSize = component.size();
+        if(componentSize >= minComponentSize) {
+            componentTable.push_back(make_pair(componentId, componentSize));
         }
     }
 
@@ -243,14 +229,13 @@ void JaccardGraph::computeConnectedComponents(
 
     // Create a JaccardGraph for each of the connected components we want to keep.
     componentGraphs.clear();
-    cout << "Connected components of the Jaccard graph, with their total length "
-        " in bases (only primary vertices are counted)." << endl;
+    cout << "Connected components of the Jaccard graph and their sizes." << endl;
     uint64_t newComponentId = 0;
     for(const auto& p: componentTable) {
         const uint64_t oldComponentId = p.first;
         const vector<vertex_descriptor>& component = components[oldComponentId];
-        const uint64_t totalBaseCount = p.second;
-        cout << newComponentId << " " << totalBaseCount << endl;
+        const uint64_t componentSize = p.second;
+        cout << newComponentId << " " << componentSize << endl;
 
         // Create a new JaccardGraph for this component.
         const shared_ptr<JaccardGraph> componentGraphPointer =
