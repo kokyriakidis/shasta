@@ -1054,7 +1054,7 @@ void AssemblyGraph::computeJaccardGraph(
         cout << "Processing Jaccard graph connected component " << componentId <<
             " with " << num_vertices(*components[componentId]) << " vertices." << endl;
 
-        if(not componentGraph.markLongPathEdges(minPathLength)) {
+        if(not componentGraph.findLongPaths(minPathLength)) {
             cout << "Jaccard graph component " << componentId << " is cyclic." << endl;
         }
 

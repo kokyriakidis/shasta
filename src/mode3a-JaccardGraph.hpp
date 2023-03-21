@@ -95,7 +95,8 @@ public:
     // Remove all vertices that belong to strogly connected components.
     void removeStronglyConnectedComponents();
 
-    bool markLongPathEdges(uint64_t minPathLength);
+    // Find long paths and mark edges and vertices on the long paths.
+    bool findLongPaths(uint64_t minPathLength);
 
     // Mark the edges to be displayed.
     void markDisplayEdges();

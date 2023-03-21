@@ -363,9 +363,18 @@ void JaccardGraph::removeStronglyConnectedComponents()
 }
 
 
-bool JaccardGraph::markLongPathEdges(uint64_t minPathLength)
+// Find long paths and mark edges and vertices on the long paths.
+bool JaccardGraph::findLongPaths(uint64_t minPathLength)
 {
     JaccardGraph& jaccardGraph = *this;
+
+    // Unmark al vertices and edges.
+    BGL_FORALL_VERTICES(v, jaccardGraph, JaccardGraph) {
+        jaccardGraph[v].isLongPathVertex = false;
+    }
+    BGL_FORALL_EDGES(e, jaccardGraph, JaccardGraph) {
+        jaccardGraph[e].isLongPathEdge = false;
+    }
 
     // Map vertices to integers.
     std::map<vertex_descriptor, uint64_t> vertexIndexMap;
@@ -389,81 +398,104 @@ bool JaccardGraph::markLongPathEdges(uint64_t minPathLength)
 
 
 
-    // To compute the longest path, process vertices in topological order.
-    // Set the length of the longest part ending at each vertex.
-    for(const vertex_descriptor v0: topologicallySortedVertices) {
-        uint64_t longestPathLength = 0;
-        BGL_FORALL_INEDGES(v0, e, jaccardGraph, JaccardGraph) {
-            const vertex_descriptor v1 = source(e, jaccardGraph);
-            longestPathLength = max(longestPathLength,
-                jaccardGraph[v1].longestPathLength + 1);
-        }
-        jaccardGraph[v0].longestPathLength = longestPathLength;
-    }
-
-    // Find the vertex with the longest path length.
-    vertex_descriptor vLongest = null_vertex();
-    uint64_t longestPathLength = 0;
-    BGL_FORALL_VERTICES(v, jaccardGraph, JaccardGraph) {
-        if(jaccardGraph[v].longestPathLength > longestPathLength) {
-            vLongest = v;
-            longestPathLength = jaccardGraph[v].longestPathLength;
-        }
-    }
-    cout << "Longest path length is " << longestPathLength <<
-        " at vertex " << vertexStringId(vLongest) << endl;
-
-
-
-
-    // To compute the longest path, walk back starting here.
-    vector<vertex_descriptor> longestPath;
-    vertex_descriptor v0 = vLongest;
     while(true) {
-        longestPath.push_back(v0);
 
-        // Find the parent with the longest path.
-        uint64_t longestParentLength = 0;
-        vertex_descriptor vLongestParent = null_vertex();
-        BGL_FORALL_INEDGES(v0, e, jaccardGraph, JaccardGraph) {
-            const vertex_descriptor v1 = source(e, jaccardGraph);
-            if(vLongestParent == null_vertex() or jaccardGraph[v1].longestPathLength > longestParentLength) {
-                longestParentLength = jaccardGraph[v1].longestPathLength;
-                vLongestParent = v1;
+        // To compute the longest path, process vertices in topological order,
+        // skipping vertices that were already assigned to a path.
+        // Set the length of the longest part ending at each vertex.
+        for(const vertex_descriptor v0: topologicallySortedVertices) {
+            if(jaccardGraph[v0].isLongPathVertex) {
+                continue;
+            }
+            uint64_t longestPathLength = 0;
+            BGL_FORALL_INEDGES(v0, e, jaccardGraph, JaccardGraph) {
+                const vertex_descriptor v1 = source(e, jaccardGraph);
+                if(jaccardGraph[v1].isLongPathVertex) {
+                    continue;
+                }
+                longestPathLength = max(longestPathLength,
+                    jaccardGraph[v1].longestPathLength + 1);
+            }
+            jaccardGraph[v0].longestPathLength = longestPathLength;
+        }
+
+        // Find the vertex with the longest path length.
+        vertex_descriptor vLongest = null_vertex();
+        uint64_t longestPathLength = 0;
+        BGL_FORALL_VERTICES(v, jaccardGraph, JaccardGraph) {
+            if(jaccardGraph[v].isLongPathVertex) {
+                continue;
+            }
+            if(jaccardGraph[v].longestPathLength > longestPathLength) {
+                vLongest = v;
+                longestPathLength = jaccardGraph[v].longestPathLength;
             }
         }
-        if(vLongestParent == null_vertex()) {
+        if(vLongest == null_vertex()) {
             break;
         }
-        v0 = vLongestParent;
-    }
-    std::reverse(longestPath.begin(), longestPath.end());
-    SHASTA_ASSERT(longestPath.size() == longestPathLength + 1);
-
-    cout << "Longest path:";
-    for(const vertex_descriptor v: longestPath) {
-        cout << " " << vertexStringId(v);
-    }
-    cout << endl;
+        cout << "Longest path length is " << longestPathLength << endl;
 
 
 
-    // Mark the edges in the longest path.
-    for(uint64_t i=1; i<longestPath.size(); i++) {
-        const vertex_descriptor v0 = longestPath[i-1];
-        const vertex_descriptor v1 = longestPath[i];
 
-        edge_descriptor e;
-        bool edgeWasFound = false;
-        tie(e, edgeWasFound) = edge(v0, v1, jaccardGraph);
-        SHASTA_ASSERT(edgeWasFound);
+        // To compute the longest path, walk back starting here.
+        vector<vertex_descriptor> longestPath;
+        vertex_descriptor v0 = vLongest;
+        while(true) {
+            longestPath.push_back(v0);
 
-        jaccardGraph[e].isLongPathEdge = true;
-    }
+            // Find the parent with the longest path.
+            uint64_t longestParentLength = 0;
+            vertex_descriptor vLongestParent = null_vertex();
+            BGL_FORALL_INEDGES(v0, e, jaccardGraph, JaccardGraph) {
+                const vertex_descriptor v1 = source(e, jaccardGraph);
+                if(jaccardGraph[v1].isLongPathVertex) {
+                    continue;
+                }
+                if(vLongestParent == null_vertex() or jaccardGraph[v1].longestPathLength > longestParentLength) {
+                    longestParentLength = jaccardGraph[v1].longestPathLength;
+                    vLongestParent = v1;
+                }
+            }
+            if(vLongestParent == null_vertex()) {
+                break;
+            }
+            v0 = vLongestParent;
+        }
+        std::reverse(longestPath.begin(), longestPath.end());
+        SHASTA_ASSERT(longestPath.size() == longestPathLength + 1);
 
-    // Also mark the vertices.
-    for(const vertex_descriptor v: longestPath) {
-        jaccardGraph[v].isLongPathVertex = true;
+        cout << "Longest path:";
+        for(const vertex_descriptor v: longestPath) {
+            cout << " " << vertexStringId(v);
+        }
+        cout << endl;
+
+        if(longestPath.size() < minPathLength) {
+            cout << "This path is too short." << endl;
+            break;
+        }
+
+
+
+        // Mark the edges in the longest path.
+        for(uint64_t i=1; i<longestPath.size(); i++) {
+            const vertex_descriptor v0 = longestPath[i-1];
+            const vertex_descriptor v1 = longestPath[i];
+
+            edge_descriptor e;
+            bool edgeWasFound = false;
+            tie(e, edgeWasFound) = edge(v0, v1, jaccardGraph);
+            SHASTA_ASSERT(edgeWasFound);
+
+            jaccardGraph[e].isLongPathEdge = true;
+        }
+
+        // Also mark the vertices.
+        for(const vertex_descriptor v: longestPath) {
+            jaccardGraph[v].isLongPathVertex = true;
+        }
     }
 
     return true;
