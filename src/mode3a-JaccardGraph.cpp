@@ -8,8 +8,9 @@ using namespace shasta;
 using namespace mode3a;
 
 // Boost libraries.
-#include <boost/graph/iteration_macros.hpp>
 #include <boost/pending/disjoint_sets.hpp>
+#include <boost/graph/iteration_macros.hpp>
+#include <boost/graph/strong_components.hpp>
 #include <boost/graph/topological_sort.hpp>
 
 // Standard library.
@@ -137,7 +138,11 @@ void JaccardGraph::writeGraphviz(ostream& dot, double minJaccard)
     dot << "digraph JaccardGraph {\n";
 
     BGL_FORALL_VERTICES(v, jaccardGraph, JaccardGraph) {
-        dot << "\"" << vertexStringId(v) << "\";\n";
+        dot << "\"" << vertexStringId(v) << "\"";
+        if(jaccardGraph[v].isLongPathVertex) {
+            dot << "[style=filled fillcolor=pink]";
+        }
+        dot << ";\n";
     }
 
 
@@ -291,6 +296,73 @@ void JaccardGraph::computeConnectedComponents(
 
 
 
+// Compute strongly connected components.
+void JaccardGraph::computeStronglyConnectedComponents(
+    vector< vector<vertex_descriptor> >& strongComponents)
+{
+    JaccardGraph& jaccardGraph = *this;
+
+    // Map vertices to integers.
+    std::map<vertex_descriptor, uint64_t> vertexIndexMap;
+    uint64_t vertexIndex = 0;
+    BGL_FORALL_VERTICES(v, jaccardGraph, JaccardGraph) {
+        vertexIndexMap.insert(make_pair(v, vertexIndex++));
+    }
+
+    // Compute strongly connected components.
+    std::map<vertex_descriptor, uint64_t> componentMap;
+    boost::strong_components(
+        jaccardGraph,
+        boost::make_assoc_property_map(componentMap),
+        boost::vertex_index_map(boost::make_assoc_property_map(vertexIndexMap)));
+
+    // Gather the vertices in each strong component.
+    std::map<uint64_t, vector<vertex_descriptor> > componentTable;
+    BGL_FORALL_VERTICES(v, jaccardGraph, JaccardGraph) {
+        const uint64_t componentId = componentMap[v];
+        componentTable[componentId].push_back(v);
+    }
+    strongComponents.clear();
+    for(const auto& p: componentTable) {
+        const vector<vertex_descriptor>& component = p.second;
+        if(component.size() > 1) {
+            strongComponents.push_back(component);
+            for(const vertex_descriptor v: component) {
+                jaccardGraph[v].isCyclic = true;
+            }
+        }
+    }
+
+#if 0
+    if(not strongComponents.empty()) {
+        cout << "Found " << strongComponents.size() <<
+            " strongly connected components with sizes";
+        for(const auto& component: strongComponents) {
+            cout << " " << component.size();
+        }
+        cout << endl;
+    }
+#endif
+}
+
+// Remove all vertices that belong to strogly connected components.
+void JaccardGraph::removeStronglyConnectedComponents()
+{
+    JaccardGraph& jaccardGraph = *this;
+
+    vector< vector<vertex_descriptor> > strongComponents;
+    computeStronglyConnectedComponents(strongComponents);
+
+    for(const vector<vertex_descriptor>& strongComponent: strongComponents) {
+        for(const vertex_descriptor v: strongComponent) {
+            vertexMap.erase(jaccardGraph[v].av);
+            boost::clear_vertex(v, jaccardGraph);
+            boost::remove_vertex(v, jaccardGraph);
+        }
+    }
+}
+
+
 bool JaccardGraph::markLongPathEdges(uint64_t minPathLength)
 {
     JaccardGraph& jaccardGraph = *this;
@@ -387,6 +459,11 @@ bool JaccardGraph::markLongPathEdges(uint64_t minPathLength)
         SHASTA_ASSERT(edgeWasFound);
 
         jaccardGraph[e].isLongPathEdge = true;
+    }
+
+    // Also mark the vertices.
+    for(const vertex_descriptor v: longestPath) {
+        jaccardGraph[v].isLongPathVertex = true;
     }
 
     return true;

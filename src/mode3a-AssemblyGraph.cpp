@@ -1038,6 +1038,10 @@ void AssemblyGraph::computeJaccardGraph(
     computeJaccardGraphData.goodPairs.clear();
     computeJaccardGraphData.goodPairs.shrink_to_fit();
 
+    // Remove Jaccard graph vertices belonging to strongly connected
+    // component. After this, the Jaccard graph is acyclic.
+    jaccardGraph.removeStronglyConnectedComponents();
+
     // Compute connected components so we can process them one at a time.
     vector< shared_ptr<JaccardGraph> > components;
     jaccardGraph.computeConnectedComponents(minComponentSize, components);

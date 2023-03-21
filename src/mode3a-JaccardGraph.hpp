@@ -39,6 +39,12 @@ public:
 
     // The length of the longest path ending here.
     uint64_t longestPathLength;
+
+    bool isLongPathVertex = false;
+
+    // This gets set if the vertex belongs to a non-trivial
+    // strong connected component.
+    bool isCyclic = false;
 };
 
 
@@ -80,6 +86,14 @@ public:
         uint64_t minComponentSize,
         vector< shared_ptr<JaccardGraph> >&
     );
+
+    // Compute strongly connected components.
+    void computeStronglyConnectedComponents(
+        vector< vector<vertex_descriptor> >&
+    );
+
+    // Remove all vertices that belong to strogly connected components.
+    void removeStronglyConnectedComponents();
 
     bool markLongPathEdges(uint64_t minPathLength);
 
