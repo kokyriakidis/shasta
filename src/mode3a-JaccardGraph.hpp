@@ -46,8 +46,11 @@ public:
 class shasta::mode3a::JaccardGraphEdge {
 public:
     double jaccard;
-    bool keep;
     bool isLongPathEdge = false;
+
+    // This is only used for displaying the JaccardGraph.
+    bool display;
+
 };
 
 
@@ -71,7 +74,6 @@ public:
 
     string vertexStringId(vertex_descriptor) const;
 
-    void makeKnn(uint64_t m);
 
     // Compute large connected components.
     void computeConnectedComponents(
@@ -81,8 +83,11 @@ public:
 
     bool markLongPathEdges(uint64_t minPathLength);
 
-    void writeGraphviz(const string& fileName, double minJaccard) const;
-    void writeGraphviz(ostream&, double minJaccard) const;
+    // Mark the edges to be displayed.
+    void markDisplayEdges();
+
+    void writeGraphviz(const string& fileName, double minJaccard);
+    void writeGraphviz(ostream&, double minJaccard);
 };
 
 #endif

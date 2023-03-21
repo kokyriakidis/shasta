@@ -33,8 +33,7 @@ Assembler::Assembler(
 {
     // EXPOSE WHEN CODE STABILIZES.
     const double minJaccard = 0.65;
-    const uint64_t knnJaccard = 1;
-    const uint64_t minComponentSizeJaccard = 20;
+     const uint64_t minComponentSizeJaccard = 20;
     const uint64_t minPathLengthJaccard = 10;
 
 #if 0
@@ -114,7 +113,6 @@ Assembler::Assembler(
     assemblyGraph->computeJaccardGraph(
         threadCount,
         minJaccard,
-        knnJaccard,
         minComponentSizeJaccard,
         minPathLengthJaccard);
 

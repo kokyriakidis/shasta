@@ -68,16 +68,20 @@ string JaccardGraph::vertexStringId(vertex_descriptor v) const
 
 
 
-void JaccardGraph::makeKnn(uint64_t m)
+
+// Mark the edges to be displayed.
+void JaccardGraph::markDisplayEdges()
 {
     JaccardGraph& jaccardGraph = *this;
 
-    // Mark all edges as not to be kept.
+    // Start with only the long path edges
     BGL_FORALL_EDGES(e, jaccardGraph, JaccardGraph) {
-        jaccardGraph[e].keep = false;
+        JaccardGraphEdge& edge = jaccardGraph[e];
+        edge.display = edge.isLongPathEdge;
     }
 
-    // Mark edges to be kept.
+    // Mark k-NN edges.
+    const uint64_t k = 1;
     vector< pair<edge_descriptor, double> > edgeTable;
     BGL_FORALL_VERTICES(v0, jaccardGraph, JaccardGraph) {
 
@@ -89,11 +93,11 @@ void JaccardGraph::makeKnn(uint64_t m)
         }
         sort(edgeTable.begin(), edgeTable.end(),
             OrderPairsBySecondOnlyGreater<edge_descriptor, double>());
-        if(edgeTable.size() > m) {
-            edgeTable.resize(m);
+        if(edgeTable.size() > k) {
+            edgeTable.resize(k);
         }
         for(const auto& p: edgeTable) {
-            jaccardGraph[p.first].keep = true;
+            jaccardGraph[p.first].display = true;
         }
 
         // Parents.
@@ -104,30 +108,18 @@ void JaccardGraph::makeKnn(uint64_t m)
         }
         sort(edgeTable.begin(), edgeTable.end(),
             OrderPairsBySecondOnlyGreater<edge_descriptor, double>());
-        if(edgeTable.size() > m) {
-            edgeTable.resize(m);
+        if(edgeTable.size() > k) {
+            edgeTable.resize(k);
         }
         for(const auto& p: edgeTable) {
-            jaccardGraph[p.first].keep = true;
+            jaccardGraph[p.first].display = true;
         }
-    }
-
-
-    // Remove all the edges not marked as to be kept.
-    vector<edge_descriptor> edgesToBeRemoved;
-    BGL_FORALL_EDGES(e, jaccardGraph, JaccardGraph) {
-        if(not jaccardGraph[e].keep) {
-            edgesToBeRemoved.push_back(e);
-        }
-    }
-    for(const edge_descriptor e: edgesToBeRemoved) {
-        boost::remove_edge(e, jaccardGraph);
     }
 
 }
 
 
-void JaccardGraph::writeGraphviz(const string& fileName, double minJaccard) const
+void JaccardGraph::writeGraphviz(const string& fileName, double minJaccard)
 {
     ofstream dot(fileName);
     writeGraphviz(dot, minJaccard);
@@ -135,9 +127,12 @@ void JaccardGraph::writeGraphviz(const string& fileName, double minJaccard) cons
 
 
 
-void JaccardGraph::writeGraphviz(ostream& dot, double minJaccard) const
+void JaccardGraph::writeGraphviz(ostream& dot, double minJaccard)
 {
     const JaccardGraph& jaccardGraph = *this;
+
+    // To simplify the display, we only display a significant subset of the edges.
+    markDisplayEdges();
 
     dot << "digraph JaccardGraph {\n";
 
@@ -148,19 +143,35 @@ void JaccardGraph::writeGraphviz(ostream& dot, double minJaccard) const
 
     dot << std::setprecision(2);
     BGL_FORALL_EDGES(e, jaccardGraph, JaccardGraph) {
+        const JaccardGraphEdge& edge = jaccardGraph[e];
+        if(not edge.display) {
+            continue;
+        }
         const vertex_descriptor v0 = source(e, jaccardGraph);
         const vertex_descriptor v1 = target(e, jaccardGraph);
 
         // Color it so jaccard=1 is green, jaccard=minJaccard is red.
-        const double jaccard = jaccardGraph[e].jaccard;
+        const double jaccard = edge.jaccard;
         const double ratio = (jaccard - minJaccard) / (1. - minJaccard);
-        const double hue = ratio / 3.;
+        const double H = ratio / 3.;
+
+        double S = 1.;
+        double V = 1;
+        /*
+        if(not edge.isLongPathEdge) {
+            S = 0.4;
+        }
+        */
 
         dot << "\"" << vertexStringId(v0) << "\"->\"" << vertexStringId(v1) <<
-            "\" [color=\"" << hue << ",1,1\""
-            // " label=\"" << jaccard << "\""
-            "]"
-            ";\n";
+            "\" [color=\"" << H << "," << S << "," << V << "\"";
+
+        if(not edge.isLongPathEdge) {
+            dot << " style=dashed";
+        }
+
+        // " label=\"" << jaccard << "\"";
+        dot << "];\n";
     }
     dot << "}\n";
 
@@ -362,6 +373,21 @@ bool JaccardGraph::markLongPathEdges(uint64_t minPathLength)
         cout << " " << vertexStringId(v);
     }
     cout << endl;
+
+
+
+    // Mark the edges in the longest path.
+    for(uint64_t i=1; i<longestPath.size(); i++) {
+        const vertex_descriptor v0 = longestPath[i-1];
+        const vertex_descriptor v1 = longestPath[i];
+
+        edge_descriptor e;
+        bool edgeWasFound = false;
+        tie(e, edgeWasFound) = edge(v0, v1, jaccardGraph);
+        SHASTA_ASSERT(edgeWasFound);
+
+        jaccardGraph[e].isLongPathEdge = true;
+    }
 
     return true;
 }

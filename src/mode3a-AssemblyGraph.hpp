@@ -594,7 +594,6 @@ public:
     void computeJaccardGraph(
         uint64_t threadCount,
         double minJaccard,
-        uint64_t knnJaccard,
         uint64_t minComponentSize,
         uint64_t minPathLength);
 private:
