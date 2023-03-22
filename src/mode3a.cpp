@@ -32,21 +32,23 @@ Assembler::Assembler(
     markerGraph(markerGraph)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    const double minJaccard = 0.65;
-     const uint64_t minComponentSizeJaccard = 20;
-    const uint64_t minPathLengthJaccard = 10;
-
 #if 0
-    const uint64_t mForJaccard = 3;
+    // Jaccard graph.
+    const double minJaccard = 0.65;
+    const uint64_t minComponentSizeJaccard = 20;
+    const uint64_t minPathLengthJaccard = 10;
+#endif
 
-    // These are used to compute partial paths.
+
+    // Partial paths.
     const uint64_t segmentCoverageThreshold1ForPaths = 3;
     const uint64_t segmentCoverageThreshold2ForPaths = 6;
     const uint64_t minLinkCoverageForPaths = 3;
 
-    const uint64_t detangleIterationCount = 3;
+    const uint64_t detangleIterationCount = 1;
     // const uint64_t minDetangleCoverage = 3;
 
+#if 0
     const uint64_t minSegmentCoverageForPackedAssemblyGraph = 8;
     const uint64_t minLinkCoverage1ForPackedAssemblyGraph = 6;
     const uint64_t minLinkCoverage2ForPackedAssemblyGraph = 4;
@@ -106,6 +108,7 @@ Assembler::Assembler(
     // Create the AssemblyGraph.
     shared_ptr<AssemblyGraph> assemblyGraph = make_shared<AssemblyGraph>(*packedMarkerGraph);
 
+#if 0
     AssemblyGraphSnapshot snapshot(
         *assemblyGraph,
         "Mode3a-AssemblyGraphSnapshot-0", *this);
@@ -115,10 +118,10 @@ Assembler::Assembler(
         minJaccard,
         minComponentSizeJaccard,
         minPathLengthJaccard);
+#endif
 
 
 
-#if 0
     // Detangle iterations.
     for(uint64_t detangleIteration=0; detangleIteration<detangleIterationCount; detangleIteration++) {
         performanceLog << timestamp << "Starting detangle iteration " << detangleIterationCount << endl;
@@ -128,7 +131,6 @@ Assembler::Assembler(
            num_vertices(*assemblyGraph) << " segments and " <<
            num_edges(*assemblyGraph) << " links." << endl;
 
-#if 1
         // Follow reads to compute partial paths.
         assemblyGraph->computePartialPaths(threadCount,
             segmentCoverageThreshold1ForPaths, segmentCoverageThreshold2ForPaths, minLinkCoverageForPaths);
@@ -137,7 +139,6 @@ Assembler::Assembler(
 
         // Find TangledAssemblyPaths.
         assemblyGraph->computeTangledAssemblyPaths(threadCount);
-#endif
 
         // Create a snapshot of the assembly graph.
         AssemblyGraphSnapshot snapshot(
@@ -145,13 +146,11 @@ Assembler::Assembler(
             "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIteration), *this);
         snapshot.write();
 
-#if 1
         // Create a new AssemblyGraph using the TangledAssemblyPaths.
         shared_ptr<AssemblyGraph> newAssemblyGraph =
             make_shared<AssemblyGraph>(
                 AssemblyGraph::DetangleUsingTangledAssemblyPaths(),
                 *assemblyGraph);
-#endif
 
 #if 0
         // Create a new AssemblyGraph using tangle matrices of the current AssemblyGraph.
@@ -175,6 +174,7 @@ Assembler::Assembler(
 
     }
 
+#if 0
     // Create the PackedAssemblyGraph.
     // This also stores information in the Assembly graph,
     // so the last AssembyGraphSnapshot should be done after this.
@@ -187,6 +187,7 @@ Assembler::Assembler(
         minJaccard,
         mForJaccard,
         threadCount);
+#endif
 
     // Create a final snapshot of the assembly graph.
     cout << "The final AssemblyGraph has " <<
@@ -196,7 +197,7 @@ Assembler::Assembler(
         *assemblyGraph,
         "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIterationCount), *this);
     snapshot.write();
-#endif
+
 }
 
 
