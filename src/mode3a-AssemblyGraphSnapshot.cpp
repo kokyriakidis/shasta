@@ -89,6 +89,39 @@ AssemblyGraphSnapshot::AssemblyGraphSnapshot(
     }
 
     createVertexTable(assemblyGraph.packedMarkerGraph);
+
+
+    // Store TangledAssemblyPaths.
+    createNew(tangledAssemblyPaths, name + "-tangledAssemblyPaths");
+    for(const auto& tangledAssemblyPathPointer: assemblyGraph.tangledAssemblyPaths) {
+        const auto& tangledAssemblyPath = *tangledAssemblyPathPointer;
+        tangledAssemblyPaths.appendVector();
+        SHASTA_ASSERT(
+            tangledAssemblyPath.primaryVertices.size() ==
+            tangledAssemblyPath.secondaryVerticesInfos.size() + 1);
+        for(uint64_t i=0; /* Check later */ ; i++) {
+
+            // Add the primary vertex.
+            const AssemblyGraph::vertex_descriptor v = tangledAssemblyPath.primaryVertices[i];
+            const AssemblyGraphVertex& vertex = assemblyGraph[v];
+            const uint64_t vertexId = getVertexId(vertex.segmentId, vertex.segmentReplicaIndex);
+            tangledAssemblyPaths.append({vertexId, true});
+
+            // If this is the last primary vertex, we are done.
+            // There are no secondary vertices following it.
+            if(i == tangledAssemblyPath.primaryVertices.size() - 1) {
+                break;
+            }
+
+            // Add the secondary vertices.
+            const auto& secondaryVerticesInfos = tangledAssemblyPath.secondaryVerticesInfos[i];
+            for(const AssemblyGraph::vertex_descriptor v: secondaryVerticesInfos.secondaryVertices) {
+                const AssemblyGraphVertex& vertex = assemblyGraph[v];
+                const uint64_t vertexId = getVertexId(vertex.segmentId, vertex.segmentReplicaIndex);
+                tangledAssemblyPaths.append({vertexId, false});
+            }
+        }
+    }
 }
 
 
@@ -162,6 +195,17 @@ uint64_t AssemblyGraphSnapshot::getVertexId(
 
 
 
+uint64_t AssemblyGraphSnapshot::getVertexId(
+    uint64_t segmentId,
+    uint64_t segmentReplicaIndex
+) const
+{
+    string message;
+    return getVertexId(segmentId, segmentReplicaIndex, message);
+}
+
+
+
 // This accesses an existing snapshot.
 AssemblyGraphSnapshot::AssemblyGraphSnapshot(
     const string& name,
@@ -178,6 +222,7 @@ AssemblyGraphSnapshot::AssemblyGraphSnapshot(
     accessExistingReadOnly(edgesBySource, name + "-edgesBySource");
     accessExistingReadOnly(edgesByTarget, name + "-edgesByTarget");
     accessExistingReadOnly(vertexTable, name + "-vertexTable");
+    accessExistingReadOnly(tangledAssemblyPaths, name + "-tangledAssemblyPaths");
 }
 
 

@@ -336,7 +336,7 @@ private:
     AnalyzePartialPathsData analyzePartialPathsData;
 
 
-
+public:
     // Class TangledAssemblyPath describes a tangled
     // assembly path ready to be "ripped" from the AssemblyGraph.
     // Sequence assembly only happens after the "ripping" operation takes place.
@@ -401,6 +401,7 @@ private:
         }
     };
     vector<shared_ptr<TangledAssemblyPath> > tangledAssemblyPaths;
+private:
 
     // Class used to sort TangledAssemblyPaths by decreasing efficiency.
     class OrderTangledAssemblyPath {

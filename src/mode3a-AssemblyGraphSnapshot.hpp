@@ -144,6 +144,10 @@ public:
         uint64_t segmentReplicaIndex,
         string& message
     ) const;
+    uint64_t getVertexId(
+        uint64_t segmentId,
+        uint64_t segmentReplicaIndex
+    ) const;
 
 
 
@@ -222,6 +226,17 @@ public:
         ostream& html,
         vector<Base>& consensusSequence
         );
+
+
+
+    // The TangledAssemblyPaths from the AssemblyGraph.
+    class TangledAssemblyPathEntry {
+    public:
+        uint64_t vertexId;
+        bool isPrimary;
+    };
+    MemoryMapped::VectorOfVectors<TangledAssemblyPathEntry, uint64_t>
+        tangledAssemblyPaths;
 
 
 
