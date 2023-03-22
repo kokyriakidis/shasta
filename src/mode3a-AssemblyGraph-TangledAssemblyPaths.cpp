@@ -49,7 +49,12 @@ void AssemblyGraph::computeTangledAssemblyPaths(uint64_t threadCount)
         // Information for primary vertices of this path.
         for(uint64_t positionInPath=0; positionInPath<path.primaryVertices.size(); positionInPath++) {
             const vertex_descriptor v = path.primaryVertices[positionInPath];
-            assemblyGraph[v].tangledPathInformation.primaryInfos.push_back({pathId, positionInPath});
+            auto& primaryInfo = assemblyGraph[v].tangledPathInformation.primaryInfo;
+
+            // Each vertex can only appear once as a primary vertex in a path.
+            SHASTA_ASSERT(primaryInfo.pathId == invalid<uint64_t>);
+
+            primaryInfo = {pathId, positionInPath};
         }
 
         // Information for secondary vertices of this path.
@@ -148,7 +153,7 @@ void AssemblyGraph::writeTangledAssemblyPathsVertexSummary() const
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
         const AssemblyGraphVertex& vertex = assemblyGraph[v];
         csv << vertex.stringId() << ",";
-        csv << vertex.tangledPathInformation.primaryInfos.size() << ",";
+        csv << vertex.tangledPathInformation.primaryCount() << ",";
         csv << vertex.tangledPathInformation.secondaryInfos.size() << "\n";
     }
 }
@@ -164,12 +169,13 @@ void AssemblyGraph::writeTangledAssemblyPathsVertexInfo() const
 
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
         const AssemblyGraphVertex& vertex = assemblyGraph[v];
+        const auto& primaryInfo = vertex.tangledPathInformation.primaryInfo;
 
-        for(const auto& info: vertex.tangledPathInformation.primaryInfos) {
+        if(primaryInfo.pathId != invalid<uint64_t>) {
             csv << vertex.stringId() << ",";
             csv << "Primary,";
-            csv << info.pathId << ",";
-            csv << info.positionInPath << "\n";
+            csv << primaryInfo.pathId << ",";
+            csv << primaryInfo.positionInPath << "\n";
         }
 
         for(const auto& info: vertex.tangledPathInformation.secondaryInfos) {
@@ -192,7 +198,7 @@ void AssemblyGraph::writeTangledAssemblyPathsVertexHistogram() const
     vector< vector<uint64_t> > histogram;
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
         const AssemblyGraphVertex& vertex = assemblyGraph[v];
-        const uint64_t primaryCount = vertex.tangledPathInformation.primaryInfos.size();
+        const uint64_t primaryCount = vertex.tangledPathInformation.primaryCount();
         const uint64_t secondaryCount = vertex.tangledPathInformation.secondaryInfos.size();
         if(histogram.size() <= primaryCount) {
             histogram.resize(primaryCount + 1);
@@ -227,6 +233,7 @@ void AssemblyGraph::writeTangledAssemblyPathsJourneyInfo() const
 
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
         const AssemblyGraphVertex& vertex = assemblyGraph[v];
+        const auto& primaryInfo = vertex.tangledPathInformation.primaryInfo;
 
         // For each of the paths that this vertex is a secondary vertex of,
         // find the journey entries that belong to that path.
@@ -243,10 +250,11 @@ void AssemblyGraph::writeTangledAssemblyPathsJourneyInfo() const
 
         // Write the header for this vertex.
         csv << "OrientedReadId,PositionInJourney,";
-        for(const auto& info: vertex.tangledPathInformation.primaryInfos) {
+        if(vertex.tangledPathInformation.primaryCount() == 1) {
             csv << "P-";
-            csv << info.pathId << "-";
-            csv << info.positionInPath << ",";
+            csv << primaryInfo.pathId << "-";
+            csv << primaryInfo.positionInPath << ",";
+
         }
         for(const auto& info: vertex.tangledPathInformation.secondaryInfos) {
             csv << "S-";
@@ -263,7 +271,7 @@ void AssemblyGraph::writeTangledAssemblyPathsJourneyInfo() const
             csv << journeyEntry.position << ",";
 
             // If this is a primary vertex of a path, all journey entries are in the path.
-            for(uint64_t j=0; j<vertex.tangledPathInformation.primaryInfos.size(); j++) {
+            if(vertex.tangledPathInformation.primaryCount() == 1) {
                 csv << "1,";
             }
 

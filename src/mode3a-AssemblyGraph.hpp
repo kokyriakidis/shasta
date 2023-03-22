@@ -56,14 +56,23 @@ public:
 class shasta::mode3a::TangledPathInformation {
 public:
 
-    // Information about appearances of this vertex as a primary vertex
-    // in tangled paths.
+    // Each vertex can apear at most once as a primary vertex in tangled paths.
     class PrimaryInfo {
     public:
-        uint64_t pathId;
-        uint64_t positionInPath;
+        uint64_t pathId = invalid<uint64_t>;
+        uint64_t positionInPath = invalid<uint64_t>;
     };
-    vector<PrimaryInfo> primaryInfos;
+    PrimaryInfo primaryInfo;
+
+    // Return the number of times this vertex appears as primary.
+    uint64_t primaryCount() const
+    {
+        if(primaryInfo.pathId == invalid<uint64_t>) {
+            return 0;
+        } else {
+            return 1;
+        }
+    }
 
     // Information about appearances of this vertex as a secondary vertex
     // in tangled paths.
@@ -77,7 +86,8 @@ public:
 
     void clear()
     {
-        primaryInfos.clear();
+        primaryInfo.pathId = invalid<uint64_t>;
+        primaryInfo.positionInPath = invalid<uint64_t>;
         secondaryInfos.clear();
     }
 };
