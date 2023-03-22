@@ -607,7 +607,7 @@ void LocalAssemblyGraph::writeSvg(
                 if(pathId == invalid<uint64_t>) {
                     color = "DimGrey";
                 } else {
-                    const uint32_t hue = MurmurHash2(&pathId, sizeof(pathId), 231) % 360;
+                    const uint32_t hue = MurmurHash2(&pathId, sizeof(pathId), options.coloringHashSeed) % 360;
                     color = "hsl(" + to_string(hue) + ",100%, 50%)";
                 }
             } else if(options.segmentColoring == "byPackedAssemblyGraphVertex") {
@@ -615,7 +615,7 @@ void LocalAssemblyGraph::writeSvg(
                 if(vertexId == invalid<uint64_t>) {
                     color = "DimGrey";
                 } else {
-                    const uint32_t hue = MurmurHash2(&vertexId, sizeof(vertexId), 231) % 360;
+                    const uint32_t hue = MurmurHash2(&vertexId, sizeof(vertexId), options.coloringHashSeed) % 360;
                     color = "hsl(" + to_string(hue) + ",100%, 50%)";
                 }
             } else {
@@ -1012,6 +1012,7 @@ LocalAssemblyGraph::SvgOptions::SvgOptions(const vector<string>& request)
     HttpServer::getParameterValue(request, "segmentColoring", segmentColoring);
     HttpServer::getParameterValue(request, "referenceSegmentId", referenceSegmentId);
     HttpServer::getParameterValue(request, "referenceSegmentReplicaIndex", referenceSegmentReplicaIndex);
+    HttpServer::getParameterValue(request, "coloringHashSeed", coloringHashSeed);
 
     // Link length and thickness.
     HttpServer::getParameterValue(request, "linkLength", linkLength);
@@ -1142,6 +1143,13 @@ void LocalAssemblyGraph::SvgOptions::addFormRows(ostream& html)
         "<input type=radio name=segmentColoring value=byTangledAssemblyPath"
         << (segmentColoring=="byTangledAssemblyPath" ? " checked=checked" : "") <<
         ">By assembly path (primary vertices only)"
+
+        "<br>"
+        "Seed for coloring hash: ";
+    writeInformationIcon(html, "Affects color choice. Change it to avoid color collisions.");
+    html <<
+        " <input type=text name=coloringHashSeed size=8 style='text-align:center'"
+        " value='" << coloringHashSeed << "'>"
 
         // Finish the table containing segment options.
         "</table>"
