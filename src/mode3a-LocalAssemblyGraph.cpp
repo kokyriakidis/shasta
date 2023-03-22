@@ -602,6 +602,14 @@ void LocalAssemblyGraph::writeSvg(
         } else {
             if(options.segmentColoring == "random") {
                 color = randomSegmentColor(snapshotVertex.segmentId);
+            } else if(options.segmentColoring == "byTangledAssemblyPath") {
+                const uint64_t pathId = snapshotVertex.tangledPathId;
+                if(pathId == invalid<uint64_t>) {
+                    color = "DimGrey";
+                } else {
+                    const uint32_t hue = MurmurHash2(&pathId, sizeof(pathId), 231) % 360;
+                    color = "hsl(" + to_string(hue) + ",100%, 50%)";
+                }
             } else if(options.segmentColoring == "byPackedAssemblyGraphVertex") {
                 const uint64_t vertexId = snapshotVertex.packedAssemblyGraphVertexId;
                 if(vertexId == invalid<uint64_t>) {
@@ -693,6 +701,10 @@ void LocalAssemblyGraph::writeSvg(
             svg << " " << jaccard;
             svg.precision(oldPrecision);
             svg.flags(oldFlags);
+        }
+        if(snapshotVertex.tangledPathId != invalid<uint64_t>) {
+            svg << " " << snapshotVertex.tangledPathId <<
+                ":" << snapshotVertex.positionInTangledPath;
         }
         if(snapshotVertex.packedAssemblyGraphVertexId != invalid<uint64_t>) {
             svg << " P" << snapshotVertex.packedAssemblyGraphVertexId <<
@@ -1124,6 +1136,12 @@ void LocalAssemblyGraph::SvgOptions::addFormRows(ostream& html)
         "<input type=radio name=segmentColoring value=byPackedAssemblyGraphVertex"
         << (segmentColoring=="byPackedAssemblyGraphVertex" ? " checked=checked" : "") <<
         ">By packed assembly graph vertex"
+
+        // Segment coloring by tangled assembly path.
+        "<hr>"
+        "<input type=radio name=segmentColoring value=byTangledAssemblyPath"
+        << (segmentColoring=="byTangledAssemblyPath" ? " checked=checked" : "") <<
+        ">By assembly path (primary vertices only)"
 
         // Finish the table containing segment options.
         "</table>"
