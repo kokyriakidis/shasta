@@ -482,6 +482,26 @@ void LocalAssemblyGraph::writeSvg(
 
 
 
+    // If coloring one assembly path, gather the necessary information.
+    // Key = vertexId in the AssemblyGraphSnapshot.
+    // Value = (position, primary/secondary).
+    std::map<uint64_t, pair<uint64_t, bool> > assemblyPathMap;
+    if(options.segmentColoring == "colorOneAssemblyPath") {
+        if(options.assemblyPathId >= assemblyGraphSnapshot.tangledAssemblyPaths.size()) {
+            throw runtime_error("Invalid assembly path id.");
+        }
+        const auto tangledPath = assemblyGraphSnapshot.tangledAssemblyPaths[options.assemblyPathId];
+        for(uint64_t position=0; position<tangledPath.size(); position++) {
+            const auto& pathEntry = tangledPath[position];
+            assemblyPathMap.insert({
+                pathEntry.vertexId,
+                {position, pathEntry.isPrimary}
+            });
+        }
+    }
+
+
+
     // Write the links first, so they don't overwrite the segments.
     svg << "<g id='" << svgId << "-links'>\n";
     BGL_FORALL_EDGES(e, localAssemblyGraph, LocalAssemblyGraph) {
@@ -618,7 +638,24 @@ void LocalAssemblyGraph::writeSvg(
                     const uint32_t hue = MurmurHash2(&vertexId, sizeof(vertexId), options.coloringHashSeed) % 360;
                     color = "hsl(" + to_string(hue) + ",100%, 50%)";
                 }
-            } else {
+            } else if(options.segmentColoring == "colorOneAssemblyPath") {
+                auto it = assemblyPathMap.find(localAssemblyGraphVertex.vertexId);
+                if(it == assemblyPathMap.end()) {
+                    color = "DimGrey";
+                } else {
+                    const uint64_t position = it->second.first;
+                    const bool isPrimary = it->second.second;
+                    uint32_t H = uint32_t(120. * double(position) / double(assemblyPathMap.size()));
+                    if(not isPrimary) {
+                        H += 180;
+                    }
+                    const uint32_t S = 100;
+                    const uint32_t L = 50;
+                    color = "hsl(" + to_string(H) + "," + to_string(S) + "%, " + to_string(L) + "%)";
+                }
+            } else if(
+                options.segmentColoring == "byJaccard" or
+                options.segmentColoring  == "byCommonReads") {
                 jaccard = assemblyGraphSnapshot.jaccard(
                     referenceVertexId,
                     localAssemblyGraphVertex.vertexId,
@@ -639,6 +676,8 @@ void LocalAssemblyGraph::writeSvg(
                     }
                     color = "hsl(" + to_string(hue) + ",100%, 50%)";
                 }
+            } else {
+                SHASTA_ASSERT(0);
             }
         }
 
@@ -1012,6 +1051,7 @@ LocalAssemblyGraph::SvgOptions::SvgOptions(const vector<string>& request)
     HttpServer::getParameterValue(request, "segmentColoring", segmentColoring);
     HttpServer::getParameterValue(request, "referenceSegmentId", referenceSegmentId);
     HttpServer::getParameterValue(request, "referenceSegmentReplicaIndex", referenceSegmentReplicaIndex);
+    HttpServer::getParameterValue(request, "assemblyPathId", assemblyPathId);
     HttpServer::getParameterValue(request, "coloringHashSeed", coloringHashSeed);
 
     // Link length and thickness.
@@ -1139,10 +1179,16 @@ void LocalAssemblyGraph::SvgOptions::addFormRows(ostream& html)
         ">By packed assembly graph vertex"
 
         // Segment coloring by tangled assembly path.
-        "<hr>"
-        "<input type=radio name=segmentColoring value=byTangledAssemblyPath"
+        "<br><input type=radio name=segmentColoring value=byTangledAssemblyPath"
         << (segmentColoring=="byTangledAssemblyPath" ? " checked=checked" : "") <<
         ">By assembly path (primary vertices only)"
+
+        // Color a single tangled assembly path.
+        "<br><input type=radio name=segmentColoring value=colorOneAssemblyPath"
+        << (segmentColoring=="colorOneAssemblyPath" ? " checked=checked" : "") <<
+        ">Color assembly path:"
+        " <input type=text name=assemblyPathId size=8 style='text-align:center'"
+        " value='" << assemblyPathId << "'>"
 
         "<br>"
         "Seed for coloring hash: ";

@@ -128,6 +128,7 @@ public:
         string segmentColoring = "random";
         uint64_t referenceSegmentId = 0;
         uint64_t referenceSegmentReplicaIndex = 0;
+        uint64_t assemblyPathId;
         uint32_t coloringHashSeed = 231;
 
         // Link length and thickness.
