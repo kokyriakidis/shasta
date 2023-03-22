@@ -367,7 +367,7 @@ private:
 
             // The journey intervals for these secondary vertices.
             // This are the ones corresponding to the entries that will be
-            // "ripped" during path ripping.
+            // used to assemble this portion of the TangleAssemblyPath.
             class JourneyInterval {
             public:
                 OrientedReadId orientedReadId;
