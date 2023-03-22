@@ -498,6 +498,77 @@ bool JaccardGraph::findLongPaths(uint64_t minPathLength)
         }
     }
 
+
+#if 0
+
+    // FOR THIS TO WORK, WE NEED TO EXCLUDE EDGES BETWEEN
+    // VERTICES OF THE SAME LONG PATH.
+    // THIS REQUIRES KEEPING TRACK OF WHAT PATH EACH VERTEX BELONGS TO.
+
+    // When two long paths come close to each other,
+    // we want to trim them a bit.
+    // We do this as follows:
+    // - Loop over edges that "bridge" between two long paths.
+    //   That is, they are not in a long path,
+    //   and both vertices are in a long path.
+    // - Unmark the two vertices.
+    // - Also unmark any adjacent edges.
+    vector<vertex_descriptor> verticesToUnmark;
+    vector<edge_descriptor> edgesToUnmark;
+    BGL_FORALL_EDGES(e, jaccardGraph, JaccardGraph) {
+        if(jaccardGraph[e].isLongPathEdge) {
+            continue;
+        }
+        const vertex_descriptor v0 = source(e, jaccardGraph);
+        const vertex_descriptor v1 = target(e, jaccardGraph);
+        if(not jaccardGraph[v0].isLongPathVertex) {
+            continue;
+        }
+        if(not jaccardGraph[v1].isLongPathVertex) {
+            continue;
+        }
+        SHASTA_ASSERT(not jaccardGraph[e].isLongPathEdge);
+        SHASTA_ASSERT(jaccardGraph[v0].isLongPathVertex);
+        SHASTA_ASSERT(jaccardGraph[v1].isLongPathVertex);
+
+        // Unmark the two vertices.
+        verticesToUnmark.push_back(v0);
+        verticesToUnmark.push_back(v1);
+        cout << "Unmark " << vertexStringId(v0) << "->" << vertexStringId(v1) << "\n";
+
+        // Unmark the adjacent edges.
+        BGL_FORALL_OUTEDGES(v0, e, jaccardGraph, JaccardGraph) {
+            edgesToUnmark.push_back(e);
+        }
+        BGL_FORALL_INEDGES(v0, e, jaccardGraph, JaccardGraph) {
+            edgesToUnmark.push_back(e);
+        }
+        BGL_FORALL_OUTEDGES(v1, e, jaccardGraph, JaccardGraph) {
+            edgesToUnmark.push_back(e);
+        }
+        BGL_FORALL_INEDGES(v1, e, jaccardGraph, JaccardGraph) {
+            edgesToUnmark.push_back(e);
+        }
+    }
+    for(const vertex_descriptor v: verticesToUnmark) {
+        jaccardGraph[v].isLongPathVertex = false;
+    }
+    for(const edge_descriptor e: edgesToUnmark) {
+        jaccardGraph[e].isLongPathEdge = false;
+    }
+
+
+    // Count the vertices where isLongPathVertex is set.
+    uint64_t longPathVertexCount = 0;
+    BGL_FORALL_VERTICES(v, jaccardGraph, JaccardGraph) {
+        if(jaccardGraph[v].isLongPathVertex) {
+            ++longPathVertexCount;
+        }
+    }
+    cout << longPathVertexCount << " vertices in long paths out of " <<
+        num_vertices(jaccardGraph) << endl;
+#endif
+
     return true;
 }
 
