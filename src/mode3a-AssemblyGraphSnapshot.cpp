@@ -185,6 +185,8 @@ AssemblyGraphSnapshot::AssemblyGraphSnapshot(
 AssemblyGraphSnapshot::Vertex::Vertex(const AssemblyGraphVertex& vertex) :
     segmentId(vertex.segmentId),
     segmentReplicaIndex(vertex.segmentReplicaIndex),
+    tangledPathId(vertex.tangledPathInformation.primaryInfo.pathId),
+    positionInTangledPath(vertex.tangledPathInformation.primaryInfo.positionInPath),
     packedAssemblyGraphVertexId(vertex.packedAssemblyGraphVertexId),
     positionInPackedAssemblyGraph(vertex.positionInPackedAssemblyGraph)
 {}

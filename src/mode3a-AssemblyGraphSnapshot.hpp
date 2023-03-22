@@ -72,6 +72,12 @@ public:
             return s;
         }
 
+        // A vertex can appear at most once as a primary vertex
+        // in a TangledAssemblyPath.
+        // Store that information here.
+        uint64_t tangledPathId = invalid<uint64_t>;
+        uint64_t positionInTangledPath = invalid<uint64_t>;
+
         // If this vertex is used somewhere in the PackedAssemblyGraph,
         // store that information here.
         uint64_t packedAssemblyGraphVertexId = invalid<uint64_t>;
