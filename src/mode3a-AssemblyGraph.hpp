@@ -456,22 +456,55 @@ public:
     // is lost, and for each vertex we store the indexes of the
     // JourneyEntries of the vertex that should be used for assembly.
 
-    class FlattenedAssemblyPathEntry {
+    class FlattenedAssemblyPathSegment {
     public:
         vertex_descriptor v;
         vector<bool> useForAssembly;  // True of false for each of the journey entries in the vertex.
 
+        // The length of the complete assembled sequence for this segment.
+        uint64_t sequenceLength;
+
+        // The portion of the segment sequence that is used to assemble this path.
+        uint64_t sequenceBegin;
+        uint64_t sequenceEnd;
+
+        // The position of this portion of sequence in assembled sequence.
+        uint64_t positionInAssembledSequence;
+
         // Constructor for a primary vertex.
-        FlattenedAssemblyPathEntry(vertex_descriptor v, uint64_t n) :
+        FlattenedAssemblyPathSegment(vertex_descriptor v, uint64_t n) :
             v(v), useForAssembly(vector<bool>(n, true)) {}
 
         // Constructor for a secondary vertex.
-        FlattenedAssemblyPathEntry(vertex_descriptor v, const vector<bool>& useForAssembly) :
+        FlattenedAssemblyPathSegment(vertex_descriptor v, const vector<bool>& useForAssembly) :
             v(v), useForAssembly(useForAssembly) {}
     };
 
-    class FlattenedAssemblyPath : public vector<FlattenedAssemblyPathEntry> {
+    class FlattenedAssemblyPathLink {
     public:
+
+        edge_descriptor e;
+
+        // Information obtained from assembleLink.
+        uint64_t leftOverride;
+        uint64_t rightOverride;
+        vector<shasta::Base> sequence;
+
+        // The portion of the link sequence that is used to assemble this path.
+        uint64_t sequenceBegin;
+        uint64_t sequenceEnd;
+
+        // The position of this portion of sequence in assembled sequence.
+        uint64_t positionInAssembledSequence;
+
+        FlattenedAssemblyPathLink(edge_descriptor e);
+    };
+
+    public:
+    class FlattenedAssemblyPath {
+    public:
+        vector<FlattenedAssemblyPathSegment> segments;
+        vector<FlattenedAssemblyPathLink> links;    // Size is segments.size() - 1
     };
 
 
@@ -481,9 +514,13 @@ public:
     void assemble();
     void assemble(uint64_t assemblyPathId);
     void assemble(
-        const FlattenedAssemblyPath&,
+        FlattenedAssemblyPath&,
         vector<shasta::Base>& sequence);
-
+    void assembleLink(
+        FlattenedAssemblyPathLink&,
+        const FlattenedAssemblyPathSegment& previousSegment,
+        const FlattenedAssemblyPathSegment& nextSegment
+    ) const;
 
 
 

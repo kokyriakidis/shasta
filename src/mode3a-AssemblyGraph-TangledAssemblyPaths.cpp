@@ -1,6 +1,7 @@
 // Shasta.
 #include "mode3a-AssemblyGraph.hpp"
 #include "mode3a-PackedMarkerGraph.hpp"
+#include "Base.hpp"
 #include "deduplicate.hpp"
 #include "enumeratePaths.hpp"
 #include "invalid.hpp"
@@ -1217,14 +1218,14 @@ void AssemblyGraph::createFromAssemblyPaths(
 
 void AssemblyGraph::assemble()
 {
-#if 0
+#if 1
     for(uint64_t pathId=0; pathId<assemblyPaths.size(); pathId++) {
         assemble(pathId);
     }
-#endif
-
-    // For now, only assembly one path.
+#else
+    // For testing, only assembly one path.
     assemble(0);
+#endif
 }
 
 
@@ -1238,6 +1239,10 @@ void AssemblyGraph::assemble(uint64_t assemblyPathId)
 
     // Construct the FlattenedAssemblyPath.
     FlattenedAssemblyPath flattenedAssemblyPath;
+
+
+
+    // Construct the FlattenedAssemblyPath segments.
     vector<bool> useForAssembly;
     for(uint64_t i=0; /* Check later */; i++) {
 
@@ -1245,7 +1250,7 @@ void AssemblyGraph::assemble(uint64_t assemblyPathId)
         // All of its journey entries are marked to be used for assembly.
         const vertex_descriptor v = assemblyPath.primaryVertices[i];
         const AssemblyGraphVertex& vertex = assemblyGraph[v];
-        flattenedAssemblyPath.push_back(FlattenedAssemblyPathEntry(v, vertex.journeyEntries.size()));
+        flattenedAssemblyPath.segments.emplace_back(v, vertex.journeyEntries.size());
 
         // If this is the last primary vertex, there are no secondary
         // vertices and we are done.
@@ -1259,24 +1264,80 @@ void AssemblyGraph::assemble(uint64_t assemblyPathId)
             const AssemblyGraphVertex& vertex = assemblyGraph[v];
             secondaryVertexInfo.getVertexJourneyEntries(vertex, useForAssembly);
             SHASTA_ASSERT(useForAssembly.size() == vertex.journeyEntries.size());
-            flattenedAssemblyPath.push_back(FlattenedAssemblyPathEntry(v, useForAssembly));
+            flattenedAssemblyPath.segments.emplace_back(v, useForAssembly);
         }
     }
 
+
+
+    // Construct the FlattenedAssemblyPath links.
+    for(uint64_t i=1; i<flattenedAssemblyPath.segments.size(); i++) {
+        const vertex_descriptor v0 = flattenedAssemblyPath.segments[i-1].v;
+        const vertex_descriptor v1 = flattenedAssemblyPath.segments[i].v;
+
+        // Find the edge.
+        edge_descriptor e;
+        bool edgeWasFound = false;
+        tie(e, edgeWasFound) = edge(v0, v1, assemblyGraph);
+        SHASTA_ASSERT(edgeWasFound);
+
+        flattenedAssemblyPath.links.emplace_back(e);
+    }
+
+
+
+    // Assemble it.
+    // This fills in the fields in the segments and links that
+    // were not initialized here.
     assemble(flattenedAssemblyPath, assemblyPath.assembledSequence);
 }
 
 
 
+AssemblyGraph::FlattenedAssemblyPathLink::FlattenedAssemblyPathLink(edge_descriptor e) :
+    e(e) {}
+
+
+
 // Assemble a FlattenedAssemblyPath.
-// This is similar to the code in AssemblyGraphSnapshot::createSimpleAssemblyPath
-// and AssemblyGraphSnapshot::SimpleAssemblyPath::getAssembledSequence,
+// This is similar to assembly code in AssemblyGraphSnapshot,
 // but it only uses a subset of the JourneyEntries of each vertex,
 // as specified by the FlattenedAssemblyPath.
 void AssemblyGraph::assemble(
-    const FlattenedAssemblyPath& flattenedAssemblyPath,
+    FlattenedAssemblyPath& flattenedAssemblyPath,
     vector<shasta::Base>& sequence)
+{
+    const AssemblyGraph& assemblyGraph = *this;
+
+    // Fill in sequence length for all segments.
+    for(auto& segment: flattenedAssemblyPath.segments) {
+        const AssemblyGraphVertex& vertex = assemblyGraph[segment.v];
+        segment.sequenceLength = packedMarkerGraph.segmentSequences[vertex.segmentId].size();
+    }
+
+    // Assemble the links.
+    SHASTA_ASSERT(flattenedAssemblyPath.links.size() == flattenedAssemblyPath.segments.size() - 1);
+    for(uint64_t i=0; i<flattenedAssemblyPath.links.size(); i++) {
+        auto& link = flattenedAssemblyPath.links[i];
+        const auto& previousSegment = flattenedAssemblyPath.segments[i];
+        const auto& nextSegment = flattenedAssemblyPath.segments[i+1];
+
+        assembleLink(link, previousSegment, nextSegment);
+    }
+
+}
+
+
+
+// Assemble a link, using only journey entries permitted
+// by the useForAssembly fields of the previous and next segment.
+void AssemblyGraph::assembleLink(
+    FlattenedAssemblyPathLink& link,
+    const FlattenedAssemblyPathSegment& previousSegment,
+    const FlattenedAssemblyPathSegment& nextSegment
+) const
 {
 
 }
+
 
