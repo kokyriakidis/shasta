@@ -138,7 +138,7 @@ Assembler::Assembler(
         assemblyGraph->analyzePartialPaths(threadCount);
 
         // Find TangledAssemblyPaths.
-        assemblyGraph->computeTangledAssemblyPaths(threadCount);
+        assemblyGraph->computeAssemblyPaths(threadCount);
 
         // Create a snapshot of the assembly graph.
         AssemblyGraphSnapshot snapshot(

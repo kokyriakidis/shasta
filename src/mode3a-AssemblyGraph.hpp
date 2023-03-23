@@ -32,7 +32,7 @@ namespace shasta {
 
         class JourneyEntry;
         class Transition;
-        class TangledPathInformation;
+        class PathInformation;
 
         class PackedMarkerGraph;
     }
@@ -51,9 +51,9 @@ public:
 
 
 
-// Class used to store information about the tangled paths that a vertex
+// Class used to store information about the paths that a vertex
 // appears in.
-class shasta::mode3a::TangledPathInformation {
+class shasta::mode3a::PathInformation {
 public:
 
     // Each vertex can apear at most once as a primary vertex in tangled paths.
@@ -75,7 +75,7 @@ public:
     }
 
     // Information about appearances of this vertex as a secondary vertex
-    // in tangled paths.
+    // in paths.
     class SecondaryInfo {
     public:
         uint64_t pathId;
@@ -139,8 +139,8 @@ public:
     vector<AssemblyGraphBaseClass::vertex_descriptor> forwardPartialPath;
     vector<AssemblyGraphBaseClass::vertex_descriptor> backwardPartialPath;
 
-    // Information about the tangled paths that this vertex appears in.
-    TangledPathInformation tangledPathInformation;
+    // Information about the paths that this vertex appears in.
+    PathInformation pathInformation;
 };
 
 
@@ -337,24 +337,25 @@ private:
 
 
 public:
-    // Class TangledAssemblyPath describes a tangled
-    // assembly path ready to be "ripped" from the AssemblyGraph.
-    // Sequence assembly only happens after the "ripping" operation takes place.
-    // At that time the assembly path becomes a linear sequence of vertices in
-    // the AssemblyGraph.
-    // Each TangledAssemblyPath corresponds to one of the longest paths
+
+    // Class AssemblyPath describes an assembly path in the AssemblyGraph.
+    // An AssemblyPath consists of a sequence of primary vertices
+    // interspeded with secondary vertices.
+    // Successive primary vertices have similar read compositions
+    // and represent the "native" sequence of the assembly paths.
+    // The secondary vertices have extraneous reads
+    // originating from unrelated sequence copies, and which
+    // should not be used for assembly.
+    // Each AssemblyPath corresponds to one of the longest paths
     // computed by analyzePartialPaths and stored in
     // analyzePartialPathsData.longestPaths.
-    class TangledAssemblyPath {
+    class AssemblyPath {
     public:
 
-        // The primary vertices are the ones that are unique to this path
-        // (that is, they don't belong to any other assembly path).
-        // They are computed by analyzePartialPaths.
-        // All of the oriented reads in the primary vertices participate in the ripping.
         vector<vertex_descriptor> primaryVertices;
 
-        // For each pair of consecutive primary vertices.
+        // For each pair of consecutive primary vertices we store a
+        // SecondaryVertexInfo describing the secondary vertices in between.
         // The secondaryVerticesInfos vector has size one less than the
         // primaryVertices vector. Each entry corresponds to the interval
         // between two consecutive primaryVertices.
@@ -400,42 +401,49 @@ public:
             efficiency = sum /double(secondaryVerticesInfos.size());
         }
     };
-    vector<shared_ptr<TangledAssemblyPath> > tangledAssemblyPaths;
+    vector<shared_ptr<AssemblyPath> > assemblyPaths;
+    void computeAssemblyPaths(uint64_t threadCount);
 private:
 
-    // Class used to sort TangledAssemblyPaths by decreasing efficiency.
-    class OrderTangledAssemblyPath {
+    // Class used to sort AssemblyPaths by decreasing efficiency.
+    class OrderAssemblyPath {
     public:
         bool operator()(
-            const shared_ptr<TangledAssemblyPath>& x,
-            const shared_ptr<TangledAssemblyPath>& y
+            const shared_ptr<AssemblyPath>& x,
+            const shared_ptr<AssemblyPath>& y
             ) const
         {
             return x->efficiency > y->efficiency;
         }
 
     };
-public:
-    void computeTangledAssemblyPaths(uint64_t threadCount);
-private:
-    void computeTangledAssemblyPathsThreadFunction(uint64_t threadId);
-    void computeTangledAssemblyPath(
+
+    void computeAssemblyPathsThreadFunction(uint64_t threadId);
+
+    // Compute an AssemblyPath given the primary vertices.
+    void computeAssemblyPath(
         const vector<vertex_descriptor>& primaryVertices,
-        TangledAssemblyPath&,
+        AssemblyPath&,
         ostream& debugOut
         );
+
+    // Find secondary vertices given a pair of consecutive primary vertices.
     void computeSecondaryVertices(
         vertex_descriptor v0,
         vertex_descriptor v1,
-        TangledAssemblyPath::SecondaryVertexInfo&,
+        AssemblyPath::SecondaryVertexInfo&,
         ostream& debugOut);
-    void writeTangledAssemblyPaths1() const;
-    void writeTangledAssemblyPaths2() const;
-    void writeTangledAssemblyPathsVertexSummary() const;
-    void writeTangledAssemblyPathsVertexInfo() const;
-    void writeTangledAssemblyPathsVertexHistogram() const;
-    void writeTangledAssemblyPathsJourneyInfo() const;
-    void writeTangledAssemblyPathsJourneyIntervals() const;
+
+    // AssemblyPath debug output.
+    void writeAssemblyPaths1() const;
+    void writeAssemblyPaths2() const;
+    void writeAssemblyPathsVertexSummary() const;
+    void writeAssemblyPathsVertexInfo() const;
+    void writeAssemblyPathsVertexHistogram() const;
+    void writeAssemblyPathsJourneyInfo() const;
+    void writeAssemblyPathsJourneyIntervals() const;
+
+
 
     // Classes used to define detangling constructors.
 public:
@@ -445,13 +453,13 @@ public:
 
 
 
-    // Create a detangled AssemblyGraph using the TangledAssemblyPaths
+    // Create a detangled AssemblyGraph using the AssemblyPaths
     // of another AssemblyGraph.
     AssemblyGraph(
         DetangleUsingTangledAssemblyPaths,
         const AssemblyGraph& oldAssemblyGraph);
 private:
-    void createFromTangledAssemblyPaths(const AssemblyGraph& oldAssemblyGraph);
+    void createFromAssemblyPaths(const AssemblyGraph& oldAssemblyGraph);
 
 
 

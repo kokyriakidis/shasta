@@ -91,34 +91,34 @@ AssemblyGraphSnapshot::AssemblyGraphSnapshot(
     createVertexTable(assemblyGraph.packedMarkerGraph);
 
 
-    // Store TangledAssemblyPaths.
-    createNew(tangledAssemblyPaths, name + "-tangledAssemblyPaths");
-    for(const auto& tangledAssemblyPathPointer: assemblyGraph.tangledAssemblyPaths) {
-        const auto& tangledAssemblyPath = *tangledAssemblyPathPointer;
-        tangledAssemblyPaths.appendVector();
+    // Store AssemblyPaths.
+    createNew(assemblyPaths, name + "-assemblyPaths");
+    for(const auto& assemblyPathPointer: assemblyGraph.assemblyPaths) {
+        const auto& assemblyPath = *assemblyPathPointer;
+        assemblyPaths.appendVector();
         SHASTA_ASSERT(
-            tangledAssemblyPath.primaryVertices.size() ==
-            tangledAssemblyPath.secondaryVerticesInfos.size() + 1);
+            assemblyPath.primaryVertices.size() ==
+            assemblyPath.secondaryVerticesInfos.size() + 1);
         for(uint64_t i=0; /* Check later */ ; i++) {
 
             // Add the primary vertex.
-            const AssemblyGraph::vertex_descriptor v = tangledAssemblyPath.primaryVertices[i];
+            const AssemblyGraph::vertex_descriptor v = assemblyPath.primaryVertices[i];
             const AssemblyGraphVertex& vertex = assemblyGraph[v];
             const uint64_t vertexId = getVertexId(vertex.segmentId, vertex.segmentReplicaIndex);
-            tangledAssemblyPaths.append({vertexId, true});
+            assemblyPaths.append({vertexId, true});
 
             // If this is the last primary vertex, we are done.
             // There are no secondary vertices following it.
-            if(i == tangledAssemblyPath.primaryVertices.size() - 1) {
+            if(i == assemblyPath.primaryVertices.size() - 1) {
                 break;
             }
 
             // Add the secondary vertices.
-            const auto& secondaryVerticesInfos = tangledAssemblyPath.secondaryVerticesInfos[i];
+            const auto& secondaryVerticesInfos = assemblyPath.secondaryVerticesInfos[i];
             for(const AssemblyGraph::vertex_descriptor v: secondaryVerticesInfos.secondaryVertices) {
                 const AssemblyGraphVertex& vertex = assemblyGraph[v];
                 const uint64_t vertexId = getVertexId(vertex.segmentId, vertex.segmentReplicaIndex);
-                tangledAssemblyPaths.append({vertexId, false});
+                assemblyPaths.append({vertexId, false});
             }
         }
     }
@@ -222,7 +222,7 @@ AssemblyGraphSnapshot::AssemblyGraphSnapshot(
     accessExistingReadOnly(edgesBySource, name + "-edgesBySource");
     accessExistingReadOnly(edgesByTarget, name + "-edgesByTarget");
     accessExistingReadOnly(vertexTable, name + "-vertexTable");
-    accessExistingReadOnly(tangledAssemblyPaths, name + "-tangledAssemblyPaths");
+    accessExistingReadOnly(assemblyPaths, name + "-assemblyPaths");
 }
 
 
@@ -230,11 +230,13 @@ AssemblyGraphSnapshot::AssemblyGraphSnapshot(
 AssemblyGraphSnapshot::Vertex::Vertex(const AssemblyGraphVertex& vertex) :
     segmentId(vertex.segmentId),
     segmentReplicaIndex(vertex.segmentReplicaIndex),
-    tangledPathId(vertex.tangledPathInformation.primaryInfo.pathId),
-    positionInTangledPath(vertex.tangledPathInformation.primaryInfo.positionInPath),
+    pathId(vertex.pathInformation.primaryInfo.pathId),
+    positionInPath(vertex.pathInformation.primaryInfo.positionInPath),
     packedAssemblyGraphVertexId(vertex.packedAssemblyGraphVertexId),
     positionInPackedAssemblyGraph(vertex.positionInPackedAssemblyGraph)
 {}
+
+
 
 // Get the stringId for a given vertexId, or "None" if vertexId is invalid<uint64_t>.
 string AssemblyGraphSnapshot::vertexStringId(uint64_t vertexId) const

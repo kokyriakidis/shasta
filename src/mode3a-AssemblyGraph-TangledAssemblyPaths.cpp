@@ -18,38 +18,37 @@ using namespace mode3a;
 
 
 
-void AssemblyGraph::computeTangledAssemblyPaths(uint64_t threadCount)
+void AssemblyGraph::computeAssemblyPaths(uint64_t threadCount)
 {
     AssemblyGraph& assemblyGraph = *this;
-    cout << "computeTangledAssemblyPaths begins." << endl;
+    cout << "computeAssemblyPaths begins." << endl;
 
     // Initialize a TangledAssemblyPath for each of the
     // longest path computed by analyzePartialPaths.
-    tangledAssemblyPaths.clear();
-    tangledAssemblyPaths.resize(analyzePartialPathsData.longestPaths.size());
+    assemblyPaths.clear();
+    assemblyPaths.resize(analyzePartialPathsData.longestPaths.size());
 
-    // Compute the TangledAssemblyPaths in parallel.
-    setupLoadBalancing(tangledAssemblyPaths.size(), 1);
-    runThreads(&AssemblyGraph::computeTangledAssemblyPathsThreadFunction, threadCount);
+    // Compute the AssemblyPaths in parallel.
+    setupLoadBalancing(assemblyPaths.size(), 1);
+    runThreads(&AssemblyGraph::computeAssemblyPathsThreadFunction, threadCount);
 
     // Sort them by decreasing efficiency.
-    sort(tangledAssemblyPaths.begin(), tangledAssemblyPaths.end(),
-        OrderTangledAssemblyPath());
+    sort(assemblyPaths.begin(), assemblyPaths.end(), OrderAssemblyPath());
 
 
 
-    // Store tangled path information in vertices.
+    // Store path information in vertices.
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
-        assemblyGraph[v].tangledPathInformation.clear();
+        assemblyGraph[v].pathInformation.clear();
     }
-    for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
-        const TangledAssemblyPath& path = *tangledAssemblyPaths[pathId];
+    for(uint64_t pathId=0; pathId<assemblyPaths.size(); pathId++) {
+        const AssemblyPath& path = *assemblyPaths[pathId];
         SHASTA_ASSERT(path.secondaryVerticesInfos.size() == path.primaryVertices.size() - 1);
 
         // Information for primary vertices of this path.
         for(uint64_t positionInPath=0; positionInPath<path.primaryVertices.size(); positionInPath++) {
             const vertex_descriptor v = path.primaryVertices[positionInPath];
-            auto& primaryInfo = assemblyGraph[v].tangledPathInformation.primaryInfo;
+            auto& primaryInfo = assemblyGraph[v].pathInformation.primaryInfo;
 
             // Each vertex can only appear once as a primary vertex in a path.
             SHASTA_ASSERT(primaryInfo.pathId == invalid<uint64_t>);
@@ -63,32 +62,32 @@ void AssemblyGraph::computeTangledAssemblyPaths(uint64_t threadCount)
 
             for(uint64_t positionInLeg=0; positionInLeg<secondaryVertexInfo.secondaryVertices.size(); positionInLeg++) {
                 const vertex_descriptor v = secondaryVertexInfo.secondaryVertices[positionInLeg];
-                assemblyGraph[v].tangledPathInformation.secondaryInfos.push_back({pathId, positionInPath, positionInLeg});
+                assemblyGraph[v].pathInformation.secondaryInfos.push_back({pathId, positionInPath, positionInLeg});
             }
         }
     }
 
 
 
-    writeTangledAssemblyPaths1();
-    writeTangledAssemblyPaths2();
-    writeTangledAssemblyPathsVertexSummary();
-    writeTangledAssemblyPathsVertexInfo();
-    writeTangledAssemblyPathsVertexHistogram();
-    writeTangledAssemblyPathsJourneyIntervals();
-    writeTangledAssemblyPathsJourneyInfo();
+    writeAssemblyPaths1();
+    writeAssemblyPaths2();
+    writeAssemblyPathsVertexSummary();
+    writeAssemblyPathsVertexInfo();
+    writeAssemblyPathsVertexHistogram();
+    writeAssemblyPathsJourneyIntervals();
+    writeAssemblyPathsJourneyInfo();
 }
 
 
 
-void AssemblyGraph::writeTangledAssemblyPaths1() const
+void AssemblyGraph::writeAssemblyPaths1() const
 {
 
-    ofstream csv(debugOutputPrefix + "TangledAssemblyPaths1.csv");
+    ofstream csv(debugOutputPrefix + "AssemblyPaths1.csv");
     csv << "Path,Path efficiency,Position,v0,v1,Efficiency,\n";
 
-    for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
-        const TangledAssemblyPath& path = *tangledAssemblyPaths[pathId];
+    for(uint64_t pathId=0; pathId<assemblyPaths.size(); pathId++) {
+        const AssemblyPath& path = *assemblyPaths[pathId];
         SHASTA_ASSERT(path.secondaryVerticesInfos.size() == path.primaryVertices.size() - 1);
 
         for(uint64_t position=0; position<path.secondaryVerticesInfos.size(); position++) {
@@ -112,14 +111,14 @@ void AssemblyGraph::writeTangledAssemblyPaths1() const
 
 
 
-void AssemblyGraph::writeTangledAssemblyPaths2() const
+void AssemblyGraph::writeAssemblyPaths2() const
 {
 
-    ofstream csv(debugOutputPrefix + "TangledAssemblyPaths2.csv");
+    ofstream csv(debugOutputPrefix + "AssemblyPaths2.csv");
     csv << "Path,Vertices\n";
 
-    for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
-        const TangledAssemblyPath& path = *tangledAssemblyPaths[pathId];
+    for(uint64_t pathId=0; pathId<assemblyPaths.size(); pathId++) {
+        const AssemblyPath& path = *assemblyPaths[pathId];
         SHASTA_ASSERT(path.secondaryVerticesInfos.size() == path.primaryVertices.size() - 1);
 
         csv << pathId << ",";
@@ -144,32 +143,32 @@ void AssemblyGraph::writeTangledAssemblyPaths2() const
 
 
 
-void AssemblyGraph::writeTangledAssemblyPathsVertexSummary() const
+void AssemblyGraph::writeAssemblyPathsVertexSummary() const
 {
     const AssemblyGraph& assemblyGraph = *this;
-    ofstream csv(debugOutputPrefix + "TangledAssemblyPathsVertexSummary.csv");
+    ofstream csv(debugOutputPrefix + "AssemblyPathsVertexSummary.csv");
     csv << "Vertex,PrimaryCount,SecondaryCount\n";
 
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
         const AssemblyGraphVertex& vertex = assemblyGraph[v];
         csv << vertex.stringId() << ",";
-        csv << vertex.tangledPathInformation.primaryCount() << ",";
-        csv << vertex.tangledPathInformation.secondaryInfos.size() << "\n";
+        csv << vertex.pathInformation.primaryCount() << ",";
+        csv << vertex.pathInformation.secondaryInfos.size() << "\n";
     }
 }
 
 
 
-void AssemblyGraph::writeTangledAssemblyPathsVertexInfo() const
+void AssemblyGraph::writeAssemblyPathsVertexInfo() const
 {
     const AssemblyGraph& assemblyGraph = *this;
 
-    ofstream csv(debugOutputPrefix + "TangledAssemblyPathsVertexInfo.csv");
+    ofstream csv(debugOutputPrefix + "AssemblyPathsVertexInfo.csv");
     csv << "Vertex,Type,PathId,PositionInPath,PositionInLeg\n";
 
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
         const AssemblyGraphVertex& vertex = assemblyGraph[v];
-        const auto& primaryInfo = vertex.tangledPathInformation.primaryInfo;
+        const auto& primaryInfo = vertex.pathInformation.primaryInfo;
 
         if(primaryInfo.pathId != invalid<uint64_t>) {
             csv << vertex.stringId() << ",";
@@ -178,7 +177,7 @@ void AssemblyGraph::writeTangledAssemblyPathsVertexInfo() const
             csv << primaryInfo.positionInPath << "\n";
         }
 
-        for(const auto& info: vertex.tangledPathInformation.secondaryInfos) {
+        for(const auto& info: vertex.pathInformation.secondaryInfos) {
             csv << vertex.stringId() << ",";
             csv << "Secondary,";
             csv << info.pathId << ",";
@@ -191,15 +190,15 @@ void AssemblyGraph::writeTangledAssemblyPathsVertexInfo() const
 
 
 // Histogram of the number of vertices by number of primary/secondary paths.
-void AssemblyGraph::writeTangledAssemblyPathsVertexHistogram() const
+void AssemblyGraph::writeAssemblyPathsVertexHistogram() const
 {
     const AssemblyGraph& assemblyGraph = *this;
 
     vector< vector<uint64_t> > histogram;
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
         const AssemblyGraphVertex& vertex = assemblyGraph[v];
-        const uint64_t primaryCount = vertex.tangledPathInformation.primaryCount();
-        const uint64_t secondaryCount = vertex.tangledPathInformation.secondaryInfos.size();
+        const uint64_t primaryCount = vertex.pathInformation.primaryCount();
+        const uint64_t secondaryCount = vertex.pathInformation.secondaryInfos.size();
         if(histogram.size() <= primaryCount) {
             histogram.resize(primaryCount + 1);
         }
@@ -225,7 +224,7 @@ void AssemblyGraph::writeTangledAssemblyPathsVertexHistogram() const
 
 
 
-void AssemblyGraph::writeTangledAssemblyPathsJourneyInfo() const
+void AssemblyGraph::writeAssemblyPathsJourneyInfo() const
 {
     const AssemblyGraph& assemblyGraph = *this;
 
@@ -233,14 +232,14 @@ void AssemblyGraph::writeTangledAssemblyPathsJourneyInfo() const
 
     BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
         const AssemblyGraphVertex& vertex = assemblyGraph[v];
-        const auto& primaryInfo = vertex.tangledPathInformation.primaryInfo;
+        const auto& primaryInfo = vertex.pathInformation.primaryInfo;
 
         // For each of the paths that this vertex is a secondary vertex of,
         // find the journey entries that belong to that path.
-        vector< vector<bool> > journeyEntryFlags(vertex.tangledPathInformation.secondaryInfos.size());
+        vector< vector<bool> > journeyEntryFlags(vertex.pathInformation.secondaryInfos.size());
         for(uint64_t i=0; i<journeyEntryFlags.size(); i++) {
-            const auto& secondaryInfo = vertex.tangledPathInformation.secondaryInfos[i];
-            const TangledAssemblyPath& path = *tangledAssemblyPaths[secondaryInfo.pathId];
+            const auto& secondaryInfo = vertex.pathInformation.secondaryInfos[i];
+            const AssemblyPath& path = *assemblyPaths[secondaryInfo.pathId];
             path.secondaryVerticesInfos[secondaryInfo.positionInPath].getVertexJourneys(
                 vertex, journeyEntryFlags[i]);
         }
@@ -250,13 +249,13 @@ void AssemblyGraph::writeTangledAssemblyPathsJourneyInfo() const
 
         // Write the header for this vertex.
         csv << "OrientedReadId,PositionInJourney,";
-        if(vertex.tangledPathInformation.primaryCount() == 1) {
+        if(vertex.pathInformation.primaryCount() == 1) {
             csv << "P-";
             csv << primaryInfo.pathId << "-";
             csv << primaryInfo.positionInPath << ",";
 
         }
-        for(const auto& info: vertex.tangledPathInformation.secondaryInfos) {
+        for(const auto& info: vertex.pathInformation.secondaryInfos) {
             csv << "S-";
             csv << info.pathId << "-";
             csv << info.positionInPath << "-";
@@ -271,7 +270,7 @@ void AssemblyGraph::writeTangledAssemblyPathsJourneyInfo() const
             csv << journeyEntry.position << ",";
 
             // If this is a primary vertex of a path, all journey entries are in the path.
-            if(vertex.tangledPathInformation.primaryCount() == 1) {
+            if(vertex.pathInformation.primaryCount() == 1) {
                 csv << "1,";
             }
 
@@ -288,13 +287,13 @@ void AssemblyGraph::writeTangledAssemblyPathsJourneyInfo() const
 
 
 
-void AssemblyGraph::writeTangledAssemblyPathsJourneyIntervals() const
+void AssemblyGraph::writeAssemblyPathsJourneyIntervals() const
 {
-    ofstream csv(debugOutputPrefix + "TangledAssemblyPathsJourneyIntervals.csv");
+    ofstream csv(debugOutputPrefix + "AssemblyPathsJourneyIntervals.csv");
     csv << "PathId,Position,OrientedReadId,Begin,End\n";
 
-    for(uint64_t pathId=0; pathId<tangledAssemblyPaths.size(); pathId++) {
-        const TangledAssemblyPath& path = *tangledAssemblyPaths[pathId];
+    for(uint64_t pathId=0; pathId<assemblyPaths.size(); pathId++) {
+        const AssemblyPath& path = *assemblyPaths[pathId];
         SHASTA_ASSERT(path.secondaryVerticesInfos.size() == path.primaryVertices.size() - 1);
 
         for(uint64_t position=0; position<path.secondaryVerticesInfos.size(); position++) {
@@ -315,7 +314,7 @@ void AssemblyGraph::writeTangledAssemblyPathsJourneyIntervals() const
 
 // Given a vertex, find which journey entries in the vertex
 // are in one of the journey intervals for this SecondaryVertexInfo.
-void AssemblyGraph::TangledAssemblyPath::SecondaryVertexInfo::getVertexJourneys(
+void AssemblyGraph::AssemblyPath::SecondaryVertexInfo::getVertexJourneys(
     const AssemblyGraphVertex& vertex,
     vector<bool>& flags   // True of false for each of the journey entries in the vertex.
 ) const
@@ -400,17 +399,17 @@ void AssemblyGraph::TangledAssemblyPath::SecondaryVertexInfo::getVertexJourneys(
 
 
 
-void AssemblyGraph::computeTangledAssemblyPathsThreadFunction(uint64_t threadId)
+void AssemblyGraph::computeAssemblyPathsThreadFunction(uint64_t threadId)
 {
-    ofstream debugOut(debugOutputPrefix + "ComputeTangledAssemblyPaths-Thread" + to_string(threadId) + ".txt");
+    ofstream debugOut(debugOutputPrefix + "ComputeAssemblyPaths-Thread" + to_string(threadId) + ".txt");
 
     uint64_t begin, end;
     while(getNextBatch(begin, end)) {
         for(uint64_t i=begin; i!=end; ++i) {
-            tangledAssemblyPaths[i] = make_shared<TangledAssemblyPath>();
-            computeTangledAssemblyPath(
+            assemblyPaths[i] = make_shared<AssemblyPath>();
+            computeAssemblyPath(
                 analyzePartialPathsData.longestPaths[i],
-                *tangledAssemblyPaths[i],
+                *assemblyPaths[i],
                 debugOut);
         }
     }
@@ -419,14 +418,14 @@ void AssemblyGraph::computeTangledAssemblyPathsThreadFunction(uint64_t threadId)
 
 
 
-void AssemblyGraph::computeTangledAssemblyPath(
+void AssemblyGraph::computeAssemblyPath(
     const vector<vertex_descriptor>& primaryVertices,
-    TangledAssemblyPath& tangledAssemblyPath,
+    AssemblyPath& assemblyPath,
     ostream& debugOut
     )
 {
     // Store the primary vertices.
-    tangledAssemblyPath.primaryVertices = primaryVertices;
+    assemblyPath.primaryVertices = primaryVertices;
 
     if(debugOut) {
         debugOut << "Computing secondary vertices for tangled assembly path " <<
@@ -440,22 +439,22 @@ void AssemblyGraph::computeTangledAssemblyPath(
     }
 
     // Compute the secondary vertices for each pair of primary vertices.
-    tangledAssemblyPath.secondaryVerticesInfos.clear();
-    tangledAssemblyPath.secondaryVerticesInfos.resize(tangledAssemblyPath.primaryVertices.size() - 1);
+    assemblyPath.secondaryVerticesInfos.clear();
+    assemblyPath.secondaryVerticesInfos.resize(assemblyPath.primaryVertices.size() - 1);
 
-    for(uint64_t i=0; i<tangledAssemblyPath.secondaryVerticesInfos.size(); i++) {
+    for(uint64_t i=0; i<assemblyPath.secondaryVerticesInfos.size(); i++) {
         computeSecondaryVertices(
-            tangledAssemblyPath.primaryVertices[i],
-            tangledAssemblyPath.primaryVertices[i+1],
-            tangledAssemblyPath.secondaryVerticesInfos[i],
+            assemblyPath.primaryVertices[i],
+            assemblyPath.primaryVertices[i+1],
+            assemblyPath.secondaryVerticesInfos[i],
             debugOut);
     }
-    tangledAssemblyPath.computeEfficiency();
+    assemblyPath.computeEfficiency();
     if(debugOut) {
-        debugOut << "Tangled assembly path " <<
+        debugOut << "Assembly path " <<
             vertexStringId(primaryVertices.front()) << "..." <<
             vertexStringId(primaryVertices.back()) <<
-            " with efficiency " << tangledAssemblyPath.efficiency <<
+            " with efficiency " << assemblyPath.efficiency <<
             "\n";
         for(uint64_t i=0; /* Check later */ ; i++) {
 
@@ -464,7 +463,7 @@ void AssemblyGraph::computeTangledAssemblyPath(
                 break;
             }
 
-            for(const vertex_descriptor v: tangledAssemblyPath.secondaryVerticesInfos[i].secondaryVertices) {
+            for(const vertex_descriptor v: assemblyPath.secondaryVerticesInfos[i].secondaryVertices) {
                 debugOut << vertexStringId(v) << " ";
             }
         }
@@ -475,7 +474,7 @@ void AssemblyGraph::computeTangledAssemblyPath(
 
 
 
-// Given a pair of primary vertices in a tangled assembly path,
+// Given a pair of primary vertices in an assembly path,
 // compute the intervening secondary vertices.
 // The code is similar to AssemblyGraph::computePartialPath2,
 // but instead of using entire oriented read journeys,
@@ -483,7 +482,7 @@ void AssemblyGraph::computeTangledAssemblyPath(
 void AssemblyGraph::computeSecondaryVertices(
     vertex_descriptor v0,
     vertex_descriptor v1,
-    TangledAssemblyPath::SecondaryVertexInfo& secondaryVerticesInfo,
+    AssemblyPath::SecondaryVertexInfo& secondaryVerticesInfo,
     ostream& debugOut)
 {
     // EXPOSE WHEN CODE STABILIZES.
@@ -1104,12 +1103,12 @@ AssemblyGraph::AssemblyGraph(
     MultithreadedObject<AssemblyGraph>(*this),
     packedMarkerGraph(oldAssemblyGraph.packedMarkerGraph)
 {
-    createFromTangledAssemblyPaths(oldAssemblyGraph);
+    createFromAssemblyPaths(oldAssemblyGraph);
 }
 
 
 
-void AssemblyGraph::createFromTangledAssemblyPaths(
+void AssemblyGraph::createFromAssemblyPaths(
     const AssemblyGraph& oldAssemblyGraph)
 {
     const bool debug = false;
@@ -1135,10 +1134,10 @@ void AssemblyGraph::createFromTangledAssemblyPaths(
 
         // For each of the paths that this vertex is a secondary vertex of,
         // find the journey entries that belong to that path.
-        vector< vector<bool> > journeyEntryFlags(oldVertex.tangledPathInformation.secondaryInfos.size());
+        vector< vector<bool> > journeyEntryFlags(oldVertex.pathInformation.secondaryInfos.size());
         for(uint64_t i=0; i<journeyEntryFlags.size(); i++) {
-            const auto& secondaryInfo = oldVertex.tangledPathInformation.secondaryInfos[i];
-            const TangledAssemblyPath& path = *(oldAssemblyGraph.tangledAssemblyPaths[secondaryInfo.pathId]);
+            const auto& secondaryInfo = oldVertex.pathInformation.secondaryInfos[i];
+            const AssemblyPath& path = *(oldAssemblyGraph.assemblyPaths[secondaryInfo.pathId]);
             path.secondaryVerticesInfos[secondaryInfo.positionInPath].getVertexJourneys(
                 oldVertex, journeyEntryFlags[i]);
         }

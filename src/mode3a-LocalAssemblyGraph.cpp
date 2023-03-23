@@ -487,12 +487,12 @@ void LocalAssemblyGraph::writeSvg(
     // Value = (position, primary/secondary).
     std::map<uint64_t, pair<uint64_t, bool> > assemblyPathMap;
     if(options.segmentColoring == "colorOneAssemblyPath") {
-        if(options.assemblyPathId >= assemblyGraphSnapshot.tangledAssemblyPaths.size()) {
+        if(options.assemblyPathId >= assemblyGraphSnapshot.assemblyPaths.size()) {
             throw runtime_error("Invalid assembly path id.");
         }
-        const auto tangledPath = assemblyGraphSnapshot.tangledAssemblyPaths[options.assemblyPathId];
-        for(uint64_t position=0; position<tangledPath.size(); position++) {
-            const auto& pathEntry = tangledPath[position];
+        const auto assemblyPath = assemblyGraphSnapshot.assemblyPaths[options.assemblyPathId];
+        for(uint64_t position=0; position<assemblyPath.size(); position++) {
+            const auto& pathEntry = assemblyPath[position];
             assemblyPathMap.insert({
                 pathEntry.vertexId,
                 {position, pathEntry.isPrimary}
@@ -623,7 +623,7 @@ void LocalAssemblyGraph::writeSvg(
             if(options.segmentColoring == "random") {
                 color = randomSegmentColor(snapshotVertex.segmentId);
             } else if(options.segmentColoring == "byTangledAssemblyPath") {
-                const uint64_t pathId = snapshotVertex.tangledPathId;
+                const uint64_t pathId = snapshotVertex.pathId;
                 if(pathId == invalid<uint64_t>) {
                     color = "DimGrey";
                 } else {
@@ -741,9 +741,9 @@ void LocalAssemblyGraph::writeSvg(
             svg.precision(oldPrecision);
             svg.flags(oldFlags);
         }
-        if(snapshotVertex.tangledPathId != invalid<uint64_t>) {
-            svg << " " << snapshotVertex.tangledPathId <<
-                ":" << snapshotVertex.positionInTangledPath;
+        if(snapshotVertex.pathId != invalid<uint64_t>) {
+            svg << " " << snapshotVertex.pathId <<
+                ":" << snapshotVertex.positionInPath;
         }
         if(snapshotVertex.packedAssemblyGraphVertexId != invalid<uint64_t>) {
             svg << " P" << snapshotVertex.packedAssemblyGraphVertexId <<
