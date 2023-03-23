@@ -900,8 +900,8 @@ void Assembler::exploreMode3aAssemblyPath(
     }
 
     // Create an assembly path and assemble its sequence.
-    AssemblyGraphSnapshot::AssemblyPath assemblyPath;
-    snapshot.createAssemblyPath(vertexIds, assemblyPath);
-    snapshot.writeAssemblyPath(assemblyPath, html);
+    AssemblyGraphSnapshot::SimpleAssemblyPath path;
+    snapshot.createSimpleAssemblyPath(vertexIds, path);
+    snapshot.writeSimpleAssemblyPath(path, html);
 }
 

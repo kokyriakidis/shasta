@@ -1204,28 +1204,30 @@ double AssemblyGraphSnapshot::jaccard(
 
 
 
-void AssemblyGraphSnapshot::createAssemblyPath(
+void AssemblyGraphSnapshot::createSimpleAssemblyPath(
     const vector<uint64_t>& vertexIds,
-    AssemblyPath& assemblyPath) const
+    SimpleAssemblyPath& path) const
 {
     SHASTA_ASSERT(vertexIds.size() >= 2);
-    assemblyPath.clear();
+    path.clear();
     ofstream html;  // Not open so no output takes place.
 
     // Store the vertex ids.
-    assemblyPath.vertices.resize(vertexIds.size());
+    // Vertices don't need to be assembled because their sequence
+    // is stored in the PackedMarkerGraph.
+    path.vertices.resize(vertexIds.size());
     for(uint64_t i=0; i<vertexIds.size(); i++) {
-        AssemblyPath::Vertex& vertex = assemblyPath.vertices[i];
+        SimpleAssemblyPath::Vertex& vertex = path.vertices[i];
         vertex.id = vertexIds[i];
         vertex.sequenceLength =
             packedMarkerGraph.segmentSequences[vertexVector[vertex.id].segmentId].size();
     }
 
     // Find the edge ids and assemble the edges (links).
-    assemblyPath.edges.resize(vertexIds.size() - 1);
+    path.edges.resize(vertexIds.size() - 1);
     for(uint64_t i=1; i<vertexIds.size(); i++) {
-        const uint64_t vertexId0 = assemblyPath.vertices[i-1].id;
-        const uint64_t vertexId1 = assemblyPath.vertices[i].id;
+        const uint64_t vertexId0 = path.vertices[i-1].id;
+        const uint64_t vertexId1 = path.vertices[i].id;
         const auto outEdges0 = edgesBySource[vertexId0];
         uint64_t edgeId01 = invalid<uint64_t>;
         for(const uint64_t edgeId: outEdges0) {
@@ -1241,7 +1243,7 @@ void AssemblyGraphSnapshot::createAssemblyPath(
         }
 
         // Fill in the information for this edge (link).
-        AssemblyPath::Edge& edge = assemblyPath.edges[i-1];
+        SimpleAssemblyPath::Edge& edge = path.edges[i-1];
         edge.edgeId = edgeId01;
         assembleLink(edgeId01, html,
             edge.sequence, edge.leftOverride, edge.rightOverride);
@@ -1255,17 +1257,17 @@ void AssemblyGraphSnapshot::createAssemblyPath(
 
     // Use the edges leftOverride/rightOverride to choose the portion of
     // sequence of each vertex (segment) that will be used to assemble the path.
-    assemblyPath.vertices.front().sequenceBegin = 0;
-    assemblyPath.vertices.back().sequenceEnd = assemblyPath.vertices.back().sequenceLength;
-    for(uint64_t i=0; i<assemblyPath.edges.size(); i++) {
-        const auto& edge = assemblyPath.edges[i];
-        auto& vertex0 = assemblyPath.vertices[i];
-        auto& vertex1 = assemblyPath.vertices[i+1];
+    path.vertices.front().sequenceBegin = 0;
+    path.vertices.back().sequenceEnd = path.vertices.back().sequenceLength;
+    for(uint64_t i=0; i<path.edges.size(); i++) {
+        const auto& edge = path.edges[i];
+        auto& vertex0 = path.vertices[i];
+        auto& vertex1 = path.vertices[i+1];
         vertex0.sequenceEnd = vertex0.sequenceLength - edge.leftOverride;
         vertex1.sequenceBegin = edge.rightOverride;
     }
 
-    for(const auto& vertex:assemblyPath.vertices) {
+    for(const auto& vertex:path.vertices) {
         // This can happen and has to be handled.
         SHASTA_ASSERT(vertex.sequenceBegin <= vertex.sequenceEnd);
     }
@@ -1274,24 +1276,24 @@ void AssemblyGraphSnapshot::createAssemblyPath(
     // Compute the begin position in the path sequence of the sequence portion
     // contributed by each segment or link.
     for(uint64_t i=0; /* Check later */ ; i++) {
-        auto& segment = assemblyPath.vertices[i];
+        auto& segment = path.vertices[i];
 
         // Do it for this segment.
         if(i == 0) {
             segment.pathPosition = 0;
         } else {
-            const auto& previousLink = assemblyPath.edges[i-1];
+            const auto& previousLink = path.edges[i-1];
             segment.pathPosition = previousLink.pathPosition +
                 previousLink.sequenceEnd - previousLink.sequenceBegin;
         }
 
         // If this is the last segment, we are done.
-        if(i == assemblyPath.vertices.size() - 1) {
+        if(i == path.vertices.size() - 1) {
             break;
         }
 
         // Do it for this link.
-        auto& link = assemblyPath.edges[i];
+        auto& link = path.edges[i];
         link.pathPosition = segment.pathPosition +
             segment.sequenceEnd - segment.sequenceBegin;
 
@@ -1300,16 +1302,16 @@ void AssemblyGraphSnapshot::createAssemblyPath(
 
 
 
-void AssemblyGraphSnapshot::writeAssemblyPath(
-    const AssemblyPath& assemblyPath,
+void AssemblyGraphSnapshot::writeSimpleAssemblyPath(
+    const SimpleAssemblyPath& path,
     ostream& html
 ) const
 {
-    html << "<h3>Assembly path with " << assemblyPath.vertices.size() << " segments and " <<
-        assemblyPath.edges.size() << " links</h3>";
+    html << "<h3>Assembly path with " << path.vertices.size() << " segments and " <<
+        path.edges.size() << " links</h3>";
 
     vector<Base> assembledSequence;
-    assemblyPath.getAssembledSequence(packedMarkerGraph, *this, assembledSequence);
+    path.getAssembledSequence(packedMarkerGraph, *this, assembledSequence);
     html << "<h4>Assembled sequence </h4>" << assembledSequence.size() << " bases.<p>"
         "<div style='max-width:600px;overflow-wrap:break-word;font-family:courier'>";
     copy(assembledSequence.begin(), assembledSequence.end(),
@@ -1326,13 +1328,13 @@ void AssemblyGraphSnapshot::writeAssemblyPath(
     // Write the ids in a single cell.
     html << "<td class=centered>";
     for(uint64_t i=0; /* Check later */; i++) {
-        const AssemblyPath::Vertex& vertex = assemblyPath.vertices[i];
+        const SimpleAssemblyPath::Vertex& vertex = path.vertices[i];
         html << "<span style='font-family:courier;color:Green'>" <<
             vertexStringId(vertex.id) << "</span><br>";
-        if(i == assemblyPath.vertices.size() -1) {
+        if(i == path.vertices.size() -1) {
             break;
         }
-        const AssemblyPath::Edge& edge = assemblyPath.edges[i];
+        const SimpleAssemblyPath::Edge& edge = path.edges[i];
         html << "<span style='font-family:courier;color:Red'>" <<
             edge.edgeId << "</span><br>";
     }
@@ -1340,13 +1342,13 @@ void AssemblyGraphSnapshot::writeAssemblyPath(
     // Write the positions in a single cell.
     html << "<td class=centered>";
     for(uint64_t i=0; /* Check later */; i++) {
-        const AssemblyPath::Vertex& vertex = assemblyPath.vertices[i];
+        const SimpleAssemblyPath::Vertex& vertex = path.vertices[i];
         html << "<span style='font-family:courier;color:Green'>" <<
             vertex.pathPosition << "</span><br>";
-        if(i == assemblyPath.vertices.size() -1) {
+        if(i == path.vertices.size() -1) {
             break;
         }
-        const AssemblyPath::Edge& edge = assemblyPath.edges[i];
+        const SimpleAssemblyPath::Edge& edge = path.edges[i];
         html << "<span style='font-family:courier;color:Red'>" <<
             edge.pathPosition << "</span><br>";
     }
@@ -1354,17 +1356,17 @@ void AssemblyGraphSnapshot::writeAssemblyPath(
     // Write the sequence in a single cell.
     html << "<td>";
     for(uint64_t i=0; /* Check later */; i++) {
-        const AssemblyPath::Vertex& vertex = assemblyPath.vertices[i];
+        const SimpleAssemblyPath::Vertex& vertex = path.vertices[i];
         const uint64_t segmentId = vertexVector[vertex.id].segmentId;
         const auto vertexSequence = packedMarkerGraph.segmentSequences[segmentId];
         html << "<span style='font-family:courier;color:Green'>";
         copy(vertexSequence.begin() + vertex.sequenceBegin, vertexSequence.begin() + vertex.sequenceEnd,
             ostream_iterator<Base>(html));
         html << "</span><br>";
-        if(i == assemblyPath.vertices.size() -1) {
+        if(i == path.vertices.size() -1) {
             break;
         }
-        const AssemblyPath::Edge& edge = assemblyPath.edges[i];
+        const SimpleAssemblyPath::Edge& edge = path.edges[i];
         html << "<span style='font-family:courier;color:Red'>";
         copy(edge.sequence.begin() + edge.sequenceBegin, edge.sequence.begin() + edge.sequenceEnd,
             ostream_iterator<Base>(html));
@@ -1414,7 +1416,7 @@ void AssemblyGraphSnapshot::writeAssemblyPath(
     for(uint64_t i=0; /* Check later */; i++) {
 
         // Write the vertex (segment).
-        const AssemblyPath::Vertex& vertex = assemblyPath.vertices[i];
+        const SimpleAssemblyPath::Vertex& vertex = path.vertices[i];
         const uint64_t segmentId = vertexVector[vertex.id].segmentId;
 
         html << "<tr>"
@@ -1441,12 +1443,12 @@ void AssemblyGraphSnapshot::writeAssemblyPath(
 
 
 
-        if(i == assemblyPath.edges.size()) {
+        if(i == path.edges.size()) {
             break;
         }
 
         // Write the edge (link).
-        const AssemblyPath::Edge& edge = assemblyPath.edges[i];
+        const SimpleAssemblyPath::Edge& edge = path.edges[i];
         html << "<tr>"
             "<td>" <<
             "<td class=centered>" << edge.edgeId <<
@@ -1474,7 +1476,7 @@ void AssemblyGraphSnapshot::writeAssemblyPath(
 
 
 
-void AssemblyGraphSnapshot::AssemblyPath::clear()
+void AssemblyGraphSnapshot::SimpleAssemblyPath::clear()
 {
     vertices.clear();
     edges.clear();
@@ -1482,14 +1484,14 @@ void AssemblyGraphSnapshot::AssemblyPath::clear()
 
 
 
-void AssemblyGraphSnapshot::AssemblyPath::getAssembledSequence(
+void AssemblyGraphSnapshot::SimpleAssemblyPath::getAssembledSequence(
     const PackedMarkerGraph& packedMarkerGraph,
     const AssemblyGraphSnapshot& snapshot,
     vector<Base>& sequence) const
 {
     sequence.clear();
     for(uint64_t i=0; /* Check later */; i++) {
-        const AssemblyPath::Vertex& vertex = vertices[i];
+        const SimpleAssemblyPath::Vertex& vertex = vertices[i];
         const uint64_t segmentId = snapshot.vertexVector[vertex.id].segmentId;
         const auto vertexSequence = packedMarkerGraph.segmentSequences[segmentId];
         copy(vertexSequence.begin() + vertex.sequenceBegin, vertexSequence.begin() + vertex.sequenceEnd,
@@ -1497,7 +1499,7 @@ void AssemblyGraphSnapshot::AssemblyPath::getAssembledSequence(
         if(i == vertices.size() -1) {
             break;
         }
-        const AssemblyPath::Edge& edge = edges[i];
+        const SimpleAssemblyPath::Edge& edge = edges[i];
         copy(edge.sequence.begin() + edge.sequenceBegin, edge.sequence.begin() + edge.sequenceEnd,
             back_inserter(sequence));
     }

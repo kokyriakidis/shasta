@@ -240,8 +240,15 @@ public:
 
 
 
-    // Create an assembly path and assemble its sequence.
-    class AssemblyPath {
+    // A SimpleAssemblyPath is an arbitrary path in the AssemblyGraphSnapshot
+    // which does not necessarily corresponds to true genomic sequence.
+    // It has no notion of primary and secondary vertices
+    // and its links are assembled using all available reads at each vertex,
+    // which can result in assembly errors due to the inclusion
+    // of extraneous reads.
+    // This is only used in the http server to assemble paths interactively.
+    // Assembly output sequence is created using class AssemblyGraph::AssemblyPath.
+    class SimpleAssemblyPath {
     public:
         void clear();
 
@@ -277,17 +284,18 @@ public:
             // The position of this portion of sequence in the assembled path.
             uint64_t pathPosition;
         };
-        vector<Edge> edges;
+        vector<Edge> edges; // Size is equal to vertices.size() - 1.
+
         void getAssembledSequence(
             const PackedMarkerGraph&,
             const AssemblyGraphSnapshot&,
             vector<Base>&) const;
     };
-    void createAssemblyPath(
+    void createSimpleAssemblyPath(
         const vector<uint64_t>& vertexIds,
-        AssemblyPath&) const;
-    void writeAssemblyPath(
-        const AssemblyPath&,
+        SimpleAssemblyPath&) const;
+    void writeSimpleAssemblyPath(
+        const SimpleAssemblyPath&,
         ostream& html
     ) const;
 };
