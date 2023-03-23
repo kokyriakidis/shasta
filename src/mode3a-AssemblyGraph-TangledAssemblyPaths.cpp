@@ -240,7 +240,7 @@ void AssemblyGraph::writeAssemblyPathsJourneyInfo() const
         for(uint64_t i=0; i<journeyEntryFlags.size(); i++) {
             const auto& secondaryInfo = vertex.pathInformation.secondaryInfos[i];
             const AssemblyPath& path = *assemblyPaths[secondaryInfo.pathId];
-            path.secondaryVerticesInfos[secondaryInfo.positionInPath].getVertexJourneys(
+            path.secondaryVerticesInfos[secondaryInfo.positionInPath].getVertexJourneyEntries(
                 vertex, journeyEntryFlags[i]);
         }
 
@@ -314,7 +314,7 @@ void AssemblyGraph::writeAssemblyPathsJourneyIntervals() const
 
 // Given a vertex, find which journey entries in the vertex
 // are in one of the journey intervals for this SecondaryVertexInfo.
-void AssemblyGraph::AssemblyPath::SecondaryVertexInfo::getVertexJourneys(
+void AssemblyGraph::AssemblyPath::SecondaryVertexInfo::getVertexJourneyEntries(
     const AssemblyGraphVertex& vertex,
     vector<bool>& flags   // True of false for each of the journey entries in the vertex.
 ) const
@@ -1138,7 +1138,7 @@ void AssemblyGraph::createFromAssemblyPaths(
         for(uint64_t i=0; i<journeyEntryFlags.size(); i++) {
             const auto& secondaryInfo = oldVertex.pathInformation.secondaryInfos[i];
             const AssemblyPath& path = *(oldAssemblyGraph.assemblyPaths[secondaryInfo.pathId]);
-            path.secondaryVerticesInfos[secondaryInfo.positionInPath].getVertexJourneys(
+            path.secondaryVerticesInfos[secondaryInfo.positionInPath].getVertexJourneyEntries(
                 oldVertex, journeyEntryFlags[i]);
         }
 
@@ -1212,3 +1212,71 @@ void AssemblyGraph::createFromAssemblyPaths(
     }
 
 }
+
+
+
+void AssemblyGraph::assemble()
+{
+#if 0
+    for(uint64_t pathId=0; pathId<assemblyPaths.size(); pathId++) {
+        assemble(pathId);
+    }
+#endif
+
+    // For now, only assembly one path.
+    assemble(0);
+}
+
+
+
+void AssemblyGraph::assemble(uint64_t assemblyPathId)
+{
+    const AssemblyGraph& assemblyGraph = *this;
+    AssemblyPath& assemblyPath = *assemblyPaths[assemblyPathId];
+
+
+
+    // Construct the FlattenedAssemblyPath.
+    FlattenedAssemblyPath flattenedAssemblyPath;
+    vector<bool> useForAssembly;
+    for(uint64_t i=0; /* Check later */; i++) {
+
+        // Add the primary vertex at this position.
+        // All of its journey entries are marked to be used for assembly.
+        const vertex_descriptor v = assemblyPath.primaryVertices[i];
+        const AssemblyGraphVertex& vertex = assemblyGraph[v];
+        flattenedAssemblyPath.push_back(FlattenedAssemblyPathEntry(v, vertex.journeyEntries.size()));
+
+        // If this is the last primary vertex, there are no secondary
+        // vertices and we are done.
+        if(i == assemblyPath.primaryVertices.size() - 1) {
+            break;
+        }
+
+        // Add the secondary vertices following this primary vertex.
+        const auto& secondaryVertexInfo = assemblyPath.secondaryVerticesInfos[i];
+        for(const vertex_descriptor v: secondaryVertexInfo.secondaryVertices) {
+            const AssemblyGraphVertex& vertex = assemblyGraph[v];
+            secondaryVertexInfo.getVertexJourneyEntries(vertex, useForAssembly);
+            SHASTA_ASSERT(useForAssembly.size() == vertex.journeyEntries.size());
+            flattenedAssemblyPath.push_back(FlattenedAssemblyPathEntry(v, useForAssembly));
+        }
+    }
+
+    assemble(flattenedAssemblyPath, assemblyPath.assembledSequence);
+}
+
+
+
+// Assemble a FlattenedAssemblyPath.
+// This is similar to the code in AssemblyGraphSnapshot::createSimpleAssemblyPath
+// and AssemblyGraphSnapshot::SimpleAssemblyPath::getAssembledSequence,
+// but it only uses a subset of the JourneyEntries of each vertex,
+// as specified by the FlattenedAssemblyPath.
+void AssemblyGraph::assemble(
+    const FlattenedAssemblyPath& flattenedAssemblyPath,
+    vector<shasta::Base>& sequence)
+{
+
+}
+

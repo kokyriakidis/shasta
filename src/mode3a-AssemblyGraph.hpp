@@ -36,6 +36,8 @@ namespace shasta {
 
         class PackedMarkerGraph;
     }
+
+    class Base;
 }
 
 
@@ -379,7 +381,7 @@ public:
 
             // Given a vertex, find which journey entries in the vertex
             // are in one of the above journey intervals for this SecondaryVertexInfo.
-            void getVertexJourneys(
+            void getVertexJourneyEntries(
                 const AssemblyGraphVertex&,
                 vector<bool>&   // True of false for each of the journey entries in the vertex.
             ) const;
@@ -400,6 +402,9 @@ public:
             }
             efficiency = sum /double(secondaryVerticesInfos.size());
         }
+
+        // Assembled sequence.
+        vector<shasta::Base> assembledSequence;
     };
     vector<shared_ptr<AssemblyPath> > assemblyPaths;
     void computeAssemblyPaths(uint64_t threadCount);
@@ -442,11 +447,47 @@ private:
     void writeAssemblyPathsVertexHistogram() const;
     void writeAssemblyPathsJourneyInfo() const;
     void writeAssemblyPathsJourneyIntervals() const;
+public:
+
+
+
+    // A "flattened" version of the AssemblyPath,
+    // in which the distinction between primary and secondary vertices
+    // is lost, and for each vertex we store the indexes of the
+    // JourneyEntries of the vertex that should be used for assembly.
+
+    class FlattenedAssemblyPathEntry {
+    public:
+        vertex_descriptor v;
+        vector<bool> useForAssembly;  // True of false for each of the journey entries in the vertex.
+
+        // Constructor for a primary vertex.
+        FlattenedAssemblyPathEntry(vertex_descriptor v, uint64_t n) :
+            v(v), useForAssembly(vector<bool>(n, true)) {}
+
+        // Constructor for a secondary vertex.
+        FlattenedAssemblyPathEntry(vertex_descriptor v, const vector<bool>& useForAssembly) :
+            v(v), useForAssembly(useForAssembly) {}
+    };
+
+    class FlattenedAssemblyPath : public vector<FlattenedAssemblyPathEntry> {
+    public:
+    };
+
+
+
+
+    // Use the AssemblyPaths to assemble sequence.
+    void assemble();
+    void assemble(uint64_t assemblyPathId);
+    void assemble(
+        const FlattenedAssemblyPath&,
+        vector<shasta::Base>& sequence);
+
 
 
 
     // Classes used to define detangling constructors.
-public:
     class DetangleUsingTangledAssemblyPaths {};
     class DetangleUsingTangleMatrices {};
     class DetangleUsingLocalClustering {};
