@@ -19,6 +19,8 @@
 #include "vector.hpp"
 
 namespace shasta {
+
+    class Base;
     namespace mode3a {
 
         class AssemblyGraph;
@@ -35,9 +37,18 @@ namespace shasta {
         class PathInformation;
 
         class PackedMarkerGraph;
+
+        // Compute the MSA for a link using spoa.
+        // Takes as input a vector of (sequence, frequency) containing
+        // the MSA sequences for the oriented reads of the link
+        // and the number of times each was found.
+        void linkMsaUsingSpoa(
+            const vector< pair<vector<Base>, uint64_t> >& msaSequences,
+            ostream& html,
+            vector<Base>& consensusSequence
+            );
     }
 
-    class Base;
 }
 
 
