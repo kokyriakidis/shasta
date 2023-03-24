@@ -5,6 +5,8 @@
 #include "deduplicate.hpp"
 #include "enumeratePaths.hpp"
 #include "invalid.hpp"
+#include "Marker.hpp"
+#include "Reads.hpp"
 using namespace shasta;
 using namespace mode3a;
 
@@ -1351,22 +1353,158 @@ void AssemblyGraph::assemble(
 
 // Assemble a link, using only journey entries permitted
 // by the useForAssembly fields of the previous and next segment.
+// Much of this code is similar to AssemblyGraphSnapshot::assembleLink,
+// but uses only a subset of the transitions.
 void AssemblyGraph::assembleLink(
     FlattenedAssemblyPathLink& link,
-    const FlattenedAssemblyPathSegment& previousSegment,
-    const FlattenedAssemblyPathSegment& nextSegment
+    const FlattenedAssemblyPathSegment& segment0,
+    const FlattenedAssemblyPathSegment& segment1
 ) const
 {
+    const AssemblyGraph& assemblyGraph = *this;
     const bool debug = true;
+    using shasta::Base;
+
+    // Gather some information we need.
+    const AssemblyGraphVertex& vertex0 = assemblyGraph[segment0.v];
+    const AssemblyGraphVertex& vertex1 = assemblyGraph[segment1.v];
+
+    const uint64_t segmentId0 = vertex0.segmentId;
+    const uint64_t segmentId1 = vertex1.segmentId;
+
+    const auto leftPath = packedMarkerGraph.segments[segmentId0];
+    const auto rightPath = packedMarkerGraph.segments[segmentId1];
+
+    const auto leftSegmentSequence = packedMarkerGraph.segmentSequences[segmentId0];
+    const auto rightSegmentSequence = packedMarkerGraph.segmentSequences[segmentId1];
+
+    const auto leftVertexOffsets = packedMarkerGraph.segmentVertexOffsets[segmentId0];
+    const auto rightVertexOffsets = packedMarkerGraph.segmentVertexOffsets[segmentId1];
+
+    const uint64_t k = packedMarkerGraph.k;
 
     // Find the Transitions to be used to assemble this link.
     vector<Transition> transitions;
-    getTransitionsForAssembly(previousSegment, nextSegment, transitions);
+    getTransitionsForAssembly(segment0, segment1, transitions);
     SHASTA_ASSERT(not transitions.empty());
 
     if(debug) {
         cout << "Link assembly will use " << transitions.size() <<
             " oriented reads." << endl;
+    }
+
+    // Loop over transitions to compute the maximum left/right skip,
+    // that is, the maximum number of marker graph edges skipped
+    // by an oriented read at the end of the left segment or
+    // at the beginning of the right segment.
+    // This is needed below to compute the sequences that participate in the MSA.
+    uint64_t maxLeftSkip = 0;
+    uint64_t maxRightSkip = 0;
+    for(const Transition& transition: transitions) {
+        const OrientedReadId orientedReadId = transition.orientedReadId;
+        const auto journey = packedMarkerGraph.journeys[orientedReadId.getValue()];
+        SHASTA_ASSERT(transition.position0 + 1 == transition.position1);
+        const auto& leftJourneyStep = journey[transition.position0];
+        const auto& rightJourneyStep = journey[transition.position1];
+        const uint64_t leftSkip = leftPath.size() - leftJourneyStep.positions[1];
+        const uint64_t rightSkip = rightJourneyStep.positions[0];
+        maxLeftSkip = max(maxLeftSkip, leftSkip);
+        maxRightSkip = max(maxRightSkip, rightSkip);
+    }
+
+    // Compute the position in the left segment of the begining of the left segment
+    // sequence that will be used to fill in MSA sequence.
+    const uint64_t leftPositionBegin = leftVertexOffsets[leftVertexOffsets.size() -1 - maxLeftSkip];
+
+    // Compute the position in the right segment of the end of the right segment
+    // sequence that will be used to fill in MSA sequence.
+    const uint64_t rightPositionEnd = rightVertexOffsets[maxRightSkip] + k;
+    // A vector to contain the distinct MSA sequence we found, each with the number of times it was found.
+    vector< pair<vector<Base>, uint64_t> > msaSequences;
+
+    // A vector that, for each transition, gives the index in msaSequence.
+    vector<uint64_t> msaSequenceTable(transitions.size());
+
+
+
+    // Loop over transitions to compute the MSA sequence to be used for each oriented read.
+    vector<Base> msaSequence;
+    for(uint64_t iTransition=0; iTransition<transitions.size(); iTransition++) {
+        const Transition& transition = transitions[iTransition];
+        const OrientedReadId orientedReadId = transition.orientedReadId;
+        const auto journey = packedMarkerGraph.journeys[orientedReadId.getValue()];
+        SHASTA_ASSERT(transition.position0 + 1 == transition.position1);
+        const auto& leftJourneyStep = journey[transition.position0];
+        const auto& rightJourneyStep = journey[transition.position1];
+        const uint64_t leftSkip = leftPath.size() - leftJourneyStep.positions[1];
+        const uint64_t rightSkip = rightJourneyStep.positions[0];
+        const uint64_t leftOrdinal = leftJourneyStep.ordinals[1];
+        const uint64_t rightOrdinal = rightJourneyStep.ordinals[0];
+        SHASTA_ASSERT(rightOrdinal >= leftOrdinal);
+        /*
+        const uint64_t ordinalSkip = rightOrdinal - leftOrdinal;
+        const int64_t linkSeparation =
+            int64_t(ordinalSkip) -
+            int64_t(leftSkip) -
+            int64_t(rightSkip);
+        */
+        const auto orientedReadMarkers = packedMarkerGraph.markers[orientedReadId.getValue()];
+        const CompressedMarker& marker0 = orientedReadMarkers[leftOrdinal];
+        const CompressedMarker& marker1 = orientedReadMarkers[rightOrdinal];
+
+        // Now we can compute the portion of the oriented read sequence that will
+        // participate in the MSA.
+        // This will be extended to the left/right as necessary,
+        // using the sequence of the left/right segment.
+        const uint64_t positionBegin = marker0.position;
+        const uint64_t positionEnd = marker1.position + k;
+
+        // Compute the position of the left extension in the left segment.
+        const uint64_t leftPositionEnd = leftVertexOffsets[leftVertexOffsets.size() - 1 - leftSkip];
+
+        // Compute the position of the right extension in the right segment.
+        const uint64_t rightPositionBegin = rightVertexOffsets[rightSkip] + k;
+
+        // Add the left extension to the MSA sequence.
+        msaSequence.clear();
+        for(uint64_t position=leftPositionBegin; position!=leftPositionEnd; ++position) {
+            msaSequence.push_back(leftSegmentSequence[position]);
+        }
+
+        // Add the oriented read to the MSA sequence.
+        for(uint64_t position=positionBegin; position!=positionEnd; ++position) {
+            msaSequence.push_back(packedMarkerGraph.reads.getOrientedReadBase(orientedReadId, uint32_t(position)));
+        }
+
+        // Add the right extension to the MSA sequence.
+        for(uint64_t position=rightPositionBegin; position!=rightPositionEnd; ++position) {
+            msaSequence.push_back(rightSegmentSequence[position]);
+        }
+
+        // Update the msaSequences and msaSequenceTable.
+        bool done = false;
+        for(uint64_t i=0; i<msaSequences.size(); i++) {
+            if(msaSequence == msaSequences[i].first) {
+                msaSequenceTable[iTransition] = i;
+                ++msaSequences[i].second;
+                done = true;
+                break;
+            }
+        }
+        if(not done) {
+            msaSequenceTable[iTransition] = msaSequences.size();
+            msaSequences.push_back(make_pair(msaSequence, 1));
+        }
+    }
+
+    if(debug) {
+        cout << "MSA sequences with coverage:" << endl;
+        for(const auto& p: msaSequences) {
+            const vector<Base>& sequence = p.first;
+            const uint64_t coverage = p.second;
+            copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(cout));
+            cout << " " << coverage << endl;
+        }
     }
 }
 
@@ -1472,7 +1610,6 @@ void AssemblyGraph::getTransitionsForAssembly(
         }
         ++i0;
         ++i1;
-
     }
 }
 
