@@ -796,7 +796,8 @@ void AssemblyGraphSnapshot::assembleLink(
     html << "</table>";
 
     // Compute the multiple sequence alignment.
-    linkMsaUsingSpoa(msaSequences, html, consensusSequence);
+    const uint64_t maxLength = 10000;
+    linkMsaUsingSpoa(msaSequences, maxLength, html, consensusSequence);
 
     // Compute the number of bases at the beginning of the consensus sequence
     // that are identical to the corresponding bases in the left segment.

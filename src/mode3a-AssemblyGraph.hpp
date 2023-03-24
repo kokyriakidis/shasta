@@ -44,6 +44,7 @@ namespace shasta {
         // and the number of times each was found.
         void linkMsaUsingSpoa(
             const vector< pair<vector<Base>, uint64_t> >& msaSequences,
+            uint64_t maxLength,
             ostream& html,
             vector<Base>& consensusSequence
             );

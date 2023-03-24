@@ -1261,8 +1261,9 @@ void AssemblyGraph::computeJaccardPairsThreadFunction(uint64_t threadId)
 // Takes as input a vector of (sequence, frequency) containing
 // the MSA sequences for the oriented reads of the link
 // and the number of times each was found.
-void mode3a::linkMsaUsingSpoa(
+void shasta::mode3a::linkMsaUsingSpoa(
     const vector< pair<vector<Base>, uint64_t> >& msaSequences,
+    uint64_t maxLength,
     ostream& html,
     vector<Base>& consensusSequence
     )
@@ -1279,6 +1280,23 @@ void mode3a::linkMsaUsingSpoa(
     }
     sort(msaSequencesTable.begin(), msaSequencesTable.end(),
         OrderPairsBySecondOnlyGreater<uint64_t, uint64_t>());
+
+
+    // If any of the sequences are too long, just return
+    // the most frequent sequence as the consensus.
+    bool isTooLong = false;
+    for(const auto& p: msaSequences) {
+        const vector<Base>& msaSequence = p.first;
+        if(msaSequence.size() > maxLength) {
+            isTooLong = true;
+            break;
+        }
+    }
+    if(isTooLong) {
+        const uint64_t mostFrequentSequenceIndex = msaSequencesTable.front().first;
+        consensusSequence = msaSequences[mostFrequentSequenceIndex].first;
+        return;
+    }
 
 
     // Create the spoa alignment engine and alignment graph.

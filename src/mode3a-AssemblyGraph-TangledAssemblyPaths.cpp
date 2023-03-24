@@ -1220,14 +1220,9 @@ void AssemblyGraph::createFromAssemblyPaths(
 
 void AssemblyGraph::assemble()
 {
-#if 1
     for(uint64_t pathId=0; pathId<assemblyPaths.size(); pathId++) {
         assemble(pathId);
     }
-#else
-    // For testing, only assembly one path.
-    assemble(0);
-#endif
 }
 
 
@@ -1505,6 +1500,19 @@ void AssemblyGraph::assembleLink(
             copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(cout));
             cout << " " << coverage << endl;
         }
+    }
+
+    // Compute the multiple sequence alignment.
+    vector<Base> consensusSequence;
+    const uint64_t maxLength = 10000;
+    ostream html(0);
+    linkMsaUsingSpoa(msaSequences, maxLength, html, consensusSequence);
+
+    if(debug) {
+        cout << "Consensus sequence:\n";
+        copy(consensusSequence.begin(), consensusSequence.end(),
+            ostream_iterator<Base>(cout));
+        cout << endl;
     }
 }
 
