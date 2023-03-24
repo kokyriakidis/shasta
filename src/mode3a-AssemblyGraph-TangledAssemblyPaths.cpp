@@ -1235,6 +1235,14 @@ void AssemblyGraph::assemble(uint64_t assemblyPathId)
     const AssemblyGraph& assemblyGraph = *this;
     AssemblyPath& assemblyPath = *assemblyPaths[assemblyPathId];
 
+    const bool debug = true;
+    if(debug) {
+        cout << "Assembling path " << assemblyPathId << " with " <<
+            assemblyPath.primaryVertices.size() << " primary vertices." << endl;
+        cout << "Path begins at " << vertexStringId(assemblyPath.primaryVertices.front()) <<
+            " and ends at " << vertexStringId(assemblyPath.primaryVertices.back()) << endl;
+    }
+
 
 
     // Construct the FlattenedAssemblyPath.
@@ -1284,6 +1292,10 @@ void AssemblyGraph::assemble(uint64_t assemblyPathId)
         flattenedAssemblyPath.links.emplace_back(e);
     }
 
+    if(debug) {
+        cout << "The FlattenedAssemblyPath has " << flattenedAssemblyPath.segments.size() <<
+            " segments." << endl;
+    }
 
 
     // Assemble it.
@@ -1308,6 +1320,7 @@ void AssemblyGraph::assemble(
     vector<shasta::Base>& sequence)
 {
     const AssemblyGraph& assemblyGraph = *this;
+    const bool debug = true;
 
     // Fill in sequence length for all segments.
     for(auto& segment: flattenedAssemblyPath.segments) {
@@ -1321,6 +1334,13 @@ void AssemblyGraph::assemble(
         auto& link = flattenedAssemblyPath.links[i];
         const auto& previousSegment = flattenedAssemblyPath.segments[i];
         const auto& nextSegment = flattenedAssemblyPath.segments[i+1];
+
+        if(debug) {
+            cout << "Assembling link at position " << i <<
+                " between vertices " << vertexStringId(previousSegment.v) <<
+                " and " << vertexStringId(nextSegment.v) << endl;
+
+        }
 
         assembleLink(link, previousSegment, nextSegment);
     }
@@ -1337,7 +1357,124 @@ void AssemblyGraph::assembleLink(
     const FlattenedAssemblyPathSegment& nextSegment
 ) const
 {
+    const bool debug = true;
 
+    // Find the Transitions to be used to assemble this link.
+    vector<Transition> transitions;
+    getTransitionsForAssembly(previousSegment, nextSegment, transitions);
+    SHASTA_ASSERT(not transitions.empty());
+
+    if(debug) {
+        cout << "Link assembly will use " << transitions.size() <<
+            " oriented reads." << endl;
+    }
 }
+
+
+
+// Find the Transitions to be used to assemble this link.
+// These transitions are defined as follows:
+// - The OrientedReadId has a JourneyEntry in the previous
+//   segment that is flagged as usable for assembly.
+// - The OrientedReadId has a JourneyEntry in the next
+//   segment that is flagged as usable for assembly.
+// - The positions of the two journey entries differ by 1.
+// To find them, we use the fact that the journey entries of a vertex
+// are ordered by OrientedReadId and the by position.
+// Use index 0 for the previous segment/vertex
+// and index 1 for the next segment/vertex.
+void AssemblyGraph::getTransitionsForAssembly(
+    const FlattenedAssemblyPathSegment& segment0,
+    const FlattenedAssemblyPathSegment& segment1,
+    vector<Transition>& transitions) const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+    transitions.clear();
+
+    // Extract some information we need below.
+    const AssemblyGraphVertex& vertex0 = assemblyGraph[segment0.v];
+    const AssemblyGraphVertex& vertex1 = assemblyGraph[segment1.v];
+
+    const vector<JourneyEntry>& entries0 = vertex0.journeyEntries;
+    const vector<JourneyEntry>& entries1 = vertex1.journeyEntries;
+
+    const uint64_t n0 = entries0.size();
+    const uint64_t n1 = entries1.size();
+
+    SHASTA_ASSERT(segment0.useForAssembly.size() == n0);
+    SHASTA_ASSERT(segment1.useForAssembly.size() == n1);
+
+
+
+    const bool debug = false;
+    if(debug) {
+        cout << "AssemblyGraph::getTransitionsForAssembly called at " <<
+            vertexStringId(segment0.v) << " " <<
+            vertexStringId(segment1.v) << endl;
+        cout << "Entries0:" << endl;
+        for(uint64_t i=0; i<n0; i++) {
+            cout << entries0[i].orientedReadId << " " <<
+                entries0[i].position  << " " <<
+                int(segment0.useForAssembly[i]) << endl;
+        }
+        cout << "Entries1:" << endl;
+        for(uint64_t i=0; i<n1; i++) {
+            cout << entries1[i].orientedReadId << " " <<
+                entries1[i].position  << " " <<
+                int(segment1.useForAssembly[i]) << endl;
+        }
+    }
+
+
+
+    // Joint iteration over the journey entries of the two vertices.
+    uint64_t i0 = 0;
+    uint64_t i1 = 0;
+    while(i0 < n0 and i1 < n1) {
+        const JourneyEntry& entry0 = entries0[i0];
+        const JourneyEntry& entry1 = entries1[i1];
+
+        // Check the OrientedReadIds.
+        if(entry0.orientedReadId < entry1.orientedReadId) {
+            ++i0;
+            continue;
+        }
+
+        if(entry0.orientedReadId > entry1.orientedReadId) {
+            ++i1;
+            continue;
+        }
+
+        const OrientedReadId orientedReadId = entry0.orientedReadId;
+        SHASTA_ASSERT(entry1.orientedReadId == orientedReadId);
+
+        // We have two entries for the same OrientedReadId.
+        // We are only interested if the positions differ by 1.
+        if(entry0.position + 1 < entry1.position) {
+            ++i0;
+            continue;
+        }
+
+        if(entry0.position + 1 > entry1.position) {
+            ++i1;
+            continue;
+        }
+        SHASTA_ASSERT(entry0.position + 1 == entry1.position);
+
+        // If these entries are usable for assembly, they generate
+        // a new Transition.
+        if(segment0.useForAssembly[i0] and segment1.useForAssembly[i1]) {
+            Transition transition;
+            transition.orientedReadId = orientedReadId;
+            transition.position0 = entry0.position;
+            transition.position1 = entry1.position;
+            transitions.push_back(transition);
+        }
+        ++i0;
+        ++i1;
+
+    }
+}
+
 
 

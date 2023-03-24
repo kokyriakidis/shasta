@@ -48,6 +48,8 @@ void AssemblyGraph::createSegmentsAndJourneys()
     // Initially, we construct it from the corresponding journey
     // in the PackedMarkerGraph.
     // While constructing the journeys, we also store journey entries in the vertices.
+    // Because of the way they are constructed, the journey entries of a vertex
+    // are ordered by OrientedReadId and then by position.
     journeys.resize(packedMarkerGraph.journeys.size());
     for(uint64_t i=0; i<journeys.size(); i++) {
         const OrientedReadId orientedReadId = OrientedReadId::fromValue(ReadId(i));

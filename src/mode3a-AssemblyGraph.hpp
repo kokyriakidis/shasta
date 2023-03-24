@@ -124,6 +124,8 @@ public:
     }
 
     // The journey entries that go through this vertex.
+    // Because of the way they are constructed, the journey entries of a vertex
+    // are ordered by OrientedReadId and then by position.
     vector<JourneyEntry> journeyEntries;
 
     // The deduplicated oriented reads in this vertex.
@@ -521,6 +523,13 @@ public:
         const FlattenedAssemblyPathSegment& previousSegment,
         const FlattenedAssemblyPathSegment& nextSegment
     ) const;
+
+    // Find the Transitions to be used to assemble a link.
+    vector<Transition> transitions;
+    void getTransitionsForAssembly(
+        const FlattenedAssemblyPathSegment& previousSegment,
+        const FlattenedAssemblyPathSegment& nextSegment,
+        vector<Transition>&) const;
 
 
 
