@@ -1509,10 +1509,110 @@ void AssemblyGraph::assembleLink(
     linkMsaUsingSpoa(msaSequences, maxLength, html, consensusSequence);
 
     if(debug) {
-        cout << "Consensus sequence:\n";
+        cout << "Consensus sequence has length " << consensusSequence.size() << ":\n";
         copy(consensusSequence.begin(), consensusSequence.end(),
             ostream_iterator<Base>(cout));
-        cout << endl;
+        cout << "\n";
+    }
+
+    // Compute the number of bases at the beginning of the consensus sequence
+    // that are identical to the corresponding bases in the left segment.
+    uint64_t leftIdentical = 0;
+    for(uint64_t i=leftPositionBegin; i<leftSegmentSequence.size(); i++) {
+        if(i-leftPositionBegin >= consensusSequence.size()) {
+            break;
+        }
+        if(leftSegmentSequence[i] == consensusSequence[i-leftPositionBegin]) {
+            ++leftIdentical;
+        } else {
+            break;
+        }
+    }
+    if(debug) {
+        cout << "Number of link consensus bases identical to previous segment " << leftIdentical << "\n";
+    }
+
+    // Compute the number of bases at the end of the consensus sequence
+    // that are identical to the corresponding bases in the right segment.
+    uint64_t rightIdentical = 0;
+    uint64_t j = rightPositionEnd - 1; // j is index in right segment sequence.
+    for(uint64_t i=consensusSequence.size()-1; /* Check later */; i--, j--) { // i is index in consensus sequence.
+        if(consensusSequence[i] == rightSegmentSequence[j]) {
+            ++rightIdentical;
+        } else {
+            break;
+        }
+        if(i == 0) {
+            break;
+        }
+        if(j == 0) {
+            break;
+        }
+    }
+    if(debug) {
+        cout << "Number of link consensus bases identical to next segment " << rightIdentical << "\n";
+    }
+
+
+
+    // Trim consensus bases at the end of the consensusSequence that are identical
+    // to the corresponding bases in the right segment sequence.
+    // Here, rightOverride is the number of bases at the beginning of the right segment
+    // that are overridden by bases in the consensus sequence of the link.
+    link.rightOverride = rightPositionEnd;
+    while(not consensusSequence.empty()) {
+        if(consensusSequence.back() == rightSegmentSequence[link.rightOverride-1]) {
+            consensusSequence.resize(consensusSequence.size() - 1);
+            --link.rightOverride;
+            if(link.rightOverride == 0) {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    // Same, on the left.
+    link.leftOverride = leftSegmentSequence.size() - leftPositionBegin;
+    uint64_t leftTrim = 0;
+    for(uint64_t i=0; i<consensusSequence.size(); i++) {
+        const uint64_t j = i + leftPositionBegin;
+        if(j >= leftSegmentSequence.size()) {
+            break;
+        }
+        if(consensusSequence[i] == leftSegmentSequence[j]) {
+            ++leftTrim;
+            --link.leftOverride;
+            if(link.leftOverride == 0) {
+                break;
+            }
+        }
+    }
+    copy(consensusSequence.begin() + leftTrim, consensusSequence.end(), consensusSequence.begin());
+    consensusSequence.resize(consensusSequence.size() - leftTrim);
+
+    // Store the trimmed consensus sequence.
+    link.sequence = consensusSequence;
+
+
+    if(debug) {
+        cout << "After trimming sequence identical to adjacent segments, "
+            "consensus sequence has length " << consensusSequence.size() << ":\n";
+        copy(consensusSequence.begin(), consensusSequence.end(),
+            ostream_iterator<Base>(cout));
+        cout << "\n";
+        cout << "Number of previous segment bases overridden by link consensus:" << link.leftOverride << "\n";
+        cout << "Number of next segment bases overridden by link consensus:" << link.rightOverride << "\n";
+
+
+        cout << "Assembly of the path consisting of this link plus the adjacent segments:\n";
+        copy(leftSegmentSequence.begin(), leftSegmentSequence.end() - link.leftOverride,
+            ostream_iterator<Base>(cout));
+        copy(consensusSequence.begin(), consensusSequence.end(),
+            ostream_iterator<Base>(cout));
+        copy(rightSegmentSequence.begin()+ link.rightOverride, rightSegmentSequence.end(),
+            ostream_iterator<Base>(cout));
+        cout << "\n";
     }
 }
 
