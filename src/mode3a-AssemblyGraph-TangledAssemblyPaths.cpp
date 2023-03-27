@@ -1223,6 +1223,18 @@ void AssemblyGraph::assemble()
     for(uint64_t pathId=0; pathId<assemblyPaths.size(); pathId++) {
         assemble(pathId);
     }
+
+    ofstream fasta("mode3a-Assembly.fasta");
+    for(uint64_t pathId=0; pathId<assemblyPaths.size(); pathId++) {
+        const AssemblyPath& assemblyPath = *assemblyPaths[pathId];
+        const vector<shasta::Base>& sequence = assemblyPath.assembledSequence;
+
+        fasta << ">" << pathId << " " << sequence.size() << "\n";
+        copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(fasta));
+        fasta << "\n";
+
+    }
+
 }
 
 
@@ -1299,6 +1311,10 @@ void AssemblyGraph::assemble(uint64_t assemblyPathId)
     // This fills in the fields in the segments and links that
     // were not initialized here.
     assemble(flattenedAssemblyPath, assemblyPath.assembledSequence);
+
+    if(debug) {
+        cout << "Assembled sequence length is " << assemblyPath.assembledSequence.size() << endl;
+    }
 }
 
 
@@ -1342,6 +1358,64 @@ void AssemblyGraph::assemble(
         assembleLink(link, previousSegment, nextSegment);
     }
 
+    // Except for special cases (see below), the entire sequence of each link is
+    // used to assemble the path.
+    for(auto& link: flattenedAssemblyPath.links) {
+        link.sequenceBegin = 0;
+        link.sequenceEnd = link.sequence.size();
+    }
+
+
+
+    // Use the edges leftOverride/rightOverride to choose the portion of
+    // sequence of each vertex (segment) that will be used to assemble the path.
+    flattenedAssemblyPath.segments.front().sequenceBegin = 0;
+    flattenedAssemblyPath.segments.back().sequenceEnd = flattenedAssemblyPath.segments.back().sequenceLength;
+    for(uint64_t i=0; i<flattenedAssemblyPath.links.size(); i++) {
+        const auto& link = flattenedAssemblyPath.links[i];
+        auto& segment0 = flattenedAssemblyPath.segments[i];
+        auto& segment1 = flattenedAssemblyPath.segments[i+1];
+        segment0.sequenceEnd = segment0.sequenceLength - link.leftOverride;
+        segment1.sequenceBegin = link.rightOverride;
+    }
+
+    for(const auto& segment: flattenedAssemblyPath.segments) {
+        // Even though this is rare, it can happen and has to be handled.
+        // Fix it when we have a case where this happens.
+        SHASTA_ASSERT(segment.sequenceBegin <= segment.sequenceEnd);
+    }
+
+
+
+    // Compute the begin position in the path sequence of the sequence portion
+    // contributed by each segment or link.
+    for(uint64_t i=0; /* Check later */ ; i++) {
+        auto& segment = flattenedAssemblyPath.segments[i];
+
+        // Do it for this segment.
+        if(i == 0) {
+            segment.positionInAssembledSequence = 0;
+        } else {
+            const auto& previousLink = flattenedAssemblyPath.links[i-1];
+            segment.positionInAssembledSequence = previousLink.positionInAssembledSequence +
+                previousLink.sequenceEnd - previousLink.sequenceBegin;
+        }
+
+        // If this is the last segment, we are done.
+        if(i == flattenedAssemblyPath.segments.size() - 1) {
+            break;
+        }
+
+        // Do it for this link.
+        auto& link = flattenedAssemblyPath.links[i];
+        link.positionInAssembledSequence = segment.positionInAssembledSequence +
+            segment.sequenceEnd - segment.sequenceBegin;
+
+    }
+
+
+    // Now we have all the information needed to assemble the sequence.
+    getAssembledSequence(flattenedAssemblyPath, sequence);
 }
 
 
@@ -1614,6 +1688,40 @@ void AssemblyGraph::assembleLink(
             ostream_iterator<Base>(cout));
         cout << "\n";
     }
+}
+
+
+
+// Extract assembled sequence from a FlattenedAssemblyPath.
+void AssemblyGraph::getAssembledSequence(
+    const FlattenedAssemblyPath& flattenedAssemblyPath,
+    vector<shasta::Base>& sequence) const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+    sequence.clear();
+
+    for(uint64_t i=0; /* Check later */; i++) {
+
+        // Append segment sequence.
+        const FlattenedAssemblyPathSegment& segment = flattenedAssemblyPath.segments[i];
+        const uint64_t segmentId = assemblyGraph[segment.v].segmentId;
+        const auto segmentSequence = packedMarkerGraph.segmentSequences[segmentId];
+        copy(
+            segmentSequence.begin() + segment.sequenceBegin,
+            segmentSequence.begin() + segment.sequenceEnd,
+            back_inserter(sequence));
+        if(i == flattenedAssemblyPath.segments.size() -1) {
+            break;
+        }
+
+        // Append link sequence.
+        const FlattenedAssemblyPathLink& link = flattenedAssemblyPath.links[i];
+        copy(
+            link.sequence.begin() + link.sequenceBegin,
+            link.sequence.begin() + link.sequenceEnd,
+            back_inserter(sequence));
+    }
+
 }
 
 

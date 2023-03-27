@@ -543,6 +543,11 @@ public:
         const FlattenedAssemblyPathSegment& nextSegment,
         vector<Transition>&) const;
 
+    // Extract assembled sequence from a FlattenedAssemblyPath.
+    void getAssembledSequence(
+        const FlattenedAssemblyPath&,
+         vector<shasta::Base>&) const;
+
 
 
     // Classes used to define detangling constructors.
