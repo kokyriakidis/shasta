@@ -1353,17 +1353,76 @@ void shasta::mode3a::linkMsaUsingSpoa(
     }
 
 
-    const string consensusString = spoaAlignmentGraph.GenerateConsensus();
-    consensusSequence.clear();
-    for(const char c: consensusString) {
-        consensusSequence.push_back(Base::fromCharacter(c));
+
+#if 0
+    // Get the consensus as computed by spoa.
+    // This is generally not as accurate as coverage-based consensus computed below.
+    // See here for some discussion:
+    // https://github.com/rvaser/spoa/issues/63
+    const string spoaConsensusString = spoaAlignmentGraph.GenerateConsensus();
+    vector<Base> spoaConsensus;
+    for(const char c: spoaConsensusString) {
+        spoaConsensus.push_back(Base::fromCharacter(c));
     }
+#endif
+
+
+
+    // Get the MSA alignment.
+    // The true argument causes a final alignment entry equal to the consensus.
+    vector<string> alignment = spoaAlignmentGraph.GenerateMultipleSequenceAlignment(false);
+    SHASTA_ASSERT(alignment.size() == msaSequencesTable.size());
+
+    // Compute coverage at each alignment position for each of the 5 AlignedBases.
+    const uint64_t alignmentLength = alignment.front().size();
+    vector< array<uint64_t, 5> > coverage(alignmentLength, {0, 0, 0, 0, 0});
+    for(uint64_t indexByFrequency=0; indexByFrequency<msaSequencesTable.size(); indexByFrequency++) {
+        const string& alignmentRow = alignment[indexByFrequency];
+        SHASTA_ASSERT(alignmentRow.size() == alignmentLength);
+        for(uint64_t position=0; position<alignmentLength; position++) {
+            const AlignedBase b = AlignedBase::fromCharacter(alignmentRow[position]);
+            coverage[position][b.value] += msaSequencesTable[indexByFrequency].second;
+        }
+    }
+
+    // Compute coverage-based consensus at each alignment position.
+    vector<AlignedBase> coverageBasedAlignedConsensus;
+    for(const auto& c: coverage) {
+        const uint64_t iBase = std::max_element(c.begin(), c.end()) - c.begin();
+        coverageBasedAlignedConsensus.push_back(AlignedBase::fromInteger(iBase));
+    }
+    SHASTA_ASSERT(coverageBasedAlignedConsensus.size() == alignmentLength);
+
+    // Take out the gaps.
+    vector<Base> coverageBasedConsensus;
+    for(const AlignedBase b: coverageBasedAlignedConsensus) {
+        if(not b.isGap()) {
+            coverageBasedConsensus.push_back(Base(b));
+        }
+    }
+    consensusSequence = coverageBasedConsensus;
+
+    // Compute concordant and discordant count at each alignment position.
+    vector<uint64_t> concordantCount(alignmentLength, 0);
+    vector<uint64_t> discordantCount(alignmentLength, 0);
+    for(uint64_t position=0; position<alignmentLength; position++) {
+        for(uint64_t iBase=0; iBase<5; iBase++) {
+            if(AlignedBase::fromInteger(iBase) == coverageBasedAlignedConsensus[position]) {
+                concordantCount[position] += coverage[position][iBase];
+            } else {
+                discordantCount[position] += coverage[position][iBase];
+            }
+        }
+    }
+
+
+
     if(html) {
         html <<
-            "<h3>MSA consensus</h3>"
-            "Consensus sequence has length " << consensusSequence.size() <<
+            "<h2>Consensus sequence</h2>"
+            "The consensus sequence has length " << coverageBasedConsensus.size() <<
             ":<div style='font-family:courier'>";
-        for(const Base base: consensusSequence) {
+        for(const Base base: coverageBasedConsensus) {
             html << base;
         }
         html << "</div>";
@@ -1373,7 +1432,7 @@ void shasta::mode3a::linkMsaUsingSpoa(
         bool found = false;
         for(uint64_t msaSequenceIndex=0; msaSequenceIndex<msaSequences.size(); msaSequenceIndex++) {
             const auto& p = msaSequences[msaSequenceIndex];
-            if(consensusSequence == p.first) {
+            if(coverageBasedConsensus == p.first) {
                 html << "The consensus sequences is the same as the MSA sequence with index " <<
                     msaSequenceIndex << ".";
                 found = true;
@@ -1384,10 +1443,7 @@ void shasta::mode3a::linkMsaUsingSpoa(
             html << "<br>The consensus sequence is not equal to any of the MSA sequences.";
         }
 
-
-
         // Write MSA details.
-        vector<string> alignment = spoaAlignmentGraph.GenerateMultipleSequenceAlignment(true);
         html << "<h3>MSA details</h3>"
             "<table><tr>"
             "<th>Index<br>by<br>frequency"
@@ -1395,7 +1451,6 @@ void shasta::mode3a::linkMsaUsingSpoa(
             "<th>MSA<br>sequence<br>frequency"
             "<th>MSA<br>sequence"
             "<th>MSA<br>sequence<br>length";
-        vector<uint64_t> discordantCount(alignment.back().size(), 0);
         for(uint64_t indexByFrequency=0; indexByFrequency<msaSequencesTable.size(); indexByFrequency++) {
             const auto& p = msaSequencesTable[indexByFrequency];
             const uint64_t msaSequenceIndex = p.first;
@@ -1409,11 +1464,10 @@ void shasta::mode3a::linkMsaUsingSpoa(
                 "<td class=centered>" << msaSequenceIndex <<
                 "<td class=centered>" << frequency <<
                 "<td class=centered style='font-family:courier'>";
-            for(uint64_t i=0; i<alignment[indexByFrequency].size(); i++) {
-                const char c = alignment[indexByFrequency][i];
-                const bool isConcordant = (c == alignment.back()[i]);    // With consensus.
+            for(uint64_t position=0; position<alignment[indexByFrequency].size(); position++) {
+                const char c = alignment[indexByFrequency][position];
+                const bool isConcordant = (c == coverageBasedAlignedConsensus[position].character());
                 if(not isConcordant) {
-                    discordantCount[i] += frequency;
                     html << "<span style='color:Red;font-weight:bold'>";
                 }
                 html << c;
@@ -1423,9 +1477,58 @@ void shasta::mode3a::linkMsaUsingSpoa(
             }
             html << "<td class=centered>" << msaSequence.size();
         }
+
+        // Add rows with coverage for each of the 5 AlignedBases.
+        for(uint64_t iBase=0; iBase<5; iBase++) {
+            if(iBase==0) {
+                html << "<tr><td colspan=2 rowspan=5 class=centered>Coverage";
+            } else {
+                html << "<tr>";
+            }
+            const AlignedBase base = AlignedBase::fromInteger(iBase);
+            html << "<td class=centered style='font-family:courier'>" << base <<
+                "<td class=centered style='font-family:courier'>";
+            for(uint64_t position=0; position<alignmentLength; position++) {
+                const uint64_t n = coverage[position][iBase];
+                if(n == 0) {
+                    html << "&nbsp;";
+                } else if(n < 10) {
+                    html << n;
+                } else {
+                    html << "*";
+                }
+            }
+        }
+
+        // Add a row with consensus.
         html << "<tr><td class=centered colspan=3>Consensus"
-            "<td class=centered style='font-family:courier'>" << alignment.back() <<
-            "<td class=centered>" << consensusSequence.size() <<
+            "<td class=centered style='font-family:courier'>";
+        for(uint64_t position=0; position<coverageBasedAlignedConsensus.size(); position++) {
+            const AlignedBase b = coverageBasedAlignedConsensus[position];
+            html << b;
+        }
+        html <<
+            "<td class=centered>" << coverageBasedConsensus.size();
+
+
+        // Add a row with concordant count.
+        html <<
+            "<tr><td class=centered colspan=3>Concordant"
+            "<td class=centered style='font-family:courier'>";
+        for(uint64_t i=0; i<concordantCount.size(); i++) {
+            const uint64_t n = concordantCount[i];
+            if(n == 0) {
+                html << "&nbsp;";
+            } else if(n < 10) {
+                html << n;
+            } else {
+                html << "*";
+            }
+        }
+        html << "<td>";
+
+        // Add a row with discordant count.
+        html <<
             "<tr><td class=centered colspan=3>Discordant"
             "<td class=centered style='font-family:courier'>";
         for(uint64_t i=0; i<discordantCount.size(); i++) {
@@ -1441,6 +1544,7 @@ void shasta::mode3a::linkMsaUsingSpoa(
         html << "<td>";
 
         html << "</table>";
+
     }
 }
 
