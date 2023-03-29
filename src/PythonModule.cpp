@@ -13,6 +13,7 @@
 #include "dset64Test.hpp"
 #include "diploidBayesianPhase.hpp"
 #include "shastaLapack.hpp"
+#include "globalMsa.hpp"
 #include "LongBaseSequence.hpp"
 #include "longestPath.hpp"
 #include "mappedCopy.hpp"
@@ -779,6 +780,9 @@ PYBIND11_MODULE(shasta, shastaModule)
         );
     shastaModule.def("testLongestPath",
         testLongestPath
+        );
+    shastaModule.def("globalMsaPython",
+        globalMsaPython
         );
 }
 
