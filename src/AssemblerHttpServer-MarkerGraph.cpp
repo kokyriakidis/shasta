@@ -2139,6 +2139,10 @@ void Assembler::exploreMarkerConnectivity(
         ++frequencyMap[orientedReadId];
     }
 
+    html << "<br>The marker connectivity graph has " <<
+        num_vertices(graph) << " vertices and " <<
+        num_edges(graph) << " edges.";
+
 
     // Write the graph out in graphviz format.
     const string uuid = to_string(boost::uuids::random_generator()());
