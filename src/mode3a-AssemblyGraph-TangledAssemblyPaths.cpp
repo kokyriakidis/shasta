@@ -4,6 +4,7 @@
 #include "Base.hpp"
 #include "deduplicate.hpp"
 #include "enumeratePaths.hpp"
+#include "globalMsa.hpp"
 #include "invalid.hpp"
 #include "Marker.hpp"
 #include "Reads.hpp"
@@ -1579,8 +1580,7 @@ void AssemblyGraph::assembleLink(
     // Compute the multiple sequence alignment.
     vector<Base> consensusSequence;
     const uint64_t maxLength = 10000;
-    ostream html(0);
-    linkMsaUsingSpoa(msaSequences, maxLength, html, consensusSequence);
+    globalMsa(msaSequences, maxLength, packedMarkerGraph.k, consensusSequence);
 
     if(debug) {
         cout << "Consensus sequence has length " << consensusSequence.size() << ":\n";
