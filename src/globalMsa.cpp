@@ -27,6 +27,16 @@ void shasta::globalMsa(
     )
 {
     const bool debug = true;
+    if(debug) {
+        cout << "globalMsa called with " << sequences.size() << " sequences with (length,weight):" << endl;
+        uint64_t totalWeight = 0;
+        for(const auto& p: sequences) {
+            cout << "(" << p.first.size() << "," << p.second << ") ";
+            totalWeight += p.second;
+        }
+        cout << endl;
+        cout << "Total weight is " << totalWeight << endl;
+    }
 
     // Sanity check.
     SHASTA_ASSERT(not sequences.empty());
@@ -48,6 +58,9 @@ void shasta::globalMsa(
 
     // If short enough, use spoa.
     if(maxLength <= maxSpoaLength) {
+        if(debug) {
+            cout << "Using spoa." << endl;
+        }
         globalMsaSpoa(sequences, consensus);
         return;
     }
@@ -72,7 +85,7 @@ void shasta::globalMsa(
 
     for(uint64_t i=0; i<sequences.size(); i++) {
         const vector<Base>& sequence = sequences[i].first;
-        if(debug) {
+        if(false) {
             cout << "Finding unique k-mers for sequence of length " << sequence.size() << endl;
         }
         vector<KmerInfo>& kmerInfos = kmerTable1[i];
@@ -96,11 +109,11 @@ void shasta::globalMsa(
         SHASTA_ASSERT(kmerInfos.size() == sequence.size() - kmerLength + 1);
 
         // Only keep the k-mers that appear once.
-        if(debug) {
+        if(false) {
             cout << kmerInfos.size() << " total kmers." << endl;
         }
         deduplicateAndCountAndKeepUnique(kmerInfos);
-        if(debug) {
+        if(false) {
             cout << kmerInfos.size() << " unique kmers." << endl;
         }
     }
@@ -126,7 +139,6 @@ void shasta::globalMsa(
         }
     }
     sort(kmerTable2.begin(), kmerTable2.end());
-    // cout << "***B" << endl;
 
 
 
@@ -178,7 +190,6 @@ void shasta::globalMsa(
         // Store this streak in kmerTable3.
         UniqueKmerInfo uniqueKmerInfo;
         uniqueKmerInfo.kmer = kmer;
-        // cout << "***A "; kmer.write(cout, kmerLength); cout << endl;
         for(; it!=jt; it++) {
             const uint64_t sequenceIndex = it->sequenceIndex;
             const uint64_t sequenceLength = sequences[sequenceIndex].first.size();
@@ -195,7 +206,7 @@ void shasta::globalMsa(
     sort(kmerTable3.begin(), kmerTable3.end());
 
 
-    if(debug) {
+    if(false) {
         for(const auto& uniqueKmerInfo: kmerTable3) {
             uniqueKmerInfo.write(cout, kmerLength);
         }
