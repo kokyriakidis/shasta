@@ -390,6 +390,7 @@ void Assembler::selectKmersBasedOnFrequency(
     // until we have enough.
     uint64_t kmerOccurrencesCount = 0;
     uint64_t kmerCount = 0;
+    const uint64_t giveUpCount =  uint64_t(0.9 * double(candidateKmers.size()));
     const uint64_t desiredKmerOccurrencesCount =
         uint64_t(markerDensity * double(totalKmerOccurrences));
     while(kmerOccurrencesCount < desiredKmerOccurrencesCount) {
@@ -422,6 +423,10 @@ void Assembler::selectKmersBasedOnFrequency(
         reverseComplementedInfo.isMarker = true;
         kmerOccurrencesCount += reverseComplementedInfo.frequency;
         ++kmerCount;
+
+        if(kmerCount >= giveUpCount) {
+            throw runtime_error("Giving up after selecting as markers 90% of the candidate kmers.");
+        }
     }
     cout << "Selected " << kmerCount << " k-mers as markers." << endl;
 
