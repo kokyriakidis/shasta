@@ -66,7 +66,7 @@ void Assembler::alignOrientedReads3(
     array<TSequence, 2> downsampledSequences;
 
     // Fill in downsampled markers.
-    // SeqAn uses 45 to represent gaps, so we add 45 to the KmerIds passed to SeqAn.
+    // SeqAn uses 45 to represent gaps, so we add 100 to the KmerIds passed to SeqAn.
     // This means that we can't do k=16.
     const uint32_t hashThreshold =
         uint32_t(downsamplingFactor * double(std::numeric_limits<uint32_t>::max()));
