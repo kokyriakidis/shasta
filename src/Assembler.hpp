@@ -619,6 +619,19 @@ private:
 
 
 
+    // KmerIds for all markers. Indexed by OrientedReadId::getValue().
+    // Used by alignment methods 1 and 3.
+    // Only stored during alignment computation, and then freed.
+    // They are also permanently stored in each CompressedMarker currently,
+    // but that will go away soon.
+    MemoryMapped::VectorOfVectors<KmerId, uint64_t> markerKmers;
+public:
+    void computeMarkerKmers(uint64_t threadCount);
+private:
+    void computeMarkerKmersThreadFunction(size_t threadId);
+
+
+
     // Given a MarkerId, compute the MarkerId of the
     // reverse complemented marker.
     MarkerId findReverseComplement(MarkerId) const;
