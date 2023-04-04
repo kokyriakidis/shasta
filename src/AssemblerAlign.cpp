@@ -234,7 +234,7 @@ void Assembler::computeAlignments(
     }
 
     // Compute marker k-mers.
-    computeMarkerKmers(threadCount);
+    computeMarkerKmerIds(threadCount);
 
     // For alignment method 4, compute sorted markers.
     if(alignOptions.alignMethod == 4) {
@@ -290,7 +290,7 @@ void Assembler::computeAlignments(
     compressedAlignments.unreserve();
 
     // Cleanup.
-    markerKmers.remove();
+    markerKmerIds.remove();
     if(alignOptions.alignMethod == 4) {
         sortedMarkers.remove();
     }

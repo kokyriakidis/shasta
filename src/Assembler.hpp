@@ -624,11 +624,39 @@ private:
     // Only stored during alignment computation, and then freed.
     // They are also permanently stored in each CompressedMarker currently,
     // but that will go away soon.
-    MemoryMapped::VectorOfVectors<KmerId, uint64_t> markerKmers;
+    MemoryMapped::VectorOfVectors<KmerId, uint64_t> markerKmerIds;
 public:
-    void computeMarkerKmers(uint64_t threadCount);
+    void computeMarkerKmerIds(uint64_t threadCount);
 private:
-    void computeMarkerKmersThreadFunction(size_t threadId);
+    void computeMarkerKmerIdsThreadFunction(size_t threadId);
+
+
+
+    // Low level functions to get marker Kmers/KmerIds of an oriented read.
+    // They are obtained from the reads and not from CompressedMarker::kmerId,
+    // which will soon go away.
+
+    // Get all marker Kmers/KmerIds for an oriented read.
+    void getOrientedReadMarkerKmers(OrientedReadId, const span<Kmer>&) const;
+    void getOrientedReadMarkerKmersStrand0(ReadId, const span<Kmer>&) const;
+    void getOrientedReadMarkerKmersStrand1(ReadId, const span<Kmer>&) const;
+    void getOrientedReadMarkerKmerIds(OrientedReadId, const span<KmerId>&) const;
+    void getOrientedReadMarkerKmerIdsStrand0(ReadId, const span<KmerId>&) const;
+    void getOrientedReadMarkerKmerIdsStrand1(ReadId, const span<KmerId>&) const;
+
+    // Get all marker Kmers/KmerIds for a read in both orientations.
+    void getReadMarkerKmers(
+        ReadId,
+        const span<Kmer>& Kmers0,
+        const span<Kmer>& Kmers1) const;
+    void getReadMarkerKmerIds(
+        ReadId,
+        const span<KmerId>& kmerIds0,
+        const span<KmerId>& kmerIds1) const;
+
+    // Get the Kmer/KmerId for an oriented read at a given marker ordinal.
+    Kmer getOrientedReadMarkerKmer(OrientedReadId, uint64_t ordinal) const;
+    KmerId getOrientedReadMarkerKmerId(OrientedReadId, uint64_t ordinal) const;
 
 
 
