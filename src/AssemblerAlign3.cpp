@@ -53,11 +53,25 @@ void Assembler::alignOrientedReads3(
     using TDepStringSet = StringSet<TSequence, Dependent<> >;
     using TAlignGraph = Graph<Alignment<TDepStringSet> >;
 
+    // Get the marker KmerIds for the two oriented reads.
+    array<span<KmerId>, 2> allMarkerKmerIds;
+    array<vector<KmerId>, 2> allMarkerKmerIdsVectors;
+    if(markerKmerIds.isOpen()) {
+        allMarkerKmerIds[0] = markerKmerIds[orientedReadId0.getValue()];
+        allMarkerKmerIds[1] = markerKmerIds[orientedReadId1.getValue()];
+    } else {
+        // This is slower and will happen if markerKmerIds is not available.
+        // Resize the vectors and make the spans point to the vectors.
+        // Then call getOrientedReadMarkerKmerIds to fill them in.
+        allMarkerKmerIdsVectors[0].resize(markers.size(orientedReadId0.getValue()));
+        allMarkerKmerIdsVectors[1].resize(markers.size(orientedReadId1.getValue()));
+        allMarkerKmerIds[0] = span<KmerId>(allMarkerKmerIdsVectors[0]);
+        allMarkerKmerIds[1] = span<KmerId>(allMarkerKmerIdsVectors[1]);
+        getOrientedReadMarkerKmerIds(orientedReadId0, allMarkerKmerIds[0]);
+        getOrientedReadMarkerKmerIds(orientedReadId1, allMarkerKmerIds[1]);
+    }
 
-    // Get the markers for the two oriented reads.
-    array<span<CompressedMarker>, 2> allMarkers;
-    allMarkers[0] = markers[orientedReadId0.getValue()];
-    allMarkers[1] = markers[orientedReadId1.getValue()];
+
 
     // Vectors to contain downsampled markers.
     // For each of the two reads we store vectors of
@@ -71,8 +85,8 @@ void Assembler::alignOrientedReads3(
     const uint32_t hashThreshold =
         uint32_t(downsamplingFactor * double(std::numeric_limits<uint32_t>::max()));
     for(uint64_t i=0; i<2; i++) {
-        for(uint32_t ordinal=0; ordinal<uint32_t(allMarkers[i].size()); ordinal++) {
-            const KmerId kmerId = allMarkers[i][ordinal].kmerId;
+        for(uint32_t ordinal=0; ordinal<uint32_t(allMarkerKmerIds[i].size()); ordinal++) {
+            const KmerId kmerId = allMarkerKmerIds[i][ordinal];
              if(kmerTable[kmerId].hash < hashThreshold) {
                 downsampledMarkers[i].push_back(make_pair(ordinal, kmerId));
                 appendValue(downsampledSequences[i], kmerId + 100);
@@ -82,7 +96,7 @@ void Assembler::alignOrientedReads3(
 
     if(debug) {
         cout << "Aligning two oriented reads with " <<
-            allMarkers[0].size() << " and " << allMarkers[1].size() << " markers." << endl;
+            allMarkerKmerIds[0].size() << " and " << allMarkerKmerIds[1].size() << " markers." << endl;
         cout << "Downsampled markers for step 1 to " <<
             downsampledMarkers[0].size() << " and " <<
             downsampledMarkers[1].size() << " markers." << endl;
@@ -101,7 +115,7 @@ void Assembler::alignOrientedReads3(
         // One of the downsampled sequences is empty. Return an empty alignment.
         alignment.clear();
         alignmentInfo.create(
-            alignment, uint32_t(allMarkers[0].size()), uint32_t(allMarkers[1].size()));
+            alignment, uint32_t(allMarkerKmerIds[0].size()), uint32_t(allMarkerKmerIds[1].size()));
         return;
     }
 
@@ -186,7 +200,7 @@ void Assembler::alignOrientedReads3(
         downsampledMarkers[0].size() + downsampledMarkers[1].size()) {
         alignment.clear();
         alignmentInfo.create(
-            alignment, uint32_t(allMarkers[0].size()), uint32_t(allMarkers[1].size()));
+            alignment, uint32_t(allMarkerKmerIds[0].size()), uint32_t(allMarkerKmerIds[1].size()));
         return;
     }
 
@@ -234,7 +248,7 @@ void Assembler::alignOrientedReads3(
     if((bandMax - bandMin) > maxBand) {
         alignment.clear();
         alignmentInfo.create(
-            alignment, uint32_t(allMarkers[0].size()), uint32_t(allMarkers[1].size()));
+            alignment, uint32_t(allMarkerKmerIds[0].size()), uint32_t(allMarkerKmerIds[1].size()));
         return;
     }
 
@@ -243,8 +257,8 @@ void Assembler::alignOrientedReads3(
     // Now, do a alignment using this band and all markers.
     array<TSequence, 2> sequences;
     for(uint64_t i=0; i<2; i++) {
-        for(uint32_t ordinal=0; ordinal<uint32_t(allMarkers[i].size()); ordinal++) {
-            const KmerId kmerId = allMarkers[i][ordinal].kmerId;
+        for(uint32_t ordinal=0; ordinal<uint32_t(allMarkerKmerIds[i].size()); ordinal++) {
+            const KmerId kmerId = allMarkerKmerIds[i][ordinal];
             appendValue(sequences[i], kmerId + 100);
         }
     }
@@ -280,10 +294,10 @@ void Assembler::alignOrientedReads3(
     uint32_t ordinal0 = 0;
     uint32_t ordinal1 = 0;
     for(int i=0;
-        i<alignmentLength and ordinal0<allMarkers[0].size() and ordinal1<allMarkers[1].size(); i++) {
+        i<alignmentLength and ordinal0<allMarkerKmerIds[0].size() and ordinal1<allMarkerKmerIds[1].size(); i++) {
         if( align[i] != seqanGapValue and
             align[i + alignmentLength] != seqanGapValue and
-            allMarkers[0][ordinal0].kmerId == allMarkers[1][ordinal1].kmerId) {
+            allMarkerKmerIds[0][ordinal0] == allMarkerKmerIds[1][ordinal1]) {
             alignment.ordinals.push_back(array<uint32_t, 2>{ordinal0, ordinal1});
         }
         if(align[i] != seqanGapValue) {
@@ -308,7 +322,7 @@ void Assembler::alignOrientedReads3(
     }
 
     // Store the alignment info.
-    alignmentInfo.create(alignment, uint32_t(allMarkers[0].size()), uint32_t(allMarkers[1].size()));
+    alignmentInfo.create(alignment, uint32_t(allMarkerKmerIds[0].size()), uint32_t(allMarkerKmerIds[1].size()));
 
 }
 
