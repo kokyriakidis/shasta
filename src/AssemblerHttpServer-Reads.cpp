@@ -1084,7 +1084,7 @@ void Assembler::exploreReadRaw(
             const Kmer kmer(marker.kmerId, k);
 
             // Write the required number of spaces.
-            SHASTA_ASSERT(position > oldPosition);  // There must be at least a blank.
+            SHASTA_ASSERT((position==0) or (position > oldPosition));  // There must be at least a blank.
             for(uint64_t i=oldPosition; i<position; i++) {
                 html << "&nbsp;";
             }
