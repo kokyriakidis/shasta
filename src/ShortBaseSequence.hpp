@@ -107,7 +107,7 @@ public:
     }
 
     // Return the reverse complement of the first n bases.
-    ShortBaseSequence<Int> reverseComplement(uint64_t n) const
+    ShortBaseSequence<Int> reverseComplementSlow(uint64_t n) const
     {
         ShortBaseSequence<Int> reverseComplementedSequence;
         for(size_t i=0; i<n; i++) {
@@ -116,6 +116,29 @@ public:
         }
         return reverseComplementedSequence;
     }
+
+
+
+    // Return the reverse complement of the first n bases.
+    // Use bit reversal for speed. This avoids a loop over the n bases.
+    ShortBaseSequence<Int> reverseComplement(uint64_t n) const
+    {
+        const Int shift = Int(capacity - n);
+        const Int mask = Int(1ULL << n) - Int(1);
+        ShortBaseSequence<Int> reverseComplementedSequence;
+        reverseComplementedSequence.data[0] = Int(((~bitReversal(data[0])) & mask) << shift);
+        reverseComplementedSequence.data[1] = Int(((~bitReversal(data[1])) & mask) << shift);
+
+#if 0
+        // Testing.
+        SHASTA_ASSERT(reverseComplementedSequence == reverseComplementSlow(n));
+        SHASTA_ASSERT(reverseComplementedSequence.reverseComplementSlow(n) == *this);
+#endif
+
+        return reverseComplementedSequence;
+    }
+
+
 
     bool operator==(const ShortBaseSequence<Int>& that) const
     {

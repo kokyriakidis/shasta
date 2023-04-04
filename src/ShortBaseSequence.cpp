@@ -9,7 +9,7 @@ using namespace shasta;
 
 void shasta::testShortBaseSequence()
 {
-    ShortBaseSequence8 s;
+    ShortBaseSequence16 s;
     s.set(0, Base::fromCharacter('T'));
     s.set(1, Base::fromCharacter('C'));
     s.set(2, Base::fromCharacter('G'));
@@ -19,13 +19,13 @@ void shasta::testShortBaseSequence()
     cout << s << endl;
 
     // const auto oldFill = cout.fill('0');
-    for(const uint8_t x: s.data) {
+    for(const uint16_t x: s.data) {
         cout << std::setw(2) << std::hex << int(x) << endl;
         // cout << int(x) << endl;
     }
     // cout.fill(oldFill);
 
     // Check that constructor from id does the inverse of function id().
-    const ShortBaseSequence8 t(s.id(4), 4);
+    const ShortBaseSequence16 t(s.id(4), 4);
     SHASTA_ASSERT(t == s);
 }
