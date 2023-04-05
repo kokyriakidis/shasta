@@ -614,13 +614,13 @@ public:
     void computeSortedMarkers(uint64_t threadCount);
     bool accessSortedMarkers();
 private:
-    void computeSortedMarkersThreadFunction1(size_t threadId);
-    void computeSortedMarkersThreadFunction2(size_t threadId);
+    void computeSortedMarkersThreadFunction(size_t threadId);
+    // void computeSortedMarkersThreadFunction1(size_t threadId);
+    // void computeSortedMarkersThreadFunction2(size_t threadId);
 
 
 
     // KmerIds for all markers. Indexed by OrientedReadId::getValue().
-    // Used by alignment methods 1 and 3.
     // Only stored during alignment computation, and then freed.
     // They are also permanently stored in each CompressedMarker currently,
     // but that will go away soon.

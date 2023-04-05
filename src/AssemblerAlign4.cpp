@@ -192,6 +192,8 @@ void Assembler::computeSortedMarkers(uint64_t threadCount)
     // Check that we have what we need.
     checkMarkersAreOpen();
     const uint64_t orientedReadCount = markers.size();
+    SHASTA_ASSERT(markerKmerIds.isOpen());
+    SHASTA_ASSERT(markerKmerIds.size() == orientedReadCount);
 
     // Adjust the numbers of threads, if necessary.
     if(threadCount == 0) {
@@ -200,18 +202,48 @@ void Assembler::computeSortedMarkers(uint64_t threadCount)
 
     // Do it.
     sortedMarkers.createNew(largeDataName("SortedMarkers"), largeDataPageSize);
-    sortedMarkers.beginPass1(orientedReadCount);
-    const uint64_t batchSize = 10000;
+    for(uint64_t i=0; i<orientedReadCount; i++) {
+        sortedMarkers.appendVector(markers[i].size());
+    }
+    const uint64_t batchSize = 100;
     setupLoadBalancing(orientedReadCount, batchSize);
-    runThreads(&Assembler::computeSortedMarkersThreadFunction1, threadCount);
-    sortedMarkers.beginPass2();
-    sortedMarkers.endPass2(false);
-    setupLoadBalancing(orientedReadCount, batchSize);
-    runThreads(&Assembler::computeSortedMarkersThreadFunction2, threadCount);
+    runThreads(&Assembler::computeSortedMarkersThreadFunction, threadCount);
 }
 
 
 
+void Assembler::computeSortedMarkersThreadFunction(size_t threadId)
+{
+    // Loop over all batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over oriented reads in this batch.
+        for(uint64_t i=begin; i!=end; i++) {
+
+            // Access the marker KmerIs and sorted markers for this oriented read.
+            const auto kmerIds = markerKmerIds[i];
+            const uint64_t markerCount = kmerIds.size();
+            const span< pair<KmerId, uint32_t> > sm = sortedMarkers[i];
+            SHASTA_ASSERT(sm.size() == markerCount);
+
+            // Copy the KmerId's and ordinals.
+            for(uint32_t ordinal=0; ordinal<markerCount; ordinal++) {
+                auto& p = sm[ordinal];
+                p.first = kmerIds[ordinal];
+                p.second = ordinal;
+            }
+
+            // Sort them by KmerId.
+            sort(sm.begin(), sm.end(), OrderPairsByFirstOnly<KmerId, uint32_t>());
+        }
+    }
+
+}
+
+
+
+#if 0
 void Assembler::computeSortedMarkersThreadFunction1(size_t threadId)
 {
     // Loop over all batches assigned to this thread.
@@ -259,6 +291,8 @@ void Assembler::computeSortedMarkersThreadFunction2(size_t threadId)
     }
 
 }
+#endif
+
 
 
 bool Assembler::accessSortedMarkers()
