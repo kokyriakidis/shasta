@@ -72,21 +72,41 @@ void Assembler::alignOrientedReads1(
     using TDepStringSet = StringSet<TSequence, Dependent<> >;
     using TAlignGraph = Graph<Alignment<TDepStringSet> >;
 
+#if 0
     // Access the markers of our oriented reads.
     const span<CompressedMarker> markers0 =
         markers[orientedReadId0.getValue()];
     const span<CompressedMarker> markers1 =
         markers[orientedReadId1.getValue()];
+#endif
+
+    // Get the marker KmerIds for the two oriented reads.
+    array<span<KmerId>, 2> allMarkerKmerIds;
+    array<vector<KmerId>, 2> allMarkerKmerIdsVectors;
+    if(markerKmerIds.isOpen()) {
+        allMarkerKmerIds[0] = markerKmerIds[orientedReadId0.getValue()];
+        allMarkerKmerIds[1] = markerKmerIds[orientedReadId1.getValue()];
+    } else {
+        // This is slower and will happen if markerKmerIds is not available.
+        // Resize the vectors and make the spans point to the vectors.
+        // Then call getOrientedReadMarkerKmerIds to fill them in.
+        allMarkerKmerIdsVectors[0].resize(markers.size(orientedReadId0.getValue()));
+        allMarkerKmerIdsVectors[1].resize(markers.size(orientedReadId1.getValue()));
+        allMarkerKmerIds[0] = span<KmerId>(allMarkerKmerIdsVectors[0]);
+        allMarkerKmerIds[1] = span<KmerId>(allMarkerKmerIdsVectors[1]);
+        getOrientedReadMarkerKmerIds(orientedReadId0, allMarkerKmerIds[0]);
+        getOrientedReadMarkerKmerIds(orientedReadId1, allMarkerKmerIds[1]);
+    }
 
     // Construct the sequences of KmerId's we want to align.
     // SeqAn uses 45 to represent gaps, so we add 100 to the KmerIds passed to SeqAn.
     TSequence seq0;
-    for(const CompressedMarker marker: markers0) {
-        appendValue(seq0, marker.kmerId + 100);
+    for(const KmerId kmerId: allMarkerKmerIds[0]) {
+        appendValue(seq0, kmerId + 100);
     }
     TSequence seq1;
-    for(const CompressedMarker marker: markers1) {
-        appendValue(seq1, marker.kmerId + 100);
+    for(const KmerId kmerId: allMarkerKmerIds[1]) {
+        appendValue(seq1, kmerId + 100);
     }
 
     // Store them in a SeqAn string set.
@@ -128,10 +148,13 @@ void Assembler::alignOrientedReads1(
     uint32_t ordinal1 = 0;
     const uint32_t seqanGapValue = 45;
     for(int i=0;
-        i<alignmentLength and ordinal0<markers0.size() and ordinal1<markers1.size(); i++) {
+        i<alignmentLength and
+        ordinal0<allMarkerKmerIds[0].size() and
+        ordinal1<allMarkerKmerIds[1].size();
+        i++) {
         if( align[i] != seqanGapValue and
             align[i + alignmentLength] != seqanGapValue and
-            markers0[ordinal0].kmerId == markers1[ordinal1].kmerId) {
+            allMarkerKmerIds[0][ordinal0] == allMarkerKmerIds[1][ordinal1]) {
             alignment.ordinals.push_back(array<uint32_t, 2>{ordinal0, ordinal1});
         }
         if(align[i] != seqanGapValue) {
@@ -143,7 +166,7 @@ void Assembler::alignOrientedReads1(
     }
 
     // Store the alignment info.
-    alignmentInfo.create(alignment, uint32_t(markers0.size()), uint32_t(markers1.size()));
+    alignmentInfo.create(alignment, uint32_t(allMarkerKmerIds[0].size()), uint32_t(allMarkerKmerIds[1].size()));
 
 
     // Debugging.
