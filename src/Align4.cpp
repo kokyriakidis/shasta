@@ -28,7 +28,7 @@ using namespace Align4;
 
 
 void shasta::Align4::align(
-    const array<CompressedMarkers, 2>& compressedMarkers,
+    const array< span<const KmerId>, 2>& kmerIds,
     const array<span< const pair<KmerId, uint32_t> >, 2> sortedMarkers,
     const Options& options,
     MemoryMapped::ByteAllocator& byteAllocator,
@@ -36,7 +36,7 @@ void shasta::Align4::align(
     AlignmentInfo& alignmentInfo,
     bool debug)
 {
-    Align4::Aligner graph(compressedMarkers, sortedMarkers,
+    Align4::Aligner graph(kmerIds, sortedMarkers,
         options, byteAllocator, alignment, alignmentInfo,
         debug);
 }
@@ -44,15 +44,15 @@ void shasta::Align4::align(
 
 
 Aligner::Aligner(
-    const array<CompressedMarkers, 2>& compressedMarkers,
+    const array<span<const KmerId>, 2>& kmerIds,
     const array<span< const pair<KmerId, uint32_t> >, 2> sortedMarkers,
     const Options& options,
     MemoryMapped::ByteAllocator& byteAllocator,
     Alignment& alignment,
     AlignmentInfo& alignmentInfo,
     bool debug) :
-    nx(uint32_t(compressedMarkers[0].size())),
-    ny(uint32_t(compressedMarkers[1].size())),
+    nx(uint32_t(kmerIds[0].size())),
+    ny(uint32_t(kmerIds[1].size())),
     deltaX(int32_t(options.deltaX)),
     deltaY(int32_t(options.deltaY)),
     byteAllocator(byteAllocator)
@@ -109,7 +109,7 @@ Aligner::Aligner(
     }
     vector< pair<Alignment, AlignmentInfo> > alignments;
     computeBandedAlignments(
-        compressedMarkers,
+        kmerIds,
         options.minAlignedMarkerCount,
         options.minAlignedFraction,
         options.maxSkip,
@@ -873,7 +873,7 @@ void Aligner::findActiveCellsConnectedComponents()
 // active cells. Return the ones that match requirements on
 // minAlignedMarkerCount, minAlignedFraction, maxSkip, maxDrift, maxTrim.
 void Aligner::computeBandedAlignments(
-    const array<CompressedMarkers, 2>& compressedMarkers,
+    const array<span<const KmerId>, 2>& kmerIds,
     uint64_t minAlignedMarkerCount,
     double minAlignedFraction,
     uint64_t maxSkip,
@@ -936,7 +936,7 @@ void Aligner::computeBandedAlignments(
         // Compute an alignment with this band.
         Alignment alignment;
         AlignmentInfo alignmentInfo;
-        computeBandedAlignment(compressedMarkers, bandMin, bandMax,
+        computeBandedAlignment(kmerIds, bandMin, bandMax,
             alignment, alignmentInfo, debug);
 
         // Skip it, if it does not satisfy the requirements on
@@ -991,7 +991,7 @@ void Aligner::computeBandedAlignments(
 
 // Compute a banded alignment with a given band.
 bool Aligner::computeBandedAlignment(
-    const array<CompressedMarkers, 2>& compressedMarkers,
+    const array<span<const KmerId>, 2>& kmerIds,
     int32_t bandMin,
     int32_t bandMax,
     Alignment& alignment,
@@ -1014,8 +1014,8 @@ bool Aligner::computeBandedAlignment(
     // Add 100 to kMerIds to prevent collision from the seqan gap value.
     array<TSequence, 2> sequences;
     for(uint64_t i=0; i<2; i++) {
-        for(const CompressedMarker& marker: compressedMarkers[i]) {
-            appendValue(sequences[i], marker.kmerId + 100);
+        for(const KmerId& kmerId: kmerIds[i]) {
+            appendValue(sequences[i], kmerId + 100);
         }
     }
 
@@ -1056,7 +1056,7 @@ bool Aligner::computeBandedAlignment(
         i<alignmentLength and ordinal0<nx and ordinal1<ny; i++) {
         if( align[i] != seqanGapValue and
             align[i + alignmentLength] != seqanGapValue and
-            compressedMarkers[0][ordinal0].kmerId == compressedMarkers[1][ordinal1].kmerId) {
+            kmerIds[0][ordinal0] == kmerIds[1][ordinal1]) {
             alignment.ordinals.push_back(array<uint32_t, 2>{ordinal0, ordinal1});
         }
         if(align[i] != seqanGapValue) {

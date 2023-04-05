@@ -124,10 +124,17 @@ void Assembler::alignOrientedReads4(
     AlignmentInfo& alignmentInfo,
     bool debug) const
 {
+    /*
     // Access the markers for the two oriented reads.
     array<span<const CompressedMarker>, 2> orientedReadMarkers;
     orientedReadMarkers[0] = markers[orientedReadId0.getValue()];
     orientedReadMarkers[1] = markers[orientedReadId1.getValue()];
+    */
+
+    // Access the marker KmerIds for the two oriented reads.
+    array<span<const KmerId>, 2> orientedReadKmerIds;
+    orientedReadKmerIds[0] = markerKmerIds[orientedReadId0.getValue()];
+    orientedReadKmerIds[1] = markerKmerIds[orientedReadId1.getValue()];
 
 
 
@@ -154,33 +161,30 @@ void Assembler::alignOrientedReads4(
         for(uint64_t i=0; i<2; i++) {
 
             // Unsorted markers for this oriented read.
-            const span<const CompressedMarker>& um = orientedReadMarkers[i];
+            const span<const KmerId>& km = orientedReadKmerIds[i];
 
             // Sorted markers for this oriented read.
             vector<pair<KmerId, uint32_t> >& sm = orientedReadSortedMarkers[i];
 
             // Copy the unsorted markers.
-            const uint64_t n = um.size();
+            const uint64_t n = km.size();
             sm.resize(n);
             for(uint64_t ordinal=0; ordinal<n; ordinal++) {
-                const CompressedMarker& cm = um[ordinal];
-                sm[ordinal] = make_pair(cm.kmerId, uint32_t(ordinal));
+                sm[ordinal] = make_pair(km[ordinal], uint32_t(ordinal));
             }
 
             // Sort them.
             sort(sm.begin(), sm.end(), OrderPairsByFirstOnly<KmerId, uint32_t>());
 
             // Make the span point to the data in the vector.
-            const pair<KmerId, uint32_t> * const smBegin = &sm.front();
-            orientedReadSortedMarkersSpans[i] =
-                span< const pair<KmerId, uint32_t> >(smBegin, smBegin + n);
+            orientedReadSortedMarkersSpans[i] = sm;
         }
     }
 
 
 
     // Compute the alignment.
-    Align4::align(orientedReadMarkers, orientedReadSortedMarkersSpans,
+    Align4::align(orientedReadKmerIds, orientedReadSortedMarkersSpans,
         options, byteAllocator, alignment, alignmentInfo, debug);
 }
 
