@@ -636,13 +636,20 @@ private:
     // They are obtained from the reads and not from CompressedMarker::kmerId,
     // which will soon go away.
 
-    // Get all marker Kmers/KmerIds for an oriented read.
+    // Get all marker Kmers for an oriented read.
     void getOrientedReadMarkerKmers(OrientedReadId, const span<Kmer>&) const;
     void getOrientedReadMarkerKmersStrand0(ReadId, const span<Kmer>&) const;
     void getOrientedReadMarkerKmersStrand1(ReadId, const span<Kmer>&) const;
+
+    // Get all marker KmerIds for an oriented read.
     void getOrientedReadMarkerKmerIds(OrientedReadId, const span<KmerId>&) const;
     void getOrientedReadMarkerKmerIdsStrand0(ReadId, const span<KmerId>&) const;
     void getOrientedReadMarkerKmerIdsStrand1(ReadId, const span<KmerId>&) const;
+
+    // Get all MarkerWithOrdinals for an oriented read (includes position, KmerId, and ordinal).
+    void getOrientedReadMarkers(OrientedReadId, const span<MarkerWithOrdinal>&) const;
+    void getOrientedReadMarkersStrand0(ReadId, const span<MarkerWithOrdinal>&) const;
+    void getOrientedReadMarkersStrand1(ReadId, const span<MarkerWithOrdinal>&) const;
 
     // Get all marker Kmers/KmerIds for a read in both orientations.
     void getReadMarkerKmers(

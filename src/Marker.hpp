@@ -87,6 +87,9 @@ public:
         position(compressedMarker.position)
     {}
 
+    Marker(KmerId kmerId, uint32_t position) :
+        kmerId(kmerId), position(position) {}
+
     // Default constructor.
     Marker() {}
 };
@@ -105,6 +108,9 @@ public:
         Marker(marker),
         ordinal(ordinal)
     {}
+
+    MarkerWithOrdinal(KmerId kmerId, uint32_t position, uint32_t ordinal) :
+        Marker(kmerId, position), ordinal(ordinal) {}
 
     // Default constructor.
     MarkerWithOrdinal() {}
