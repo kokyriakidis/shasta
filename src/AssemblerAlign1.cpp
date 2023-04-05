@@ -78,46 +78,15 @@ void Assembler::alignOrientedReads1(
     const span<CompressedMarker> markers1 =
         markers[orientedReadId1.getValue()];
 
-
-
-    // Seqan uses the integer 45 to represent a gap
-    // and I did not find a good way to control that.
-    // So if KmerId 45 is a marker we replace it with the first KmerId
-    // that does not represent a marker.
-    // This is messy but I did not find a better solution.
-    bool replacementIsNeeded = false;
-    const KmerId seqanGapValue = 45;
-    KmerId replacementValue = seqanGapValue;
-    if(kmerTable[seqanGapValue].isMarker) {
-        replacementIsNeeded = true;
-        for(uint64_t i=0; i<kmerTable.size(); i++) {
-            if(!kmerTable[i].isMarker) {
-                replacementValue = KmerId(i);
-                break;
-            }
-        }
-        // cout << "Replacement value " << replacementValue << endl;
-        SHASTA_ASSERT(replacementValue != seqanGapValue);
-    }
-
-
-
     // Construct the sequences of KmerId's we want to align.
+    // SeqAn uses 45 to represent gaps, so we add 100 to the KmerIds passed to SeqAn.
     TSequence seq0;
     for(const CompressedMarker marker: markers0) {
-        if(replacementIsNeeded && marker.kmerId == seqanGapValue) {
-            appendValue(seq0, replacementValue);
-        } else {
-            appendValue(seq0, marker.kmerId);
-        }
+        appendValue(seq0, marker.kmerId + 100);
     }
     TSequence seq1;
     for(const CompressedMarker marker: markers1) {
-        if(replacementIsNeeded && marker.kmerId == seqanGapValue) {
-            appendValue(seq1, replacementValue);
-        } else {
-            appendValue(seq1, marker.kmerId);
-        }
+        appendValue(seq1, marker.kmerId + 100);
     }
 
     // Store them in a SeqAn string set.
@@ -157,6 +126,7 @@ void Assembler::alignOrientedReads1(
     alignment.clear();
     uint32_t ordinal0 = 0;
     uint32_t ordinal1 = 0;
+    const uint32_t seqanGapValue = 45;
     for(int i=0;
         i<alignmentLength and ordinal0<markers0.size() and ordinal1<markers1.size(); i++) {
         if( align[i] != seqanGapValue and
@@ -186,8 +156,8 @@ void Assembler::alignOrientedReads1(
         alignment[0].resize(alignmentLength);
         alignment[1].resize(alignmentLength);
         for(int i=0; i<alignmentLength; i++) {
-            alignment[0][i] = align[i];
-            alignment[1][i] = align[i + alignmentLength];
+            alignment[0][i] = align[i] - 100;
+            alignment[1][i] = align[i + alignmentLength] - 100;
         }
 
 
