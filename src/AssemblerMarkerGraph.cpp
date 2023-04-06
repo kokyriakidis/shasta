@@ -1489,7 +1489,7 @@ void Assembler::checkMarkerGraphIsStrandSymmetricThreadFunction2(size_t threadId
 
             const MarkerGraph::Edge& edge0 = markerGraph.edges[e0];
             const MarkerGraph::Edge& edge1 = markerGraph.edges[e1];
-            SHASTA_ASSERT(edge0.coverage == edge1.coverage);
+            SHASTA_ASSERT(markerGraph.edgeCoverage(e0) == markerGraph.edgeCoverage(e1));
             SHASTA_ASSERT(
                 edge0.wasRemovedByTransitiveReduction
                 == edge1.wasRemovedByTransitiveReduction);
@@ -2059,12 +2059,6 @@ void Assembler::createMarkerGraphEdgesThreadFunction0(size_t threadId)
                 const auto vertex1 = p.first;
                 const auto& markerIntervals = p.second;
                 edge.target = vertex1;
-                size_t coverage = markerIntervals.size();
-                if(coverage < 256) {
-                    edge.coverage = uint8_t(coverage);
-                } else {
-                    edge.coverage = 255;
-                }
 
                 // Store the edge.
                 thisThreadEdges.push_back(edge);
@@ -2394,179 +2388,6 @@ void Assembler::transitiveReduction(
     cout << markerGraph.edges.size()-weakEdgeCount << " strong edges." << endl;
 
     performanceLog << timestamp << "Transitive reduction of the marker graph ends." << endl;
-}
-
-
-
-// Approximate reverse transitive reduction of the marker graph.
-// The goal is to remove local back-edges.
-// This works similarly to transitive reduction,
-// but in the opposite direction.
-// This does the following:
-// - Edges with coverage greater than lowCoverageThreshold
-//   and less then highCoverageThreshold are processed in
-//   ordered of increasing coverage:
-//   * For each such edge A->B, we look for a path of length
-//     at most maxDistance starting at B and ending at A
-//     that does not use edge A->B and also does not use any
-//     edges already marked wasRemovedByTransitiveReduction.
-//   * If such a path is found, the edge is marked
-//     wasRemovedByTransitiveReduction.
-void Assembler::reverseTransitiveReduction(
-    size_t lowCoverageThreshold,
-    size_t highCoverageThreshold,
-    size_t maxDistance)
-{
-    // Some shorthands for readability.
-    auto& edges = markerGraph.edges;
-    using VertexId = MarkerGraph::VertexId;
-    using EdgeId = MarkerGraph::EdgeId;
-    using Edge = MarkerGraph::Edge;
-
-    // Initial message.
-    cout << timestamp << "Reverse transitive reduction of the marker graph begins." << endl;
-    cout << "The marker graph has " << markerGraph.vertexCount() << " vertices and ";
-    cout << edges.size() << " edges." << endl;
-
-    // Gather edges for each coverage less than highCoverageThreshold.
-    // Only add to the list those with id less than the id of their reverse complement.
-    MemoryMapped::VectorOfVectors<EdgeId, EdgeId>  edgesByCoverage;
-    edgesByCoverage.createNew(
-            largeDataName("tmp-flagMarkerGraphWeakEdges-edgesByCoverage"),
-            largeDataPageSize);
-    edgesByCoverage.beginPass1(highCoverageThreshold);
-    for(EdgeId edgeId=0; edgeId!=edges.size(); edgeId++) {
-        if (markerGraph.reverseComplementEdge[edgeId] < edgeId) {
-            continue;
-        }
-        const MarkerGraph::Edge& edge = edges[edgeId];
-        if(edge.coverage>lowCoverageThreshold && edge.coverage<highCoverageThreshold) {
-            edgesByCoverage.incrementCount(edge.coverage);
-        }
-    }
-    edgesByCoverage.beginPass2();
-    for(EdgeId edgeId=0; edgeId!=edges.size(); edgeId++) {
-        if (markerGraph.reverseComplementEdge[edgeId] < edgeId) {
-            continue;
-        }
-        const MarkerGraph::Edge& edge = edges[edgeId];
-        if(edge.coverage>lowCoverageThreshold && edge.coverage<highCoverageThreshold) {
-            edgesByCoverage.store(edge.coverage, edgeId);
-        }
-    }
-    edgesByCoverage.endPass2();
-
-    // Vector to contain vertex distances during each BFS.
-    // Is is set to -1 for vertices not reached by the BFS.
-    MemoryMapped::Vector<int> vertexDistances;
-    vertexDistances.createNew(
-        largeDataName("tmp-flagMarkerGraphWeakEdges-vertexDistances"),
-        largeDataPageSize);
-    vertexDistances.resize(markerGraph.vertexCount());
-    fill(vertexDistances.begin(), vertexDistances.end(), -1);
-
-    // Queue to be used for all BFSs.
-    std::queue<VertexId> q;
-
-    // Vector to store vertices encountered during a BFS.
-    vector<VertexId> bfsVertices;
-
-
-
-    // Process edges in the specified coverage range.
-    size_t removedCount = 0;
-    for(size_t coverage=lowCoverageThreshold+1;
-        coverage<highCoverageThreshold; coverage++) {
-        const auto& edgesWithThisCoverage = edgesByCoverage[coverage];
-        if(edgesWithThisCoverage.size() == 0) {
-            continue;
-        }
-        size_t count = 0;
-
-        // Loop over edges with this coverage.
-        for(const EdgeId edgeId: edgesWithThisCoverage) {
-            const Edge& edge = edges[edgeId];
-            if(edge.wasRemovedByTransitiveReduction) {
-                continue;
-            }
-            const VertexId u0 = edge.target;
-            const VertexId u1 = edge.source;
-
-            // Do a forward BFS starting at u0, up to distance maxDistance,
-            // using only edges currently marked as strong
-            // and without using this edge.
-            // If we encounter u1, u1 is reachable from u0 without
-            // using this edge, and so we can mark this edge as weak.
-            q.push(u0);
-            vertexDistances[u0] = 0;
-            bfsVertices.push_back(u0);
-            bool found = false;
-            while(!q.empty()) {
-                const VertexId v0 = q.front();
-                q.pop();
-                const int distance0 = vertexDistances[v0];
-                const int distance1 = distance0 + 1;
-                for(const auto edgeId01: markerGraph.edgesBySource[v0]) {
-                    if(edgeId01 == edgeId) {
-                        continue;
-                    }
-                    const Edge& edge01 = markerGraph.edges[edgeId01];
-                    if(edge01.wasRemovedByTransitiveReduction) {
-                        continue;
-                    }
-                    const VertexId v1 = edge01.target;
-                    if(vertexDistances[v1] >= 0) {
-                        continue;   // We already encountered this vertex.
-                    }
-                    if(v1 == u1) {
-                        // We found it!
-                        found = true;
-                        break;
-                    }
-                    vertexDistances[v1] = distance1;
-                    bfsVertices.push_back(v1);
-                    if(distance1 < int(maxDistance)) {
-                        q.push(v1);
-                    }
-                }
-                if(found) {
-                    break;
-                }
-            }
-
-            if(found) {
-                edges[edgeId].wasRemovedByTransitiveReduction = 1;
-                edges[markerGraph.reverseComplementEdge[edgeId]].wasRemovedByTransitiveReduction = 1;
-                count += 2;
-            }
-
-            // Clean up to be ready to process the next edge.
-            while(!q.empty()) {
-                q.pop();
-            }
-            for(const VertexId v: bfsVertices) {
-                vertexDistances[v] = -1;
-            }
-            bfsVertices.clear();
-        }
-
-        if(count) {
-            cout << timestamp << "Reverse transitive reduction removed " << count <<
-                " edges with coverage " << coverage <<
-                " out of "<< 2*edgesWithThisCoverage.size() << " total." << endl;
-        }
-        removedCount += count;
-    }
-    cout << timestamp << "Reverse transitive reduction removed " << removedCount <<" edges." << endl;
-
-
-    // Clean up our work areas.
-    edgesByCoverage.remove();
-    // edgeFlags.remove();
-    vertexDistances.remove();
-
-    cout << timestamp << "Reverse transitive reduction of the marker graph ends." << endl;
-
 }
 
 
@@ -4963,7 +4784,8 @@ void Assembler::computeMarkerGraphCoverageHistogram()
 
     // Edges.
     vector<uint64_t> edgeCoverageHistogram;
-    for(const MarkerGraph::Edge& edge: markerGraph.edges) {
+    for(MarkerGraphEdgeId edgeId=0; edgeId<markerGraph.edges.size(); edgeId++) {
+        const MarkerGraph::Edge& edge = markerGraph.edges[edgeId];
 
         // If this edge was removed, skip it.
         if(edge.wasRemoved()) {
@@ -4971,7 +4793,7 @@ void Assembler::computeMarkerGraphCoverageHistogram()
         }
 
         // Increment the histogram.
-        const size_t coverage = edge.coverage;
+        const size_t coverage = markerGraph.edgeCoverage(edgeId);
         if(coverage >= edgeCoverageHistogram.size()) {
             edgeCoverageHistogram.resize(coverage+1, 0);
         }

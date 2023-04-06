@@ -180,7 +180,6 @@ public:
     public:
         Uint40 source;  // The source vertex (index into globalMarkerGraphVertices).
         Uint40 target;  // The target vertex (index into globalMarkerGraphVertices).
-        uint8_t coverage;   // (255 indicates 255 or more).
 
         // Flags used to mark the edge as removed from the marker graph.
         bool wasRemoved() const
@@ -236,8 +235,7 @@ public:
         }
         Edge() :
             source(MarkerGraph::invalidCompressedVertexId),
-            target(MarkerGraph::invalidCompressedVertexId),
-            coverage(0)
+            target(MarkerGraph::invalidCompressedVertexId)
         {
             clearFlags();
         }

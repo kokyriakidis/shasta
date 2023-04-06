@@ -510,11 +510,6 @@ PYBIND11_MODULE(shasta, shastaModule)
             arg("highCoverageThreshold"),
             arg("maxDistance"),
             arg("edgeMarkerSkipThreshold"))
-        .def("reverseTransitiveReduction",
-            &Assembler::reverseTransitiveReduction,
-            arg("lowCoverageThreshold"),
-            arg("highCoverageThreshold"),
-            arg("maxDistance"))
         .def("pruneMarkerGraphStrongSubgraph",
             &Assembler::pruneMarkerGraphStrongSubgraph,
             arg("iterationCount"))

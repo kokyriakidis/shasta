@@ -1212,7 +1212,7 @@ void Assembler::exploreMarkerGraphEdge(const vector<string>& request, ostream& h
     // Access the edge.
     const MarkerGraph::Edge& edge = markerGraph.edges[edgeId];
     array<MarkerGraph::VertexId, 2> vertexIds = {edge.source, edge.target};
-    const size_t markerCount = edge.coverage;
+    const size_t markerCount = markerGraph.edgeCoverage(edgeId);
 
     // The marker intervals of this edge.
     const span<MarkerInterval> markerIntervals = markerGraph.edgeMarkerIntervals[edgeId];

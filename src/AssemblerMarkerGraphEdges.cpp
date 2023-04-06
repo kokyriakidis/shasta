@@ -332,15 +332,11 @@ void Assembler::createMarkerGraphEdgesStrictPass3(size_t threadId)
                         if( (strandCoverage[0] >= minEdgeCoveragePerStrand) and
                             (strandCoverage[1] >= minEdgeCoveragePerStrand)) {
 
-                            // If getting here, we actually generate an edge.
-                            uint64_t coverage = candidateEdge.size();
-
                             // Store the edge.
                             MarkerGraph::Edge edge;
                             edge.clearFlags();
                             edge.source = vertexId0;
                             edge.target = vertexId1;
-                            edge.coverage = (coverage > 255) ? 255 : uint8_t(coverage);
                             thisThreadEdges.push_back(edge);
 
                             // Store the marker intervals.
@@ -572,12 +568,6 @@ void Assembler::createMarkerGraphSecondaryEdges(
         MarkerGraph::Edge edge;
         edge.source = v0;
         edge.target = v1;
-        const uint64_t coverage = markerIntervals.size();
-        if(coverage < 256) {
-            edge.coverage = uint8_t(coverage);
-        } else {
-            edge.coverage = 255;
-        }
         edge.isSecondary = 1;
         markerGraph.edges.push_back(edge);
         markerGraph.edgeMarkerIntervals.appendVector(markerIntervals);
@@ -630,10 +620,8 @@ vector< vector<uint64_t> > Assembler::clusterMarkerGraphEdgeOrientedReads(
     // The length of each marker sequence.
     const size_t k = assemblerInfo->k;
 
-    const MarkerGraph::Edge& edge = markerGraph.edges[edgeId];
     const span<const MarkerInterval> markerIntervals = markerGraph.edgeMarkerIntervals[edgeId];
     const uint64_t n = markerIntervals.size();
-    SHASTA_ASSERT(edge.coverage == n);
 
 
 
@@ -811,7 +799,6 @@ void Assembler::splitMarkerGraphSecondaryEdges(
             auto& newEdge = markerGraph.edges.back();
             newEdge.source = Uint40(tmpNewEdge.source);
             newEdge.target = Uint40(tmpNewEdge.target);
-            newEdge.coverage = uint8_t(tmpNewEdge.markerIntervals.size());
             newEdge.isSecondary = 1;
             markerGraph.edgeMarkerIntervals.appendVector(tmpNewEdge.markerIntervals);
         }

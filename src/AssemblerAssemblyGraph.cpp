@@ -402,12 +402,12 @@ void Assembler::createAssemblyGraphVertices()
         for(uint64_t i=0; i<chain.size(); i++) {
             const MarkerGraph::EdgeId markerGraphEdgeId = chain[i];
             const MarkerGraph::Edge& markerGraphEdge = markerGraph.edges[markerGraphEdgeId];
-            const uint32_t edgeCoverage = markerGraphEdge.coverage;
+            const uint64_t edgeCoverage = markerGraph.edgeCoverage(markerGraphEdgeId);
             edgeCoverageSum += edgeCoverage;
             assemblyGraphEdge.minEdgeCoverage =
-                min(assemblyGraphEdge.minEdgeCoverage, edgeCoverage);
+                min(assemblyGraphEdge.minEdgeCoverage, uint32_t(edgeCoverage));
             assemblyGraphEdge.maxEdgeCoverage =
-                max(assemblyGraphEdge.maxEdgeCoverage, edgeCoverage);
+                max(assemblyGraphEdge.maxEdgeCoverage, uint32_t(edgeCoverage));
 
             if(i != 0) {
                 const MarkerGraph::EdgeId markerGraphVertexId = markerGraphEdge.source;

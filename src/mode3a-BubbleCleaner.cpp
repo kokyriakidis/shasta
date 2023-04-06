@@ -60,8 +60,7 @@ double BubbleCleaner::averageEdgeCoverage(edge_descriptor e) const
     for(const uint64_t segmentId: edge.segments) {
         const auto segment = packedMarkerGraph.segments[segmentId];
         for(const uint64_t edgeId: segment) {
-            const MarkerGraph::Edge& edge = packedMarkerGraph.markerGraph.edges[edgeId];
-            sum += edge.coverage;
+            sum += packedMarkerGraph.markerGraph.edgeCoverage(edgeId);
             n++;
         }
     }

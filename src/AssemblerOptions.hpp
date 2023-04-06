@@ -246,7 +246,6 @@ public:
     string simplifyMaxLength;
     double crossEdgeCoverageThreshold;
     vector<size_t> simplifyMaxLengthVector;
-    bool reverseTransitiveReduction;
     double peakFinderMinAreaFraction;
     uint64_t peakFinderAreaStartIndex;
 

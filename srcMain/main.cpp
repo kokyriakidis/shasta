@@ -940,19 +940,6 @@ void shasta::main::mode0Assembly(
     assembler.createMarkerGraphEdges(threadCount);
     assembler.findMarkerGraphReverseComplementEdges(threadCount);
 
-    // Approximate transitive reduction.
-    assembler.transitiveReduction(
-        assemblerOptions.markerGraphOptions.lowCoverageThreshold,
-        assemblerOptions.markerGraphOptions.highCoverageThreshold,
-        assemblerOptions.markerGraphOptions.maxDistance,
-        assemblerOptions.markerGraphOptions.edgeMarkerSkipThreshold);
-    if(assemblerOptions.markerGraphOptions.reverseTransitiveReduction) {
-        assembler.reverseTransitiveReduction(
-            assemblerOptions.markerGraphOptions.lowCoverageThreshold,
-            assemblerOptions.markerGraphOptions.highCoverageThreshold,
-            assemblerOptions.markerGraphOptions.maxDistance);
-    }
-
 
 
     // Prune the marker graph.
