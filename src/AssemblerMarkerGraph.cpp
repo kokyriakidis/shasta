@@ -2205,33 +2205,40 @@ void Assembler::transitiveReduction(
         edge.isSuperBubbleEdge = 0;
     }
 
-    // Gather edges for each coverage less than highCoverageThreshold.
+    // Compute maximum edge coverage.
+    uint64_t maximumEdgeCoverage = 0;
+    for(EdgeId edgeId=0; edgeId!=edges.size(); edgeId++) {
+        maximumEdgeCoverage = max(maximumEdgeCoverage, markerGraph.edgeCoverage(edgeId));
+    }
+    cout << "Maximum edge coverage is " << maximumEdgeCoverage << endl;
+
+
+
+    // Gather edges for each coverage up to maximumEdgeCoverage.
     // Only add to the list those with id less than the id of their reverse complement.
-    MemoryMapped::VectorOfVectors<EdgeId, EdgeId>  edgesByCoverage;
+    MemoryMapped::VectorOfVectors<EdgeId, EdgeId> edgesByCoverage;
     edgesByCoverage.createNew(
             largeDataName("tmp-flagMarkerGraphWeakEdges-edgesByCoverage"),
             largeDataPageSize);
-    edgesByCoverage.beginPass1(highCoverageThreshold);
+    edgesByCoverage.beginPass1(maximumEdgeCoverage + 1);
     for(EdgeId edgeId=0; edgeId!=edges.size(); edgeId++) {
         if (markerGraph.reverseComplementEdge[edgeId] < edgeId) {
             continue;
         }
-        const MarkerGraph::Edge& edge = edges[edgeId];
-        if(edge.coverage < highCoverageThreshold) {
-            edgesByCoverage.incrementCount(edge.coverage);
-        }
+        const uint64_t coverage = markerGraph.edgeCoverage(edgeId);
+        edgesByCoverage.incrementCount(coverage);
     }
     edgesByCoverage.beginPass2();
     for(EdgeId edgeId=0; edgeId!=edges.size(); edgeId++) {
         if (markerGraph.reverseComplementEdge[edgeId] < edgeId) {
             continue;
         }
-        const MarkerGraph::Edge& edge = edges[edgeId];
-        if(edge.coverage < highCoverageThreshold) {
-            edgesByCoverage.store(edge.coverage, edgeId);
-        }
+        const uint64_t coverage = markerGraph.edgeCoverage(edgeId);
+        edgesByCoverage.store(coverage, edgeId);
     }
     edgesByCoverage.endPass2();
+
+
 
     // Check that there are no edges with coverage 0.
     SHASTA_ASSERT(edgesByCoverage[0].size() == 0);
@@ -2254,12 +2261,8 @@ void Assembler::transitiveReduction(
 
 
     // Flag as weak all edges with coverage <= lowCoverageThreshold
-    for(size_t coverage=1; coverage<=lowCoverageThreshold; coverage++) {
+    for(size_t coverage=1; coverage<=min(lowCoverageThreshold, maximumEdgeCoverage); coverage++) {
         const auto& edgesWithThisCoverage = edgesByCoverage[coverage];
-        if(edgesWithThisCoverage.size() > 0) {
-            cout << "Flagging as weak " << 2 * edgesWithThisCoverage.size() << " edges with coverage "
-                << coverage << "." << endl;
-        }
         for(const EdgeId edgeId: edgesWithThisCoverage) {
             edges[edgeId].wasRemovedByTransitiveReduction = 1;
             edges[markerGraph.reverseComplementEdge[edgeId]].wasRemovedByTransitiveReduction = 1;
@@ -2296,12 +2299,11 @@ void Assembler::transitiveReduction(
 
     // Process edges of intermediate coverage.
     for(size_t coverage=lowCoverageThreshold+1;
-        coverage<highCoverageThreshold; coverage++) {
+        coverage<min(highCoverageThreshold, maximumEdgeCoverage+1); coverage++) {
         const auto& edgesWithThisCoverage = edgesByCoverage[coverage];
         if(edgesWithThisCoverage.size() == 0) {
             continue;
         }
-        size_t count = 0;
 
         // Loop over edges with this coverage.
         for(const EdgeId edgeId: edgesWithThisCoverage) {
@@ -2357,7 +2359,6 @@ void Assembler::transitiveReduction(
             if(found) {
                 edges[edgeId].wasRemovedByTransitiveReduction = 1;
                 edges[markerGraph.reverseComplementEdge[edgeId]].wasRemovedByTransitiveReduction = 1;
-                count += 2;
             }
 
             // Clean up to be ready to process the next edge.
@@ -2368,12 +2369,6 @@ void Assembler::transitiveReduction(
                 vertexDistances[v] = -1;
             }
             bfsVertices.clear();
-        }
-
-        if(count) {
-            cout << "Flagged as weak " << count <<
-                " edges with coverage " << coverage <<
-                " out of "<< 2*edgesWithThisCoverage.size() << " total." << endl;
         }
     }
 
