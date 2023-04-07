@@ -37,6 +37,7 @@ using namespace shasta;
 // - assemblyGraph.markerToAssemblyTable
 void Assembler::createAssemblyGraphEdges()
 {
+
     // Some shorthands.
     // using VertexId = AssemblyGraph::VertexId;
     using EdgeId = AssemblyGraph::EdgeId;
@@ -87,6 +88,7 @@ void Assembler::createAssemblyGraphEdges()
         if(debug) {
             cout << "Working on start edge " << startEdgeId;
             cout << " " << startEdge.source << "->" << startEdge.target << endl;
+            startEdge.writeFlags(cout);
         }
 
         // If this edge is not part of cleaned up marker graph, skip it.
@@ -152,6 +154,19 @@ void Assembler::createAssemblyGraphEdges()
         	reverseComplementedChain.push_back(markerGraph.reverseComplementEdge[edgeId]);
         }
         std::reverse(reverseComplementedChain.begin(), reverseComplementedChain.end());
+
+        if(debug) {
+            cout << "Chain:";
+            for(const auto edgeId: chain) {
+                cout << " " << edgeId;
+            }
+            cout << endl;
+            cout << "Reverse complemented chain:";
+            for(const auto edgeId: reverseComplementedChain) {
+                cout << " " << edgeId;
+            }
+            cout << endl;
+        }
 
 
 
@@ -262,6 +277,7 @@ void Assembler::createAssemblyGraphEdges()
         }
     }
 #endif
+
 }
 
 
@@ -460,6 +476,24 @@ void Assembler::removeLowCoverageCrossEdges(uint32_t crossEdgeCoverageThreshold)
     SHASTA_ASSERT(assemblyGraphPointer);
     AssemblyGraph& assemblyGraph = *assemblyGraphPointer;
 
+#if 0
+    // Sanity check on assembly graph edges.
+    for(AssemblyGraph::EdgeId edgeId=0; edgeId!=assemblyGraph.edges.size(); edgeId++) {
+        const AssemblyGraph::EdgeId edgeIdRc = assemblyGraph.reverseComplementEdge[edgeId];
+        SHASTA_ASSERT(assemblyGraph.reverseComplementEdge[edgeIdRc] == edgeId);
+        const auto markerGraphEdges = assemblyGraph.edgeLists[edgeId];
+        const auto markerGraphEdgesRc = assemblyGraph.edgeLists[edgeIdRc];
+        const uint64_t n = markerGraphEdges.size();
+        SHASTA_ASSERT(markerGraphEdgesRc.size() == n);
+        for(uint64_t i=0; i<n; i++) {
+            const MarkerGraphEdgeId markerGraphEdgeId = markerGraphEdges[i];
+            const MarkerGraphEdgeId markerGraphEdgeIdRc = markerGraphEdgesRc[n - 1 - i];
+            SHASTA_ASSERT(markerGraph.reverseComplementEdge[markerGraphEdgeId] == markerGraphEdgeIdRc);
+            SHASTA_ASSERT(markerGraph.reverseComplementEdge[markerGraphEdgeIdRc] == markerGraphEdgeId);
+        }
+    }
+#endif
+
     // We want to process edges in order of increasing coverage.
     // Gather edges by coverage.
     vector< vector<AssemblyGraph::EdgeId> > edgesByCoverage(crossEdgeCoverageThreshold+1);
@@ -473,7 +507,7 @@ void Assembler::removeLowCoverageCrossEdges(uint32_t crossEdgeCoverageThreshold)
     const bool debug = false;
     ofstream out;
     if(debug) {
-        out.open("LowCoverageCrossEdges.csv");
+        out.open("LowCoverageCrossEdges.txt");
     }
 
     // Process assembly graph edges in order of increasing coverage.
@@ -482,6 +516,10 @@ void Assembler::removeLowCoverageCrossEdges(uint32_t crossEdgeCoverageThreshold)
     for(const vector<AssemblyGraph::EdgeId>& edges: edgesByCoverage) {
         for(const AssemblyGraph::EdgeId edgeId: edges) {
             AssemblyGraph::Edge& edge = assemblyGraph.edges[edgeId];
+            if(edge.removalReason == AssemblyGraph::Edge::RemovalReason::LowCoverageCrossEdge) {
+                // Was already marked because it is the reverse complement of another marked edge.
+                continue;
+            }
             const AssemblyGraph::VertexId v0 = edge.source;
             const AssemblyGraph::VertexId v1 = edge.target;
 
@@ -514,14 +552,46 @@ void Assembler::removeLowCoverageCrossEdges(uint32_t crossEdgeCoverageThreshold)
             ++removedAssemblyGraphEdgeCount;
 
             // Mark the corresponding marker graph edges.
+            if(debug) {
+                out << "Assembly graph edge A" << edgeId << " marked as low coverage edge "
+                    "together with its marker graph edges:";
+            }
             for(const MarkerGraph::EdgeId markerGraphEdgeId: assemblyGraph.edgeLists[edgeId]) {
                 markerGraph.edges[markerGraphEdgeId].isLowCoverageCrossEdge = 1;
                 if(debug) {
-                    out << markerGraphEdgeId << "\n";
+                    out << " M" << markerGraphEdgeId << " ";
                 }
                 ++removedMarkerGraphEdgeCount;
             }
+            if(debug) {
+                out << endl;
+            }
 
+            // Also mark the reverse complement edge.
+            // This is necessary to keep the assembly graph and marker graph
+            // in variant under reverse complementing.
+            const AssemblyGraph::EdgeId reverseComplementEdgeId = assemblyGraph.reverseComplementEdge[edgeId];
+            if(reverseComplementEdgeId != edgeId) {
+                AssemblyGraph::Edge& reverseComplementEdge = assemblyGraph.edges[reverseComplementEdgeId];
+                reverseComplementEdge.removalReason = AssemblyGraph::Edge::RemovalReason::LowCoverageCrossEdge;
+                ++removedAssemblyGraphEdgeCount;
+                if(debug) {
+                    out << "Reverse complement assembly graph edge A" << reverseComplementEdgeId << " marked as low coverage edge "
+                        "together with its marker graph edges:";
+                }
+
+                // Mark the corresponding marker graph edges.
+                for(const MarkerGraph::EdgeId markerGraphEdgeId: assemblyGraph.edgeLists[reverseComplementEdgeId]) {
+                    markerGraph.edges[markerGraphEdgeId].isLowCoverageCrossEdge = 1;
+                    if(debug) {
+                        out << " M" << markerGraphEdgeId << " ";
+                    }
+                    ++removedMarkerGraphEdgeCount;
+                }
+                if(debug) {
+                    out << endl;
+                }
+            }
         }
     }
 
