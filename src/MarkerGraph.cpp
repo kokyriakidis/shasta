@@ -113,6 +113,20 @@ uint64_t MarkerGraph::outDegree(VertexId vertexId) const
 
 
 
+void MarkerGraph::Edge::writeFlags(ostream& s) const
+{
+    s << "wasRemovedByTransitiveReduction " << int(wasRemovedByTransitiveReduction) << "\n";
+    s << "wasPruned " << int(wasPruned) << "\n";
+    s << "isSuperBubbleEdge " << int(isSuperBubbleEdge) << "\n";
+    s << "isLowCoverageCrossEdge " << int(isLowCoverageCrossEdge) << "\n";
+    s << "wasAssembled " << int(wasAssembled) << "\n";
+    s << "isSecondary " << int(isSecondary) << "\n";
+    s << "wasRemovedWhileSplittingSecondaryEdges " << int(wasRemovedWhileSplittingSecondaryEdges) << "\n";
+    s << flush;
+}
+
+
+
 MarkerGraph::EdgeId MarkerGraph::getFirstNonRemovedOutEdge(
     MarkerGraph::VertexId vertexId) const
 {

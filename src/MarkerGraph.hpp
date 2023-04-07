@@ -239,6 +239,8 @@ public:
         {
             clearFlags();
         }
+
+        void writeFlags(ostream&) const;
     };
     MemoryMapped::Vector<Edge> edges;
     const Edge* findEdge(Uint40 source, Uint40 target) const;
