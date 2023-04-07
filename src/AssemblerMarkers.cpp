@@ -209,7 +209,7 @@ void Assembler::computeMarkerKmerIds(uint64_t threadCount)
 
 
 
-#if 1
+#if 0
     // Test the low level functions to extract Kmers/KmerIds.
     const uint64_t k = assemblerInfo->k;
     vector<Kmer> kmerVector;
