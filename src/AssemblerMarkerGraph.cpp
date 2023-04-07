@@ -1495,6 +1495,7 @@ void Assembler::checkMarkerGraphIsStrandSymmetricThreadFunction2(size_t threadId
                 == edge1.wasRemovedByTransitiveReduction);
             SHASTA_ASSERT(edge0.wasPruned == edge1.wasPruned);
             SHASTA_ASSERT(edge0.isSuperBubbleEdge == edge1.isSuperBubbleEdge);
+            SHASTA_ASSERT(edge0.isLowCoverageCrossEdge == edge1.isLowCoverageCrossEdge);
 
 #if 0
             // This portion does not work if parallel edges are present,
