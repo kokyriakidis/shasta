@@ -605,6 +605,7 @@ private:
     MemoryMapped::VectorOfVectors<KmerId, uint64_t> markerKmerIds;
 public:
     void computeMarkerKmerIds(uint64_t threadCount);
+    void cleanupMarkerKmerIds();
 private:
     void computeMarkerKmerIdsThreadFunction(size_t threadId);
 

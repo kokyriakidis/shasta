@@ -179,7 +179,7 @@ void Assembler::writeMarkerFrequency()
 
 void Assembler::computeMarkerKmerIds(uint64_t threadCount)
 {
-    performanceLog << timestamp << "computeMarkerKmerIds begins." << endl;
+    performanceLog << timestamp << "Gathering marker KmerIds." << endl;
 
     // Check that we have what we need.
     checkMarkersAreOpen();
@@ -243,9 +243,13 @@ void Assembler::computeMarkerKmerIds(uint64_t threadCount)
     }
 #endif
 
+}
 
 
-    performanceLog << timestamp << "computeMarkerKmerIds ends." << endl;
+
+void Assembler::cleanupMarkerKmerIds()
+{
+    markerKmerIds.remove();
 }
 
 

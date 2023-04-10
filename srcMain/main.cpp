@@ -662,10 +662,14 @@ void shasta::main::assemble(
     // Find the markers in the reads.
     assembler.findMarkers(0);
 
-    if(!assemblerOptions.readsOptions.palindromicReads.skipFlagging) {
+    // Gather marker KmerIds for all markers.
+    // They are used by LowHash and alignment computation.
+    // These will be kept until we are done computing alignments.
+    assembler.computeMarkerKmerIds(threadCount);
 
-        // Flag palindromic reads.
-        // These will be excluded from further processing.
+    // Flag palindromic reads.
+    // These will be excluded from further processing.
+    if(!assemblerOptions.readsOptions.palindromicReads.skipFlagging) {
         assembler.flagPalindromicReads(
             assemblerOptions.readsOptions.palindromicReads.maxSkip,
             assemblerOptions.readsOptions.palindromicReads.maxDrift,
@@ -675,8 +679,6 @@ void shasta::main::assemble(
             assemblerOptions.readsOptions.palindromicReads.deltaThreshold,
             threadCount);
     }
-
-
 
     // Find alignment candidates.
     if(assemblerOptions.minHashOptions.allPairs) {
@@ -714,6 +716,9 @@ void shasta::main::assemble(
         assemblerOptions.alignOptions,
         threadCount);
 
+    // Marker KmerIds are freed here.
+    // They can always be recomputed from the reads when needed.
+    assembler.cleanupMarkerKmerIds();
 
 
     // Create the read graph.

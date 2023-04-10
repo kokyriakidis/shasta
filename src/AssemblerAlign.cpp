@@ -233,9 +233,6 @@ void Assembler::computeAlignments(
         threadCount = std::thread::hardware_concurrency();
     }
 
-    // Compute marker k-mers.
-    computeMarkerKmerIds(threadCount);
-
     // For alignment method 4, compute sorted markers.
     if(alignOptions.alignMethod == 4) {
         cout << timestamp << "Computing sorted markers." << endl;
@@ -290,7 +287,6 @@ void Assembler::computeAlignments(
     compressedAlignments.unreserve();
 
     // Cleanup.
-    markerKmerIds.remove();
     if(alignOptions.alignMethod == 4) {
         sortedMarkers.remove();
     }
