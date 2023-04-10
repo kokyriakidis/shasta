@@ -43,7 +43,7 @@ public:
         size_t minFrequency,            // Minimum number of minHash hits for a pair to be considered a candidate.
         size_t threadCount,
         const Reads& reads,
-        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>&,
+        const MemoryMapped::VectorOfVectors<KmerId, uint64_t>& kmerIds,
         MemoryMapped::Vector<OrientedReadPair>&,
         MemoryMapped::Vector< array<uint64_t, 3> >& readLowHashStatistics,
         const string& largeDataFileNamePrefix,
@@ -60,18 +60,10 @@ private:
     size_t minFrequency;            // Minimum number of minHash hits for a pair to be considered a candidate.
     size_t threadCount;
     const Reads& reads;
-    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
+    const MemoryMapped::VectorOfVectors<KmerId, uint64_t>& kmerIds;
     MemoryMapped::Vector< array<uint64_t, 3> > &readLowHashStatistics;
     const string& largeDataFileNamePrefix;
     size_t largeDataPageSize;
-
-    // Vectors containing only the k-mer ids of all markers
-    // for all oriented reads.
-    // Indexed by OrientedReadId.getValue().
-    // This is used to speed up the computation of hash functions.
-    MemoryMapped::VectorOfVectors<KmerId, uint64_t> kmerIds;
-    void createKmerIds();
-    void createKmerIds(size_t threadId);
 
     // The current MinHash iteration.
     // This is used to compute a different MurmurHash function

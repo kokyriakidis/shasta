@@ -34,7 +34,7 @@ LowHash0::LowHash0(
     size_t minFrequency,            // Minimum number of minHash hits for a pair to be considered a candidate.
     size_t threadCountArgument,
     const Reads& reads,
-    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+    const MemoryMapped::VectorOfVectors<KmerId, uint64_t>& kmerIds,
     MemoryMapped::Vector<OrientedReadPair>& candidateAlignments,
     MemoryMapped::Vector< array<uint64_t, 3> >& readLowHashStatistics,
     const string& largeDataFileNamePrefix,
@@ -48,7 +48,7 @@ LowHash0::LowHash0(
     minFrequency(minFrequency),
     threadCount(threadCountArgument),
     reads(reads),
-    markers(markers),
+    kmerIds(kmerIds),
     readLowHashStatistics(readLowHashStatistics),
     largeDataFileNamePrefix(largeDataFileNamePrefix),
     largeDataPageSize(largeDataPageSize),
@@ -69,7 +69,7 @@ LowHash0::LowHash0(
     // and each feature generates a low hash with probability hashFraction.
     // So an estimate of the total number of hashes is:
     const uint64_t totalLowHashCountEstimate =
-        uint64_t(hashFraction * double(markers.totalSize()));
+        uint64_t(hashFraction * double(kmerIds.totalSize()));
     const uint32_t leadingZeroBitCount = uint32_t(__builtin_clzl(totalLowHashCountEstimate));
     const uint32_t log2TotalLowHashCountEstimate = 64 - leadingZeroBitCount;
 
@@ -96,18 +96,11 @@ LowHash0::LowHash0(
     cout << " = " << bucketCount << " buckets. "<< endl;
 
 
-
-
-    // Create vectors containing only the k-mer ids of all markers.
-    // This is used to speed up the computation of hash functions.
-    performanceLog << timestamp << "Creating kmer ids for oriented reads." << endl;
-    createKmerIds();
-
     // Compute the threshold for a hash value to be considered low.
     hashThreshold = uint64_t(double(hashFraction) * double(std::numeric_limits<uint64_t>::max()));
 
     // The number of oriented reads, each with its own vector of markers.
-    const OrientedReadId::Int orientedReadCount = OrientedReadId::Int(markers.size());
+    const OrientedReadId::Int orientedReadCount = OrientedReadId::Int(kmerIds.size());
     const ReadId readCount = orientedReadCount / 2;
 
 
@@ -221,7 +214,7 @@ LowHash0::LowHash0(
     for(ReadId readId=0; readId<readCount; readId++) {
         const array<uint64_t, 3>& counters = readLowHashStatistics[readId];
         const uint64_t total = std::accumulate(counters.begin(), counters.end(), 0);
-        const uint64_t featureCount = markers.size(OrientedReadId(readId, 0).getValue()) - (m-1);
+        const uint64_t featureCount = kmerIds.size(OrientedReadId(readId, 0).getValue()) - (m-1);
         const double featureSampling = double(total) / double(featureCount);
         csv << readId << ",";
         csv << (reads.getFlags(readId).isPalindromic ? "Yes," : "No,");
@@ -240,69 +233,13 @@ LowHash0::LowHash0(
         }
     }
 
-
-
-    // Clean up work areas.
+    // Clean up .
     buckets.remove();
-    kmerIds.remove();
-
-
 
     // Done.
     const auto tEnd = steady_clock::now();
     const double tTotal = seconds(tEnd - tBegin);
     performanceLog << timestamp << "LowHash0 completed in " << tTotal << " s." << endl;
-}
-
-
-
-void LowHash0::createKmerIds()
-{
-    kmerIds.createNew(
-    	largeDataFileNamePrefix.empty() ? "" : (largeDataFileNamePrefix + "tmp-LowHash0-Markers"),
-        largeDataPageSize);
-    const ReadId orientedReadCount = ReadId(markers.size());
-    const ReadId readCount = orientedReadCount / 2;
-    kmerIds.beginPass1(orientedReadCount);
-    for(ReadId readId=0; readId!=readCount; readId++) {
-        for(Strand strand=0; strand<2; strand++) {
-            const OrientedReadId orientedReadId(readId, strand);
-            const auto markerCount = markers.size(orientedReadId.getValue());
-            kmerIds.incrementCount(orientedReadId.getValue(), markerCount);
-        }
-    }
-    kmerIds.beginPass2();
-    kmerIds.endPass2(false);
-    const size_t batchSize = 10000;
-    setupLoadBalancing(readCount, batchSize);
-    runThreads(&LowHash0::createKmerIds, threadCount);
-}
-
-
-
-// Thread function for createKmerIds.
-void LowHash0::createKmerIds(size_t threadId)
-{
-
-    // Loop over batches assigned to this thread.
-    uint64_t begin, end;
-    while(getNextBatch(begin, end)) {
-
-        // Loop over reads assigned to this batch.
-        for(ReadId readId=ReadId(begin); readId!=ReadId(end); readId++) {
-            for(Strand strand=0; strand<2; strand++) {
-                const OrientedReadId orientedReadId(readId, strand);
-                const auto orientedReadMarkers = markers[orientedReadId.getValue()];
-
-                SHASTA_ASSERT(kmerIds.size(orientedReadId.getValue()) == orientedReadMarkers.size());
-
-                auto pointer = kmerIds.begin(orientedReadId.getValue());
-                for(const CompressedMarker& marker: orientedReadMarkers) {
-                    *pointer++ = marker.kmerId;
-                }
-            }
-        }
-    }
 }
 
 
@@ -338,7 +275,7 @@ void LowHash0::pass1ThreadFunction(size_t threadId)
 
 
                 // Get the markers for this oriented read.
-                KmerId* kmerIdsPointer = kmerIds.begin(orientedReadId.getValue());
+                const KmerId* kmerIdsPointer = kmerIds.begin(orientedReadId.getValue());
                 const size_t featureCount = markerCount - m + 1;
 
                 // Loop over features of this oriented read.
