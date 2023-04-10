@@ -6,6 +6,7 @@
 #include "compressAlignment.hpp"
 #include "Coverage.hpp"
 #include "dset64-gccAtomic.hpp"
+#include "extractKmer.hpp"
 #include "PeakFinder.hpp"
 #include "performanceLog.hpp"
 #include "LocalMarkerGraph.hpp"
@@ -5281,3 +5282,19 @@ void Assembler::getMarkerIntervalRleSequence(
     }
 }
 
+
+
+// Find the common KmerId for all the markers of a marker graph vertex.
+KmerId Assembler::getMarkerGraphVertexKmerId(MarkerGraphVertexId vertexId) const
+{
+    // Get it from the first marker on this vertex.
+    const MarkerId markerId = markerGraph.getVertexMarkerIds(vertexId)[0];
+
+    // Find the OrientedReadId.
+    // This is slow as it requires a binary search in the markers toc.
+    OrientedReadId orientedReadId;
+    uint32_t ordinal;
+    tie(orientedReadId, ordinal) = findMarkerId(markerId);
+
+    return getOrientedReadMarkerKmerId(orientedReadId, ordinal);
+}

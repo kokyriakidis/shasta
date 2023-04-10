@@ -615,6 +615,14 @@ private:
     // They are obtained from the reads and not from CompressedMarker::kmerId,
     // which will soon go away.
 
+    // Get the marker Kmer for an oriented read and ordinal.
+    Kmer getOrientedReadMarkerKmer(OrientedReadId, uint32_t ordinal) const;
+    Kmer getOrientedReadMarkerKmerStrand0(ReadId, uint32_t ordinal) const;
+    Kmer getOrientedReadMarkerKmerStrand1(ReadId, uint32_t ordinal) const;
+
+    // Get the marker KmerId for an oriented read and ordinal.
+    KmerId getOrientedReadMarkerKmerId(OrientedReadId, uint32_t ordinal) const;
+
     // Get all marker Kmers for an oriented read.
     void getOrientedReadMarkerKmers(OrientedReadId, const span<Kmer>&) const;
     void getOrientedReadMarkerKmersStrand0(ReadId, const span<Kmer>&) const;
@@ -1322,7 +1330,8 @@ private:
         uint32_t maxSkip,
         vector<MarkerGraphVertexId>&) const;
 
-
+    // Find the common KmerId for all the markers of a marker graph vertex.
+    KmerId getMarkerGraphVertexKmerId(MarkerGraphVertexId) const;
 
     // Clean up marker graph vertices that have duplicate markers
     // (more than one marker on the same oriented reads).

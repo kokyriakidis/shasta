@@ -278,6 +278,64 @@ void Assembler::computeMarkerKmerIdsThreadFunction(size_t threadId)
 
 
 
+Kmer Assembler::getOrientedReadMarkerKmer(OrientedReadId orientedReadId, uint32_t ordinal) const
+{
+    const ReadId readId = orientedReadId.getReadId();
+    const Strand strand = orientedReadId.getStrand();
+
+    if(strand == 0) {
+        return getOrientedReadMarkerKmerStrand0(readId, ordinal);
+    } else {
+        return getOrientedReadMarkerKmerStrand1(readId, ordinal);
+    }
+
+}
+
+
+
+Kmer Assembler::getOrientedReadMarkerKmerStrand0(ReadId readId, uint32_t ordinal0) const
+{
+    const uint64_t k = assemblerInfo->k;
+    const auto read = reads->getRead(uint32_t(readId));
+    const OrientedReadId orientedReadId0(readId, 0);
+    const auto orientedReadMarkers0 = markers[orientedReadId0.getValue()];
+
+    Kmer kmer0;
+    extractKmer(read, uint64_t(orientedReadMarkers0[ordinal0].position), k, kmer0);
+
+    return kmer0;
+}
+
+
+
+Kmer Assembler::getOrientedReadMarkerKmerStrand1(ReadId readId, uint32_t ordinal1) const
+{
+    const uint64_t k = assemblerInfo->k;
+
+    // We only have the read stored without reverse complement, so get it from there...
+    const auto read = reads->getRead(uint32_t(readId));
+    const OrientedReadId orientedReadId0(readId, 0);
+    const auto orientedReadMarkers0 = markers[orientedReadId0.getValue()];
+    const uint64_t readMarkerCount = orientedReadMarkers0.size();
+    const uint64_t ordinal0 = readMarkerCount - 1 - ordinal1;
+    Kmer kmer0;
+    extractKmer(read, uint64_t(orientedReadMarkers0[ordinal0].position), k, kmer0);
+
+    // ... then do the reverse complement.
+    const Kmer kmer1 = kmer0.reverseComplement(k);
+    return kmer1;
+}
+
+
+
+KmerId Assembler::getOrientedReadMarkerKmerId(OrientedReadId orientedReadId, uint32_t ordinal) const
+{
+    const Kmer kmer = getOrientedReadMarkerKmer(orientedReadId, ordinal);
+    return KmerId(kmer.id(assemblerInfo->k));
+}
+
+
+
 // Get all marker Kmers for an oriented read.
 void Assembler::getOrientedReadMarkerKmers(
     OrientedReadId orientedReadId,
