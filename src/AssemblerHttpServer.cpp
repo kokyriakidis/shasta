@@ -230,7 +230,8 @@ void Assembler::fillServerFunctionTable()
     SHASTA_ADD_TO_FUNCTION_TABLE(alignSequencesInMarkerRepresentation);
     SHASTA_ADD_TO_FUNCTION_TABLE(assessAlignments);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreReadGraph);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerGraph);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerGraph0);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerGraph1);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerGraphVertex);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerGraphEdge);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerCoverage);
@@ -450,7 +451,8 @@ void Assembler::writeNavigation(ostream& html) const
         {"Read graph", "exploreReadGraph"},
         });
     writeNavigation(html, "Marker graph", {
-        {"Local marker graph", "exploreMarkerGraph?useBubbleReplacementEdges=on"},
+        {"Local marker graph (version 0)", "exploreMarkerGraph0?useBubbleReplacementEdges=on"},
+        {"Local marker graph (version 1)", "exploreMarkerGraph1"},
         {"Marker graph vertices", "exploreMarkerGraphVertex"},
         {"Marker graph edges", "exploreMarkerGraphEdge"},
         {"Marker coverage", "exploreMarkerCoverage"},

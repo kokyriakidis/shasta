@@ -214,7 +214,7 @@ void LocalAssemblyGraph::Writer::operator()(std::ostream& s, vertex_descriptor v
         "\"";
 
     // URL.
-    s << " URL=\"exploreMarkerGraph?"
+    s << " URL=\"exploreMarkerGraph0?"
         "?vertexId=" << vertex.markerGraphVertexId <<
         "&maxDistance=10"
         "&timeout=30"

@@ -31,7 +31,7 @@ using namespace shasta;
 
 
 
-void Assembler::exploreMarkerGraph(
+void Assembler::exploreMarkerGraph0(
     const vector<string>& request,
     ostream& html)
 {
@@ -771,7 +771,7 @@ string LocalMarkerGraphRequestParameters::edgeThicknessScalingFactorString() con
 string LocalMarkerGraphRequestParameters::url() const
 {
     return
-        string("exploreMarkerGraph") +
+        string("exploreMarkerGraph0") +
         "?vertexId=" + to_string(vertexId) +
         "&maxDistance=" + to_string(maxDistance) +
         "&minVertexCoverage=" + to_string(minVertexCoverage) +
@@ -953,7 +953,7 @@ void Assembler::exploreMarkerGraphVertex(const vector<string>& request, ostream&
 
     // Page title.
     const string titleUrl =
-        "exploreMarkerGraph?vertexId=" + to_string(vertexId) +
+        "exploreMarkerGraph0?vertexId=" + to_string(vertexId) +
         "&maxDistance=3"
         "&useWeakEdges=on"
         "&usePrunedEdges=on"
@@ -1304,7 +1304,7 @@ void Assembler::exploreMarkerGraphEdge(const vector<string>& request, ostream& h
 
     // Page title.
     const string titleUrl =
-        "exploreMarkerGraph?vertexId=" + to_string(vertexIds[0]) +
+        "exploreMarkerGraph0?vertexId=" + to_string(vertexIds[0]) +
         "&maxDistance=3"
         "&useWeakEdges=on"
         "&usePrunedEdges=on"

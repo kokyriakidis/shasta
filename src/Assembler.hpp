@@ -2269,7 +2269,8 @@ public:
 
     // Functions and data used by the http server
     // for display of the local marker graph.
-    void exploreMarkerGraph(const vector<string>&, ostream&);
+    void exploreMarkerGraph0(const vector<string>&, ostream&);
+    void exploreMarkerGraph1(const vector<string>&, ostream&);
     void getLocalMarkerGraphRequestParameters(
         const vector<string>&,
         LocalMarkerGraphRequestParameters&) const;

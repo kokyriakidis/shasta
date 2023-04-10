@@ -675,7 +675,7 @@ void Assembler::exploreReadRle(
                 if(hasMarkerGraphVertex) {
                     // Add a hyperlink to the marker graph vertex
                     // that contains this marker.
-                    const string url = "exploreMarkerGraph?vertexId=" + to_string(vertexId) +
+                    const string url = "exploreMarkerGraph0?vertexId=" + to_string(vertexId) +
                         "&maxDistance=2&detailed=on&minCoverage=3&minConsensus=3&sizePixels=320&timeout=30";
                     html << " xlink:href='" << url << "' style='cursor:pointer'";
                 }
@@ -783,7 +783,7 @@ void Assembler::exploreReadRle(
             html << "</code><td class=centered>" << rlePosition << "<td class=centered>" << rawPosition;
 
             if(hasMarkerGraphVertex) {
-                const string url = "exploreMarkerGraph?vertexId=" + to_string(vertexId) +
+                const string url = "exploreMarkerGraph0?vertexId=" + to_string(vertexId) +
                     "&maxDistance=2&detailed=on&minCoverage=3&minConsensus=3&sizePixels=320&timeout=30";
                 html << "<td class=centered><a href='" << url << "'>" << vertexId << "</a>"
                     "<td class=centered>" << markerGraph.vertexCoverage(vertexId);
@@ -1100,7 +1100,7 @@ void Assembler::exploreReadRaw(
 
                 // There is a marker graph vertex.
                 // Write the marker as a link to that vertex.
-                const string url = "exploreMarkerGraph?vertexId=" + to_string(vertexId) +
+                const string url = "exploreMarkerGraph0?vertexId=" + to_string(vertexId) +
                     "&maxDistance=6&detailed=on&sizePixels=600&timeout=30";
                 html << "<a href='" << url << "' title='Marker " << ordinal <<
                     ", position " << marker.position <<
