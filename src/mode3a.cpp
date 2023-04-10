@@ -108,20 +108,22 @@ Assembler::Assembler(
     // Create the AssemblyGraph.
     shared_ptr<AssemblyGraph> assemblyGraph = make_shared<AssemblyGraph>(*packedMarkerGraph);
 
-#if 0
+#if 1
     AssemblyGraphSnapshot snapshot(
         *assemblyGraph,
         "Mode3a-AssemblyGraphSnapshot-0", *this);
     snapshot.write();
+    /*
     assemblyGraph->computeJaccardGraph(
         threadCount,
         minJaccard,
         minComponentSizeJaccard,
         minPathLengthJaccard);
+    */
 #endif
 
 
-
+#if 0
     // Detangle iterations.
     for(uint64_t detangleIteration=0; detangleIteration<detangleIterationCount; detangleIteration++) {
         performanceLog << timestamp << "Starting detangle iteration " << detangleIterationCount << endl;
@@ -198,6 +200,7 @@ Assembler::Assembler(
         *assemblyGraph,
         "Mode3a-AssemblyGraphSnapshot-" + to_string(detangleIterationCount), *this);
     snapshot.write();
+#endif
 
 }
 
