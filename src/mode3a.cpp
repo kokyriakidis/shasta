@@ -37,8 +37,6 @@ Assembler::Assembler(
     const double minJaccard = 0.65;
     const uint64_t minComponentSizeJaccard = 20;
     const uint64_t minPathLengthJaccard = 10;
-#endif
-
 
     // Partial paths.
     const uint64_t segmentCoverageThreshold1ForPaths = 3;
@@ -48,7 +46,6 @@ Assembler::Assembler(
     const uint64_t detangleIterationCount = 1;
     // const uint64_t minDetangleCoverage = 3;
 
-#if 0
     const uint64_t minSegmentCoverageForPackedAssemblyGraph = 8;
     const uint64_t minLinkCoverage1ForPackedAssemblyGraph = 6;
     const uint64_t minLinkCoverage2ForPackedAssemblyGraph = 4;
