@@ -654,6 +654,8 @@ void Assembler::exploreReadRle(
                 if (marker.position < beginRlePosition || marker.position > endRlePosition-k) {
                     continue;
                 }
+                const Kmer kmer = getOrientedReadMarkerKmer(orientedReadId, ordinal);
+                const KmerId kmerId = KmerId(kmer.id(k));
 
                 // See if this marker is contained in a vertex of the marker graph.
                 const MarkerGraph::VertexId vertexId =
@@ -664,10 +666,9 @@ void Assembler::exploreReadRle(
 
 
                 // Write the k-mer of this marker.
-                const Kmer kmer(marker.kmerId, k);
                 html << "<a xlink:title='Marker " << ordinal <<
                     ", position " << marker.position <<
-                    ", k-mer id " << marker.kmerId;
+                    ", k-mer id " << kmerId;
                 if(hasMarkerGraphVertex) {
                     html << ", coverage " << markerGraph.vertexCoverage(vertexId);
                 }
@@ -762,7 +763,7 @@ void Assembler::exploreReadRle(
         // Loop over all markers on this oriented read.
         for(uint32_t ordinal=0; ordinal<orientedReadMarkers.size(); ordinal++) {
             const CompressedMarker& marker = orientedReadMarkers[ordinal];
-            const Kmer kmer(marker.kmerId, k);
+            const Kmer kmer = getOrientedReadMarkerKmer(orientedReadId, ordinal);
             const uint32_t rlePosition = marker.position;
             const uint32_t rawPosition = rawPositions[rlePosition];
 
@@ -806,7 +807,7 @@ void Assembler::exploreReadRle(
         for(uint32_t ordinal=0; ordinal<uint32_t(orientedReadMarkers.size()); ordinal++) {
             const CompressedMarker& marker = orientedReadMarkers[ordinal];
             if (marker.position >= beginRlePosition && marker.position <= endRlePosition - k) {
-                kmers.push_back(marker.kmerId);
+                kmers.push_back(getOrientedReadMarkerKmerId(orientedReadId, ordinal));
             }
         }
         vector<uint32_t> kmerFrequency;
@@ -1081,7 +1082,7 @@ void Assembler::exploreReadRaw(
         for(const uint64_t ordinal: markersOnThisRow) {
             const CompressedMarker& marker = orientedReadMarkers[ordinal];
             const uint64_t position = marker.position - beginPosition;
-            const Kmer kmer(marker.kmerId, k);
+            const Kmer kmer = getOrientedReadMarkerKmer(orientedReadId, ordinal);
 
             // Write the required number of spaces.
             SHASTA_ASSERT((position==0) or (position > oldPosition));  // There must be at least a blank.
