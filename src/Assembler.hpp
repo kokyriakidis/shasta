@@ -278,7 +278,6 @@ public:
     );
     void accessAlignmentData();
     void accessAlignmentDataReadWrite();
-    void writeAlignmentDetails() const;
 
 
     // Loop over all alignments in the read graph
