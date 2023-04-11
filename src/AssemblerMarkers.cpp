@@ -59,10 +59,12 @@ void Assembler::writeMarkers(ReadId readId, Strand strand, const string& fileNam
     for(uint32_t ordinal=0; ordinal<orientedReadMarkers.size(); ordinal++) {
         const CompressedMarker& marker = orientedReadMarkers[ordinal];
         const MarkerId markerId = getMarkerId(orientedReadId, ordinal);
+        const KmerId kmerId = getOrientedReadMarkerKmerId(orientedReadId, ordinal);
+        const Kmer kmer(kmerId, assemblerInfo->k);
         csv << markerId << ",";
         csv << ordinal << ",";
-        csv << marker.kmerId << ",";
-        csv << Kmer(marker.kmerId, assemblerInfo->k) << ",";
+        csv << kmerId << ",";
+        csv << kmer << ",";
         csv << marker.position << "\n";
     }
 }
