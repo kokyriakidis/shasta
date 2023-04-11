@@ -1796,20 +1796,6 @@ private:
 
 
 
-    // Get the RLE sequence implied by a MarkerInterval.
-    // If the markers overlap, returns the number of
-    // overlapping RLE bases in overlappingRleBaseCount
-    // and empty rleSequence.
-    // Otherwise, returns zero overlappingRleBaseCount
-    // and the intervening sequence in rleSequence
-    // (which can be empty if the two markers are exactly adjacent).
-    void getMarkerIntervalRleSequence(
-        const MarkerInterval&,
-        uint64_t& overlappingRleBaseCount,
-        vector<Base>& rleSequence) const;
-
-
-
     // Use spoa to compute consensus sequence for an edge of the marker graph.
     // This does not include the bases corresponding to the flanking markers.
     void computeMarkerGraphEdgeConsensusSequenceUsingSpoa(

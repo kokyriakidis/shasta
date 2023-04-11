@@ -5131,48 +5131,6 @@ void Assembler::debugWriteMarkerGraph(const string& fileNamePrefix) const
 
 
 
-// Get the RLE sequence implied by a MarkerInterval.
-// If the markers overlap, returns the number of
-// overlapping RLE bases in overlappingRleBaseCount
-// and empty rleSequence.
-// Otherwise, returns zero overlappingRleBaseCount
-// and the intervening sequence in rleSequence
-// (which can be empty if the two markers are exactly adjacent).
-void Assembler::getMarkerIntervalRleSequence(
-    const MarkerInterval& markerInterval,
-    uint64_t& overlappingRleBaseCount,
-    vector<Base>& rleSequence) const
-{
-    const uint64_t k = assemblerInfo->k;
-    const OrientedReadId orientedReadId = markerInterval.orientedReadId;
-
-    // Extract the k-mers and their RLE positions in this oriented read.
-    array<Kmer, 2> kmers;
-    array<uint32_t, 2> positions;
-    for(uint64_t i=0; i<2; i++) {
-        const MarkerId markerId = getMarkerId(orientedReadId, markerInterval.ordinals[i]);
-        const CompressedMarker& compressedMarker = markers.begin()[markerId];
-        kmers[i] = Kmer(compressedMarker.kmerId, k);
-        positions[i] = compressedMarker.position;
-    }
-
-
-    if(positions[1] < positions[0] + k) {
-        // The two markers overlap.
-        overlappingRleBaseCount = (positions[0] + k) - positions[1];
-        rleSequence.clear();
-    } else {
-        // The two markers don't overlap.
-        overlappingRleBaseCount = 0;
-        rleSequence.clear();
-        for(uint32_t position=positions[0]+uint32_t(k); position<positions[1]; position++) {
-            rleSequence.push_back(getReads().getOrientedReadBase(orientedReadId, position));
-        }
-    }
-}
-
-
-
 // Find the common KmerId for all the markers of a marker graph vertex.
 KmerId Assembler::getMarkerGraphVertexKmerId(MarkerGraphVertexId vertexId) const
 {
