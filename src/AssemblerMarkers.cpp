@@ -71,19 +71,6 @@ void Assembler::writeMarkers(ReadId readId, Strand strand, const string& fileNam
 
 
 
-vector<KmerId> Assembler::getMarkers(ReadId readId, Strand strand)
-{
-    const OrientedReadId orientedReadId(readId, strand);
-    const auto orientedReadMarkers = markers[orientedReadId.getValue()];
-
-    vector<KmerId> v;
-    for(const CompressedMarker& marker: orientedReadMarkers) {
-        v.push_back(marker.kmerId);
-    }
-    return v;
-}
-
-
 // Get markers sorted by KmerId for a given OrientedReadId.
 void Assembler::getMarkersSortedByKmerId(
     OrientedReadId orientedReadId,
@@ -147,34 +134,6 @@ MarkerId Assembler::findReverseComplement(MarkerId markerId) const
 
 	// Return the corresponding Markerid.
 	return getMarkerId(orientedReadId, ordinal);
-}
-
-
-
-// Write the frequency of markers in oriented reads.
-void Assembler::writeMarkerFrequency()
-{
-    const uint64_t k = assemblerInfo->k;
-    const uint64_t kmerCount = 1ULL << (2ULL*k);
-    SHASTA_ASSERT(markers.isOpen());
-    vector<uint64_t> frequency(kmerCount, 0);
-
-    const CompressedMarker* compressedMarker = markers.begin();
-    const CompressedMarker* end = markers.end();
-    for(; compressedMarker!=end; ++compressedMarker) {
-        ++frequency[compressedMarker->kmerId];
-    }
-
-    ofstream csv("MarkerFrequency.csv");
-    for(uint64_t kmerId=0; kmerId<kmerCount; kmerId++) {
-        const uint64_t n = frequency[kmerId];
-        if(n== 0) {
-            continue;
-        }
-        const Kmer kmer(kmerId, k);
-        kmer.write(csv, k);
-        csv << "," << n << "\n";
-    }
 }
 
 

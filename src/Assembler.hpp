@@ -238,8 +238,6 @@ public:
     void findMarkers(size_t threadCount);
     void accessMarkers();
     void writeMarkers(ReadId, Strand, const string& fileName);
-    vector<KmerId> getMarkers(ReadId, Strand);
-    void writeMarkerFrequency();
 
     // Write the reads that overlap a given read.
     void writeOverlappingReads(ReadId, Strand, const string& fileName);

@@ -205,10 +205,6 @@ PYBIND11_MODULE(shasta, shastaModule)
             arg("readId"),
             arg("strand"),
             arg("fileName"))
-        .def("getMarkers",
-            &Assembler::getMarkers)
-        .def("writeMarkerFrequency",
-            &Assembler::writeMarkerFrequency)
         .def("computeSortedMarkers",
             &Assembler::computeSortedMarkers,
             arg("threadCount") = 0)
