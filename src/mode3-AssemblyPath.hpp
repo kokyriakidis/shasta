@@ -24,6 +24,7 @@ namespace shasta {
     class Base;
     class ConsensusCaller;
     class OrientedReadId;
+    class Reads;
 }
 
 
@@ -135,10 +136,10 @@ public:
     vector<AssemblyPathLink> links;
 
     // Top level function to assemble sequence for this path.
-    void assemble(const AssemblyGraph&);
+    void assemble(const AssemblyGraph&, const Reads&);
 
     // Assemble the sequence of each segment.
-    void assembleSegments(const AssemblyGraph&);
+    void assembleSegments(const AssemblyGraph&, const Reads&);
     void writeSegmentSequences();
 
     // Initialize the links.

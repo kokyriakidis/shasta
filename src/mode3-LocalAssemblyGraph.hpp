@@ -65,11 +65,13 @@ class shasta::mode3::LocalAssemblyGraph :
 public:
 
     LocalAssemblyGraph(
+        const Reads& reads,
         const MarkerGraph&,
         const AssemblyGraph&,
         uint64_t startSegmentId,
         uint64_t maxDistance);
 
+    const Reads& reads;
     const MarkerGraph& markerGraph;
     const AssemblyGraph& assemblyGraph;
     uint64_t maxDistance;

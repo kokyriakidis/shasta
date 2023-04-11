@@ -25,7 +25,9 @@ using namespace mode3;
 
 
 // Assemble sequence for an AssemblyPath.
-void AssemblyPath::assemble(const AssemblyGraph& assemblyGraph)
+void AssemblyPath::assemble(
+    const AssemblyGraph& assemblyGraph,
+    const Reads& reads)
 {
     const bool debug = false;
     if(debug) {
@@ -33,7 +35,7 @@ void AssemblyPath::assemble(const AssemblyGraph& assemblyGraph)
     }
 
     // Assemble each segment on the path.
-    assembleSegments(assemblyGraph);
+    assembleSegments(assemblyGraph, reads);
 
     // Assemble links in this assembly path.
     initializeLinks(assemblyGraph);
@@ -451,13 +453,14 @@ void AssemblyPath::clear()
 
 
 // Assemble each segment on the path.
-void AssemblyPath::assembleSegments(const AssemblyGraph& assemblyGraph)
+void AssemblyPath::assembleSegments(const AssemblyGraph& assemblyGraph, const Reads& reads)
 {
     for(uint64_t i=0; i<segments.size(); i++) {
         AssemblyPathSegment& segment = segments[i];
         assembleMarkerGraphPath(
             assemblyGraph.readRepresentation,
             assemblyGraph.k,
+            reads,
             assemblyGraph.markers,
             assemblyGraph.markerGraph,
             assemblyGraph.markerGraphPaths[segment.id],

@@ -253,6 +253,7 @@ public:
         uint64_t readRepresentation,
         uint64_t k, // Marker length
         const MemoryMapped::Vector<ReadFlags>& readFlags,
+        const Reads& reads,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         MarkerGraph&,
         uint64_t pruneLength,
@@ -309,6 +310,7 @@ private:
     uint64_t readRepresentation;
     uint64_t k;
     const MemoryMapped::Vector<ReadFlags>& readFlags;
+    const Reads& reads;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
 public:
     uint64_t getReadCount() const
@@ -442,7 +444,7 @@ private:
     AssembleParallelData assembleParallelData;
 
     // Assemble sequence for every marker graph path of a given edge.
-    void assemble(edge_descriptor);
+    void assemble(edge_descriptor, const Reads&);
 
     // Store GFA sequence in each edge.
     void storeGfaSequence();

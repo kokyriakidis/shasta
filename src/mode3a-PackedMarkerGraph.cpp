@@ -229,6 +229,7 @@ void PackedMarkerGraph::assembleSegmentSequences()
         assembleMarkerGraphPath(
             0,
             k,
+            reads,
             markers,
             markerGraph,
             segments[segmentId],

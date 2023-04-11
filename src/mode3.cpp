@@ -2599,7 +2599,7 @@ void AssemblyGraph::assembleJaccardGraphPath(
     }
 
     // Assemble sequence for this path.
-    assemblyPath.assemble(*this);
+    assemblyPath.assemble(*this, reads);
 
 }
 
@@ -2730,6 +2730,7 @@ void AssemblyGraph::assembleSegment(uint64_t segmentId)
     assembleMarkerGraphPath(
         readRepresentation,
         k,
+        reads,
         markers,
         markerGraph,
         markerGraphPaths[segmentId],

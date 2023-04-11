@@ -45,6 +45,7 @@ AssemblyGraph2::AssemblyGraph2(
     uint64_t readRepresentation,
     uint64_t k, // Marker length
     const MemoryMapped::Vector<ReadFlags>& readFlags,
+    const Reads& reads,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     MarkerGraph& markerGraph,
     uint64_t pruneLength,
@@ -57,6 +58,7 @@ AssemblyGraph2::AssemblyGraph2(
     readRepresentation(readRepresentation),
     k(k),
     readFlags(readFlags),
+    reads(reads),
     markers(markers),
     markerGraph(markerGraph)
 {
@@ -649,7 +651,7 @@ AssemblyGraph2::edge_descriptor AssemblyGraph2::addEdge(
         (*this)[e].storeReadInformation(markerGraph);
     }
     if(assemble) {
-        AssemblyGraph2::assemble(e);
+        AssemblyGraph2::assemble(e, reads);
     }
 
     return e;
@@ -744,7 +746,7 @@ void AssemblyGraph2::assemble()
     // Use assembled sequence from the marker graph to obtain
     // assembled sequence for all edges.
     BGL_FORALL_EDGES(e, g, G) {
-        assemble(e);
+        assemble(e, reads);
     }
 
     performanceLog << timestamp << "AssemblyGraph2::assemble ends." << endl;
@@ -785,7 +787,7 @@ void AssemblyGraph2::assembleThreadFunction(size_t threadId)
         // Loop over all edges in this batch.
         for(uint64_t i=begin; i!=end; i++) {
             const edge_descriptor e = assembleParallelData.allEdges[i];
-            assemble(e);
+            assemble(e, reads);
         }
     }
 }
@@ -793,7 +795,7 @@ void AssemblyGraph2::assembleThreadFunction(size_t threadId)
 
 
 // Assemble sequence for every marker graph path of a given edge.
-void AssemblyGraph2::assemble(edge_descriptor e)
+void AssemblyGraph2::assemble(edge_descriptor e, const Reads& reads)
 {
     G& g = *this;
 
@@ -807,7 +809,7 @@ void AssemblyGraph2::assemble(edge_descriptor e)
         MarkerGraph::EdgeId const * const end = begin + path.size();
         const span<const MarkerGraph::EdgeId> pathSpan(begin, end);
         assembleMarkerGraphPath(readRepresentation, k,
-            markers, markerGraph, pathSpan, false, assembledSegment);
+            reads, markers, markerGraph, pathSpan, false, assembledSegment);
 
 
 
@@ -2649,7 +2651,7 @@ AssemblyGraph2::edge_descriptor AssemblyGraph2::mergeWithPreviousIfPossible(edge
     newBranch.storeReadInformation(markerGraph);
 
     // Compute sequence for the updated edge.
-    assemble(eNew);
+    assemble(eNew, reads);
 
     // Remove the edges we are merging.
     boost::remove_edge(e, g);
@@ -2717,7 +2719,7 @@ AssemblyGraph2::edge_descriptor AssemblyGraph2::mergeWithFollowingIfPossible(edg
     newBranch.storeReadInformation(markerGraph);
 
     // Compute sequence for the updated edge.
-    assemble(eNew);
+    assemble(eNew, reads);
 
     // Remove the edges we are merging.
     boost::remove_edge(e, g);
@@ -3688,7 +3690,7 @@ void AssemblyGraph2::handleSuperbubble1(
                 g[eNew].storeReadInformation(markerGraph);
             }
             if(assemble) {
-                AssemblyGraph2::assemble(eNew);
+                AssemblyGraph2::assemble(eNew, reads);
             }
         }
 

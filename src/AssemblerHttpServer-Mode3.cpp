@@ -104,6 +104,7 @@ void Assembler::exploreMode3AssemblyGraph(
         cout << "Reusing the previous mode3::LocalAssemblyGraph." << endl;
     } else {
         lastLocalAssemblyGraphPointer = make_shared<mode3::LocalAssemblyGraph>(
+            *reads,
             markerGraph,
             *assemblyGraph3Pointer,
             startSegmentId, maxDistance);
@@ -317,6 +318,7 @@ void Assembler::exploreMode3AssemblyGraphSegment(
         assembleMarkerGraphPath(
             assemblyGraph3.readRepresentation,
             assemblyGraph3.k,
+            *reads,
             assemblyGraph3.markers,
             assemblyGraph3.markerGraph,
             assemblyGraph3.markerGraphPaths[segmentId],
@@ -463,7 +465,7 @@ void Assembler::exploreMode3AssemblyGraphLink(
         path.initializeLinks(assemblyGraph3);
 
         // Assemble sequence for this path.
-        path.assemble(assemblyGraph3);
+        path.assemble(assemblyGraph3, *reads);
 
         // Write path details to html.
         path.writeHtml(html, assemblyGraph3);
@@ -930,7 +932,7 @@ void Assembler::exploreMode3AssemblyPath(
     }
 
     // Assemble sequence for this path.
-    path.assemble(assemblyGraph);
+    path.assemble(assemblyGraph, *reads);
 
     // Write path details to html.
     path.writeHtml(html, assemblyGraph);
@@ -984,6 +986,7 @@ void Assembler::exploreMode3LinkAssembly(
     assembleMarkerGraphPath(
         assemblyGraph.readRepresentation,
         assemblyGraph.k,
+        *reads,
         assemblyGraph.markers,
         assemblyGraph.markerGraph,
         assemblyGraph.markerGraphPaths[segment0.id],
@@ -992,6 +995,7 @@ void Assembler::exploreMode3LinkAssembly(
     assembleMarkerGraphPath(
         assemblyGraph.readRepresentation,
         assemblyGraph.k,
+        *reads,
         assemblyGraph.markers,
         assemblyGraph.markerGraph,
         assemblyGraph.markerGraphPaths[segment1.id],

@@ -1855,7 +1855,7 @@ void Assembler::assembleAssemblyGraphEdge(
     AssembledSegment& assembledSegment)
 {
     assembleMarkerGraphPath(
-        assemblerInfo->readRepresentation, assemblerInfo->k, markers, markerGraph, markerGraphPath,
+        assemblerInfo->readRepresentation, assemblerInfo->k, *reads, markers, markerGraph, markerGraphPath,
         storeCoverageData, assembledSegment);
 }
 

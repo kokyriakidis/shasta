@@ -31,10 +31,12 @@ using namespace mode3;
 // that starts at the specified vertex and moves away
 // (in both directions) up to the specified distance
 mode3::LocalAssemblyGraph::LocalAssemblyGraph(
+    const Reads& reads,
     const MarkerGraph& markerGraph,
     const AssemblyGraph& assemblyGraph,
     uint64_t startSegmentId,
     uint64_t maxDistance) :
+    reads(reads),
     markerGraph(markerGraph),
     assemblyGraph(assemblyGraph),
     maxDistance(maxDistance)
@@ -593,7 +595,7 @@ void mode3::LocalAssemblyGraph::writeSvg(
 
         // If requested, assemble path sequence.
         if(options.assemblePathSequence) {
-            path.assemble(assemblyGraph);
+            path.assemble(assemblyGraph, reads);
         }
     }
 

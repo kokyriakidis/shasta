@@ -8,10 +8,12 @@
 namespace shasta {
 
     class AssembledSegment;
+    class Reads;
 
     void assembleMarkerGraphPath(
         uint64_t readRepresentation,
         uint64_t k,
+        const Reads& reads,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         const MarkerGraph&,
         const span<const MarkerGraph::EdgeId>& markerGraphPath,

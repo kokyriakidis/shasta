@@ -7,6 +7,7 @@ using namespace shasta;
 void shasta::assembleMarkerGraphPath(
     uint64_t readRepresentation,
     uint64_t k,
+    const Reads& reads,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     const MarkerGraph& markerGraph,
     const span<const MarkerGraph::EdgeId>& markerGraphPath,
@@ -53,9 +54,7 @@ void shasta::assembleMarkerGraphPath(
     for(size_t i=0; i<assembledSegment.vertexCount; i++) {
 
         // Get the sequence.
-        const MarkerId firstMarkerId = markerGraph.getVertexMarkerIds(assembledSegment.vertexIds[i])[0];
-        const CompressedMarker& firstMarker = markers.begin()[firstMarkerId];
-        const KmerId kmerId = firstMarker.kmerId;
+        const KmerId kmerId = markerGraph.getVertexKmerId(assembledSegment.vertexIds[i], k, reads, markers);
         const Kmer kmer(kmerId, k);
 
         if(readRepresentation == 1) {

@@ -657,6 +657,7 @@ void Assembler::exploreMode3aAssemblyGraphSegment(
         assembleMarkerGraphPath(
             0,
             k,
+            *reads,
             markers,
             markerGraph,
             path,
