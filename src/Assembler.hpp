@@ -2106,24 +2106,9 @@ private:
 
 
 
-    // Assemble the RLE sequence of a path of the marker graph, under the assumption
-    // that, for each edge, all oriented reads have exactly the same sequence.
-    // This will be the case if edges were created by Assembler::createMarkerGraphEdgesStrict.
-public:
-    void assembleMarkerGraphPathRleStrict(
-        span<const MarkerGraphEdgeId> path,
-        vector<Base>& rleSequence
-    ) const;
-    // Same, but for an assembly graph edge.
-    void assembleAssemblyGraphEdgeRleStrict(
-        AssemblyGraphEdgeId,
-        vector<Base>& rleSequence
-    ) const;
-
-
-
     // Write the assembly graph in GFA 1.0 format defined here:
     // https://github.com/GFA-spec/GFA-spec/blob/master/GFA1.md
+public:
     void writeGfa1(const string& fileName);
     void writeGfa1BothStrands(const string& fileName);
     void writeGfa1BothStrandsNoSequence(const string& fileName);
