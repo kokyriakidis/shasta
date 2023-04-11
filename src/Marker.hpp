@@ -81,12 +81,6 @@ public:
     // The position of this marker in the oriented read.
     uint32_t position;
 
-    // Constructor from a CompressedMarker.
-    Marker(const CompressedMarker& compressedMarker) :
-        kmerId(compressedMarker.kmerId),
-        position(compressedMarker.position)
-    {}
-
     Marker(KmerId kmerId, uint32_t position) :
         kmerId(kmerId), position(position) {}
 
@@ -102,12 +96,6 @@ public:
 class shasta::MarkerWithOrdinal : public Marker {
 public:
     uint32_t ordinal;
-
-    // Constructor from a marker and an ordinal.
-    MarkerWithOrdinal(const Marker& marker, uint32_t ordinal) :
-        Marker(marker),
-        ordinal(ordinal)
-    {}
 
     MarkerWithOrdinal(KmerId kmerId, uint32_t position, uint32_t ordinal) :
         Marker(kmerId, position), ordinal(ordinal) {}
