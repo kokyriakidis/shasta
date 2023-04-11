@@ -16,6 +16,7 @@ LocalMarkerGraph::LocalMarkerGraph(
     uint64_t assemblyMode,
     const Reads& reads,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+    const MarkerGraph& markerGraph,
     const MemoryMapped::Vector<MarkerGraph::CompressedVertexId>& globalMarkerGraphVertex,
     const ConsensusCaller& consensusCaller
     ) :
@@ -24,6 +25,7 @@ LocalMarkerGraph::LocalMarkerGraph(
     assemblyMode(assemblyMode),
     reads(reads),
     markers(markers),
+    markerGraph(markerGraph),
     globalMarkerGraphVertex(globalMarkerGraphVertex),
     consensusCaller(consensusCaller)
 {
@@ -83,19 +85,7 @@ LocalMarkerGraph::vertex_descriptor
 KmerId LocalMarkerGraph::getKmerId(vertex_descriptor v) const
 {
     const LocalMarkerGraphVertex& vertex = (*this)[v];
-    SHASTA_ASSERT(!vertex.markerInfos.empty());
-    const MarkerId firstMarkerId = vertex.markerInfos.front().markerId;
-    const CompressedMarker& firstMarker = markers.begin()[firstMarkerId];
-    const KmerId kmerId = firstMarker.kmerId;
-
-    // Sanity check that all markers have the same kmerId.
-    // At some point this can be removed.
-    for(const auto& markerInfo: vertex.markerInfos){
-        const CompressedMarker& marker = markers.begin()[markerInfo.markerId];
-        SHASTA_ASSERT(marker.kmerId == kmerId);
-    }
-
-    return kmerId;
+    return markerGraph.getVertexKmerId(vertex.vertexId, k, reads, markers);
 }
 
 

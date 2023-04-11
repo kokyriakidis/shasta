@@ -78,6 +78,7 @@ void Assembler::exploreMarkerGraph0(
         assemblerInfo->assemblyMode,
         getReads(),
         markers,
+        markerGraph,
         markerGraph.vertexTable,
         *consensusCaller);
     const auto createStartTime = steady_clock::now();

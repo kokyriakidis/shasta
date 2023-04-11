@@ -229,6 +229,7 @@ public:
         uint64_t assemblyMode,
         const Reads& reads,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+        const MarkerGraph&,
         const MemoryMapped::Vector<MarkerGraph::CompressedVertexId>& globalMarkerGraphVertex,
         const ConsensusCaller&
         );
@@ -301,6 +302,7 @@ private:
     // (not just those in this local marker graph).
     const Reads& reads;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
+    const MarkerGraph& markerGraph;
 
     // A reference to the vector containing the global marker graph vertex id
     // corresponding to each marker.
