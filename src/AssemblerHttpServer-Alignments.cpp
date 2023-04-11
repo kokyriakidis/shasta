@@ -1350,8 +1350,10 @@ void Assembler::exploreAlignment(
             const auto& marker0 = markers0[ordinal0];
             const auto& marker1 = markers1[ordinal1];
 
-            const auto kmerId = marker0.kmerId;
-            SHASTA_ASSERT(marker1.kmerId == kmerId);
+            const KmerId kmerId0 = getOrientedReadMarkerKmerId(orientedReadId0, ordinal0);
+            const KmerId kmerId1 = getOrientedReadMarkerKmerId(orientedReadId1, ordinal1);
+            SHASTA_ASSERT(kmerId0 == kmerId1);
+            const KmerId kmerId = kmerId0;
             const Kmer kmer(kmerId, assemblerInfo->k);
 
             const uint32_t rlePosition0 = marker0.position;
