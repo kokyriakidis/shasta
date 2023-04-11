@@ -863,7 +863,7 @@ void Assembler::exploreMarkerGraphVertex(const vector<string>& request, ostream&
     SHASTA_ASSERT(markerCount > 0);
 
     // Get the marker sequence.
-    const KmerId kmerId = markers.begin()[markerIds[0]].kmerId;
+    const KmerId kmerId = getMarkerGraphVertexKmerId(vertexId);
     const size_t k = assemblerInfo->k;
     const Kmer kmer(kmerId, k);
 
