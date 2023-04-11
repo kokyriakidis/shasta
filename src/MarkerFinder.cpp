@@ -90,12 +90,10 @@ void MarkerFinder::threadFunction(size_t threadId)
                             ++markerCount;
                         } else {
                             // Strand 0.
-                            markerPointerStrand0->kmerId = kmerId;
                             markerPointerStrand0->position = position;
                             ++markerPointerStrand0;
 
                             // Strand 1.
-                            markerPointerStrand1->kmerId = kmerTable[kmerId].reverseComplementedKmerId;
                             markerPointerStrand1->position = uint32_t(read.baseCount - k - position);
                             --markerPointerStrand1;
 

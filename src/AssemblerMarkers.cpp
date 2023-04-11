@@ -331,15 +331,6 @@ void Assembler::getOrientedReadMarkerKmersStrand0(ReadId readId, const span<Kmer
         kmers0[ordinal0] = kmer0;
     }
 
-
-
-#if 1
-    // Check against the KmerIds stored in the markers.
-    // These will soon go away.
-    for(uint64_t ordinal0=0; ordinal0<readMarkerCount; ordinal0++) {
-        SHASTA_ASSERT(kmers0[ordinal0].id(k) == orientedReadMarkers0[ordinal0].kmerId);
-    }
-#endif
 }
 
 
@@ -363,17 +354,6 @@ void Assembler::getOrientedReadMarkerKmersStrand1(ReadId readId, const span<Kmer
         kmers1[ordinal1] = kmer1;
     }
 
-
-
-#if 1
-    // Check against the KmerIds stored in the markers.
-    // These will soon go away.
-    const OrientedReadId orientedReadId1(readId, 1);
-    const auto orientedReadMarkers1 = markers[orientedReadId1.getValue()];
-    for(uint64_t ordinal1=0; ordinal1<readMarkerCount; ordinal1++) {
-        SHASTA_ASSERT(kmers1[ordinal1].id(k) == orientedReadMarkers1[ordinal1].kmerId);
-    }
-#endif
 }
 
 
@@ -412,15 +392,6 @@ void Assembler::getOrientedReadMarkerKmerIdsStrand0(ReadId readId, const span<Km
         kmerIds0[ordinal0] = KmerId(kmer0.id(k));
     }
 
-
-
-#if 1
-    // Check against the KmerIds stored in the markers.
-    // These will soon go away.
-    for(uint64_t ordinal0=0; ordinal0<readMarkerCount; ordinal0++) {
-        SHASTA_ASSERT(kmerIds0[ordinal0] == orientedReadMarkers0[ordinal0].kmerId);
-    }
-#endif
 }
 
 
@@ -444,17 +415,6 @@ void Assembler::getOrientedReadMarkerKmerIdsStrand1(ReadId readId, const span<Km
         kmerIds1[ordinal1] = KmerId(kmer1.id(k));
     }
 
-
-
-#if 1
-    // Check against the KmerIds stored in the markers.
-    // These will soon go away.
-    const OrientedReadId orientedReadId1(readId, 1);
-    const auto orientedReadMarkers1 = markers[orientedReadId1.getValue()];
-    for(uint64_t ordinal1=0; ordinal1<readMarkerCount; ordinal1++) {
-        SHASTA_ASSERT(kmerIds1[ordinal1] == orientedReadMarkers1[ordinal1].kmerId);
-    }
-#endif
 }
 
 
@@ -497,19 +457,6 @@ void Assembler::getOrientedReadMarkersStrand0(
         markers0[ordinal0] = MarkerWithOrdinal(KmerId(kmer0.id(k)), position, uint32_t(ordinal0));
     }
 
-
-
-#if 1
-    // Check against the KmerIds stored in the markers.
-    // These will soon go away.
-    for(uint64_t ordinal0=0; ordinal0<readMarkerCount; ordinal0++) {
-        const auto m = markers0[ordinal0];
-        SHASTA_ASSERT(m.kmerId == orientedReadMarkers0[ordinal0].kmerId);
-        SHASTA_ASSERT(m.position == orientedReadMarkers0[ordinal0].position);
-        SHASTA_ASSERT(m.ordinal == ordinal0);
-    }
-#endif
-
 }
 
 
@@ -538,19 +485,6 @@ void Assembler::getOrientedReadMarkersStrand1(
         const Kmer kmer1 = kmer0.reverseComplement(k);
         markers1[ordinal1] = MarkerWithOrdinal(KmerId(kmer1.id(k)), position1, uint32_t(ordinal1));
     }
-
-
-
-#if 1
-    // Check against the KmerIds stored in the markers.
-    // These will soon go away.
-    for(uint64_t ordinal1=0; ordinal1<readMarkerCount; ordinal1++) {
-        const auto m = markers1[ordinal1];
-        SHASTA_ASSERT(m.kmerId == orientedReadMarkers1[ordinal1].kmerId);
-        SHASTA_ASSERT(m.position == orientedReadMarkers1[ordinal1].position);
-        SHASTA_ASSERT(m.ordinal == ordinal1);
-    }
-#endif
 
 }
 
@@ -586,20 +520,6 @@ void Assembler::getReadMarkerKmers(
         kmers1[ordinal1] = kmer1;
     }
 
-
-
-#if 1
-    // Check against the KmerIds stored in the markers.
-    // These will soon go away.
-    for(uint64_t ordinal0=0; ordinal0<readMarkerCount; ordinal0++) {
-        SHASTA_ASSERT(kmers0[ordinal0].id(k) == orientedReadMarkers0[ordinal0].kmerId);
-    }
-    const OrientedReadId orientedReadId1(uint32_t(readId), 1);
-    const auto orientedReadMarkers1 = markers[orientedReadId1.getValue()];
-    for(uint64_t ordinal1=0; ordinal1<readMarkerCount; ordinal1++) {
-        SHASTA_ASSERT(kmers1[ordinal1].id(k) == orientedReadMarkers1[ordinal1].kmerId);
-    }
-#endif
 }
 
 
@@ -635,20 +555,6 @@ void Assembler::getReadMarkerKmerIds(
         kmerIds1[ordinal1] = KmerId(kmer1.id(k));
     }
 
-
-
-#if 1
-    // Check against the KmerIds stored in the markers.
-    // These will soon go away.
-    for(uint64_t ordinal0=0; ordinal0<readMarkerCount; ordinal0++) {
-        SHASTA_ASSERT(kmerIds0[ordinal0] == orientedReadMarkers0[ordinal0].kmerId);
-    }
-    const OrientedReadId orientedReadId1(uint32_t(readId), 1);
-    const auto orientedReadMarkers1 = markers[orientedReadId1.getValue()];
-    for(uint64_t ordinal1=0; ordinal1<readMarkerCount; ordinal1++) {
-        SHASTA_ASSERT(kmerIds1[ordinal1] == orientedReadMarkers1[ordinal1].kmerId);
-    }
-#endif
 }
 
 
