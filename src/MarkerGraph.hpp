@@ -13,8 +13,10 @@
 namespace shasta {
 
     class Base;
-    class MarkerGraph;
     class CompressedCoverageData;
+    class CompressedMarker;
+    class MarkerGraph;
+    class Reads;
 
     extern template class MultithreadedObject<MarkerGraph>;
 }
@@ -168,6 +170,15 @@ private:
     void removeVerticesThreadFunction2(size_t threadId);
     void removeVerticesThreadFunction3(size_t threadId);
 public:
+
+
+    // Find the common KmerId for all the markers of a marker graph vertex.
+    KmerId getVertexKmerId(
+        MarkerGraphVertexId vertexId,
+        uint64_t k,
+        const Reads&,
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers
+        ) const;
 
 
 

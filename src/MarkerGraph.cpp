@@ -1,6 +1,8 @@
 // Shasta.
 #include "MarkerGraph.hpp"
 #include "Coverage.hpp"
+#include "findMarkerId.hpp"
+#include "markerAccessFunctions.hpp"
 using namespace shasta;
 
 // Standard library.
@@ -610,3 +612,29 @@ void MarkerGraph::createVerticesFromVertexTableThreadFunction4(size_t threadId)
 }
 
 
+
+// Find the common KmerId for all the markers of a marker graph vertex.
+KmerId MarkerGraph::getVertexKmerId(
+    MarkerGraphVertexId vertexId,
+    uint64_t k,
+    const Reads& reads,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers
+    ) const
+{
+    // Get it from the first marker on this vertex.
+    const MarkerId markerId = getVertexMarkerIds(vertexId)[0];
+
+    // Find the OrientedReadId.
+    // This is slow as it requires a binary search in the markers toc.
+    OrientedReadId orientedReadId;
+    uint32_t ordinal;
+    tie(orientedReadId, ordinal) = findMarkerId(markerId, markers);
+
+    return getOrientedReadMarkerKmerId(
+        orientedReadId,
+        ordinal,
+        k,
+        reads,
+        markers
+        );
+}
