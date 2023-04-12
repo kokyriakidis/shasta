@@ -402,8 +402,8 @@ private:
     // The markers are selected at the beginning of an assembly
     // and never changed, and selected in such a way that,
     // if (and only if) a k-mer is a marker, its reverse complement
-    // is also a marker. That is, for all permitted values of i, 0 <= i < 4^k:
-    // kmerTable[i].isMarker == kmerTable[kmerTable[i].reverseComplementKmerId].isMarker
+    // is also a marker.
+    // This will go away when we start supporting longer markers.
     MemoryMapped::Vector<KmerInfo> kmerTable;
     void checkKmersAreOpen() const;
 

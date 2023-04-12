@@ -10,12 +10,6 @@ and never changed, and selected in such a way that,
 if (and only if) a k-mer is a marker, its reverse complement
 is also a marker.
 
-The k-mer table is a vector of 4^k KmerInfo object,
-indexed by k-mer id as computed using Kmer::id(k).
-Because of the way markers are selected, the following is
-true for all permitted values of i, 0 <= i < 4^k:
-kmerTable[i].isMarker == kmerTable[kmerTable[i].reverseComplementKmerId].isMarker
-
 *******************************************************************************/
 
 #include "Kmer.hpp"
