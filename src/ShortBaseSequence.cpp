@@ -28,4 +28,30 @@ void shasta::testShortBaseSequence()
     // Check that constructor from id does the inverse of function id().
     const ShortBaseSequence16 t(s.id(4), 4);
     SHASTA_ASSERT(t == s);
+
+
+    // Verify that the KmerId for a k-mer of given length k is the
+    // same regardless of how the k-mer is stored.
+    {
+        const string sequenceString = "TCGAGCTTAG";
+        const uint64_t k = sequenceString.size();
+
+        ShortBaseSequence16 s16;
+        ShortBaseSequence32 s32;
+        ShortBaseSequence64 s64;
+        for(uint64_t i=0; i<k; i++) {
+            const Base base = Base::fromCharacter(sequenceString[i]);
+            s16.set(i, base);
+            s32.set(i, base);
+            s64.set(i, base);
+        }
+        const uint64_t kmerId16 = s16.id(k);
+        const uint64_t kmerId32 = s32.id(k);
+        const uint64_t kmerId64 = s64.id(k);
+
+        cout << kmerId16 << " " << kmerId32 << " " << kmerId64 << endl;
+        SHASTA_ASSERT(kmerId16 == kmerId32);
+        SHASTA_ASSERT(kmerId32 == kmerId64);
+
+    }
 }
