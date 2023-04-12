@@ -87,8 +87,7 @@ void Assembler::alignOrientedReads3(
     for(uint64_t i=0; i<2; i++) {
         for(uint32_t ordinal=0; ordinal<uint32_t(allMarkerKmerIds[i].size()); ordinal++) {
             const KmerId kmerId = allMarkerKmerIds[i][ordinal];
-            SHASTA_ASSERT(hashKmerId(kmerId) == kmerTable[kmerId].hash);
-             if(kmerTable[kmerId].hash < hashThreshold) {
+            if(hashKmerId(kmerId) < hashThreshold) {
                 downsampledMarkers[i].push_back(make_pair(ordinal, kmerId));
                 appendValue(downsampledSequences[i], kmerId + 100);
             }
