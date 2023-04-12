@@ -547,6 +547,9 @@ private:
     void initializeKmerTable();
 
 
+    // Hash a KmerId in such a way that it has the same hash as its reverse
+    // complement. This is used by alignment method 3 to downsample markers.
+    uint32_t hashKmerId(KmerId) const;
 
     // The markers on all oriented reads. Indexed by OrientedReadId::getValue().
     MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t> markers;
