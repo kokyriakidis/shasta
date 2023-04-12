@@ -8,6 +8,7 @@
 namespace shasta {
     class MarkerFinder;
     class LongBaseSequences;
+    class KmerChecker;
 
     namespace MemoryMapped {
         template<class T> class Vector;
@@ -26,7 +27,7 @@ public:
     // The constructor does all the work.
     MarkerFinder(
         size_t k,
-        const MemoryMapped::Vector<KmerInfo>& kmerTable,
+        const KmerChecker&,
         const Reads& reads,
         MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         size_t threadCount);
@@ -35,7 +36,7 @@ private:
 
     // The arguments passed to the constructor.
     size_t k;
-    const MemoryMapped::Vector<KmerInfo>& kmerTable;
+    const KmerChecker& kmerChecker;
     const Reads& reads;
     MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
     size_t threadCount;

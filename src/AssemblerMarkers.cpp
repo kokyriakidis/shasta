@@ -19,7 +19,7 @@ void Assembler::findMarkers(size_t threadCount)
     markers.createNew(largeDataName("Markers"), largeDataPageSize);
     MarkerFinder markerFinder(
         assemblerInfo->k,
-        kmerTable,
+        *kmerChecker,
         getReads(),
         markers,
         threadCount);

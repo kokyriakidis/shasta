@@ -1,6 +1,7 @@
 // shasta.
 #include "MarkerFinder.hpp"
 #include "LongBaseSequence.hpp"
+#include "KmerChecker.hpp"
 #include "performanceLog.hpp"
 #include "ReadId.hpp"
 #include "timestamp.hpp"
@@ -15,13 +16,13 @@ template class MultithreadedObject<MarkerFinder>;
 
 MarkerFinder::MarkerFinder(
     size_t k,
-    const MemoryMapped::Vector<KmerInfo>& kmerTable,
+    const KmerChecker& kmerChecker,
     const Reads& reads,
     MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     size_t threadCountArgument) :
     MultithreadedObject(*this),
     k(k),
-    kmerTable(kmerTable),
+    kmerChecker(kmerChecker),
     reads(reads),
     markers(markers),
     threadCount(threadCountArgument)
@@ -83,7 +84,7 @@ void MarkerFinder::threadFunction(size_t threadId)
                 }
                 for(uint32_t position=0; /*The check is done later */; position++) {
                     const KmerId kmerId = KmerId(kmer.id(k));
-                    if(kmerTable[kmerId].isMarker) {
+                    if(kmerChecker.isMarker(kmerId)) {
                         // This k-mer is a marker.
 
                         if(pass == 1) {

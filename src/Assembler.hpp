@@ -7,6 +7,7 @@
 #include "AssemblyGraph2Statistics.hpp"
 #include "HttpServer.hpp"
 #include "Kmer.hpp"
+#include "KmerChecker.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "Marker.hpp"
 #include "MarkerGraph.hpp"
@@ -39,7 +40,6 @@ namespace shasta {
     class ConsensusCaller;
     class Histogram2;
     class InducedAlignment;
-    class KmerChecker;
     class LocalAssemblyGraph;
     class LocalAlignmentCandidateGraph;
     class LocalAlignmentGraph;
@@ -412,7 +412,11 @@ private:
     // is a marker. The initial implementation of the KmerChecker is table based,
     // but later we will switch to hashing.
     shared_ptr<KmerChecker> kmerChecker;
-public:
+    bool isMarker(KmerId kmerId) const
+    {
+        return kmerChecker->isMarker(kmerId);
+    }
+    public:
     void createKmerChecker();
     void accessKmerChecker();
 
