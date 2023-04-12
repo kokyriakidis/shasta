@@ -933,19 +933,6 @@ void Assembler::writeAssemblySummaryBody(ostream& html)
     using std::setprecision;
     AssemblyGraph& assemblyGraph = *assemblyGraphPointer;
 
-
-    // Compute the number of run-length k-mers used as markers.
-    uint64_t totalRleKmerCount = 0;
-    uint64_t markerRleKmerCount = 0;
-    for(const auto& tableEntry: kmerTable) {
-        if(tableEntry.isRleKmer) {
-            ++totalRleKmerCount;
-            if(tableEntry.isMarker) {
-                ++markerRleKmerCount;
-            }
-        }
-    }
-
     const uint64_t totalDiscardedReadCount =
         assemblerInfo->discardedInvalidBaseReadCount +
         assemblerInfo->discardedShortReadReadCount +
@@ -1031,21 +1018,6 @@ void Assembler::writeAssemblySummaryBody(ostream& html)
 
 
     html <<
-        "<h3>Marker <i>k</i>-mers</h3>"
-        "<table>"
-        "<tr><td>Length <i>k</i> of <i>k</i>-mers used as markers"
-        "<td class=right>" << assemblerInfo->k <<
-        "<tr><td>Total number of <i>k</i>-mers"
-        "<td class=right>" << totalRleKmerCount <<
-        "<tr><td>Number of <i>k</i>-mers used as markers"
-        "<td class=right>" << markerRleKmerCount <<
-        "<tr><td>Fraction of <i>k</i>-mers used as markers"
-        "<td class=right>" << setprecision(3) << double(markerRleKmerCount) / double(totalRleKmerCount) <<
-        "</table>"
-        "<ul><li>In the above table, all <i>k</i>-mer counts only include run-length encoded <i>k</i>-mers, "
-        "that is, <i>k</i>-mers without repeated bases.</ul>"
-
-
 
         "<h3>Markers</h3>"
         "<table>"
@@ -1265,20 +1237,6 @@ void Assembler::writeAssemblySummaryJson(ostream& json)
     AssemblyGraph& assemblyGraph = *assemblyGraphPointer;
     using std::setprecision;
 
-
-
-    // Compute the number of run-length k-mers used as markers.
-    uint64_t totalRleKmerCount = 0;
-    uint64_t markerRleKmerCount = 0;
-    for(const auto& tableEntry: kmerTable) {
-        if(tableEntry.isRleKmer) {
-            ++totalRleKmerCount;
-            if(tableEntry.isMarker) {
-                ++markerRleKmerCount;
-            }
-        }
-    }
-
     const uint64_t totalDiscardedReadCount =
         assemblerInfo->discardedInvalidBaseReadCount +
         assemblerInfo->discardedShortReadReadCount +
@@ -1357,17 +1315,6 @@ void Assembler::writeAssemblySummaryJson(ostream& json)
         double(totalDiscardedBaseCount + assemblerInfo->baseCount)
         << "\n"
         "    }\n"
-        "  },\n";
-
-
-    json <<
-        "  \"Marker k-mers\":\n"
-        "  {\n"
-        "    \"Length k of k-mers used as markers\": " << assemblerInfo->k << ",\n"
-        "    \"Total number of k-mers\": " << totalRleKmerCount << ",\n"
-        "    \"Number of k-mers used as markers\": " << markerRleKmerCount << ",\n"
-        "    \"Fraction of k<-mers used as markers\": " <<
-        setprecision(3) << double(markerRleKmerCount) / double(totalRleKmerCount) <<
         "  },\n"
 
 
