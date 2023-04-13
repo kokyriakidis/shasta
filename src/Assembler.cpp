@@ -1,7 +1,10 @@
 #include "Assembler.hpp"
+#include "AssemblerOptions.hpp"
 #include "buildId.hpp"
 #include "Coverage.hpp"
+#include "KmerChecker.hpp"
 #include "MedianConsensusCaller.hpp"
+#include "MurmurHash2.hpp"
 #include "Reads.hpp"
 #include "SimpleConsensusCaller.hpp"
 #include "SimpleBayesianConsensusCaller.hpp"
@@ -169,4 +172,58 @@ void Assembler::storeAssemblyTime(
 void Assembler::storePeakMemoryUsage(uint64_t peakMemoryUsage) {
     assemblerInfo->peakMemoryUsage = peakMemoryUsage;
 }
+
+
+
+void Assembler::createKmerChecker(
+    const KmersOptions& kmersOptions,
+    uint64_t threadCount)
+{
+    if(threadCount == 0) {
+        threadCount = std::thread::hardware_concurrency();
+    }
+
+    assemblerInfo->k = kmersOptions.k;
+    assemblerInfo->kmerGenerationMethod = kmersOptions.generationMethod;
+    kmerChecker = make_shared<KmerChecker>(kmersOptions, threadCount, getReads(), *this);
+}
+
+
+
+void Assembler::accessKmerChecker()
+{
+    kmerChecker = make_shared<KmerChecker>(
+        assemblerInfo->k,
+        assemblerInfo->kmerGenerationMethod,
+        getReads(),
+        *this);
+}
+
+
+
+// Hash a KmerId in such a way that it has the same hash as its reverse
+// complement. This is used by alignment method 3 to downsample markers.
+uint32_t Assembler::hashKmerId(KmerId kmerId) const
+{
+    const uint64_t k = assemblerInfo->k;
+
+    // Construct the k-mer and its reverse complement.
+    const Kmer kmer(kmerId, k);
+    const Kmer kmerRc = kmer.reverseComplement(k);
+
+    // Compute the id of the reverse complement k-mer.
+    const KmerId kmerIdRc = KmerId(kmerRc.id(k));
+
+    // Hash the sum of the two KmerIds.
+    // This guarantees that we return the same hash
+    // for a k-mer and its reverse complement.
+    const uint64_t sum = kmerId + kmerIdRc;
+
+    return MurmurHash2(&sum, sizeof(sum), 13477);
+}
+
+
+
+
+
 
