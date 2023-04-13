@@ -78,7 +78,7 @@ void Assembler::createMarkerGraphVertices(
     // Check that we have what we need.
     reads->checkReadsAreOpen();
     reads->checkReadFlagsAreOpen();
-    checkKmersAreOpen();
+    SHASTA_ASSERT(kmerChecker);
     checkMarkersAreOpen();
     checkAlignmentDataAreOpen();
     SHASTA_ASSERT(compressedAlignments.isOpen());
@@ -4234,7 +4234,7 @@ void Assembler::assembleMarkerGraphVertices(size_t threadCount)
     SHASTA_ASSERT(assemblerInfo->readRepresentation == 1);
 
     // Check that we have what we need.
-    checkKmersAreOpen();
+    SHASTA_ASSERT(kmerChecker);
     reads->checkReadsAreOpen();
     checkMarkersAreOpen();
     checkMarkerGraphVerticesAreAvailable();
@@ -4302,7 +4302,7 @@ void Assembler::computeMarkerGraphVerticesCoverageData(size_t threadCount)
     performanceLog << timestamp<< "computeMarkerGraphVerticesCoverageData begins." << endl;
 
     // Check that we have what we need.
-    checkKmersAreOpen();
+    SHASTA_ASSERT(kmerChecker);
     reads->checkReadsAreOpen();
     checkMarkersAreOpen();
     checkMarkerGraphVerticesAreAvailable();
@@ -4473,7 +4473,7 @@ void Assembler::assembleMarkerGraphEdges(
     performanceLog << timestamp << "assembleMarkerGraphEdges begins." << endl;
 
     // Check that we have what we need.
-    checkKmersAreOpen();
+    SHASTA_ASSERT(kmerChecker);
     reads->checkReadsAreOpen();
     checkMarkersAreOpen();
     checkMarkerGraphVerticesAreAvailable();

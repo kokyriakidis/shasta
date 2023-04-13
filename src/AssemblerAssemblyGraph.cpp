@@ -721,7 +721,7 @@ void Assembler::assemble(
     AssemblyGraph& assemblyGraph = *assemblyGraphPointer;
 
     // Check that we have what we need.
-    checkKmersAreOpen();
+    SHASTA_ASSERT(kmerChecker);
     reads->checkReadsAreOpen();
     checkMarkersAreOpen();
     checkMarkerGraphVerticesAreAvailable();

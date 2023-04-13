@@ -22,7 +22,7 @@ void Assembler::findAlignmentCandidatesLowHash0(
 {
 
     // Check that we have what we need.
-    checkKmersAreOpen();
+    SHASTA_ASSERT(kmerChecker);
     checkMarkersAreOpen();
     const ReadId readCount = ReadId(markers.size() / 2);
     SHASTA_ASSERT(readCount > 0);

@@ -156,37 +156,8 @@ PYBIND11_MODULE(shasta, shastaModule)
         // K-mers.
         .def("accessKmers",
             &Assembler::accessKmers)
-        .def("writeKmers",
-            &Assembler::writeKmers,
-            arg("fileName") = "Kmers.csv")
-        .def("randomlySelectKmers",
-            &Assembler::randomlySelectKmers,
-            arg("k"),
-            arg("probability"),
-            arg("seed") = 231)
-        .def("selectKmersBasedOnFrequency",
-            &Assembler::selectKmersBasedOnFrequency,
-            arg("k"),
-            arg("markerDensity"),
-            arg("seed") = 231,
-            arg("enrichmentThreshold"),
-            arg("threadCount") = 0)
-        .def("selectKmers2",
-            &Assembler::selectKmers2,
-            arg("k"),
-            arg("markerDensity"),
-            arg("seed") = 231,
-            arg("enrichmentThreshold"),
-            arg("threadCount") = 0)
-        .def("selectKmers4",
-            &Assembler::selectKmers4,
-            arg("k"),
-            arg("markerDensity"),
-            arg("seed") = 231,
-            arg("distanceThreshold"),
-            arg("threadCount") = 0)
-
-
+        .def("accessKmerChecker",
+            &Assembler::accessKmerChecker)
 
          // Markers.
         .def("accessMarkers",

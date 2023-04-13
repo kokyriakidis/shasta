@@ -607,9 +607,9 @@ void Assembler::accessAllSoft()
     bool allDataAreAvailable = true;
 
     try {
-        accessKmers();
+        accessKmerChecker();
     } catch(const exception& e) {
-        cout << "K-mers are not accessible." << endl;
+        cout << "The k-mer checker is not accessible." << endl;
         allDataAreAvailable = false;
     }
 

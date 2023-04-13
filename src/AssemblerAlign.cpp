@@ -220,7 +220,7 @@ void Assembler::computeAlignments(
 
     // Check that we have what we need.
     reads->checkReadsAreOpen();
-    checkKmersAreOpen();
+    SHASTA_ASSERT(kmerChecker);
     checkMarkersAreOpen();
     checkAlignmentCandidatesAreOpen();
 

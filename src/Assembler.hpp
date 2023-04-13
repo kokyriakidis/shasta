@@ -7,7 +7,6 @@
 #include "AssemblyGraph2Statistics.hpp"
 #include "HttpServer.hpp"
 #include "Kmer.hpp"
-#include "KmerChecker.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "Marker.hpp"
 #include "MarkerGraph.hpp"
@@ -40,6 +39,8 @@ namespace shasta {
     class ConsensusCaller;
     class Histogram2;
     class InducedAlignment;
+    class KmerChecker;
+    class KmersOptions;
     class LocalAssemblyGraph;
     class LocalAlignmentCandidateGraph;
     class LocalAlignmentGraph;
@@ -108,6 +109,9 @@ public:
 
     // The length of k-mers used to define markers.
     size_t k;
+
+    // The method used to generate kmers (--Kmers.generationMethod).
+    uint64_t kmerGenerationMethod;
 
     // The page size in use for this run.
     size_t largeDataPageSize;
@@ -393,162 +397,24 @@ private:
 
 
 
-    // Table of all k-mers of length k.
-    // Among all 4^k k-mers of length k, we choose a subset
-    // that we call "markers".
-    // The value of k used is stored in assemblerInfo.
-    // The k-mer table is a vector of 4^k pairs,
-    // indexed by k-mer id as computed using Kmer::id(k).
-    // The markers are selected at the beginning of an assembly
-    // and never changed, and selected in such a way that,
-    // if (and only if) a k-mer is a marker, its reverse complement
-    // is also a marker.
-    // This will go away when we start supporting longer markers.
-    MemoryMapped::Vector<KmerInfo> kmerTable;
-    void checkKmersAreOpen() const;
 
-    // As we transition to longer markers, we will no longer be able to store a k-mer
-    // table. Instead, the KmerChecker will be used to find out if a given k-mer
-    // is a marker. The initial implementation of the KmerChecker is table based,
-    // but later we will switch to hashing.
+    // The KmerChecker can find out if a given KmerId is a marker.
     shared_ptr<KmerChecker> kmerChecker;
-    bool isMarker(KmerId kmerId) const
-    {
-        return kmerChecker->isMarker(kmerId);
-    }
     public:
-    void createKmerChecker();
+    void createKmerChecker(
+        const KmersOptions& kmersOptions,
+        uint64_t threadCount);
     void accessKmerChecker();
 
-    void accessKmers();
-    void writeKmers(const string& fileName) const;
+    // This one should eventually go away, but there are several scripts
+    // that depend on it.
+    void accessKmers()
+    {
+        accessKmerChecker();
+    }
 
-    // Select marker k-mers randomly.
-    void randomlySelectKmers(
-        size_t k,           // k-mer length.
-        double probability, // The probability that a k-mer is selected as a marker.
-        int seed            // For random number generator.
-    );
-
-
-
-    // Select marker k-mers randomly, but excluding
-    // the ones that have high frequency in the reads.
-    void selectKmersBasedOnFrequency(
-
-        // k-mer length.
-        size_t k,
-
-        // The desired marker density
-        double markerDensity,
-
-        // Seed for random number generator.
-        int seed,
-
-        // Exclude k-mers enriched by more than this amount.
-        // Enrichment is the ratio of k-mer frequency in reads
-        // over what a random distribution would give.
-        double enrichmentThreshold,
-
-        size_t threadCount
-    );
-
-
-
-    // In this version, marker k-mers are selected randomly, but excluding
-    // any k-mer that is over-enriched even in a single oriented read.
-    void selectKmers2(
-
-        // k-mer length.
-        size_t k,
-
-        // The desired marker density
-        double markerDensity,
-
-        // Seed for random number generator.
-        int seed,
-
-        // Exclude k-mers enriched by more than this amount,
-        // even in a single oriented read.
-        // Enrichment is the ratio of k-mer frequency in reads
-        // over what a random distribution would give.
-        double enrichmentThreshold,
-
-        size_t threadCount
-    );
-private:
-
-    class SelectKmers2Data {
-    public:
-
-        double enrichmentThreshold;
-
-        // The number of times each k-mer appears in an oriented read.
-        // Indexed by KmerId.
-        MemoryMapped::Vector<uint64_t> globalFrequency;
-
-        // The number of oriented reads that each k-mer is
-        // over-enriched in by more than a factor enrichmentThreshold.
-        // Indexed by KmerId.
-        MemoryMapped::Vector<ReadId> overenrichedReadCount;
-
-    };
-    SelectKmers2Data selectKmers2Data;
-    void selectKmers2ThreadFunction(size_t threadId);
-
-
-
-    // In this version, marker k-mers are selected randomly, but excluding
-    // k-mers that appear repeated at short distances in any oriented read.
-    // More precisely, for each k-mer we compute the minimum distance
-    // (in RLE bases) at which any two copies of that k-mer appear in any oriented read.
-    // K-mers for which this minimum distance is less than distanceThreshold
-    // are not used as markers. Marker k-mers are selected randomly among the
-    // remaining k-mers, until the desired marker density is achieved.
-public:
-    void selectKmers4(
-
-        // k-mer length.
-        uint64_t k,
-
-        // The desired marker density
-        double markerDensity,
-
-        // Seed for random number generator.
-        uint64_t seed,
-
-        // Exclude k-mers that appear in any read in two copies,
-        // with the two copies closer than this distance (in RLE bases).
-        uint64_t distanceThreshold,
-
-        size_t threadCount
-    );
-private:
-    void selectKmers4ThreadFunction(size_t threadId);
-    class SelectKmers4Data {
-    public:
-
-        // The number of times each k-mer appears in an oriented read.
-        // Indexed by KmerId.
-        MemoryMapped::Vector<uint64_t> globalFrequency;
-
-        // The minimum distance at which two copies of each k-mer
-        // appear in any oriented read.
-        // Indexed by KmerId.
-        MemoryMapped::Vector< pair<std::mutex, uint32_t> > minimumDistance;
-
-    };
-    SelectKmers4Data selectKmers4Data;
-
-
-
-    // Read the k-mers from file.
-public:
-    void readKmersFromFile(uint64_t k, const string& fileName);
 
 private:
-    void computeKmerFrequency(size_t threadId);
-    void initializeKmerTable();
 
 
     // Hash a KmerId in such a way that it has the same hash as its reverse

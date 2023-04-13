@@ -600,64 +600,9 @@ void shasta::main::assemble(
     performanceLog << timestamp << "Done loading reads from " << inputFileNames.size() << " files." << endl;
     performanceLog << "Read loading took " << seconds(t1-t0) << "s." << endl;
 
-
-
-    // Select the k-mers that will be used as markers.
-    switch(assemblerOptions.kmersOptions.generationMethod) {
-    case 0:
-        assembler.randomlySelectKmers(
-            assemblerOptions.kmersOptions.k,
-            assemblerOptions.kmersOptions.probability, 231);
-        break;
-
-    case 1:
-        // Randomly select the k-mers to be used as markers, but
-        // excluding those that are globally overenriched in the input reads,
-        // as measured by total frequency in all reads.
-        assembler.selectKmersBasedOnFrequency(
-            assemblerOptions.kmersOptions.k,
-            assemblerOptions.kmersOptions.probability, 231,
-            assemblerOptions.kmersOptions.enrichmentThreshold, threadCount);
-        break;
-
-    case 2:
-        // Randomly select the k-mers to be used as markers, but
-        // excluding those that are overenriched even in a single oriented read.
-        assembler.selectKmers2(
-            assemblerOptions.kmersOptions.k,
-            assemblerOptions.kmersOptions.probability, 231,
-            assemblerOptions.kmersOptions.enrichmentThreshold, threadCount);
-        break;
-
-    case 3:
-        // Read the k-mers to be used as markers from a file.
-        if(assemblerOptions.kmersOptions.file.empty() or
-            assemblerOptions.kmersOptions.file[0] != '/') {
-            throw runtime_error("Option --Kmers.file must specify an absolute path. "
-                "A relative path is not accepted.");
-        }
-        assembler.readKmersFromFile(
-            assemblerOptions.kmersOptions.k,
-            assemblerOptions.kmersOptions.file);
-        break;
-
-    case 4:
-        // Randomly select the k-mers to be used as markers, but
-        // excluding those that appear in two copies close to each other
-        // even in a single oriented read.
-        assembler.selectKmers4(
-            assemblerOptions.kmersOptions.k,
-            assemblerOptions.kmersOptions.probability, 231,
-            assemblerOptions.kmersOptions.distanceThreshold, threadCount);
-        break;
-
-    default:
-        throw runtime_error("Invalid --Kmers generationMethod. "
-            "Specify a value between 0 and 4, inclusive.");
-    }
-    assembler.createKmerChecker();
-
-
+    // Initialize the KmerChecker, which has the information needed
+    // to decide if a k-mer is a marker.
+    assembler.createKmerChecker(assemblerOptions.kmersOptions, threadCount);
 
     // Find the markers in the reads.
     assembler.findMarkers(0);

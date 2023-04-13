@@ -14,7 +14,7 @@ using namespace shasta;
 void Assembler::findMarkers(size_t threadCount)
 {
     reads->checkReadsAreOpen();
-    checkKmersAreOpen();
+    SHASTA_ASSERT(kmerChecker);
 
     markers.createNew(largeDataName("Markers"), largeDataPageSize);
     MarkerFinder markerFinder(
@@ -44,7 +44,7 @@ void Assembler::checkMarkersAreOpen() const
 void Assembler::writeMarkers(ReadId readId, Strand strand, const string& fileName)
 {
     // Check that we have what we need.
-    checkKmersAreOpen();
+    SHASTA_ASSERT(kmerChecker);
     reads->checkReadsAreOpen();
     checkMarkersAreOpen();
     reads->checkReadId(readId);

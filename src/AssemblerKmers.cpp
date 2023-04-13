@@ -1,5 +1,6 @@
 // Shasta.
 #include "Assembler.hpp"
+#include "AssemblerOptions.hpp"
 #include "deduplicate.hpp"
 #include "KmerChecker.hpp"
 #include "MurmurHash2.hpp"
@@ -13,48 +14,38 @@ using namespace shasta;
 
 
 
-void Assembler::accessKmers()
+void Assembler::createKmerChecker(
+    const KmersOptions& kmersOptions,
+    uint64_t threadCount)
 {
-    kmerTable.accessExistingReadOnly(largeDataName("Kmers"));
-    if(kmerTable.size() != (1ULL<< (2*assemblerInfo->k))) {
-        throw runtime_error("Size of k-mer vector is inconsistent with stored value of k.");
+    if(threadCount == 0) {
+        threadCount = std::thread::hardware_concurrency();
     }
-    accessKmerChecker();
+
+    assemblerInfo->k = kmersOptions.k;
+    assemblerInfo->kmerGenerationMethod = kmersOptions.generationMethod;
+    kmerChecker = make_shared<KmerChecker>(kmersOptions, threadCount, getReads(), *this);
 }
 
-void Assembler::checkKmersAreOpen()const
-{
-    if(!kmerTable.isOpen or not kmerChecker) {
-        throw runtime_error("Kmers are not accessible.");
-    }
-}
 
-void Assembler::createKmerChecker()
-{
-    kmerChecker = make_shared<KmerChecker>();
-    kmerChecker->create(kmerTable, largeDataName("KmerChecker"), largeDataPageSize);
-}
+
 void Assembler::accessKmerChecker()
 {
-    kmerChecker = make_shared<KmerChecker>();
-    kmerChecker->access(largeDataName("KmerChecker"));
-
+    kmerChecker = make_shared<KmerChecker>(
+        assemblerInfo->k,
+        assemblerInfo->kmerGenerationMethod,
+        getReads(),
+        *this);
 }
 
 
 
 // Randomly select the k-mers to be used as markers.
-void Assembler::randomlySelectKmers(
-    size_t k,           // k-mer length.
+void KmerChecker::create0(
     double probability, // The probability that a k-mer is selected as a marker.
     int seed            // For random number generator.
 )
 {
-    // Sanity check on the value of k, then store it.
-    if(k > Kmer::capacity) {
-        throw runtime_error("K-mer capacity exceeded.");
-    }
-    assemblerInfo->k = k;
 
     // The total number of k-mers of this length.
     // This includes both RLE and non-RLE k-mers.
@@ -68,12 +59,6 @@ void Assembler::randomlySelectKmers(
         throw runtime_error("Invalid k-mer probability " +
             to_string(probability) + " requested.");
     }
-
-
-
-    // Fill in the fields of the k-mer table
-    // that depends only on k.
-    initializeKmerTable();
 
 
 
@@ -112,57 +97,14 @@ void Assembler::randomlySelectKmers(
     }
 
 
-    // Do some counting.
-    uint64_t rleKmerCount = 0;
-    uint64_t markerKmerCount = 0;
-    uint64_t markerRleKmerCount = 0;
-    for(uint64_t kmerId=0; kmerId<kmerCount; kmerId++) {
-        const KmerInfo& kmerInfo = kmerTable[kmerId];
-        if(kmerInfo.isRleKmer) {
-            ++rleKmerCount;
-        }
-        if(kmerInfo.isMarker) {
-            ++markerKmerCount;
-        }
-        if(kmerInfo.isRleKmer and kmerInfo.isMarker) {
-            ++markerRleKmerCount;
-        }
-    }
-
-
-
-    // Summary messages.
-    if(assemblerInfo->readRepresentation == 0) {
-
-        // We are using the raw representation of the reads.
-        cout << "Total number of k-mers of length " << k << " is " << kmerCount << endl;
-        cout << "Of those, " << markerKmerCount << " will be used as markers." << endl;
-        cout << "Fraction of k-mers used as markers: requested " <<
-            probability << ", actual " <<
-            double(markerKmerCount)/double(kmerCount) << "." << endl;
-
-
-    } else {
-
-        // We are using the RLE representation of the reads.
-        cout << "Total number of k-mers of length " << k << " is " << kmerCount << endl;
-        cout << "Number of RLE k-mers of length " << k << " is " << rleKmerCount << endl;
-        cout << "Of those, " << markerRleKmerCount << " will be used as markers." << endl;
-        cout << "Fraction of k-mers used as markers: requested " <<
-            probability << ", actual " <<
-            double(markerRleKmerCount)/double(rleKmerCount) << "." << endl;
-
-    }
-
 }
 
 
 
-void Assembler::initializeKmerTable()
+void KmerChecker::initializeKmerTable()
 {
     // Create the kmer table with the necessary size.
     kmerTable.createNew(largeDataName("Kmers"), largeDataPageSize);
-    const size_t k = assemblerInfo->k;
     const size_t kmerCount = 1ULL << (2ULL*k);
     kmerTable.resize(kmerCount);
 
@@ -219,37 +161,9 @@ uint32_t Assembler::hashKmerId(KmerId kmerId) const
 
 
 
-void Assembler::writeKmers(const string& fileName) const
-{
-    checkKmersAreOpen();
-
-    // Get the k-mer length.
-    const size_t k = assemblerInfo->k;
-    const size_t kmerCount = 1ULL << (2ULL*k);
-    SHASTA_ASSERT(kmerTable.size() == kmerCount);
-
-    // Open the output file and write the header line.
-    ofstream file(fileName);
-    file << "KmerId,Kmer,IsMarker,ReverseComplementedKmerId,ReverseComplementedKmer\n";
-
-    // Write a line for each k-mer.
-    for(uint64_t kmerId=0; kmerId<kmerCount; kmerId++) {
-        file << kmerId << ",";
-        file << Kmer(kmerId, k) << ",";
-        file << int(kmerTable[kmerId].isMarker) << ",";
-        file << kmerTable[kmerId].reverseComplementedKmerId << ",";
-        file << Kmer(kmerTable[kmerId].reverseComplementedKmerId, k) << "\n";
-    }
-}
-
-
-
 // Select marker k-mers randomly, but excluding
 // the ones that have high frequency in the reads.
-void Assembler::selectKmersBasedOnFrequency(
-
-    // k-mer length.
-    size_t k,
+void KmerChecker::create1(
 
     // The desired marker density
     double markerDensity,
@@ -262,15 +176,11 @@ void Assembler::selectKmersBasedOnFrequency(
     // over what a random distribution would give.
     double enrichmentThreshold,
 
+    const Reads& reads,
+
     size_t threadCount
 )
 {
-
-    // Sanity check on the value of k, then store it.
-    if(k > Kmer::capacity) {
-        throw runtime_error("K-mer capacity exceeded.");
-    }
-    assemblerInfo->k = k;
 
     // Sanity check.
     if(markerDensity<0. || markerDensity>1.) {
@@ -283,13 +193,9 @@ void Assembler::selectKmersBasedOnFrequency(
         threadCount = std::thread::hardware_concurrency();
     }
 
-    // Fill in the fields of the k-mer table
-    // that depends only on k.
-    initializeKmerTable();
-
     // Compute the frequency of all k-mers in oriented reads.
-    setupLoadBalancing(reads->readCount(), 1000);
-    runThreads(&Assembler::computeKmerFrequency, threadCount);
+    setupLoadBalancing(reads.readCount(), 1000);
+    runThreads(&KmerChecker::computeKmerFrequency, threadCount);
 
     // Compute the total number of k-mer occurrences in reads
     // and the number of k-mers that can possibly occur.
@@ -301,7 +207,7 @@ void Assembler::selectKmersBasedOnFrequency(
     for(uint64_t kmerId=0; kmerId!=kmerTable.size(); kmerId++) {
         const KmerInfo& info = kmerTable[kmerId];
         totalKmerOccurrences += info.frequency;
-        if(assemblerInfo->readRepresentation == 0) {
+        if(reads.representation == 0) {
             ++possibleKmerCount;
         } else {
             if(info.isRleKmer) {
@@ -314,7 +220,7 @@ void Assembler::selectKmersBasedOnFrequency(
 
 
 
-    if(assemblerInfo->readRepresentation == 0) {
+    if(reads.representation == 0) {
 
         // We are using raw read representation.
         cout <<
@@ -375,7 +281,7 @@ void Assembler::selectKmersBasedOnFrequency(
     vector<KmerId> candidateKmers;
     for(uint64_t kmerId=0; kmerId<kmerTable.size(); kmerId++) {
         const KmerInfo& info = kmerTable[kmerId];
-        if((assemblerInfo->readRepresentation==1) and  (not info.isRleKmer)) {
+        if((reads.representation==1) and  (not info.isRleKmer)) {
             continue;
         }
         const uint64_t frequency = info.frequency;
@@ -450,7 +356,8 @@ void Assembler::selectKmersBasedOnFrequency(
 }
 
 
-void Assembler::computeKmerFrequency(size_t threadId)
+
+void KmerChecker::computeKmerFrequency(size_t threadId)
 {
     // Create a frequency vector for this thread.
     MemoryMapped::Vector<uint64_t> frequency;
@@ -463,7 +370,6 @@ void Assembler::computeKmerFrequency(size_t threadId)
 
 
     // Loop over all batches assigned to this thread.
-    const size_t k = assemblerInfo->k;
     uint64_t begin, end;
     while(getNextBatch(begin, end)) {
 
@@ -471,7 +377,7 @@ void Assembler::computeKmerFrequency(size_t threadId)
         for(ReadId readId=ReadId(begin); readId!=ReadId(end); readId++) {
 
             // Access the sequence of this read.
-            const LongBaseSequenceView read = reads->getRead(readId);
+            const LongBaseSequenceView read = reads.getRead(readId);
 
             // If the read is pathologically short, it has no k-mers.
             if(read.baseCount < k) {
@@ -524,17 +430,13 @@ void Assembler::computeKmerFrequency(size_t threadId)
 
 
 // Read the k-mers from file.
-void Assembler::readKmersFromFile(uint64_t k, const string& fileName)
+void KmerChecker::create3(const string& fileName)
 {
-    // Sanity check on the value of k, then store it.
-    if(k > Kmer::capacity) {
-        throw runtime_error("K-mer capacity exceeded.");
+    if(fileName.empty() or
+        fileName[0] != '/') {
+        throw runtime_error("Option --Kmers.file must specify an absolute path. "
+            "A relative path is not accepted.");
     }
-    assemblerInfo->k = k;
-
-    // Fill in the fields of the k-mer table
-    // that depends only on k.
-    initializeKmerTable();
 
     // Open the file.
     ifstream file(fileName);
@@ -576,7 +478,7 @@ void Assembler::readKmersFromFile(uint64_t k, const string& fileName)
         const KmerId kmerId = KmerId(kmer.id(k));
         SHASTA_ASSERT(kmerId < kmerTable.size());
         KmerInfo& kmerInfo = kmerTable[kmerId];
-        if((assemblerInfo->readRepresentation==1) and (not kmerInfo.isRleKmer)) {
+        if((reads.representation==1) and (not kmerInfo.isRleKmer)) {
             throw runtime_error("Non-RLE k-mer (duplicate consecutive bases) in " +
                 fileName + ":\n" + line);
         }
@@ -596,7 +498,7 @@ void Assembler::readKmersFromFile(uint64_t k, const string& fileName)
         if(kmerInfo.isMarker) {
             ++usedKmerCount;
         }
-        if(assemblerInfo->readRepresentation == 0) {
+        if(reads.representation == 0) {
             ++possibleKmerCount;
         } else {
             if(kmerInfo.isRleKmer) {
@@ -612,10 +514,7 @@ void Assembler::readKmersFromFile(uint64_t k, const string& fileName)
 
 // In this version, marker k-mers are selected randomly, but excluding
 // any k-mer that is over-enriched even in a single oriented read.
-void Assembler::selectKmers2(
-
-    // k-mer length.
-    size_t k,
+void KmerChecker::create2(
 
     // The desired marker density
     double markerDensity,
@@ -632,11 +531,6 @@ void Assembler::selectKmers2(
     size_t threadCount
 )
 {
-    // Sanity check on the value of k, then store it.
-    if(k > Kmer::capacity) {
-        throw runtime_error("K-mer capacity exceeded.");
-    }
-    assemblerInfo->k = k;
 
     // Sanity check.
     if(markerDensity<0. || markerDensity>1.) {
@@ -648,10 +542,6 @@ void Assembler::selectKmers2(
     if(threadCount == 0) {
         threadCount = std::thread::hardware_concurrency();
     }
-
-    // Fill in the fields of the k-mer table
-    // that depends only on k.
-    initializeKmerTable();
 
     // Store the enrichmentThreshold so all threads can see it.
     selectKmers2Data.enrichmentThreshold = enrichmentThreshold;
@@ -672,8 +562,8 @@ void Assembler::selectKmers2(
     fill(
         selectKmers2Data.overenrichedReadCount.begin(),
         selectKmers2Data.overenrichedReadCount.end(), 0);
-    setupLoadBalancing(reads->readCount(), 100);
-    runThreads(&Assembler::selectKmers2ThreadFunction, threadCount);
+    setupLoadBalancing(reads.readCount(), 100);
+    runThreads(&KmerChecker::selectKmers2ThreadFunction, threadCount);
 
 
 
@@ -683,7 +573,7 @@ void Assembler::selectKmers2(
     uint64_t possibleKmerCount = 0;
     for(uint64_t kmerId=0; kmerId!=kmerTable.size(); kmerId++) {
         totalKmerOccurrences += selectKmers2Data.globalFrequency[kmerId];
-        if(assemblerInfo->readRepresentation == 0) {
+        if(reads.representation == 0) {
             ++ possibleKmerCount;
         } else {
             if(kmerTable[kmerId].isRleKmer) {
@@ -719,13 +609,16 @@ void Assembler::selectKmers2(
 
         csv << "\n";
     }
+    csv.close();
+
 
 
     // Gather k-mers that are not overenriched in any read and therefore
     // can be used as markers.
     vector<KmerId> candidateKmers;
     for(uint64_t kmerId=0; kmerId<kmerTable.size(); kmerId++) {
-        if(kmerTable[kmerId].isRleKmer and selectKmers2Data.overenrichedReadCount[kmerId] == 0) {
+        const bool readIsUsable = (reads.representation==0) ? true : kmerTable[kmerId].isRleKmer;
+        if(readIsUsable and selectKmers2Data.overenrichedReadCount[kmerId] == 0) {
             candidateKmers.push_back(KmerId(kmerId));
         }
     }
@@ -740,7 +633,7 @@ void Assembler::selectKmers2(
         " corresponds to one occurrence every " <<
         double(possibleKmerCount) / enrichmentThreshold <<
         " bases";
-    if(assemblerInfo->readRepresentation == 1) {
+    if(reads.representation == 1) {
         cout << " (in RLE representation)";
     }
     cout << "." << endl;
@@ -763,6 +656,7 @@ void Assembler::selectKmers2(
     uint64_t kmerCount = 0;
     const uint64_t desiredKmerOccurrencesCount =
         uint64_t(markerDensity * double(totalKmerOccurrences));
+    const uint64_t giveUpCount =  uint64_t(0.9 * double(candidateKmers.size()));
     while(kmerOccurrencesCount < desiredKmerOccurrencesCount) {
 
         // Generate a random index into the candidateKmers vector.
@@ -793,6 +687,10 @@ void Assembler::selectKmers2(
         reverseComplementedInfo.isMarker = true;
         kmerOccurrencesCount += selectKmers2Data.globalFrequency[info.reverseComplementedKmerId];
         ++kmerCount;
+
+        if(kmerCount >= giveUpCount) {
+            throw runtime_error("Giving up after selecting as markers 90% of the candidate kmers.");
+        }
     }
     cout << "Selected " << kmerCount << " k-mers as markers." << endl;
     cout << "These k-mers have a total " << kmerOccurrencesCount <<
@@ -803,7 +701,7 @@ void Assembler::selectKmers2(
 
 
 
-void Assembler::selectKmers2ThreadFunction(size_t threadId)
+void KmerChecker::selectKmers2ThreadFunction(size_t threadId)
 {
     // Initialize globalFrequency for this thread.
     MemoryMapped::Vector<uint64_t> globalFrequency;
@@ -832,7 +730,7 @@ void Assembler::selectKmers2ThreadFunction(size_t threadId)
     // It is needed below for overenrichment computations.
     uint64_t possibleKmerCount = 0;
     for(const KmerInfo& kmerInfo: kmerTable) {
-        if(assemblerInfo->readRepresentation == 0) {
+        if(reads.representation == 0) {
             ++possibleKmerCount;
         } else {
             if(kmerInfo.isRleKmer) {
@@ -843,7 +741,6 @@ void Assembler::selectKmers2ThreadFunction(size_t threadId)
 
 
     // Loop over all batches assigned to this thread.
-    const size_t k = assemblerInfo->k;
     uint64_t begin, end;
     while(getNextBatch(begin, end)) {
 
@@ -851,7 +748,7 @@ void Assembler::selectKmers2ThreadFunction(size_t threadId)
         for(ReadId readId=ReadId(begin); readId!=ReadId(end); readId++) {
 
             // Access the sequence of this read.
-            const LongBaseSequenceView read = reads->getRead(readId);
+            const LongBaseSequenceView read = reads.getRead(readId);
 
             // If the read is pathologically short, it has no k-mers.
             if(read.baseCount < k) {
@@ -909,6 +806,7 @@ void Assembler::selectKmers2ThreadFunction(size_t threadId)
     }
 
 
+
     // Add our globalFrequency and overenrichedReadCount
     // to the values computer by the other threads.
     {
@@ -924,7 +822,6 @@ void Assembler::selectKmers2ThreadFunction(size_t threadId)
 
 
 
-
 // In this version, marker k-mers are selected randomly, but excluding
 // k-mers that appear repeated at short distances in any oriented read.
 // More precisely, for each k-mer we compute the minimum distance
@@ -932,16 +829,13 @@ void Assembler::selectKmers2ThreadFunction(size_t threadId)
 // K-mers for which this minimum distance is less than distanceThreshold
 // are not used as markers. Marker k-mers are selected randomly among the
 // remaining k-mers, until the desired marker density is achieved.
-void Assembler::selectKmers4(
-
-    // k-mer length.
-    uint64_t k,
+void KmerChecker::create4(
 
     // The desired marker density
     double markerDensity,
 
     // Seed for random number generator.
-    uint64_t seed,
+    int seed,
 
     // Exclude k-mers that appear in any read in two copies,
     // with the two copies closer than this distance (in RLE bases).
@@ -951,13 +845,6 @@ void Assembler::selectKmers4(
 )
 {
     const bool debug = false;
-    cout << timestamp << "Begin selectKmers4." << endl;
-
-    // Sanity check on the value of k, then store it.
-    if(k > Kmer::capacity) {
-        throw runtime_error("K-mer capacity exceeded.");
-    }
-    assemblerInfo->k = k;
 
     // Sanity check.
     if(markerDensity<0. || markerDensity>1.) {
@@ -969,10 +856,6 @@ void Assembler::selectKmers4(
     if(threadCount == 0) {
         threadCount = std::thread::hardware_concurrency();
     }
-
-    // Fill in the fields of the k-mer table
-    // that depends only on k.
-    initializeKmerTable();
 
     // Initialize the global frequency of all k-mers.
     selectKmers4Data.globalFrequency.createNew(
@@ -995,8 +878,8 @@ void Assembler::selectKmers4(
     }
 
     // Compute the minimumDistance vector.
-    setupLoadBalancing(reads->readCount(), 100);
-    runThreads(&Assembler::selectKmers4ThreadFunction, threadCount);
+    setupLoadBalancing(reads.readCount(), 100);
+    runThreads(&KmerChecker::selectKmers4ThreadFunction, threadCount);
 
 
 
@@ -1048,7 +931,7 @@ void Assembler::selectKmers4(
     uint64_t rleKmerCount = 0;
     for(uint64_t kmerId=0; kmerId!=kmerTable.size(); kmerId++) {
         const KmerInfo& info = kmerTable[kmerId];
-        if(not info.isRleKmer) {
+        if((reads.representation==1) and (not info.isRleKmer)) {
             SHASTA_ASSERT(selectKmers4Data.globalFrequency[kmerId] == 0);
             continue;
         }
@@ -1074,7 +957,7 @@ void Assembler::selectKmers4(
     for(uint64_t kmerId=0; kmerId<kmerTable.size(); kmerId++) {
         const KmerInfo& info = kmerTable[kmerId];
         const KmerId kmerIdRc = info.reverseComplementedKmerId;
-        if(not info.isRleKmer) {
+        if((reads.representation==1) and (not info.isRleKmer)) {
             continue;
         }
         if(kmerIdRc == kmerId) {
@@ -1162,17 +1045,12 @@ void Assembler::selectKmers4(
     selectKmers4Data.minimumDistance.remove();
     selectKmers4Data.globalFrequency.remove();
 
-    // Done.
-    cout << timestamp << "End selectKmers4." << endl;
 }
 
 
 
-void Assembler::selectKmers4ThreadFunction(size_t threadId)
+void KmerChecker::selectKmers4ThreadFunction(size_t threadId)
 {
-    // K-mer length.
-    const size_t k = assemblerInfo->k;
-
     // Initialize globalFrequency for this thread.
     // Having all threads accumulate atomically on the global frequency vector is too slow.
     MemoryMapped::Vector<uint64_t> globalFrequency;
@@ -1193,7 +1071,7 @@ void Assembler::selectKmers4ThreadFunction(size_t threadId)
         for(ReadId readId=ReadId(begin); readId!=ReadId(end); readId++) {
 
             // Access the sequence of this read.
-            const LongBaseSequenceView read = reads->getRead(readId);
+            const LongBaseSequenceView read = reads.getRead(readId);
 
             // If the read is pathologically short, it has no k-mers.
             if(read.baseCount < k) {
@@ -1256,4 +1134,3 @@ void Assembler::selectKmers4ThreadFunction(size_t threadId)
     }
     globalFrequency.remove();
 }
-
