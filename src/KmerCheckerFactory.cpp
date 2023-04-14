@@ -1,4 +1,5 @@
 #include "KmerCheckerFactory.hpp"
+#include "KmerTable.hpp"
 #include "AssemblerOptions.hpp"
 #include "Reads.hpp"
 using namespace shasta;

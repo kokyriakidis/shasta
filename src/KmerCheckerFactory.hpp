@@ -3,14 +3,13 @@
 
 // Shasta.
 #include "KmerChecker.hpp"
-#include "MappedMemoryOwner.hpp"
-#include "MemoryMappedVector.hpp"
-#include "MultithreadedObject.hpp"
+#include "memory.hpp"
 
 namespace shasta {
     class KmerCheckerFactory;
 
     class KmerChecker;
+    class KmersOptions;
     class Reads;
     class MappedMemoryOwner;
 
