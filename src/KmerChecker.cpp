@@ -9,77 +9,97 @@ using namespace shasta;
 #include "fstream.hpp"
 #include <random>
 
-// Explicit instantiation.
+// Explicit template instantiations.
 #include "MultithreadedObject.tpp"
-template class MultithreadedObject<KmerChecker>;
+template class MultithreadedObject<KmerTable1>;
+template class MultithreadedObject<KmerTable2>;
+template class MultithreadedObject<KmerTable4>;
 
 
 
-// Initial creation.
-KmerChecker::KmerChecker(
+std::shared_ptr<KmerChecker> shasta::KmerCheckerFactory::createNew(
     const KmersOptions& kmersOptions,
     uint64_t threadCount,
     const Reads& reads,
-    const MappedMemoryOwner& mappedMemoryOwner) :
-    MultithreadedObject<KmerChecker>(*this),
-    MappedMemoryOwner(mappedMemoryOwner),
-    k(kmersOptions.k),
-    reads(reads)
+    const MappedMemoryOwner& mappedMemoryOwner)
 {
-    // Sanity check on the value of k.
-    if(k > Kmer::capacity) {
-        throw runtime_error("K-mer capacity exceeded.");
-    }
-
-    initializeKmerTable();
     const int seed = 231;
 
     switch(kmersOptions.generationMethod) {
-    case 0:
-        // Randomly select kmers.
-        create0(
-            kmersOptions.probability,
-            seed);
-        break;
+        case 0:
+        return make_shared<KmerTable0>(
+            kmersOptions.k,
+             kmersOptions.probability,
+             seed,
+             mappedMemoryOwner);
 
-    case 1:
-        // Randomly select the k-mers to be used as markers, but
-        // excluding those that are globally overenriched in the input reads,
-        // as measured by total frequency in all reads.
-        create1(
-            kmersOptions.probability,
-            seed,
-            kmersOptions.enrichmentThreshold,
-            reads,
-            threadCount);
-        break;
+        case 1:
+        return make_shared<KmerTable1>(
+             kmersOptions.k,
+             kmersOptions.probability,
+             seed,
+             kmersOptions.enrichmentThreshold,
+             reads,
+             threadCount,
+             mappedMemoryOwner);
 
-    case 2:
-        // Randomly select the k-mers to be used as markers, but
-        // excluding those that are overenriched even in a single oriented read.
-        create2(
-            kmersOptions.probability,
-            seed,
-            kmersOptions.enrichmentThreshold,
-            threadCount);
-        break;
+        case 2:
+        return make_shared<KmerTable2>(
+             kmersOptions.k,
+             kmersOptions.probability,
+             seed,
+             kmersOptions.enrichmentThreshold,
+             reads,
+             threadCount,
+             mappedMemoryOwner);
 
-    case 3:
-        // Read the k-mers to be used as markers from a file.
-        create3(
-            kmersOptions.file);
-        break;
+        case 3:
+        return make_shared<KmerTable3>(
+            kmersOptions.k,
+            reads.representation,
+            kmersOptions.file,
+            mappedMemoryOwner);
 
-    case 4:
-        // Randomly select the k-mers to be used as markers, but
-        // excluding those that appear in two copies close to each other
-        // even in a single oriented read.
-        create4(
+        case 4:
+        return make_shared<KmerTable4>(
+            kmersOptions.k,
             kmersOptions.probability,
             seed,
             kmersOptions.distanceThreshold,
-            threadCount);
-        break;
+            reads,
+            threadCount,
+            mappedMemoryOwner);
+
+        default:
+            throw runtime_error("Invalid --Kmers generationMethod. "
+                "Specify a value between 0 and 4, inclusive.");
+     }
+}
+
+
+
+std::shared_ptr<shasta::KmerChecker> shasta::KmerCheckerFactory::createFromBinaryData(
+    uint64_t k,
+    uint64_t generationMethod,
+    const Reads& reads,
+    const MappedMemoryOwner& mappedMemoryOwner)
+{
+    switch(generationMethod) {
+    case 0:
+         return make_shared<KmerTable0>(k, mappedMemoryOwner);
+
+    case 1:
+         return make_shared<KmerTable1>(k, reads, mappedMemoryOwner);
+
+    case 2:
+         return make_shared<KmerTable2>(k, reads, mappedMemoryOwner);
+
+    case 3:
+         return make_shared<KmerTable3>(k, mappedMemoryOwner);
+
+    case 4:
+         return make_shared<KmerTable4>(k, reads, mappedMemoryOwner);
+
 
     default:
         throw runtime_error("Invalid --Kmers generationMethod. "
@@ -89,28 +109,13 @@ KmerChecker::KmerChecker(
 
 
 
-// Create from binary data.
-KmerChecker::KmerChecker(
-    uint64_t k,
-    uint64_t generationMethod,
-    const Reads& reads,
-    const MappedMemoryOwner& mappedMemoryOwner) :
-    MultithreadedObject<KmerChecker>(*this),
-    MappedMemoryOwner(mappedMemoryOwner),
-    k(k),
-    reads(reads)
-{
-    kmerTable.accessExistingReadOnly(largeDataName("Kmers"));
-}
-
-
-
-
 // Randomly select the k-mers to be used as markers.
-void KmerChecker::create0(
+KmerTable0::KmerTable0(
+    uint64_t k,
     double probability, // The probability that a k-mer is selected as a marker.
-    int seed            // For random number generator.
-)
+    int seed ,           // For random number generator.
+    const MappedMemoryOwner& mappedMemoryOwner
+    ) : KmerTable(k, true, mappedMemoryOwner)
 {
 
     // The total number of k-mers of this length.
@@ -167,8 +172,24 @@ void KmerChecker::create0(
 
 
 
-void KmerChecker::initializeKmerTable()
+KmerTable::KmerTable(
+    uint64_t k,
+    bool createNew,
+    const MappedMemoryOwner& mappedMemoryOwner) :
+    MappedMemoryOwner(mappedMemoryOwner), k(k)
 {
+    if(createNew) {
+        createKmerTable();
+    } else {
+        accessKmerTable();
+    }
+}
+
+
+
+void KmerTable::createKmerTable()
+{
+
     // Create the kmer table with the necessary size.
     kmerTable.createNew(largeDataName("Kmers"), largeDataPageSize);
     const size_t kmerCount = 1ULL << (2ULL*k);
@@ -204,9 +225,19 @@ void KmerChecker::initializeKmerTable()
 
 
 
+void KmerTable::accessKmerTable()
+{
+    kmerTable.accessExistingReadOnly(largeDataName("Kmers"));
+    SHASTA_ASSERT(kmerTable.size() == 1ULL << (2ULL*k));
+}
+
+
+
 // Select marker k-mers randomly, but excluding
 // the ones that have high frequency in the reads.
-void KmerChecker::create1(
+KmerTable1::KmerTable1(
+
+    uint64_t k,
 
     // The desired marker density
     double markerDensity,
@@ -221,8 +252,13 @@ void KmerChecker::create1(
 
     const Reads& reads,
 
-    size_t threadCount
-)
+    size_t threadCount,
+
+    const MappedMemoryOwner& mappedMemoryOwner) :
+
+    KmerTable(k, true, mappedMemoryOwner),
+    MultithreadedObject<KmerTable1>(*this),
+    reads(reads)
 {
 
     // Sanity check.
@@ -238,7 +274,7 @@ void KmerChecker::create1(
 
     // Compute the frequency of all k-mers in oriented reads.
     setupLoadBalancing(reads.readCount(), 1000);
-    runThreads(&KmerChecker::computeKmerFrequency, threadCount);
+    runThreads(&KmerTable1::computeKmerFrequency, threadCount);
 
     // Compute the total number of k-mer occurrences in reads
     // and the number of k-mers that can possibly occur.
@@ -400,7 +436,7 @@ void KmerChecker::create1(
 
 
 
-void KmerChecker::computeKmerFrequency(size_t threadId)
+void KmerTable1::computeKmerFrequency(size_t threadId)
 {
     // Create a frequency vector for this thread.
     MemoryMapped::Vector<uint64_t> frequency;
@@ -473,7 +509,12 @@ void KmerChecker::computeKmerFrequency(size_t threadId)
 
 
 // Read the k-mers from file.
-void KmerChecker::create3(const string& fileName)
+KmerTable3::KmerTable3(
+    uint64_t k,
+    uint64_t readRepresentation,
+    const string& fileName,
+    const MappedMemoryOwner& mappedMemoryOwner) :
+    KmerTable(k, true, mappedMemoryOwner)
 {
     if(fileName.empty() or
         fileName[0] != '/') {
@@ -521,7 +562,7 @@ void KmerChecker::create3(const string& fileName)
         const KmerId kmerId = KmerId(kmer.id(k));
         SHASTA_ASSERT(kmerId < kmerTable.size());
         KmerInfo& kmerInfo = kmerTable[kmerId];
-        if((reads.representation==1) and (not kmerInfo.isRleKmer)) {
+        if((readRepresentation==1) and (not kmerInfo.isRleKmer)) {
             throw runtime_error("Non-RLE k-mer (duplicate consecutive bases) in " +
                 fileName + ":\n" + line);
         }
@@ -541,7 +582,7 @@ void KmerChecker::create3(const string& fileName)
         if(kmerInfo.isMarker) {
             ++usedKmerCount;
         }
-        if(reads.representation == 0) {
+        if(readRepresentation == 0) {
             ++possibleKmerCount;
         } else {
             if(kmerInfo.isRleKmer) {
@@ -557,22 +598,18 @@ void KmerChecker::create3(const string& fileName)
 
 // In this version, marker k-mers are selected randomly, but excluding
 // any k-mer that is over-enriched even in a single oriented read.
-void KmerChecker::create2(
-
-    // The desired marker density
+KmerTable2::KmerTable2(
+    uint64_t k,
     double markerDensity,
-
-    // Seed for random number generator.
     int seed,
-
-    // Exclude k-mers enriched by more than this amount,
-    // even in a single oriented read.
-    // Enrichment is the ratio of k-mer frequency in reads
-    // over what a random distribution would give.
     double enrichmentThreshold,
-
-    size_t threadCount
-)
+    const Reads& reads,
+    uint64_t threadCount,
+    const MappedMemoryOwner& mappedMemoryOwner) :
+    KmerTable(k, true, mappedMemoryOwner),
+    MultithreadedObject<KmerTable2>(*this),
+    reads(reads),
+    enrichmentThreshold(enrichmentThreshold)
 {
 
     // Sanity check.
@@ -586,27 +623,24 @@ void KmerChecker::create2(
         threadCount = std::thread::hardware_concurrency();
     }
 
-    // Store the enrichmentThreshold so all threads can see it.
-    selectKmers2Data.enrichmentThreshold = enrichmentThreshold;
-
     // For each KmerId that is an RLE k-mer, compute the
     // global frequency (total number of occurrences in all
     // oriented reads) and the number of reads in
     // which the k-mer is over-enriched.
-    selectKmers2Data.globalFrequency.createNew(
+    globalFrequency.createNew(
         largeDataName("tmp-SelectKmers2-GlobalFrequency"),  largeDataPageSize);
-    selectKmers2Data.overenrichedReadCount.createNew(
+    overenrichedReadCount.createNew(
         largeDataName("tmp-SelectKmers2-OverenrichedReadCount"),  largeDataPageSize);
-    selectKmers2Data.globalFrequency.resize(kmerTable.size());
-    selectKmers2Data.overenrichedReadCount.resize(kmerTable.size());
+    globalFrequency.resize(kmerTable.size());
+    overenrichedReadCount.resize(kmerTable.size());
     fill(
-        selectKmers2Data.globalFrequency.begin(),
-        selectKmers2Data.globalFrequency.end(), 0);
+        globalFrequency.begin(),
+        globalFrequency.end(), 0);
     fill(
-        selectKmers2Data.overenrichedReadCount.begin(),
-        selectKmers2Data.overenrichedReadCount.end(), 0);
+        overenrichedReadCount.begin(),
+        overenrichedReadCount.end(), 0);
     setupLoadBalancing(reads.readCount(), 100);
-    runThreads(&KmerChecker::selectKmers2ThreadFunction, threadCount);
+    runThreads(&KmerTable2::threadFunction, threadCount);
 
 
 
@@ -615,7 +649,7 @@ void KmerChecker::create2(
     uint64_t totalKmerOccurrences = 0;
     uint64_t possibleKmerCount = 0;
     for(uint64_t kmerId=0; kmerId!=kmerTable.size(); kmerId++) {
-        totalKmerOccurrences += selectKmers2Data.globalFrequency[kmerId];
+        totalKmerOccurrences += globalFrequency[kmerId];
         if(reads.representation == 0) {
             ++ possibleKmerCount;
         } else {
@@ -635,7 +669,7 @@ void KmerChecker::create2(
         "GlobalFrequency,GlobalEnrichment,NumberOfReadsOverenriched\n";
     for(uint64_t kmerId=0; kmerId<kmerTable.size(); kmerId++) {
         const KmerInfo& info = kmerTable[kmerId];
-        const uint64_t frequency = selectKmers2Data.globalFrequency[kmerId];
+        const uint64_t frequency = globalFrequency[kmerId];
 
         const Kmer kmer(kmerId, k);
         const Kmer reverseComplementedKmer(info.reverseComplementedKmerId, k);
@@ -648,7 +682,7 @@ void KmerChecker::create2(
         csv << frequency << ",";
         csv << double(frequency) / averageOccurrenceCount;
         csv << ",";
-        csv << selectKmers2Data.overenrichedReadCount[kmerId];
+        csv << overenrichedReadCount[kmerId];
 
         csv << "\n";
     }
@@ -661,7 +695,7 @@ void KmerChecker::create2(
     vector<KmerId> candidateKmers;
     for(uint64_t kmerId=0; kmerId<kmerTable.size(); kmerId++) {
         const bool readIsUsable = (reads.representation==0) ? true : kmerTable[kmerId].isRleKmer;
-        if(readIsUsable and selectKmers2Data.overenrichedReadCount[kmerId] == 0) {
+        if(readIsUsable and overenrichedReadCount[kmerId] == 0) {
             candidateKmers.push_back(KmerId(kmerId));
         }
     }
@@ -715,7 +749,7 @@ void KmerChecker::create2(
         // This k-mer is not already selected as a marker.
         // Let's add it.
         info.isMarker = true;
-        kmerOccurrencesCount += selectKmers2Data.globalFrequency[kmerId];
+        kmerOccurrencesCount += globalFrequency[kmerId];
         ++kmerCount;
 
         // If this k-mer is palindromic, we are done.
@@ -728,7 +762,7 @@ void KmerChecker::create2(
         SHASTA_ASSERT(!reverseComplementedInfo.isMarker);
         SHASTA_ASSERT(reverseComplementedInfo.frequency == info.frequency);
         reverseComplementedInfo.isMarker = true;
-        kmerOccurrencesCount += selectKmers2Data.globalFrequency[info.reverseComplementedKmerId];
+        kmerOccurrencesCount += globalFrequency[info.reverseComplementedKmerId];
         ++kmerCount;
 
         if(kmerCount >= giveUpCount) {
@@ -744,30 +778,27 @@ void KmerChecker::create2(
 
 
 
-void KmerChecker::selectKmers2ThreadFunction(size_t threadId)
+void KmerTable2::threadFunction(size_t threadId)
 {
     // Initialize globalFrequency for this thread.
-    MemoryMapped::Vector<uint64_t> globalFrequency;
-    globalFrequency.createNew(
-        largeDataName("tmp-SelectKmers2-GlobalFrequency-" + to_string(threadId)),
+    MemoryMapped::Vector<uint64_t> threadGlobalFrequency;
+    threadGlobalFrequency.createNew(
+        largeDataName("tmp-KmerTable2-GlobalFrequency-" + to_string(threadId)),
         largeDataPageSize);
-    globalFrequency.resize(kmerTable.size());
-    fill(globalFrequency.begin(), globalFrequency.end(), 0);
+    threadGlobalFrequency.resize(kmerTable.size());
+    fill(threadGlobalFrequency.begin(), threadGlobalFrequency.end(), 0);
 
     // Initialize overenrichedReadCount for this thread.
-    MemoryMapped::Vector<ReadId> overenrichedReadCount;
-    overenrichedReadCount.createNew(
-        largeDataName("tmp-SelectKmers2-OverenrichedReadCount-" + to_string(threadId)),
+    MemoryMapped::Vector<ReadId> threadOverenrichedReadCount;
+    threadOverenrichedReadCount.createNew(
+        largeDataName("tmp-KmerTable2-OverenrichedReadCount-" + to_string(threadId)),
         largeDataPageSize);
-    overenrichedReadCount.resize(kmerTable.size());
-    fill(overenrichedReadCount.begin(), overenrichedReadCount.end(), 0);
+    threadOverenrichedReadCount.resize(kmerTable.size());
+    fill(threadOverenrichedReadCount.begin(), threadOverenrichedReadCount.end(), 0);
 
     // Vectors to hold KmerIds and their frequencies for a single read.
     vector<KmerId> readKmerIds;
     vector<uint32_t> readKmerIdFrequencies;
-
-    // Access the enrichmentThreshold.
-    const double enrichmentThreshold = selectKmers2Data.enrichmentThreshold;
 
     // Compute the total number of possible k-mers.
     // It is needed below for overenrichment computations.
@@ -811,10 +842,10 @@ void KmerChecker::selectKmers2ThreadFunction(size_t threadId)
                 readKmerIds.push_back(kmerId);
 
                 // Increment its global frequency.
-                ++globalFrequency[kmerId];
+                ++threadGlobalFrequency[kmerId];
 
                 // Also increment the frequency of the reverse complemented k-mer.
-                ++globalFrequency[kmerTable[kmerId].reverseComplementedKmerId];
+                ++threadGlobalFrequency[kmerTable[kmerId].reverseComplementedKmerId];
 
                 // Check if we reached the end of the read.
                 if(position+k == read.baseCount) {
@@ -841,8 +872,8 @@ void KmerChecker::selectKmers2ThreadFunction(size_t threadId)
                 const KmerId kmerId = readKmerIds[i];
                 const uint32_t frequency = readKmerIdFrequencies[i];
                 if(frequency > frequencyThreshold) {
-                    ++overenrichedReadCount[kmerId];
-                    ++overenrichedReadCount[kmerTable[kmerId].reverseComplementedKmerId];
+                    ++threadOverenrichedReadCount[kmerId];
+                    ++threadOverenrichedReadCount[kmerTable[kmerId].reverseComplementedKmerId];
                 }
             }
         }
@@ -855,12 +886,12 @@ void KmerChecker::selectKmers2ThreadFunction(size_t threadId)
     {
         std::lock_guard<std::mutex> lock(mutex);
         for(uint64_t kmerId=0; kmerId!=globalFrequency.size(); kmerId++) {
-            selectKmers2Data.globalFrequency[kmerId] += globalFrequency[kmerId];
-            selectKmers2Data.overenrichedReadCount[kmerId] += overenrichedReadCount[kmerId];
+            globalFrequency[kmerId] += threadGlobalFrequency[kmerId];
+            overenrichedReadCount[kmerId] += threadOverenrichedReadCount[kmerId];
         }
     }
-    globalFrequency.remove();
-    overenrichedReadCount.remove();
+    threadGlobalFrequency.remove();
+    threadOverenrichedReadCount.remove();
 }
 
 
@@ -872,20 +903,17 @@ void KmerChecker::selectKmers2ThreadFunction(size_t threadId)
 // K-mers for which this minimum distance is less than distanceThreshold
 // are not used as markers. Marker k-mers are selected randomly among the
 // remaining k-mers, until the desired marker density is achieved.
-void KmerChecker::create4(
-
-    // The desired marker density
+KmerTable4::KmerTable4(
+    uint64_t k,
     double markerDensity,
-
-    // Seed for random number generator.
     int seed,
-
-    // Exclude k-mers that appear in any read in two copies,
-    // with the two copies closer than this distance (in RLE bases).
     uint64_t distanceThreshold,
-
-    size_t threadCount
-)
+    const Reads& reads,
+    uint64_t threadCount,
+    const MappedMemoryOwner& mappedMemoryOwner) :
+        KmerTable(k, true, mappedMemoryOwner),
+    MultithreadedObject<KmerTable4>(*this),
+    reads(reads)
 {
     const bool debug = false;
 
@@ -901,36 +929,36 @@ void KmerChecker::create4(
     }
 
     // Initialize the global frequency of all k-mers.
-    selectKmers4Data.globalFrequency.createNew(
-        largeDataName("tmp-SelectKmers4-GlobalFrequency"),  largeDataPageSize);
-    selectKmers4Data.globalFrequency.resize(kmerTable.size());
+    globalFrequency.createNew(
+        largeDataName("tmp-KmerTable44-GlobalFrequency"),  largeDataPageSize);
+    globalFrequency.resize(kmerTable.size());
     fill(
-        selectKmers4Data.globalFrequency.begin(),
-        selectKmers4Data.globalFrequency.end(), 0);
+        globalFrequency.begin(),
+        globalFrequency.end(), 0);
 
 
     // Initialize the minimumDistance vector, which stores
     // the minimum RLE distance between any two copies of each k-mer
     // in any oriented read.
-    selectKmers4Data.minimumDistance.createNew(
-        largeDataName("tmp-selectKmers4-minimumDistance"), largeDataPageSize);
+    minimumDistance.createNew(
+        largeDataName("tmp-KmerTable4-minimumDistance"), largeDataPageSize);
     const uint64_t kmerCount = kmerTable.size();
-    selectKmers4Data.minimumDistance.resize(kmerCount);
+    minimumDistance.resize(kmerCount);
     for(uint64_t i=0; i<kmerCount; i++) {
-        selectKmers4Data.minimumDistance[i].second = std::numeric_limits<uint32_t>::max();
+        minimumDistance[i].second = std::numeric_limits<uint32_t>::max();
     }
 
     // Compute the minimumDistance vector.
     setupLoadBalancing(reads.readCount(), 100);
-    runThreads(&KmerChecker::selectKmers4ThreadFunction, threadCount);
+    runThreads(&KmerTable4::threadFunction, threadCount);
 
 
 
     // Write out what we found.
     if(debug) {
         const uint64_t totalFrequency = std::accumulate(
-            selectKmers4Data.globalFrequency.begin(),
-            selectKmers4Data.globalFrequency.end(), 0ULL);
+            globalFrequency.begin(),
+            globalFrequency.end(), 0ULL);
         cout << "Total number of k-mer occurrences in all oriented reads is " << totalFrequency << endl;
         ofstream csv("KmerInfo.csv");
         csv << "KmerId,Kmer,KmerIdRc,KmerRc,Frequency,FrequencyRc,TotalFrequency,"
@@ -941,13 +969,13 @@ void KmerChecker::create4(
                 continue;
             }
 
-            const uint64_t frequency = selectKmers4Data.globalFrequency[kmerId];
-            const uint64_t frequencyReverseComplement = selectKmers4Data.globalFrequency[info.reverseComplementedKmerId];
+            const uint64_t frequency = globalFrequency[kmerId];
+            const uint64_t frequencyReverseComplement = globalFrequency[info.reverseComplementedKmerId];
             const uint64_t totalFrequency = frequency + frequencyReverseComplement;
 
-            const uint32_t minimumDistance = selectKmers4Data.minimumDistance[kmerId].second;
-            const uint32_t minimumDistanceReverseComplement =
-                selectKmers4Data.minimumDistance[info.reverseComplementedKmerId].second;
+            const uint32_t kmerMinimumDistance = minimumDistance[kmerId].second;
+            const uint32_t kmerMinimumDistanceReverseComplement =
+                minimumDistance[info.reverseComplementedKmerId].second;
 
             const Kmer kmer(kmerId, k);
             const Kmer reverseComplementedKmer(info.reverseComplementedKmerId, k);
@@ -960,9 +988,9 @@ void KmerChecker::create4(
             csv << frequency << ",";
             csv << frequencyReverseComplement << ",";
             csv << totalFrequency << ",";
-            csv << minimumDistance << ",";
-            csv << minimumDistanceReverseComplement << ",";
-            csv << min(minimumDistance, minimumDistanceReverseComplement) << "\n";
+            csv << kmerMinimumDistance << ",";
+            csv << kmerMinimumDistanceReverseComplement << ",";
+            csv << min(kmerMinimumDistance, kmerMinimumDistanceReverseComplement) << "\n";
         }
     }
 
@@ -975,10 +1003,10 @@ void KmerChecker::create4(
     for(uint64_t kmerId=0; kmerId!=kmerTable.size(); kmerId++) {
         const KmerInfo& info = kmerTable[kmerId];
         if((reads.representation==1) and (not info.isRleKmer)) {
-            SHASTA_ASSERT(selectKmers4Data.globalFrequency[kmerId] == 0);
+            SHASTA_ASSERT(globalFrequency[kmerId] == 0);
             continue;
         }
-        totalKmerOccurrences += selectKmers4Data.globalFrequency[kmerId];
+        totalKmerOccurrences += globalFrequency[kmerId];
         if(kmerTable[kmerId].isRleKmer) {
             ++rleKmerCount;
         }
@@ -1011,18 +1039,18 @@ void KmerChecker::create4(
         if(kmerId > kmerIdRc) {
             continue;
         }
-        if(selectKmers4Data.minimumDistance[kmerId].second < distanceThreshold) {
+        if(minimumDistance[kmerId].second < distanceThreshold) {
             // Too close. skip.
             continue;
         }
-        if(selectKmers4Data.minimumDistance[kmerIdRc].second < distanceThreshold) {
+        if(minimumDistance[kmerIdRc].second < distanceThreshold) {
             // Too close. Skip.
             continue;
         }
 
         candidateKmers.push_back(KmerId(kmerId));
-        candidateFrequency += selectKmers4Data.globalFrequency[kmerId];
-        candidateFrequency += selectKmers4Data.globalFrequency[kmerIdRc];
+        candidateFrequency += globalFrequency[kmerId];
+        candidateFrequency += globalFrequency[kmerIdRc];
     }
     cout << "Markers will be chosen randomly from the a pool of " <<
         2*candidateKmers.size() << " RLE k-mers." << endl;
@@ -1066,8 +1094,8 @@ void KmerChecker::create4(
 
         // Increment counters.
         markerCount += 2;
-        markerOccurrencesCount += selectKmers4Data.globalFrequency[kmerId];
-        markerOccurrencesCount += selectKmers4Data.globalFrequency[kmerIdRc];
+        markerOccurrencesCount += globalFrequency[kmerId];
+        markerOccurrencesCount += globalFrequency[kmerIdRc];
 
         // Remove kmerId from the vector of candidates.
         if(i != candidateKmers.size()-1) {
@@ -1085,23 +1113,23 @@ void KmerChecker::create4(
 
 
     // Clean up.
-    selectKmers4Data.minimumDistance.remove();
-    selectKmers4Data.globalFrequency.remove();
+    minimumDistance.remove();
+    globalFrequency.remove();
 
 }
 
 
 
-void KmerChecker::selectKmers4ThreadFunction(size_t threadId)
+void KmerTable4::threadFunction(size_t threadId)
 {
     // Initialize globalFrequency for this thread.
     // Having all threads accumulate atomically on the global frequency vector is too slow.
-    MemoryMapped::Vector<uint64_t> globalFrequency;
-    globalFrequency.createNew(
-        largeDataName("tmp-SelectKmers4-GlobalFrequency-" + to_string(threadId)),
+    MemoryMapped::Vector<uint64_t> threadGlobalFrequency;
+    threadGlobalFrequency.createNew(
+        largeDataName("tmp-KmerTable4-GlobalFrequency-" + to_string(threadId)),
         largeDataPageSize);
-    globalFrequency.resize(kmerTable.size());
-    fill(globalFrequency.begin(), globalFrequency.end(), 0);
+    threadGlobalFrequency.resize(kmerTable.size());
+    fill(threadGlobalFrequency.begin(), threadGlobalFrequency.end(), 0);
 
     // Vector to hold pairs(KmerId, RLE position) for one read.
     vector< pair<KmerId, uint32_t> > readKmers;
@@ -1134,8 +1162,8 @@ void KmerChecker::selectKmers4ThreadFunction(size_t threadId)
                 readKmers.push_back(make_pair(kmerId, position));
 
                 // Update the frequency of this k-mer.
-                ++globalFrequency[kmerId];
-                ++globalFrequency[kmerTable[kmerId].reverseComplementedKmerId];
+                ++threadGlobalFrequency[kmerId];
+                ++threadGlobalFrequency[kmerTable[kmerId].reverseComplementedKmerId];
 
                 // Check if we reached the end of the read.
                 if(position+k == read.baseCount) {
@@ -1161,7 +1189,7 @@ void KmerChecker::selectKmers4ThreadFunction(size_t threadId)
                 }
                 const uint32_t distance = p1.second - p0.second;
 
-                pair<std::mutex, uint32_t>& p = selectKmers4Data.minimumDistance[kmerId0];
+                pair<std::mutex, uint32_t>& p = minimumDistance[kmerId0];
                 std::lock_guard<std::mutex> lock(p.first);;
                 p.second = min(p.second, distance);
             }
@@ -1172,8 +1200,63 @@ void KmerChecker::selectKmers4ThreadFunction(size_t threadId)
     {
         std::lock_guard<std::mutex> lock(mutex);
         for(uint64_t kmerId=0; kmerId!=globalFrequency.size(); kmerId++) {
-            selectKmers4Data.globalFrequency[kmerId] += globalFrequency[kmerId];
+            globalFrequency[kmerId] += threadGlobalFrequency[kmerId];
         }
     }
-    globalFrequency.remove();
+    threadGlobalFrequency.remove();
 }
+
+
+
+KmerTable0::KmerTable0(
+    uint64_t k,
+    const MappedMemoryOwner& mappedMemoryOwner) :
+    KmerTable(k, false, mappedMemoryOwner)
+{
+}
+
+
+
+KmerTable1::KmerTable1(
+    uint64_t k,
+    const Reads& reads,
+    const MappedMemoryOwner& mappedMemoryOwner) :
+    KmerTable(k, false, mappedMemoryOwner),
+    MultithreadedObject<KmerTable1>(*this),
+    reads(reads)
+{
+}
+
+
+
+KmerTable2::KmerTable2(
+    uint64_t k,
+    const Reads& reads,
+    const MappedMemoryOwner& mappedMemoryOwner) :
+    KmerTable(k, false, mappedMemoryOwner),
+    MultithreadedObject<KmerTable2>(*this),
+    reads(reads)
+{
+}
+
+
+
+KmerTable3::KmerTable3(
+    uint64_t k,
+    const MappedMemoryOwner& mappedMemoryOwner) :
+    KmerTable(k, false, mappedMemoryOwner)
+{
+}
+
+
+
+KmerTable4::KmerTable4(
+    uint64_t k,
+    const Reads& reads,
+    const MappedMemoryOwner& mappedMemoryOwner) :
+    KmerTable(k, false, mappedMemoryOwner),
+    MultithreadedObject<KmerTable4>(*this),
+    reads(reads)
+{
+}
+

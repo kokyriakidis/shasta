@@ -185,14 +185,19 @@ void Assembler::createKmerChecker(
 
     assemblerInfo->k = kmersOptions.k;
     assemblerInfo->kmerGenerationMethod = kmersOptions.generationMethod;
-    kmerChecker = make_shared<KmerChecker>(kmersOptions, threadCount, getReads(), *this);
+
+    kmerChecker = KmerCheckerFactory::createNew(
+        kmersOptions,
+        threadCount,
+        getReads(),
+        *this);
 }
 
 
 
 void Assembler::accessKmerChecker()
 {
-    kmerChecker = make_shared<KmerChecker>(
+    kmerChecker = KmerCheckerFactory::createFromBinaryData(
         assemblerInfo->k,
         assemblerInfo->kmerGenerationMethod,
         getReads(),
