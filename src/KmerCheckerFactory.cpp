@@ -1,5 +1,6 @@
 #include "KmerCheckerFactory.hpp"
 #include "KmerTable.hpp"
+#include "HashedKmerChecker.hpp"
 #include "AssemblerOptions.hpp"
 #include "Reads.hpp"
 using namespace shasta;
@@ -12,8 +13,15 @@ std::shared_ptr<KmerChecker> KmerCheckerFactory::createNew(
     const Reads& reads,
     const MappedMemoryOwner& mappedMemoryOwner)
 {
-    const int seed = 231;
+    // For generation method 0, always use the HashedKmerChecker.
+    if(kmersOptions.generationMethod == 0) {
+        return make_shared<HashedKmerChecker>(
+            kmersOptions.k,
+            kmersOptions.probability,
+            mappedMemoryOwner);
+    }
 
+    const int seed = 231;
     switch(kmersOptions.generationMethod) {
         case 0:
         return make_shared<KmerTable0>(
@@ -73,6 +81,11 @@ std::shared_ptr<shasta::KmerChecker> KmerCheckerFactory::createFromBinaryData(
     const Reads& reads,
     const MappedMemoryOwner& mappedMemoryOwner)
 {
+    // For generation method 0, always use the HashedKmerChecker.
+    if(generationMethod == 0) {
+        return make_shared<HashedKmerChecker>(mappedMemoryOwner);
+    }
+
     switch(generationMethod) {
     case 0:
          return make_shared<KmerTable0>(k, mappedMemoryOwner);
