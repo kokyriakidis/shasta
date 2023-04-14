@@ -14,23 +14,6 @@ namespace shasta {
     static_assert(
         std::numeric_limits<KmerId>::digits == 2*Kmer::capacity,
         "Kmer and KmerId types are inconsistent.");
-
-    class KmerInfo;
 }
-
-
-
-class shasta::KmerInfo {
-public:
-
-    // Frequency of this k-mer in input reads.
-    // Only filled in if selectKmersBasedOnFrequency
-    // is used.
-    uint64_t frequency = 0;
-
-    KmerId reverseComplementedKmerId;
-    bool isMarker;
-    bool isRleKmer;
-};
 
 #endif

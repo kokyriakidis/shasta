@@ -76,6 +76,19 @@ public:
 
 protected:
 
+    class KmerInfo {
+    public:
+
+        // Frequency of this k-mer in input reads.
+        // This is only used in some of the derived classes and
+        // so there is opportunity for some cleanup here.
+        uint64_t frequency = 0;
+
+        KmerId reverseComplementedKmerId;
+        bool isMarker;
+        bool isRleKmer;
+    };
+
     uint64_t k;
     MemoryMapped::Vector<KmerInfo> kmerTable;
 
