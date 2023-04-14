@@ -13,21 +13,11 @@ namespace shasta {
 
 // The KmerChecker is an abstract class that knows how to find
 // out if a k-mer is a marker.
+// All implementations must guarantee that if a KmerId if a marker
+// its reverse complement is also a marker.
 class shasta::KmerChecker {
 public:
     virtual bool isMarker(KmerId) const = 0;
-};
-
-
-
-// The new implementation of the KmerChecker is not table based
-// and uses hashing instead.
-// It only supports marker generation method 0 (random generation)
-// but allow marker lengths k<32.
-// This class is not yet implemented.
-class shasta::HashedKmerChecker : public KmerChecker {
-public:
-    bool isMarker(KmerId) const;
 };
 
 #endif
