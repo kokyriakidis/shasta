@@ -39,26 +39,6 @@ public:
 
 
 
-// The KmerCheckerFactory knows how to create the appropriate
-// type of KmerChecker for the options used.
-class shasta::KmerCheckerFactory {
-public:
-
-    static shared_ptr<KmerChecker> createNew(
-        const KmersOptions&,
-        uint64_t threadCount,
-        const Reads&,
-        const MappedMemoryOwner&);
-
-    static shared_ptr<KmerChecker> createFromBinaryData(
-        uint64_t k,
-        uint64_t generationMethod,
-        const Reads&,
-        const MappedMemoryOwner&);
-};
-
-
-
 // Old implementations are table based.
 // There are derived classes to support all 5 marker generation methods
 // but they are limited to k-mer lengths k<16.

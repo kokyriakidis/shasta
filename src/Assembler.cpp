@@ -2,7 +2,7 @@
 #include "AssemblerOptions.hpp"
 #include "buildId.hpp"
 #include "Coverage.hpp"
-#include "KmerChecker.hpp"
+#include "KmerCheckerFactory.hpp"
 #include "MedianConsensusCaller.hpp"
 #include "MurmurHash2.hpp"
 #include "Reads.hpp"
