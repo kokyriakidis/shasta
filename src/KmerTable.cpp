@@ -98,6 +98,7 @@ KmerTable::KmerTable(
 
 void KmerTable::createKmerTable()
 {
+    SHASTA_ASSERT(k <= Kmer16::capacity);
 
     // Create the kmer table with the necessary size.
     kmerTable.createNew(largeDataName("Kmers"), largeDataPageSize);
@@ -108,7 +109,7 @@ void KmerTable::createKmerTable()
     for(uint64_t kmerId=0; kmerId<kmerCount; kmerId++) {
         const Kmer kmer(kmerId, k);
         const Kmer reverseComplementedKmer = kmer.reverseComplement(k);
-        kmerTable[kmerId].reverseComplementedKmerId = KmerId(reverseComplementedKmer.id(k));
+        kmerTable[kmerId].reverseComplementedKmerId = KmerId16(reverseComplementedKmer.id(k));
     }
     for(uint64_t kmerId=0; kmerId<kmerCount; kmerId++) {
         const uint64_t reverseComplementedKmerId = kmerTable[kmerId].reverseComplementedKmerId;

@@ -1,4 +1,5 @@
 #include "KmerCheckerFactory.hpp"
+#include "Kmer.hpp"
 #include "KmerTable.hpp"
 #include "HashedKmerChecker.hpp"
 #include "AssemblerOptions.hpp"
@@ -19,6 +20,13 @@ std::shared_ptr<KmerChecker> KmerCheckerFactory::createNew(
             kmersOptions.k,
             kmersOptions.probability,
             mappedMemoryOwner);
+    }
+
+    // In all other cases, we are limited to k<=16.
+    if(kmersOptions.k > int(Kmer16::capacity)) {
+        throw runtime_error("Kmer generation method " +
+            to_string(kmersOptions.generationMethod) +
+            " is only supported for a maximum marker length of 15.");
     }
 
     const int seed = 231;

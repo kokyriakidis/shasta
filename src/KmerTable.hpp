@@ -50,7 +50,7 @@ protected:
         // so there is opportunity for some cleanup here.
         uint64_t frequency = 0;
 
-        KmerId reverseComplementedKmerId;
+        KmerId16 reverseComplementedKmerId;
         bool isMarker;
         bool isRleKmer;
     };

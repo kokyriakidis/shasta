@@ -263,21 +263,26 @@ Can be one of the following:
 <li>1: Random selection, excluding k-mers that are globally overenriched,
 as defined by their global frequency in input reads, and by
 the value specified as <code>--Kmers.enrichmentThreshold</code>.
+Only supported when <code>--Kmers.k</code> is less than 16.
 <li>2: Random selection, excluding k-mers that are overenriched
 even in a single read, 
 as defined by 
 the value specified as <code>--Kmers.enrichmentThreshold</code>.
+Only supported when <code>--Kmers.k</code> is less than 16.
 <li>3: Read from file. Use <code>--Kmers.file</code>
 to specify the file.
+Only supported when <code>--Kmers.k</code> is less than 16.
 <li>4: Random selection, excluding k-mers that appear 
 in two copies close to each other, even in a single read.
 The two k-mer copies are considered close if they occur at a distance from each other less than
 <code>--Kmers.distanceThreshold</code> RLE bases.
+Only supported when <code>--Kmers.k</code> is less than 16.
 </ul>
 
 <tr id='Kmers.k'>
 <td><code>--Kmers.k</code><td class=centered><code>10</code><td>
 Length of marker <i>k</i>-mers (in run-length representation).
+Can be up to 31 for Mode 0 assembly, 30 for Mode 2 assembly.
 <a class=qm href='ComputationalMethods.html#Markers'/>
 
 <tr id='Kmers.probability'>
