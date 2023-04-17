@@ -392,6 +392,11 @@ public:
 
     void computeReadIdsSortedByName();
 
+    // Find duplicate reads, as determined by name (not sequence).
+    // This also sets the isDuplicate and discardDueToDuplicates read flags
+    // and summarizes what it found Duplicates.csv.
+    void findDuplicateReads(const string& handleDuplicates);
+
 
 private:
 

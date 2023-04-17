@@ -600,6 +600,10 @@ void shasta::main::assemble(
     performanceLog << timestamp << "Done loading reads from " << inputFileNames.size() << " files." << endl;
     performanceLog << "Read loading took " << seconds(t1-t0) << "s." << endl;
 
+    // Find duplicate reads and handle them according to the setting
+    // of --Reads.handleDuplicates.
+    assembler.findDuplicateReads(assemblerOptions.readsOptions.handleDuplicates);
+
     // Initialize the KmerChecker, which has the information needed
     // to decide if a k-mer is a marker.
     assembler.createKmerChecker(assemblerOptions.kmersOptions, threadCount);

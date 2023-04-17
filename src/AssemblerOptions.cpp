@@ -252,6 +252,12 @@ void AssemblerOptions::addConfigurableOptions()
         "This is done by specifying the O_DIRECT flag when opening "
         "input files containing reads.")
 
+        ("Reads.handleDuplicates",
+        value<string>(&readsOptions.handleDuplicates)->
+        default_value("useOneCopy"),
+        "Controls handling of reads with duplicate names. "
+        "Can be one of: useAllCopies, useOneCopy, useNone, forbid.")
+
         ("Reads.palindromicReads.skipFlagging",
         bool_switch(&readsOptions.palindromicReads.skipFlagging)->
         default_value(false),
@@ -944,6 +950,7 @@ void ReadsOptions::write(ostream& s) const
     s << "desiredCoverage = " << desiredCoverageString << "\n";
     s << "noCache = " <<
         convertBoolToPythonString(noCache) << "\n";
+    s << "handleDuplicates = " << handleDuplicates << "\n";
     palindromicReads.write(s);
 }
 

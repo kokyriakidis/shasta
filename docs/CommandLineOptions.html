@@ -219,6 +219,33 @@ Implemented for Linux only (uses the <a href='http://man7.org/linux/man-pages/ma
 Can help performance, but only use it if you know you will not 
 need to access the input files again soon.
 
+
+<tr id='Reads.handleDuplicates'>
+<td><code>--Reads.handleDuplicates</code><td class=centered><code>useOneCopy</code><td>
+Specifies how to handle reads with duplicate names (the name of a read is its
+id in an input fasta or fastq file). 
+These can occasionally occur, typically due to glitches in the basecalling or subsequent
+pipelines before assembly starts.
+Can be one of the following:
+<ul>
+<li><code>useAllCopies</code>:
+All copies of reads with duplicate names are used in the assembly.
+This can cause artifacts in some cases.
+This was the Shasta behavior before this option was introduced.
+<li><code>useOneCopy</code>:
+For each set of reads with duplicate names, only one read is used in the assembly.
+This is the default.
+<li><code>useNone</code>:
+None of the reads with duplicate names are used in the assembly.
+<li><code>forbid</code>:
+If any reads with duplicate names are found, the assembly stops.
+</ul>
+In all cases, a message is written with the number of reads with duplicate names
+found, and the number of reads that were discarded for that reason. 
+A file <code>DuplicateReads.csv</code> ,
+listing details for all reads wth duplicate names, 
+is also written to the assembly directory.
+
 <tr id='Reads.palindromicReads.skipFlagging'>
 <td><code>--Reads.palindromicReads.skipFlagging</code><td class=centered><code>False</code><td>
 Skip flagging palindromic reads. Oxford Nanopore reads should be flagged for better results.

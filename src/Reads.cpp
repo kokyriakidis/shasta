@@ -541,3 +541,113 @@ ReadId Reads::getReadId(const span<const char>& readName) const
     }
 }
 
+
+
+// Find duplicate reads, as determined by name (not sequence).
+// This also sets the isDuplicate and discardDueToDuplicates read flags
+// and summarizes what it found Duplicates.csv.
+void Reads::findDuplicates(const string& handleDuplicates)
+{
+    const uint64_t readCount = reads.size();
+    SHASTA_ASSERT(readFlags.size() == readCount);
+    SHASTA_ASSERT(readNames.size() == readCount);
+
+    // Set bool variables correspondng to the permitted values of handleDuplicates.
+    bool useAllCopies = false;
+    bool useOneCopy = false;
+    bool useNone = false;
+    bool forbid = false;
+    if(handleDuplicates == "useAllCopies") {
+        useAllCopies = true;
+    } else if(handleDuplicates == "useOneCopy") {
+        useOneCopy = true;
+    } else if(handleDuplicates == "useNone") {
+        useNone = true;
+    } else if(handleDuplicates == "forbid") {
+        forbid = true;
+    } else {
+        throw runtime_error("Invalid value " + handleDuplicates + " specified for --Reads.handleDuplicates. "
+            "Must be one of: useAllCopies, useOneCopy, useNone, forbid.");
+    }
+
+    uint64_t discardedCount = 0;
+    vector<uint64_t> duplicatedReadIds;
+    for(uint64_t i=0; i<readCount; i++) {
+        const uint64_t readId = readIdsSortedByName[i];
+        const auto name = readNames[readId];
+
+        // Find out if the name is the same as the
+        // name of the previous read, in order sorted by name.
+        bool hasSameNameAsPrevious = false;
+        if(i != 0) {
+            const auto previousName = readNames[readIdsSortedByName[i - 1]];
+            hasSameNameAsPrevious = equal(
+                name.begin(), name.end(),
+                previousName.begin(), previousName.end());
+        }
+
+        // Find out if the name is the same as the
+        // name of the next read, in order sorted by name.
+        bool hasSameNameAsNext = false;
+        if(i < readCount - 1) {
+            const auto nextName = readNames[readIdsSortedByName[i + 1]];
+            hasSameNameAsNext = equal(
+                name.begin(), name.end(),
+                nextName.begin(), nextName.end());
+        }
+
+        // Set the isDuplicate flag for this read.
+        ReadFlags& flags = readFlags[readId];
+        flags.isDuplicate = uint8_t(hasSameNameAsPrevious or hasSameNameAsNext);
+
+        // Set the discardDueToDuplicates flag for this read.
+        if(useAllCopies) {
+            flags.discardDueToDuplicates = uint8_t(false);
+        } else if(useOneCopy) {
+            flags.discardDueToDuplicates = uint8_t(hasSameNameAsPrevious);
+        } else if(useNone) {
+            flags.discardDueToDuplicates = flags.isDuplicate;
+        } else if(forbid) {
+            // This does not really matter because in this case the assembly will stop.
+            flags.discardDueToDuplicates = flags.isDuplicate;
+        }
+
+        // Increment counts.
+        if(flags.isDuplicate) {
+            duplicatedReadIds.push_back(readId);
+        }
+        if(flags.discardDueToDuplicates) {
+            ++discardedCount;
+        }
+    }
+
+    cout << "Found " << duplicatedReadIds.size() << " reads with duplicate names." << endl;
+    cout << "Discarded from the assembly " << discardedCount << " reads with duplicate names." << endl;
+
+
+
+    // Write a csv file with details of the duplicate reads.
+    ofstream csv("DuplicateReads.csv");
+    csv << "Id,Discarded,Name,MetaData\n";
+    for(const uint64_t readId: duplicatedReadIds) {
+        const ReadFlags& flags = readFlags[readId];
+        if(flags.isDuplicate) {
+            csv << readId << ",";
+            csv << (flags.discardDueToDuplicates ? "Yes" : "No") << ",";
+
+            const auto name = readNames[readId];
+            copy(name.begin(), name.end(), ostream_iterator<char>(csv));
+            csv << ",";
+
+            const auto metaData = readMetaData[readId];
+            copy(metaData.begin(), metaData.end(), ostream_iterator<char>(csv));
+            csv << "\n";
+        }
+    }
+
+    // If there are duplicates, stop the assembly, if requested.
+    if(forbid and duplicatedReadIds.size() > 0) {
+        throw runtime_error("Stopping assembly because reads with duplicate names were found "
+            "and --Reads.handleDuplicates is set to forbid.");
+    }
+}

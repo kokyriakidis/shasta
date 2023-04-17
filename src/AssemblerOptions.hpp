@@ -127,6 +127,16 @@ public:
     bool noCache;
     string desiredCoverageString;
     uint64_t desiredCoverage;
+
+    // String to control handling of duplicate reads.
+    // Can be one of:
+    // useAllCopies
+    // useOneCopy
+    // useNone
+    // forbid
+    // See ReadFlags.hpp for the meaning of each option.
+    string handleDuplicates;
+
     PalindromicReadOptions palindromicReads;
 
     void write(ostream&) const;

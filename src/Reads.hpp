@@ -256,6 +256,11 @@ public:
         uint64_t& discardedShortReadBases
     );
 
+    // Find duplicate reads, as determined by name (not sequence).
+    // This also sets the isDuplicate and discardDueToDuplicates read flags
+    // and summarizes what it found Duplicates.csv.
+    void findDuplicates(const string& handleDuplicates);
+
     void remove();
 
     uint64_t representation; // 0 = raw sequence, 1 = RLE sequence

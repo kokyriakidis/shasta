@@ -257,7 +257,11 @@ void LowHash0::pass1ThreadFunction(size_t threadId)
 
         // Loop over oriented reads assigned to this batch.
         for(ReadId readId=ReadId(begin); readId!=ReadId(end); readId++) {
-            if(reads.getFlags(readId).isPalindromic) {
+            const ReadFlags& flags = reads.getFlags(readId);
+            if(flags.discardDueToDuplicates) {
+                continue;
+            }
+            if(flags.isPalindromic) {
                 continue;
             }
             for(Strand strand=0; strand<2; strand++) {
@@ -306,7 +310,11 @@ void LowHash0::pass2ThreadFunction(size_t threadId)
 
         // Loop over oriented reads assigned to this batch.
         for(ReadId readId=ReadId(begin); readId!=ReadId(end); readId++) {
-            if(reads.getFlags(readId).isPalindromic) {
+            const ReadFlags& flags = reads.getFlags(readId);
+            if(flags.discardDueToDuplicates) {
+                continue;
+            }
+            if(flags.isPalindromic) {
                 continue;
             }
             for(Strand strand=0; strand<2; strand++) {

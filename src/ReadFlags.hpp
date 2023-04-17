@@ -10,6 +10,14 @@ namespace shasta {
 class shasta::ReadFlags {
 public:
 
+    // Set if we have other reads with the same name.
+    uint8_t isDuplicate : 1;
+
+    // Set if this read is not to be used in the assembly
+    // due to the presence of duplicates.
+    // The way this is set is determined by the value of --Reads.handleDuplicates:
+    uint8_t discardDueToDuplicates : 1;
+
     // This is set for reads that are approximate palindromic,
     // that is, are well aligned with their own reverse complement.
     uint8_t isPalindromic : 1;

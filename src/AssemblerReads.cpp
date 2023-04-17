@@ -297,3 +297,13 @@ void Assembler::computeReadIdsSortedByName()
     reads->computeReadIdsSortedByName();
 }
 
+
+
+
+// Find duplicate reads, as determined by name (not sequence).
+// This also sets the isDuplicate and discardDueToDuplicates read flags
+// and summarizes what it found Duplicates.csv.
+void Assembler::findDuplicateReads(const string& handleDuplicates)
+{
+    reads->findDuplicates(handleDuplicates);
+}
