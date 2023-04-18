@@ -1909,7 +1909,7 @@ bool Assembler::extractLocalMarkerGraph(
     auto spoaAlignmentEngine = spoa::AlignmentEngine::Create(alignmentType, match, mismatch, gap);
     spoa::Graph spoaAlignmentGraph;
     BGL_FORALL_EDGES(e, graph, LocalMarkerGraph0) {
-        LocalMarkerGraphEdge& edge = graph[e];
+        LocalMarkerGraph0Edge& edge = graph[e];
         ComputeMarkerGraphEdgeConsensusSequenceUsingSpoaDetail detail;
         computeMarkerGraphEdgeConsensusSequenceUsingSpoa(
             edge.edgeId,

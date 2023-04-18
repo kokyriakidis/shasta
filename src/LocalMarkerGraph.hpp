@@ -27,14 +27,14 @@ a group of aligned markers.
 namespace shasta {
 
     class LocalMarkerGraph0Vertex;
-    class LocalMarkerGraphEdge;
+    class LocalMarkerGraph0Edge;
     class LocalMarkerGraph0;
     using LocalMarkerGraph0BaseClass = boost::adjacency_list<
         boost::listS,   // Permit parallel edges created by createMarkerGraphEdgesStrict
         boost::listS,
         boost::bidirectionalS,
         LocalMarkerGraph0Vertex,
-        LocalMarkerGraphEdge
+        LocalMarkerGraph0Edge
         >;
 
     class CompressedMarker;
@@ -103,7 +103,7 @@ public:
 
 
 
-class shasta::LocalMarkerGraphEdge {
+class shasta::LocalMarkerGraph0Edge {
 public:
 
     // Class to describe the intervening sequence between
@@ -263,7 +263,7 @@ public:
 
     // Store sequence information in the edge.
     // Takes as input a vector of the
-    // LocalMarkerGraphEdge::Info that caused the edge to be created.
+    // LocalMarkerGraph0Edge::Info that caused the edge to be created.
     void storeEdgeInfo(edge_descriptor, const vector<MarkerInterval>&);
 
 
@@ -344,8 +344,8 @@ private:
         static const string edgeLabelColorNotRemovedNotAssembled;
         static const string edgeLabelColorNotRemovedAssembled;
         string vertexColor(const LocalMarkerGraph0Vertex&) const;
-        string edgeArrowColor(const LocalMarkerGraphEdge&) const;
-        string edgeLabelColor(const LocalMarkerGraphEdge&) const;
+        string edgeArrowColor(const LocalMarkerGraph0Edge&) const;
+        string edgeLabelColor(const LocalMarkerGraph0Edge&) const;
     };
     friend class Writer;
 

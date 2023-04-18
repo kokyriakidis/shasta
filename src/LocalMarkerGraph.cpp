@@ -164,22 +164,22 @@ void LocalMarkerGraph0::computeVertexConsensusInfo( vertex_descriptor v)
 
 // Store sequence information in the edge.
 // This version takes as input a vector of the
-// LocalMarkerGraphEdge::Info that caused the edge to be created.
+// LocalMarkerGraph0Edge::Info that caused the edge to be created.
 void LocalMarkerGraph0::storeEdgeInfo(
     edge_descriptor e,
     const vector<MarkerInterval>& intervals)
 {
     LocalMarkerGraph0& graph = *this;
-    LocalMarkerGraphEdge& edge = graph[e];
+    LocalMarkerGraph0Edge& edge = graph[e];
 
     // Map to store the oriented read ids and ordinals, grouped by sequence.
-    std::map<LocalMarkerGraphEdge::Sequence, vector<MarkerIntervalWithRepeatCounts> > sequenceTable;
+    std::map<LocalMarkerGraph0Edge::Sequence, vector<MarkerIntervalWithRepeatCounts> > sequenceTable;
     for(const MarkerInterval& interval: intervals) {
         const CompressedMarker& marker0 = markers.begin(interval.orientedReadId.getValue())[interval.ordinals[0]];
         const CompressedMarker& marker1 = markers.begin(interval.orientedReadId.getValue())[interval.ordinals[1]];
 
         // Fill in the sequence information and, if necessary, the base repeat counts.
-        LocalMarkerGraphEdge::Sequence sequence;
+        LocalMarkerGraph0Edge::Sequence sequence;
         MarkerIntervalWithRepeatCounts intervalWithRepeatCounts(interval);
         if(marker1.position <= marker0.position + k) {
 
@@ -255,7 +255,7 @@ void LocalMarkerGraph0::storeEdgeInfo(
     // Sort by decreasing size of the infos vector.
     sort(edge.infos.begin(), edge.infos.end(),
         OrderPairsBySizeOfSecondGreater<
-        LocalMarkerGraphEdge::Sequence,
+        LocalMarkerGraph0Edge::Sequence,
         vector<MarkerIntervalWithRepeatCounts> >());
 
 }
@@ -282,7 +282,7 @@ pair<bool, uint32_t> LocalMarkerGraph0Vertex::getOrdinal(
 // Look for the ordinals for a given oriented read id.
 // If found, returns true.
 // If more than an ordinal pairs is found, the first one is returned.
-bool LocalMarkerGraphEdge::getOrdinals(
+bool LocalMarkerGraph0Edge::getOrdinals(
     OrientedReadId orientedReadId,
     array<uint32_t, 2>& ordinals) const
 {

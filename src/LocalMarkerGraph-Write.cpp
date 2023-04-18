@@ -103,7 +103,7 @@ string LocalMarkerGraph0::Writer::vertexColor(const LocalMarkerGraph0Vertex& ver
 
 
 
-string LocalMarkerGraph0::Writer::edgeArrowColor(const LocalMarkerGraphEdge& edge) const
+string LocalMarkerGraph0::Writer::edgeArrowColor(const LocalMarkerGraph0Edge& edge) const
 {
 
     if(edgeColoring == "none") {
@@ -164,7 +164,7 @@ string LocalMarkerGraph0::Writer::edgeArrowColor(const LocalMarkerGraphEdge& edg
 
 
 
-string LocalMarkerGraph0::Writer::edgeLabelColor(const LocalMarkerGraphEdge& edge) const
+string LocalMarkerGraph0::Writer::edgeLabelColor(const LocalMarkerGraph0Edge& edge) const
 {
     if(edgeColoring == "none") {
         return "white";
@@ -467,7 +467,7 @@ void LocalMarkerGraph0::Writer::operator()(std::ostream& s, vertex_descriptor v)
 void LocalMarkerGraph0::Writer::operator()(std::ostream& s, edge_descriptor e) const
 {
 
-    const LocalMarkerGraphEdge& edge = graph[e];
+    const LocalMarkerGraph0Edge& edge = graph[e];
     const size_t coverage = edge.coverage();
     const string arrowColor = edgeArrowColor(edge);
     const string labelColor = edgeLabelColor(edge);
@@ -607,7 +607,7 @@ void LocalMarkerGraph0::Writer::operator()(std::ostream& s, edge_descriptor e) c
         // Verbose labels include the detail of all oriented read ids on this edge.
         if(edgeLabels == 2) {
 
-            vector< pair<OrientedReadId, LocalMarkerGraphEdge::Sequence> > table;
+            vector< pair<OrientedReadId, LocalMarkerGraph0Edge::Sequence> > table;
             for(const auto& info: edge.infos) {
                 const auto& sequence = info.first;
                 const auto& intervals = info.second;
@@ -616,7 +616,7 @@ void LocalMarkerGraph0::Writer::operator()(std::ostream& s, edge_descriptor e) c
                 }
             }
             sort(table.begin(), table.end(),
-                OrderPairsByFirstOnly<OrientedReadId, LocalMarkerGraphEdge::Sequence>());
+                OrderPairsByFirstOnly<OrientedReadId, LocalMarkerGraph0Edge::Sequence>());
 
             s << "<hr/>";
             for(const auto& p: table) {

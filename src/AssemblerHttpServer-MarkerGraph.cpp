@@ -334,7 +334,7 @@ void Assembler::exploreMarkerGraph0(
     // the graph at the source vertex of that edge, right click shows edge details.
     html << "<script>\n";
     BGL_FORALL_EDGES(e, graph, LocalMarkerGraph0) {
-        const LocalMarkerGraphEdge& edge = graph[e];
+        const LocalMarkerGraph0Edge& edge = graph[e];
         const LocalMarkerGraph0::vertex_descriptor v0 = source(e, graph);
         const LocalMarkerGraph0Vertex& vertex0 = graph[v0];
         const string url = requestParameters.urlForVertex(vertex0.vertexId);
