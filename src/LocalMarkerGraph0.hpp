@@ -1,5 +1,5 @@
-#ifndef SHASTA_LOCAL_MARKER_GRAPH_HPP
-#define SHASTA_LOCAL_MARKER_GRAPH_HPP
+#ifndef SHASTA_LOCAL_MARKER_GRAPH0_HPP
+#define SHASTA_LOCAL_MARKER_GRAPH0_HPP
 
 /*******************************************************************************
 

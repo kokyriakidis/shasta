@@ -1,5 +1,7 @@
 #include "Assembler.hpp"
 #include "invalid.hpp"
+#include "LocalMarkerGraph1.hpp"
+#include "Reads.hpp"
 using namespace shasta;
 
 
@@ -8,6 +10,11 @@ void Assembler::exploreMarkerGraph1(
     const vector<string>& request,
     ostream& html)
 {
+    // This makes the following assumptions.
+    SHASTA_ASSERT(getReads().representation == 0);  // No RLE.
+    SHASTA_ASSERT((assemblerInfo->k % 2) == 0);      // Marker length is even.
+
+
     // Get the request parameters.
     uint64_t vertexId = invalid<uint64_t>;
     getParameterValue(request, "vertexId", vertexId);
@@ -76,4 +83,16 @@ void Assembler::exploreMarkerGraph1(
         html << ". Must be between 0 and " << markerGraph.vertexCount()-1 << " inclusive.";
         return;
     }
+
+
+
+    // Create the local marker graph.
+    LocalMarkerGraph1 graph(
+        markerGraph,
+        vertexId,
+        maxDistance,
+        minVertexCoverage,
+        minEdgeCoverage);
+    html << "<p>The local marker graph has " << num_vertices(graph) <<
+        " vertices and " << num_edges(graph) << " edges.";
 }
