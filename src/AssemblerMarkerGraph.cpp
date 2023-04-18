@@ -1631,7 +1631,7 @@ bool Assembler::extractLocalMarkerGraph(
     bool useSuperBubbleEdges,
     bool useLowCoverageCrossEdges,
     bool useRemovedSecondaryEdges,
-    LocalMarkerGraph& graph
+    LocalMarkerGraph0& graph
     )
 {
     const MarkerGraph::VertexId startVertexId =
@@ -1662,7 +1662,7 @@ bool Assembler::extractLocalMarkerGraph(
     bool useSuperBubbleEdges,
     bool useLowCoverageCrossEdges,
     bool useRemovedSecondaryEdges,
-    LocalMarkerGraph& graph
+    LocalMarkerGraph0& graph
     )
 {
     // Sanity check.
@@ -1670,8 +1670,8 @@ bool Assembler::extractLocalMarkerGraph(
 
     // Some shorthands.
     AssemblyGraph& assemblyGraph = *assemblyGraphPointer;
-    using vertex_descriptor = LocalMarkerGraph::vertex_descriptor;
-    using edge_descriptor = LocalMarkerGraph::edge_descriptor;
+    using vertex_descriptor = LocalMarkerGraph0::vertex_descriptor;
+    using edge_descriptor = LocalMarkerGraph0::edge_descriptor;
 
     // Start a timer.
     const auto startTime = steady_clock::now();
@@ -1807,7 +1807,7 @@ bool Assembler::extractLocalMarkerGraph(
 
 
     // Create edges.
-    BGL_FORALL_VERTICES(v0, graph, LocalMarkerGraph) {
+    BGL_FORALL_VERTICES(v0, graph, LocalMarkerGraph0) {
         const LocalMarkerGraphVertex& vertex0 = graph[v0];
         const MarkerGraph::VertexId vertexId0 = vertex0.vertexId;
 
@@ -1883,7 +1883,7 @@ bool Assembler::extractLocalMarkerGraph(
     // Store consensus repeat counts for all vertices.
     if(markerGraph.vertexRepeatCounts.isOpen) {
         const size_t k = assemblerInfo->k;
-        BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph) {
+        BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph0) {
             LocalMarkerGraphVertex& vertex = graph[v];
             vertex.storedConsensusRepeatCounts.resize(k);
             const uint8_t* begin = markerGraph.vertexRepeatCounts.begin() + k * vertex.vertexId;
@@ -1908,7 +1908,7 @@ bool Assembler::extractLocalMarkerGraph(
     const int8_t gap = -1;
     auto spoaAlignmentEngine = spoa::AlignmentEngine::Create(alignmentType, match, mismatch, gap);
     spoa::Graph spoaAlignmentGraph;
-    BGL_FORALL_EDGES(e, graph, LocalMarkerGraph) {
+    BGL_FORALL_EDGES(e, graph, LocalMarkerGraph0) {
         LocalMarkerGraphEdge& edge = graph[e];
         ComputeMarkerGraphEdgeConsensusSequenceUsingSpoaDetail detail;
         computeMarkerGraphEdgeConsensusSequenceUsingSpoa(

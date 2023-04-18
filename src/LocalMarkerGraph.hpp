@@ -3,7 +3,7 @@
 
 /*******************************************************************************
 
-The local marker graph created by class LocalMarkerGraph is a subgraph
+The local marker graph created by class LocalMarkerGraph0 is a subgraph
 of the global marker graph, created by starting at a given vertex,
 and extending out to a specified distance in both directions.
 Distance is number of edges on the global marker graph.
@@ -28,8 +28,8 @@ namespace shasta {
 
     class LocalMarkerGraphVertex;
     class LocalMarkerGraphEdge;
-    class LocalMarkerGraph;
-    using LocalMarkerGraphBaseClass = boost::adjacency_list<
+    class LocalMarkerGraph0;
+    using LocalMarkerGraph0BaseClass = boost::adjacency_list<
         boost::listS,   // Permit parallel edges created by createMarkerGraphEdgesStrict
         boost::listS,
         boost::bidirectionalS,
@@ -219,11 +219,11 @@ public:
 
 
 
-class shasta::LocalMarkerGraph :
-    public LocalMarkerGraphBaseClass {
+class shasta::LocalMarkerGraph0 :
+    public LocalMarkerGraph0BaseClass {
 public:
 
-    LocalMarkerGraph(
+    LocalMarkerGraph0(
         uint64_t readRepresentation,
         uint32_t k,
         uint64_t assemblyMode,
@@ -318,13 +318,13 @@ private:
     class Writer : public LocalMarkerGraphRequestParameters {
     public:
         Writer(
-            const LocalMarkerGraph&,
+            const LocalMarkerGraph0&,
             const LocalMarkerGraphRequestParameters&);
 
         void operator()(ostream&) const;
         void operator()(ostream&, vertex_descriptor) const;
         void operator()(ostream&, edge_descriptor) const;
-        const LocalMarkerGraph& graph;
+        const LocalMarkerGraph0& graph;
 
         // Vertex and edge colors.
         static const string vertexColorZeroDistance;

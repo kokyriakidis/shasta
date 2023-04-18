@@ -15,7 +15,7 @@ using namespace shasta;
 
 
 // Write the graph in Graphviz format.
-void LocalMarkerGraph::write(
+void LocalMarkerGraph0::write(
     const string& fileName,
     const LocalMarkerGraphRequestParameters& localMarkerGraphRequestParameters) const
 {
@@ -25,7 +25,7 @@ void LocalMarkerGraph::write(
     }
     write(outputFileStream, localMarkerGraphRequestParameters);
 }
-void LocalMarkerGraph::write(
+void LocalMarkerGraph0::write(
     ostream& s,
     const LocalMarkerGraphRequestParameters& localMarkerGraphRequestParameters) const
 {
@@ -34,8 +34,8 @@ void LocalMarkerGraph::write(
         boost::get(&LocalMarkerGraphVertex::vertexId, *this));
 }
 
-LocalMarkerGraph::Writer::Writer(
-    const LocalMarkerGraph& graph,
+LocalMarkerGraph0::Writer::Writer(
+    const LocalMarkerGraph0& graph,
     const LocalMarkerGraphRequestParameters& parameters) :
     LocalMarkerGraphRequestParameters(parameters),
     graph(graph)
@@ -45,26 +45,26 @@ LocalMarkerGraph::Writer::Writer(
 
 
 // Vertex and edge colors.
-const string LocalMarkerGraph::Writer::vertexColorZeroDistance                          = "#6666ff";
-const string LocalMarkerGraph::Writer::vertexColorIntermediateDistance                  = "#00ccff";
-const string LocalMarkerGraph::Writer::vertexColorMaxDistance                           = "#66ffff";
-const string LocalMarkerGraph::Writer::edgeArrowColorRemovedDuringTransitiveReduction   = "#ff0000";
-const string LocalMarkerGraph::Writer::edgeArrowColorRemovedDuringPruning               = "#ff00ff";
-const string LocalMarkerGraph::Writer::edgeArrowColorRemovedDuringSuperBubbleRemoval    = "#009900";
-const string LocalMarkerGraph::Writer::edgeArrowColorRemovedAsLowCoverageCrossEdge      = "#c0c000";
-const string LocalMarkerGraph::Writer::edgeArrowColorRemovedWhileSplittingSecondaryEdges      = "#ff0000";
-const string LocalMarkerGraph::Writer::edgeArrowColorNotRemovedNotAssembled             = "#fcba03";
-const string LocalMarkerGraph::Writer::edgeArrowColorNotRemovedAssembled                = "#000000";
-const string LocalMarkerGraph::Writer::edgeLabelColorRemovedDuringTransitiveReduction   = "#ff9999";
-const string LocalMarkerGraph::Writer::edgeLabelColorRemovedDuringPruning               = "#c03280";
-const string LocalMarkerGraph::Writer::edgeLabelColorRemovedDuringSuperBubbleRemoval    = "#99ff99";
-const string LocalMarkerGraph::Writer::edgeLabelColorRemovedAsLowCoverageCrossEdge      = "#e0e000";
-const string LocalMarkerGraph::Writer::edgeLabelColorNotRemovedNotAssembled             = "#996600";
-const string LocalMarkerGraph::Writer::edgeLabelColorNotRemovedAssembled                = "#999999";
+const string LocalMarkerGraph0::Writer::vertexColorZeroDistance                          = "#6666ff";
+const string LocalMarkerGraph0::Writer::vertexColorIntermediateDistance                  = "#00ccff";
+const string LocalMarkerGraph0::Writer::vertexColorMaxDistance                           = "#66ffff";
+const string LocalMarkerGraph0::Writer::edgeArrowColorRemovedDuringTransitiveReduction   = "#ff0000";
+const string LocalMarkerGraph0::Writer::edgeArrowColorRemovedDuringPruning               = "#ff00ff";
+const string LocalMarkerGraph0::Writer::edgeArrowColorRemovedDuringSuperBubbleRemoval    = "#009900";
+const string LocalMarkerGraph0::Writer::edgeArrowColorRemovedAsLowCoverageCrossEdge      = "#c0c000";
+const string LocalMarkerGraph0::Writer::edgeArrowColorRemovedWhileSplittingSecondaryEdges      = "#ff0000";
+const string LocalMarkerGraph0::Writer::edgeArrowColorNotRemovedNotAssembled             = "#fcba03";
+const string LocalMarkerGraph0::Writer::edgeArrowColorNotRemovedAssembled                = "#000000";
+const string LocalMarkerGraph0::Writer::edgeLabelColorRemovedDuringTransitiveReduction   = "#ff9999";
+const string LocalMarkerGraph0::Writer::edgeLabelColorRemovedDuringPruning               = "#c03280";
+const string LocalMarkerGraph0::Writer::edgeLabelColorRemovedDuringSuperBubbleRemoval    = "#99ff99";
+const string LocalMarkerGraph0::Writer::edgeLabelColorRemovedAsLowCoverageCrossEdge      = "#e0e000";
+const string LocalMarkerGraph0::Writer::edgeLabelColorNotRemovedNotAssembled             = "#996600";
+const string LocalMarkerGraph0::Writer::edgeLabelColorNotRemovedAssembled                = "#999999";
 
 
 
-string LocalMarkerGraph::Writer::vertexColor(const LocalMarkerGraphVertex& vertex) const
+string LocalMarkerGraph0::Writer::vertexColor(const LocalMarkerGraphVertex& vertex) const
 {
     if(vertexColoring == "none") {
         return "black";
@@ -103,7 +103,7 @@ string LocalMarkerGraph::Writer::vertexColor(const LocalMarkerGraphVertex& verte
 
 
 
-string LocalMarkerGraph::Writer::edgeArrowColor(const LocalMarkerGraphEdge& edge) const
+string LocalMarkerGraph0::Writer::edgeArrowColor(const LocalMarkerGraphEdge& edge) const
 {
 
     if(edgeColoring == "none") {
@@ -164,7 +164,7 @@ string LocalMarkerGraph::Writer::edgeArrowColor(const LocalMarkerGraphEdge& edge
 
 
 
-string LocalMarkerGraph::Writer::edgeLabelColor(const LocalMarkerGraphEdge& edge) const
+string LocalMarkerGraph0::Writer::edgeLabelColor(const LocalMarkerGraphEdge& edge) const
 {
     if(edgeColoring == "none") {
         return "white";
@@ -211,7 +211,7 @@ string LocalMarkerGraph::Writer::edgeLabelColor(const LocalMarkerGraphEdge& edge
 
 
 
-void LocalMarkerGraph::writeColorLegendVerticesByDistance(ostream& html)
+void LocalMarkerGraph0::writeColorLegendVerticesByDistance(ostream& html)
 {
     html <<
         "<table>"
@@ -226,7 +226,7 @@ void LocalMarkerGraph::writeColorLegendVerticesByDistance(ostream& html)
 
 
 
-void LocalMarkerGraph::writeColorLegendEdgeArrowsByFlags(ostream& html)
+void LocalMarkerGraph0::writeColorLegendEdgeArrowsByFlags(ostream& html)
 {
     if(assemblyMode == 2) {
         html <<
@@ -261,7 +261,7 @@ void LocalMarkerGraph::writeColorLegendEdgeArrowsByFlags(ostream& html)
 
 
 
-void LocalMarkerGraph::writeColorLegendEdgeLabelsByFlags(ostream& html)
+void LocalMarkerGraph0::writeColorLegendEdgeLabelsByFlags(ostream& html)
 {
     html <<
         "<table>"
@@ -283,7 +283,7 @@ void LocalMarkerGraph::writeColorLegendEdgeLabelsByFlags(ostream& html)
 
 
 
-void LocalMarkerGraph::Writer::operator()(std::ostream& s) const
+void LocalMarkerGraph0::Writer::operator()(std::ostream& s) const
 {
     // This turns off the tooltip on the graph and the edges.
     s << "tooltip = \" \";\n";
@@ -316,7 +316,7 @@ void LocalMarkerGraph::Writer::operator()(std::ostream& s) const
 
 
 
-void LocalMarkerGraph::Writer::operator()(std::ostream& s, vertex_descriptor v) const
+void LocalMarkerGraph0::Writer::operator()(std::ostream& s, vertex_descriptor v) const
 {
     const LocalMarkerGraphVertex& vertex = graph[v];
     const auto coverage = vertex.markerInfos.size();
@@ -464,7 +464,7 @@ void LocalMarkerGraph::Writer::operator()(std::ostream& s, vertex_descriptor v) 
 
 
 
-void LocalMarkerGraph::Writer::operator()(std::ostream& s, edge_descriptor e) const
+void LocalMarkerGraph0::Writer::operator()(std::ostream& s, edge_descriptor e) const
 {
 
     const LocalMarkerGraphEdge& edge = graph[e];

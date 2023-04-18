@@ -10,7 +10,7 @@ using namespace shasta;
 
 
 
-LocalMarkerGraph::LocalMarkerGraph(
+LocalMarkerGraph0::LocalMarkerGraph0(
     uint64_t readRepresentation,
     uint32_t k,
     uint64_t assemblyMode,
@@ -36,8 +36,8 @@ LocalMarkerGraph::LocalMarkerGraph(
 // Find out if a vertex with the given MarkerGraph::VertexId exists.
 // If it exists, return make_pair(true, v).
 // Otherwise, return make_pair(false, null_vertex());
-std::pair<bool, LocalMarkerGraph::vertex_descriptor>
-    LocalMarkerGraph::findVertex(MarkerGraph::VertexId vertexId) const
+std::pair<bool, LocalMarkerGraph0::vertex_descriptor>
+    LocalMarkerGraph0::findVertex(MarkerGraph::VertexId vertexId) const
 {
     const auto it = vertexMap.find(vertexId);
     if(it == vertexMap.end()) {
@@ -52,8 +52,8 @@ std::pair<bool, LocalMarkerGraph::vertex_descriptor>
 // Add a vertex with the given MarkerGraph::VertexId
 // and return its vertex descriptor.
 // A vertex with this MarkerGraph::VertexId must not exist.
-LocalMarkerGraph::vertex_descriptor
-    LocalMarkerGraph::addVertex(
+LocalMarkerGraph0::vertex_descriptor
+    LocalMarkerGraph0::addVertex(
     MarkerGraph::VertexId vertexId,
     uint64_t distance,
     span<MarkerId> vertexMarkers)
@@ -82,7 +82,7 @@ LocalMarkerGraph::vertex_descriptor
 
 
 // Get the KmerId for a vertex.
-KmerId LocalMarkerGraph::getKmerId(vertex_descriptor v) const
+KmerId LocalMarkerGraph0::getKmerId(vertex_descriptor v) const
 {
     const LocalMarkerGraphVertex& vertex = (*this)[v];
     return markerGraph.getVertexKmerId(vertex.vertexId, k, reads, markers);
@@ -91,7 +91,7 @@ KmerId LocalMarkerGraph::getKmerId(vertex_descriptor v) const
 
 
 // Get the repeat counts for a MarkerInfo of a vertex.
-vector<uint8_t> LocalMarkerGraph::getRepeatCounts(
+vector<uint8_t> LocalMarkerGraph0::getRepeatCounts(
     const LocalMarkerGraphVertex::MarkerInfo& markerInfo) const
 {
 
@@ -122,19 +122,19 @@ vector<uint8_t> LocalMarkerGraph::getRepeatCounts(
 
 
 // Fill in the ConsensusInfo's for each vertex.
-void LocalMarkerGraph::computeVertexConsensusInfo()
+void LocalMarkerGraph0::computeVertexConsensusInfo()
 {
 
-    LocalMarkerGraph& graph = *this;
-    BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph) {
+    LocalMarkerGraph0& graph = *this;
+    BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph0) {
         computeVertexConsensusInfo(v);
     }
 }
-void LocalMarkerGraph::computeVertexConsensusInfo( vertex_descriptor v)
+void LocalMarkerGraph0::computeVertexConsensusInfo( vertex_descriptor v)
 {
 
     // Short-hands for the graph and the vertex.
-    LocalMarkerGraph& graph = *this;
+    LocalMarkerGraph0& graph = *this;
     LocalMarkerGraphVertex& vertex = graph[v];
 
     // Get the marker k-mer of this vertex.
@@ -165,11 +165,11 @@ void LocalMarkerGraph::computeVertexConsensusInfo( vertex_descriptor v)
 // Store sequence information in the edge.
 // This version takes as input a vector of the
 // LocalMarkerGraphEdge::Info that caused the edge to be created.
-void LocalMarkerGraph::storeEdgeInfo(
+void LocalMarkerGraph0::storeEdgeInfo(
     edge_descriptor e,
     const vector<MarkerInterval>& intervals)
 {
-    LocalMarkerGraph& graph = *this;
+    LocalMarkerGraph0& graph = *this;
     LocalMarkerGraphEdge& edge = graph[e];
 
     // Map to store the oriented read ids and ordinals, grouped by sequence.
@@ -304,12 +304,12 @@ bool LocalMarkerGraphEdge::getOrdinals(
 // Approximate topological sort, adding edges
 // in order of decreasing coverage. The topological sort
 // stored in LocalMarkerGrapg2Vertex::rank.
-void LocalMarkerGraph::approximateTopologicalSort()
+void LocalMarkerGraph0::approximateTopologicalSort()
 {
-    LocalMarkerGraph& graph = *this;
+    LocalMarkerGraph0& graph = *this;
 
     vector<pair<uint32_t, edge_descriptor> > edgeTable;
-    BGL_FORALL_EDGES(e, graph, LocalMarkerGraph) {
+    BGL_FORALL_EDGES(e, graph, LocalMarkerGraph0) {
         edgeTable.push_back(make_pair(graph[e].coverage(), e));
     }
     sort(edgeTable.begin(), edgeTable.end(),
@@ -325,7 +325,7 @@ void LocalMarkerGraph::approximateTopologicalSort()
 
     // Also store the vertices in topological sort order.
     vector< pair<size_t, vertex_descriptor> > vertexTable;
-    BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph) {
+    BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph0) {
         vertexTable.push_back(make_pair(graph[v].rank, v));
     }
     sort(vertexTable.begin(), vertexTable.end());

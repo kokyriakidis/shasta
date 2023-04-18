@@ -72,7 +72,7 @@ void Assembler::exploreMarkerGraph0(
 
 
     // Create the local marker graph.
-    LocalMarkerGraph graph(
+    LocalMarkerGraph0 graph(
         assemblerInfo->readRepresentation,
         uint32_t(assemblerInfo->k),
         assemblerInfo->assemblyMode,
@@ -163,7 +163,7 @@ void Assembler::exploreMarkerGraph0(
     // Color legend for vertices when colored by distance.
     if(requestParameters.vertexColoring == "byDistance") {
         html << "<h3>Color legend for vertices</h3>";
-        LocalMarkerGraph::writeColorLegendVerticesByDistance(html);
+        LocalMarkerGraph0::writeColorLegendVerticesByDistance(html);
     }
 
 
@@ -309,7 +309,7 @@ void Assembler::exploreMarkerGraph0(
     // Make the vertices clickable: Ctrl-click recenters
     // the graph at that vertex, right click shows vertex details.
     html << "<script>\n";
-    BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph) {
+    BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph0) {
         const LocalMarkerGraphVertex& vertex = graph[v];
         SHASTA_ASSERT(!vertex.markerInfos.empty());
         const string url = requestParameters.urlForVertex(vertex.vertexId);
@@ -333,9 +333,9 @@ void Assembler::exploreMarkerGraph0(
     // Make the edges clickable: Ctrl-click recenters
     // the graph at the source vertex of that edge, right click shows edge details.
     html << "<script>\n";
-    BGL_FORALL_EDGES(e, graph, LocalMarkerGraph) {
+    BGL_FORALL_EDGES(e, graph, LocalMarkerGraph0) {
         const LocalMarkerGraphEdge& edge = graph[e];
-        const LocalMarkerGraph::vertex_descriptor v0 = source(e, graph);
+        const LocalMarkerGraph0::vertex_descriptor v0 = source(e, graph);
         const LocalMarkerGraphVertex& vertex0 = graph[v0];
         const string url = requestParameters.urlForVertex(vertex0.vertexId);
         html <<

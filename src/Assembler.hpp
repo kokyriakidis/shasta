@@ -44,7 +44,7 @@ namespace shasta {
     class LocalAssemblyGraph;
     class LocalAlignmentCandidateGraph;
     class LocalAlignmentGraph;
-    class LocalMarkerGraph;
+    class LocalMarkerGraph0;
     class LocalReadGraph;
     class LocalReadGraphTriangles;
     class LocalMarkerGraphRequestParameters;
@@ -1608,7 +1608,7 @@ private:
         bool useSuperBubbleEdges,
         bool useLowCoverageCrossEdges,
         bool useRemovedSecondaryEdges,
-        LocalMarkerGraph&
+        LocalMarkerGraph0&
         );
     bool extractLocalMarkerGraph(
         MarkerGraph::VertexId,
@@ -1621,7 +1621,7 @@ private:
         bool useSuperBubbleEdges,
         bool useLowCoverageCrossEdges,
         bool useRemovedSecondaryEdges,
-        LocalMarkerGraph&
+        LocalMarkerGraph0&
         );
 
     // Compute consensus sequence for a vertex of the marker graph.

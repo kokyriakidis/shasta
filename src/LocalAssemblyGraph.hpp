@@ -4,7 +4,7 @@
 
 /*******************************************************************************
 
-The local marker graph created by class LocalMarkerGraph is a subgraph
+The local marker graph created by class LocalAssemblyGraph is a subgraph
 of the global assembly graph, created by starting at a given vertex,
 and extending out to a specified distance in both directions.
 Distance is number of edges on the global assembly graph.
