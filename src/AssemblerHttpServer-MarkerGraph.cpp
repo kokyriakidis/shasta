@@ -310,7 +310,7 @@ void Assembler::exploreMarkerGraph0(
     // the graph at that vertex, right click shows vertex details.
     html << "<script>\n";
     BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph0) {
-        const LocalMarkerGraphVertex& vertex = graph[v];
+        const LocalMarkerGraph0Vertex& vertex = graph[v];
         SHASTA_ASSERT(!vertex.markerInfos.empty());
         const string url = requestParameters.urlForVertex(vertex.vertexId);
         html <<
@@ -336,7 +336,7 @@ void Assembler::exploreMarkerGraph0(
     BGL_FORALL_EDGES(e, graph, LocalMarkerGraph0) {
         const LocalMarkerGraphEdge& edge = graph[e];
         const LocalMarkerGraph0::vertex_descriptor v0 = source(e, graph);
-        const LocalMarkerGraphVertex& vertex0 = graph[v0];
+        const LocalMarkerGraph0Vertex& vertex0 = graph[v0];
         const string url = requestParameters.urlForVertex(vertex0.vertexId);
         html <<
             "element = document.getElementById('edge" << edge.edgeId << "');\n"

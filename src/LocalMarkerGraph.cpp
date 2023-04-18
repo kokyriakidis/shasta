@@ -62,14 +62,14 @@ LocalMarkerGraph0::vertex_descriptor
     SHASTA_ASSERT(vertexMap.find(vertexId) == vertexMap.end());
 
     // Add the vertex and store it in the vertex map.
-    const vertex_descriptor v = add_vertex(LocalMarkerGraphVertex(vertexId, distance), *this);
+    const vertex_descriptor v = add_vertex(LocalMarkerGraph0Vertex(vertexId, distance), *this);
     vertexMap.insert(make_pair(vertexId, v));
 
     // Fill in the marker information for this vertex.
-    LocalMarkerGraphVertex& vertex = (*this)[v];
+    LocalMarkerGraph0Vertex& vertex = (*this)[v];
     vertex.markerInfos.reserve(vertexMarkers.size());
     for(const MarkerId markerId: vertexMarkers) {
-        LocalMarkerGraphVertex::MarkerInfo markerInfo;
+        LocalMarkerGraph0Vertex::MarkerInfo markerInfo;
         markerInfo.markerId = markerId;
         tie(markerInfo.orientedReadId, markerInfo.ordinal) =
             findMarkerId(markerId, markers);
@@ -84,7 +84,7 @@ LocalMarkerGraph0::vertex_descriptor
 // Get the KmerId for a vertex.
 KmerId LocalMarkerGraph0::getKmerId(vertex_descriptor v) const
 {
-    const LocalMarkerGraphVertex& vertex = (*this)[v];
+    const LocalMarkerGraph0Vertex& vertex = (*this)[v];
     return markerGraph.getVertexKmerId(vertex.vertexId, k, reads, markers);
 }
 
@@ -92,7 +92,7 @@ KmerId LocalMarkerGraph0::getKmerId(vertex_descriptor v) const
 
 // Get the repeat counts for a MarkerInfo of a vertex.
 vector<uint8_t> LocalMarkerGraph0::getRepeatCounts(
-    const LocalMarkerGraphVertex::MarkerInfo& markerInfo) const
+    const LocalMarkerGraph0Vertex::MarkerInfo& markerInfo) const
 {
 
     if(readRepresentation == 1) {
@@ -135,7 +135,7 @@ void LocalMarkerGraph0::computeVertexConsensusInfo( vertex_descriptor v)
 
     // Short-hands for the graph and the vertex.
     LocalMarkerGraph0& graph = *this;
-    LocalMarkerGraphVertex& vertex = graph[v];
+    LocalMarkerGraph0Vertex& vertex = graph[v];
 
     // Get the marker k-mer of this vertex.
     const KmerId kmerId = graph.getKmerId(v);
@@ -266,7 +266,7 @@ void LocalMarkerGraph0::storeEdgeInfo(
 // If found, returns pair(true, ordinal).
 // Otherwise, returns pair(false, don't care).
 // If more than an ordinal is found, the first one is returned.
-pair<bool, uint32_t> LocalMarkerGraphVertex::getOrdinal(
+pair<bool, uint32_t> LocalMarkerGraph0Vertex::getOrdinal(
     OrientedReadId orientedReadId) const
 {
     for(const MarkerInfo& markerInfo: markerInfos) {

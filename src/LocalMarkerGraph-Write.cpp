@@ -31,7 +31,7 @@ void LocalMarkerGraph0::write(
 {
     Writer writer(*this, localMarkerGraphRequestParameters);
     boost::write_graphviz(s, *this, writer, writer, writer,
-        boost::get(&LocalMarkerGraphVertex::vertexId, *this));
+        boost::get(&LocalMarkerGraph0Vertex::vertexId, *this));
 }
 
 LocalMarkerGraph0::Writer::Writer(
@@ -64,7 +64,7 @@ const string LocalMarkerGraph0::Writer::edgeLabelColorNotRemovedAssembled       
 
 
 
-string LocalMarkerGraph0::Writer::vertexColor(const LocalMarkerGraphVertex& vertex) const
+string LocalMarkerGraph0::Writer::vertexColor(const LocalMarkerGraph0Vertex& vertex) const
 {
     if(vertexColoring == "none") {
         return "black";
@@ -318,7 +318,7 @@ void LocalMarkerGraph0::Writer::operator()(std::ostream& s) const
 
 void LocalMarkerGraph0::Writer::operator()(std::ostream& s, vertex_descriptor v) const
 {
-    const LocalMarkerGraphVertex& vertex = graph[v];
+    const LocalMarkerGraph0Vertex& vertex = graph[v];
     const auto coverage = vertex.markerInfos.size();
     const string color = vertexColor(vertex);
     SHASTA_ASSERT(coverage > 0);

@@ -26,14 +26,14 @@ a group of aligned markers.
 
 namespace shasta {
 
-    class LocalMarkerGraphVertex;
+    class LocalMarkerGraph0Vertex;
     class LocalMarkerGraphEdge;
     class LocalMarkerGraph0;
     using LocalMarkerGraph0BaseClass = boost::adjacency_list<
         boost::listS,   // Permit parallel edges created by createMarkerGraphEdgesStrict
         boost::listS,
         boost::bidirectionalS,
-        LocalMarkerGraphVertex,
+        LocalMarkerGraph0Vertex,
         LocalMarkerGraphEdge
         >;
 
@@ -45,7 +45,7 @@ namespace shasta {
 
 
 
-class shasta::LocalMarkerGraphVertex {
+class shasta::LocalMarkerGraph0Vertex {
 public:
 
     // The global vertex id of the vertex of the global marker
@@ -64,7 +64,7 @@ public:
     };
     vector<MarkerInfo> markerInfos;
 
-    LocalMarkerGraphVertex(
+    LocalMarkerGraph0Vertex(
         MarkerGraph::VertexId vertexId,
         uint64_t distance) :
         vertexId(vertexId),
@@ -255,7 +255,7 @@ public:
     KmerId getKmerId(vertex_descriptor) const;
 
     // Get the repeat counts for a MarkerInfo of a vertex.
-    vector<uint8_t> getRepeatCounts(const LocalMarkerGraphVertex::MarkerInfo&) const;
+    vector<uint8_t> getRepeatCounts(const LocalMarkerGraph0Vertex::MarkerInfo&) const;
 
     // Fill in the ConsensusInfo's for each vertex.
     void computeVertexConsensusInfo();
@@ -343,7 +343,7 @@ private:
         static const string edgeLabelColorRemovedAsLowCoverageCrossEdge;
         static const string edgeLabelColorNotRemovedNotAssembled;
         static const string edgeLabelColorNotRemovedAssembled;
-        string vertexColor(const LocalMarkerGraphVertex&) const;
+        string vertexColor(const LocalMarkerGraph0Vertex&) const;
         string edgeArrowColor(const LocalMarkerGraphEdge&) const;
         string edgeLabelColor(const LocalMarkerGraphEdge&) const;
     };

@@ -1704,7 +1704,7 @@ bool Assembler::extractLocalMarkerGraph(
         // Dequeue a vertex.
         const vertex_descriptor v0 = q.front();
         q.pop();
-        const LocalMarkerGraphVertex& vertex0 = graph[v0];
+        const LocalMarkerGraph0Vertex& vertex0 = graph[v0];
         const MarkerGraph::VertexId vertexId0 = vertex0.vertexId;
         const uint64_t distance0 = vertex0.distance;
         const uint64_t distance1 = distance0 + 1;
@@ -1808,7 +1808,7 @@ bool Assembler::extractLocalMarkerGraph(
 
     // Create edges.
     BGL_FORALL_VERTICES(v0, graph, LocalMarkerGraph0) {
-        const LocalMarkerGraphVertex& vertex0 = graph[v0];
+        const LocalMarkerGraph0Vertex& vertex0 = graph[v0];
         const MarkerGraph::VertexId vertexId0 = vertex0.vertexId;
 
         // Loop over the children that exist in the local marker graph
@@ -1884,7 +1884,7 @@ bool Assembler::extractLocalMarkerGraph(
     if(markerGraph.vertexRepeatCounts.isOpen) {
         const size_t k = assemblerInfo->k;
         BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph0) {
-            LocalMarkerGraphVertex& vertex = graph[v];
+            LocalMarkerGraph0Vertex& vertex = graph[v];
             vertex.storedConsensusRepeatCounts.resize(k);
             const uint8_t* begin = markerGraph.vertexRepeatCounts.begin() + k * vertex.vertexId;
             copy(begin, begin+k, vertex.storedConsensusRepeatCounts.begin());
