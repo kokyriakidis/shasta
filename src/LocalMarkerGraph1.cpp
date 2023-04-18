@@ -121,9 +121,7 @@ LocalMarkerGraph1::LocalMarkerGraph1(
             if(it != vertexMap.end()) {
                 const vertex_descriptor v1 = it->second;
                 add_edge(v0, v1, LocalMarkerGraph1Edge(edgeId), graph);
-                cout << "Added " << edgeId << endl;
             } else {
-                cout << "Skipped " << edgeId << endl;
             }
         }
     }
