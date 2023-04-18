@@ -1,5 +1,5 @@
 // Shasta.
-#include "LocalMarkerGraph.hpp"
+#include "LocalMarkerGraph0.hpp"
 #include "ConsensusCaller.hpp"
 #include "Marker.hpp"
 #include "MemoryMappedVectorOfVectors.hpp"

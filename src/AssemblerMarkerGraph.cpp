@@ -9,7 +9,7 @@
 #include "extractKmer.hpp"
 #include "PeakFinder.hpp"
 #include "performanceLog.hpp"
-#include "LocalMarkerGraph.hpp"
+#include "LocalMarkerGraph0.hpp"
 #include "Reads.hpp"
 #include "timestamp.hpp"
 using namespace shasta;

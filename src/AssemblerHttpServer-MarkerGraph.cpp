@@ -6,7 +6,7 @@
 #include "Coverage.hpp"
 #include "hsv.hpp"
 #include "InducedAlignment.hpp"
-#include "LocalMarkerGraph.hpp"
+#include "LocalMarkerGraph0.hpp"
 #include "MarkerConnectivityGraph.hpp"
 #include "MurmurHash2.hpp"
 #include "platformDependent.hpp"

@@ -17,7 +17,7 @@ a group of aligned markers.
 #include "AssemblyGraph.hpp"
 #include "Coverage.hpp"
 #include "Kmer.hpp"
-#include "LocalMarkerGraphRequestParameters.hpp"
+#include "LocalMarkerGraph0RequestParameters.hpp"
 #include "MarkerGraph.hpp"
 #include "Reads.hpp"
 
