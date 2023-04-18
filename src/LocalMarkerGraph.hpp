@@ -39,7 +39,6 @@ namespace shasta {
 
     class CompressedMarker;
     class ConsensusCaller;
-    class LocalMarkerGraphRequestParameters;
     class LongBaseSequences;
 }
 
@@ -270,10 +269,10 @@ public:
     // Write in Graphviz format.
     void write(
         ostream&,
-        const LocalMarkerGraphRequestParameters&) const;
+        const LocalMarkerGraph0RequestParameters&) const;
     void write(
         const string& fileName,
-        const LocalMarkerGraphRequestParameters&) const;
+        const LocalMarkerGraph0RequestParameters&) const;
 
 
     // Approximate topological sort, adding edges
@@ -315,11 +314,11 @@ private:
 
 
     // Class used for graphviz output.
-    class Writer : public LocalMarkerGraphRequestParameters {
+    class Writer : public LocalMarkerGraph0RequestParameters {
     public:
         Writer(
             const LocalMarkerGraph0&,
-            const LocalMarkerGraphRequestParameters&);
+            const LocalMarkerGraph0RequestParameters&);
 
         void operator()(ostream&) const;
         void operator()(ostream&, vertex_descriptor) const;

@@ -36,8 +36,8 @@ void Assembler::exploreMarkerGraph0(
     ostream& html)
 {
     // Get the request parameters.
-    LocalMarkerGraphRequestParameters requestParameters;
-    getLocalMarkerGraphRequestParameters(request, requestParameters);
+    LocalMarkerGraph0RequestParameters requestParameters;
+    getLocalMarkerGraph0RequestParameters(request, requestParameters);
 
     // Write the form.
     html << "<h1>Display a local subgraph of the global marker graph</h3>";
@@ -366,9 +366,9 @@ void Assembler::exploreMarkerGraph0(
 
 // Extract  from the request the parameters for the display
 // of the local marker graph.
-void Assembler::getLocalMarkerGraphRequestParameters(
+void Assembler::getLocalMarkerGraph0RequestParameters(
     const vector<string>& request,
-    LocalMarkerGraphRequestParameters& parameters) const
+    LocalMarkerGraph0RequestParameters& parameters) const
 {
     parameters.vertexId = 0;
     parameters.vertexIdIsPresent = getParameterValue(
@@ -478,7 +478,7 @@ void Assembler::getLocalMarkerGraphRequestParameters(
 // highlightedOrientedReads. Each oriented read is assigned a hue
 // via hashing of the OrientedReadId. This way, an oriented read
 // is always highlighted in the same color.
-void LocalMarkerGraphRequestParameters::parseHighlightedOrientedReads()
+void LocalMarkerGraph0RequestParameters::parseHighlightedOrientedReads()
 {
     highlightedOrientedReads.clear();
     if(highlightedOrientedReadsString.empty()) {
@@ -502,7 +502,7 @@ void LocalMarkerGraphRequestParameters::parseHighlightedOrientedReads()
 
 
 
-void LocalMarkerGraphRequestParameters::writeForm(
+void LocalMarkerGraph0RequestParameters::writeForm(
     ostream& html,
     MarkerGraph::VertexId vertexCount) const
 {
@@ -720,7 +720,7 @@ void LocalMarkerGraphRequestParameters::writeForm(
 
 
 
-bool LocalMarkerGraphRequestParameters::hasMissingRequiredParameters() const
+bool LocalMarkerGraph0RequestParameters::hasMissingRequiredParameters() const
 {
     return
         !vertexIdIsPresent ||
@@ -730,7 +730,7 @@ bool LocalMarkerGraphRequestParameters::hasMissingRequiredParameters() const
 
 
 
-string LocalMarkerGraphRequestParameters::vertexScalingFactorString() const
+string LocalMarkerGraph0RequestParameters::vertexScalingFactorString() const
 {
     if(vertexScalingFactorIsPresent) {
         std::ostringstream s;
@@ -743,7 +743,7 @@ string LocalMarkerGraphRequestParameters::vertexScalingFactorString() const
 
 
 
-string LocalMarkerGraphRequestParameters::arrowScalingFactorString() const
+string LocalMarkerGraph0RequestParameters::arrowScalingFactorString() const
 {
     if(arrowScalingFactorIsPresent) {
         std::ostringstream s;
@@ -756,7 +756,7 @@ string LocalMarkerGraphRequestParameters::arrowScalingFactorString() const
 
 
 
-string LocalMarkerGraphRequestParameters::edgeThicknessScalingFactorString() const
+string LocalMarkerGraph0RequestParameters::edgeThicknessScalingFactorString() const
 {
     if(edgeThicknessScalingFactorIsPresent) {
         std::ostringstream s;
@@ -769,7 +769,7 @@ string LocalMarkerGraphRequestParameters::edgeThicknessScalingFactorString() con
 
 
 
-string LocalMarkerGraphRequestParameters::url() const
+string LocalMarkerGraph0RequestParameters::url() const
 {
     return
         string("exploreMarkerGraph0") +
@@ -800,16 +800,16 @@ string LocalMarkerGraphRequestParameters::url() const
 
 
 
-string LocalMarkerGraphRequestParameters::urlForVertex(uint64_t newVertexId) const
+string LocalMarkerGraph0RequestParameters::urlForVertex(uint64_t newVertexId) const
 {
-    LocalMarkerGraphRequestParameters newParameters = *this;
+    LocalMarkerGraph0RequestParameters newParameters = *this;
     newParameters.vertexId = newVertexId;
     return newParameters.url();
 }
 
 
 
-string LocalMarkerGraphRequestParameters::vertexLabelsString() const
+string LocalMarkerGraph0RequestParameters::vertexLabelsString() const
 {
     switch(vertexLabels) {
         case 0: return "none";
@@ -821,7 +821,7 @@ string LocalMarkerGraphRequestParameters::vertexLabelsString() const
 
 
 
-string LocalMarkerGraphRequestParameters::edgeLabelsString() const
+string LocalMarkerGraph0RequestParameters::edgeLabelsString() const
 {
     switch(edgeLabels) {
         case 0: return "none";

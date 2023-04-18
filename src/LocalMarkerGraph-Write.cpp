@@ -17,7 +17,7 @@ using namespace shasta;
 // Write the graph in Graphviz format.
 void LocalMarkerGraph0::write(
     const string& fileName,
-    const LocalMarkerGraphRequestParameters& localMarkerGraphRequestParameters) const
+    const LocalMarkerGraph0RequestParameters& localMarkerGraphRequestParameters) const
 {
     ofstream outputFileStream(fileName);
     if(!outputFileStream) {
@@ -27,7 +27,7 @@ void LocalMarkerGraph0::write(
 }
 void LocalMarkerGraph0::write(
     ostream& s,
-    const LocalMarkerGraphRequestParameters& localMarkerGraphRequestParameters) const
+    const LocalMarkerGraph0RequestParameters& localMarkerGraphRequestParameters) const
 {
     Writer writer(*this, localMarkerGraphRequestParameters);
     boost::write_graphviz(s, *this, writer, writer, writer,
@@ -36,8 +36,8 @@ void LocalMarkerGraph0::write(
 
 LocalMarkerGraph0::Writer::Writer(
     const LocalMarkerGraph0& graph,
-    const LocalMarkerGraphRequestParameters& parameters) :
-    LocalMarkerGraphRequestParameters(parameters),
+    const LocalMarkerGraph0RequestParameters& parameters) :
+    LocalMarkerGraph0RequestParameters(parameters),
     graph(graph)
 {
 }

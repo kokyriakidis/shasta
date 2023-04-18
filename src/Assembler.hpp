@@ -47,7 +47,7 @@ namespace shasta {
     class LocalMarkerGraph0;
     class LocalReadGraph;
     class LocalReadGraphTriangles;
-    class LocalMarkerGraphRequestParameters;
+    class LocalMarkerGraph0RequestParameters;
     class LongBaseSequences;
     class MarkerConnectivityGraph;
     class MarkerConnectivityGraphVertexMap;
@@ -2117,9 +2117,9 @@ public:
     // for display of the local marker graph.
     void exploreMarkerGraph0(const vector<string>&, ostream&);
     void exploreMarkerGraph1(const vector<string>&, ostream&);
-    void getLocalMarkerGraphRequestParameters(
+    void getLocalMarkerGraph0RequestParameters(
         const vector<string>&,
-        LocalMarkerGraphRequestParameters&) const;
+        LocalMarkerGraph0RequestParameters&) const;
     void exploreMarkerGraphVertex(const vector<string>&, ostream&);
     void exploreMarkerGraphEdge(const vector<string>&, ostream&);
     void exploreMarkerCoverage(const vector<string>&, ostream&);

@@ -5,13 +5,13 @@
 #include <map>
 
 namespace shasta {
-    class LocalMarkerGraphRequestParameters;
+    class LocalMarkerGraph0RequestParameters;
 }
 
 
 // Class describing the parameters in the form
 // in the local marker graph page.
-class shasta::LocalMarkerGraphRequestParameters {
+class shasta::LocalMarkerGraph0RequestParameters {
 public:
 
     uint64_t vertexId;
