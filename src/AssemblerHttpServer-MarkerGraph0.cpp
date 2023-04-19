@@ -2098,6 +2098,10 @@ void Assembler::exploreMarkerConnectivity(
     const bool ordinalIsPresent = getParameterValue(request, "ordinal", ordinal);
     string whichAlignments = "ReadGraphAlignments";
     getParameterValue(request, "whichAlignments", whichAlignments);
+    string labelsString;
+    const bool labels = getParameterValue(request, "labels", labelsString);
+    double timeout = 30;
+    getParameterValue(request, "timeout", timeout);
 
     // Write the form.
     html <<
@@ -2120,7 +2124,14 @@ void Assembler::exploreMarkerConnectivity(
     html << "<br><input type=radio name=whichAlignments value=ReadGraphAlignments" <<
         (whichAlignments=="ReadGraphAlignments" ? " checked=checked" : "") <<
         "> Only use alignments in the read graph.";
-    html << "</form>";
+    html << "<br><input type=checkbox name=labels" <<
+         (labels ? " checked" : "") <<
+         "> Labels"
+        "<br>Timeout (seconds) for graph layout"
+        " <input type=text required name=timeout size=8 style='text-align:center'" <<
+        " value='" << timeout <<
+        "'>"
+        "</form>";
     const bool useReadGraphAlignmentsOnly = (whichAlignments == "ReadGraphAlignments");
 
     // If the required parameters are missing, stop here.
@@ -2166,15 +2177,19 @@ void Assembler::exploreMarkerConnectivity(
         const MarkerDescriptor markerDescriptor = graph[v];
         const OrientedReadId orientedReadId1 = markerDescriptor.first;
         const uint32_t ordinal1 = markerDescriptor.second;
-        dotFile << "\"" << orientedReadId1 << "-" << ordinal1 << "\""
-            " [label=\"" << orientedReadId1 << "\\n" << ordinal1 <<
-            "\"";
-        if(frequencyMap[orientedReadId1] != 1) {
-            dotFile << " style=filled fillcolor=pink";
-        } else {
-            dotFile << " style=filled fillcolor=cornsilk";
+        dotFile << "\"" << orientedReadId1 << "-" << ordinal1 << "\"";
+        if(labels) {
+            dotFile <<
+                " [label=\"" << orientedReadId1 << "\\n" << ordinal1 <<
+                "\"";
+            if(frequencyMap[orientedReadId1] != 1) {
+                dotFile << " style=filled fillcolor=pink";
+            } else {
+                dotFile << " style=filled fillcolor=cornsilk";
+            }
+            dotFile << "]";
         }
-        dotFile << "];\n";
+        dotFile << ";\n";
     }
     BGL_FORALL_EDGES(e, graph, MarkerConnectivityGraph) {
         const auto v0 = source(e, graph);
@@ -2191,8 +2206,9 @@ void Assembler::exploreMarkerConnectivity(
 
 
     // Use graphviz to render it to svg.
-    const string command = timeoutCommand() + " 30 sfdp -O -T svg " + dotFileName +
-        " -Goverlap=false -Gsplines=true -Gsmoothing=triangle";
+    const string command = timeoutCommand() + " " + to_string(int(timeout)) + " sfdp -O -T svg " + dotFileName +
+        ( labels ? " -Goverlap=false -Gsplines=true -Gsmoothing=triangle" :
+            " -Nshape=point -Gsize=10 -Gratio=expand -Epenwidth=0.4");
     const int commandStatus = ::system(command.c_str());
     if(WIFEXITED(commandStatus)) {
         const int exitStatus = WEXITSTATUS(commandStatus);
