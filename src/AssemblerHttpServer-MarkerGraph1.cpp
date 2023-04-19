@@ -38,6 +38,8 @@ void Assembler::exploreMarkerGraph1(
     uint64_t sizePixels = 600;
     getParameterValue(request, "sizePixels", sizePixels);
 
+    string outputType = "createGfa";
+    getParameterValue(request, "outputType", outputType);
 
 
     // Write the form.
@@ -73,9 +75,19 @@ void Assembler::exploreMarkerGraph1(
         "<td class=centered><input type=text required name=sizePixels size=8 style='text-align:center'"
         " value='" << sizePixels << "'>"
 
+        "<tr>"
+        "<td>Output"
+        "<td>"
+        "<input type=radio name=outputType value='createGfa'" <<
+        (outputType == "createGfa" ? " checked=on" : "") <<
+        ">Create a GFA file"
+         "<br><input type=radio required name=outputType value='createAndOpenGfa'" <<
+        (outputType == "createAndOpenGfa" ? " checked=on" : "") <<
+        ">Create a GFA file and open it in Bandage"
+
         "</table>"
 
-        "<br><input type=submit value='Display'>"
+        "<br><input type=submit value='Do it'>"
         "</form>";
 
 
@@ -135,4 +147,12 @@ void Assembler::exploreMarkerGraph1(
     }
     </script>
     )###";
+
+
+    // If requested, open it in Bandage.
+    // This is done on the server side, of course. This can have unexpected
+    // consequences if running remotely.
+    if(outputType == "createAndOpenGfa") {
+        ::system(("Bandage load " + gfaFileName + "&").c_str());
+    }
 }
