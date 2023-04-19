@@ -587,6 +587,10 @@ void Assembler::writeGnuPlotPngToHtml(
 
     // Write the png file to html.
     writePngToHtml(html, pngFileName);
+
+    // Remove the files we created.
+    std::filesystem::remove(gnuplotFileName);
+    std::filesystem::remove(pngFileName);
 }
 
 
