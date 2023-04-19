@@ -158,7 +158,8 @@ void LocalMarkerGraph1::writeGfa(const string& fileName) const
         const MarkerGraphEdgeId edgeId = graph[e].edgeId;
         gfa <<
             "S\t" << edgeId << "\t" << "*"
-            // "\tLN:i:" << path.size() <<
+            "\tLN:i:" << 1 <<
+            "\tRC:i:" << markerGraph.edgeCoverage(edgeId) <<
             "\n";
     }
 
