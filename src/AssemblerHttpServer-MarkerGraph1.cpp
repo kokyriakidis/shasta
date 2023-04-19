@@ -1,8 +1,15 @@
+// Shasta.
 #include "Assembler.hpp"
 #include "invalid.hpp"
 #include "LocalMarkerGraph1.hpp"
+#include "platformDependent.hpp"
 #include "Reads.hpp"
 using namespace shasta;
+
+// Boost libraries.
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 
 
@@ -95,4 +102,10 @@ void Assembler::exploreMarkerGraph1(
         minEdgeCoverage);
     html << "<p>The local marker graph has " << num_vertices(graph) <<
         " vertices and " << num_edges(graph) << " edges.";
+
+    // Create a gfa file to represent the local marker graph.
+    const string gfaFileName = tmpDirectory() + to_string(boost::uuids::random_generator()()) + ".gfa";
+    graph.writeGfa(gfaFileName);
+    html << "<p>The local marker graph is in " << gfaFileName;
+        " Remove when done with it.";
 }

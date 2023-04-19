@@ -9,6 +9,7 @@
 
 // Standard library.
 #include <map>
+#include "string.hpp"
 
 namespace shasta {
 
@@ -79,6 +80,8 @@ public:
 
     std::map<MarkerGraphVertexId, vertex_descriptor> vertexMap;
     vertex_descriptor addVertex(MarkerGraphVertexId, uint64_t distance);
+
+    void writeGfa(const string& fileName) const;
 };
 
 #endif

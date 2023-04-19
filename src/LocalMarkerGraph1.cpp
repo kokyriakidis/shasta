@@ -7,6 +7,7 @@ using namespace shasta;
 #include "boost/graph/iteration_macros.hpp"
 
 // Standard library.
+#include "fstream.hpp"
 #include <queue>
 
 
@@ -140,4 +141,40 @@ LocalMarkerGraph1::vertex_descriptor LocalMarkerGraph1::addVertex(
     vertexMap.insert(make_pair(vertexId, v));
 
     return v;
+}
+
+
+
+void LocalMarkerGraph1::writeGfa(const string& fileName) const
+{
+    const LocalMarkerGraph1& graph = *this;
+    ofstream gfa(fileName);
+
+    // Write the header.
+    gfa << "H\tVN:Z:1.0\n";
+
+    // Write one segment for each edge.
+    BGL_FORALL_EDGES(e, graph, LocalMarkerGraph1) {
+        const MarkerGraphEdgeId edgeId = graph[e].edgeId;
+        gfa <<
+            "S\t" << edgeId << "\t" << "*"
+            // "\tLN:i:" << path.size() <<
+            "\n";
+    }
+
+
+
+    // Write the links.
+    // For each vertex, we write links between all pairs of incomint/outgoing edges.
+    BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
+        BGL_FORALL_INEDGES(v, e0, graph, LocalMarkerGraph1) {
+            const MarkerGraphEdgeId edgeId0 = graph[e0].edgeId;
+            BGL_FORALL_OUTEDGES(v, e1, graph, LocalMarkerGraph1) {
+                const MarkerGraphEdgeId edgeId1 = graph[e1].edgeId;
+                gfa << "L\t" <<
+                    edgeId0 << "\t+\t" <<
+                    edgeId1 << "\t+\t0M\n";
+            }
+        }
+    }
 }
