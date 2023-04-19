@@ -106,6 +106,33 @@ void Assembler::exploreMarkerGraph1(
     // Create a gfa file to represent the local marker graph.
     const string gfaFileName = tmpDirectory() + to_string(boost::uuids::random_generator()()) + ".gfa";
     graph.writeGfa(gfaFileName);
-    html << "<p>The local marker graph is in " << gfaFileName;
-        " Remove when done with it.";
+    html << "<p>The local marker graph is in "
+        "<span id='SpanToBeCopied' style='color:Blue'>" << gfaFileName << "</span>"
+        ". Remove it when done with it."
+        "<br><button onClick='copySpanToClipboard()'>Copy GFA file name to clipboard</button>";
+    html << R"###(
+    <script>
+    function copySpanToClipboard()
+    {
+          
+        // Remove any previous selection.
+        var selection = window.getSelection();
+        selection.removeAllRanges();
+        
+        // Select the span.
+        var element = document.getElementById("SpanToBeCopied");
+        var range = document.createRange();
+        range.selectNodeContents(element);
+        selection.addRange(range);
+        
+        // Copy it to the clipboard.
+        document.execCommand("copy");
+
+        // Unselect it.
+        selection.removeAllRanges();
+        
+
+    }
+    </script>
+    )###";
 }
