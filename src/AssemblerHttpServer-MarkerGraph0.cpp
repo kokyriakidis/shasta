@@ -1767,6 +1767,10 @@ void Assembler::exploreMarkerCoverage(
     const bool readIdIsPresent = getParameterValue(request, "readId", readId);
     Strand strand = 0;
     const bool strandIsPresent = getParameterValue(request, "strand", strand);
+    uint32_t firstOrdinal = 0;
+    getParameterValue(request, "firstOrdinal", firstOrdinal);
+    uint32_t lastOrdinal = 0;
+    getParameterValue(request, "lastOrdinal", lastOrdinal);
     int width = 600;
     getParameterValue(request, "width", width);
     int height = 400;
@@ -1782,6 +1786,10 @@ void Assembler::exploreMarkerCoverage(
         "<tr><td>Strand<td class=centered>";
     writeStrandSelection(html, "strand", strandIsPresent && strand==0, strandIsPresent && strand==1);
     html <<
+        "<tr><td>First ordinal<td class=centered>"
+        "<input type=text name=firstOrdinal style='text-align:center' size=8 value='" << firstOrdinal << "'>"
+        "<tr><td>Last ordinal<br>(0 for unlimited)<td class=centered>"
+        "<input type=text name=lastOrdinal style='text-align:center' size=8 value='" << lastOrdinal << "'>"
         "<tr><td>Plot width<td class=centered>"
         "<input type=text name=width style='text-align:center' size=8 value='" << width << "'>"
         "<tr><td>Plot height<td class=centered>"
@@ -1806,7 +1814,11 @@ void Assembler::exploreMarkerCoverage(
         "plot '-' with points pointtype 7 pointsize 0.5 linecolor rgb '#0000ff' notitle\n";
 
     const uint32_t markerCount = uint32_t(markers.size(orientedReadId.getValue()));
-    for(uint32_t ordinal=0; ordinal<markerCount; ordinal++) {
+    if(lastOrdinal == 0) {
+        lastOrdinal = markerCount - 1;
+    }
+    SHASTA_ASSERT(lastOrdinal >= firstOrdinal);
+    for(uint32_t ordinal=firstOrdinal; ordinal<=lastOrdinal; ordinal++) {
         const MarkerGraph::VertexId vertexId =
             getGlobalMarkerGraphVertex(orientedReadId, ordinal);
         if(vertexId == MarkerGraph::invalidCompressedVertexId) {
