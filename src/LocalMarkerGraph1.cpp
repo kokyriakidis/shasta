@@ -1,5 +1,6 @@
 // Shasta.
 #include "LocalMarkerGraph1.hpp"
+#include "Base.hpp"
 #include "MarkerGraph.hpp"
 using namespace shasta;
 
@@ -157,9 +158,16 @@ void LocalMarkerGraph1::writeGfa(const string& fileName) const
     BGL_FORALL_EDGES(e, graph, LocalMarkerGraph1) {
         const MarkerGraphEdgeId edgeId = graph[e].edgeId;
         gfa <<
-            "S\t" << edgeId << "\t" << "*"
-            "\tLN:i:" << 1 <<
-            "\tRC:i:" << markerGraph.edgeCoverage(edgeId) <<
+            "S\t" << edgeId << "\t";
+
+        auto sequence = markerGraph.edgeSequence[edgeId];
+        copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(gfa));
+
+        // RC is multiplied by sequence length so reports the number of reads
+        // (edge coverage) as depth.
+        gfa <<
+            "\tLN:i:" << sequence.size() <<
+            "\tRC:i:" << sequence.size() * markerGraph.edgeCoverage(edgeId) <<
             "\n";
     }
 

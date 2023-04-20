@@ -937,3 +937,46 @@ void Assembler::splitMarkerGraphSecondaryEdgesThreadFunction(size_t threadId)
     __sync_fetch_and_add(&data.splitCount, splitCount);
     __sync_fetch_and_add(&data.createdCount, createdCount);
 }
+
+
+
+
+// Assemble Mode 3 sequence for all marker graph edges.
+// See the comments before MarkerGraph::edgeSequence for more information.
+// The sequence of each edge is simply obtained from the first
+// marker interval of the edge.
+// For now this is done sequentially.
+void Assembler::assembleMarkerGraphEdgesMode3()
+{
+    const uint64_t k = assemblerInfo->k;
+    SHASTA_ASSERT((k % 2) == 0);
+    const uint64_t kHalf = k / 2;
+    SHASTA_ASSERT(getReads().representation == 0);
+
+    markerGraph.edgeSequence.createNew(
+        largeDataName("MarkerGraphEdgesSequence"), largeDataPageSize);
+
+    // Loop over all marker graph edges.
+    for(MarkerGraphEdgeId edgeId=0; edgeId<markerGraph.edges.size(); edgeId++) {
+        markerGraph.edgeSequence.appendVector();
+
+        // Get the first marker interval for this edge.
+        const span<const MarkerInterval> markerIntervals = markerGraph.edgeMarkerIntervals[edgeId];
+        const MarkerInterval& firstMarkerInterval = markerIntervals.front();
+        const OrientedReadId orientedReadId = firstMarkerInterval.orientedReadId;
+        const uint64_t ordinal0 = firstMarkerInterval.ordinals[0];
+        const uint64_t ordinal1 = firstMarkerInterval.ordinals[1];
+
+        // Get the position interval on the oriented read that corresponds to this
+        // marker interval, including k/2 bases on each of the adjacent markers.
+        const span<const CompressedMarker> orientedReadMarkers = markers[orientedReadId.getValue()];
+        const uint64_t positionBegin = orientedReadMarkers[ordinal0].position + kHalf;
+        const uint64_t positionEnd = orientedReadMarkers[ordinal1].position + kHalf;
+
+        for(uint64_t position=positionBegin; position!=positionEnd; position++) {
+            const Base base = getReads().getOrientedReadBase(orientedReadId, uint32_t(position));
+            markerGraph.edgeSequence.append(base);
+        }
+    }
+
+}

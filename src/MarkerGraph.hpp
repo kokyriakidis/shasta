@@ -338,6 +338,25 @@ public:
     // ordered by position.
     MemoryMapped::VectorOfVectors<pair<uint32_t, CompressedCoverageData>, uint64_t>
         edgeCoverageData;
+
+
+
+    // Edge sequence for each edge, for Mode 3 assembly.
+    // There are several difference compared to the consensus sequences stored above,
+    // which are not used in Mode 3 assembly:
+    // - Mode 3 assembly assumes we are not using RLE, so we don't need to store repeat counts.
+    // - Mode 3 assembly uses createMarkerGraphedgesStrict, which guarantees that
+    //   all marker interval on a marker graph edge have exactly the same sequence.
+    //   This dramatically simplifies edge sequence assembly because we can just
+    //   obtain the sequence from the first marker interval, and multiple sequence
+    //   alignment is not nedeed.
+    // - For Mode 3 assembly we assume that marker ength k is even, and
+    //   the stored edge sequence includes the last k/2 bases from the marker
+    //   of the source vertex and the first k/2 bases from the marker of
+    //   the target vertex. As a result, every edge has at least one base of sequence,
+    //   even when adjacent markers overlap. And the sequence of a path can
+    //   be obtained by just concatenating the edge sequences.
+    MemoryMapped::VectorOfVectors<Base, uint64_t> edgeSequence;
 };
 
 #endif

@@ -1103,19 +1103,12 @@ void shasta::main::mode3Assembly(
     // Coverage histograms for vertices and edges of the marker graph.
     assembler.computeMarkerGraphCoverageHistogram();
 
-    // Coverage histograms for vertices and edges of the marker graph.
-    assembler.computeMarkerGraphCoverageHistogram();
-
-    // Compute consensus sequence for all marker graph edges.
-    // We could use instead a much simpler version of assembleMarkerGraphEdges
-    // because all oriented reads on each edge have the same sequence.
-    assembler.assembleMarkerGraphEdges(
-        threadCount,
-        assemblerOptions.assemblyOptions.markerGraphEdgeLengthThresholdForConsensus,
-        assemblerOptions.assemblyOptions.storeCoverageData or
-        assemblerOptions.assemblyOptions.storeCoverageDataCsvLengthThreshold>0,
-        true
-        );
+    // Assemble sequence for marker graph edges.
+    // This assembles MarkerGraph::edgeSequence which is
+    // different from what happens in other assembly modes.
+    // see the comments before MarkerGraph::edgeSequence
+    // for more information.
+    assembler.assembleMarkerGraphEdgesMode3();
 }
 
 

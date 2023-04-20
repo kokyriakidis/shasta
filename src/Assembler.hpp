@@ -1928,7 +1928,17 @@ public:
 private:
 
 
+
+    // Assemble Mode 3 sequence for all marker graph edges.
+    // See the comments before MarkerGraph::edgeSequence for more information.
+    // For now this is done sequentially.
+public:
+    void assembleMarkerGraphEdgesMode3();
+
+
+
     // Assemble sequence for an edge of the assembly graph.
+private:
     void assembleAssemblyGraphEdge(
         AssemblyGraphEdgeId,
         bool storeCoverageData,

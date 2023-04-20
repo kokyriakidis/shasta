@@ -4717,14 +4717,19 @@ void Assembler::assembleMarkerGraphEdgesThreadFunction(size_t threadId)
 
 void Assembler::accessMarkerGraphConsensus()
 {
-    if(assemblerInfo->readRepresentation == 1) {
-        markerGraph.vertexRepeatCounts.accessExistingReadOnly(
-            largeDataName("MarkerGraphVertexRepeatCounts"));
+    if(assemblerInfo->assemblyMode == 3) {
+        markerGraph.edgeSequence.accessExistingReadOnly(largeDataName("MarkerGraphEdgesSequence"));
+
+    } else {
+        if(assemblerInfo->readRepresentation == 1) {
+            markerGraph.vertexRepeatCounts.accessExistingReadOnly(
+                largeDataName("MarkerGraphVertexRepeatCounts"));
+        }
+        markerGraph.edgeConsensus.accessExistingReadOnly(
+            largeDataName("MarkerGraphEdgesConsensus"));
+        markerGraph.edgeConsensusOverlappingBaseCount.accessExistingReadOnly(
+            largeDataName("MarkerGraphEdgesConsensusOverlappingBaseCount"));
     }
-    markerGraph.edgeConsensus.accessExistingReadOnly(
-        largeDataName("MarkerGraphEdgesConsensus"));
-    markerGraph.edgeConsensusOverlappingBaseCount.accessExistingReadOnly(
-        largeDataName("MarkerGraphEdgesConsensusOverlappingBaseCount"));
 
 }
 
