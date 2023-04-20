@@ -152,6 +152,8 @@ void Assembler::exploreMarkerGraph1(
     // If requested, open it in Bandage.
     // This is done on the server side, of course. This can have unexpected
     // consequences if running remotely.
+    // Also, because of this the connection with the http client is not closed
+    // until Bandage terminates, so the browser thinks ore data are coming.
     if(outputType == "createAndOpenGfa") {
         ::system(("Bandage load " + gfaFileName + "&").c_str());
     }
