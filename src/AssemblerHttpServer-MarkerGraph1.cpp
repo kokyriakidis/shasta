@@ -78,7 +78,10 @@ void Assembler::exploreMarkerGraph1(
         "<tr>"
         "<td>Output"
         "<td>"
-        "<input type=radio name=outputType value='createGfa'" <<
+        "<input type=radio name=outputType value='noOutput'" <<
+        (outputType == "noOutput" ? " checked=on" : "") <<
+        ">Show the number of vertices and edges"
+        "<br><input type=radio name=outputType value='createGfa'" <<
         (outputType == "createGfa" ? " checked=on" : "") <<
         ">Create a GFA file"
          "<br><input type=radio required name=outputType value='createAndOpenGfa'" <<
@@ -114,6 +117,10 @@ void Assembler::exploreMarkerGraph1(
         minEdgeCoverage);
     html << "<p>The local marker graph has " << num_vertices(graph) <<
         " vertices and " << num_edges(graph) << " edges.";
+
+    if(outputType == "noOutput") {
+        return;
+    }
 
     // Create a gfa file to represent the local marker graph.
     const string gfaFileName = tmpDirectory() + to_string(boost::uuids::random_generator()()) + ".gfa";
