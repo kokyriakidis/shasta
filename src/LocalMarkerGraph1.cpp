@@ -1,15 +1,24 @@
 // Shasta.
 #include "LocalMarkerGraph1.hpp"
 #include "Base.hpp"
+#include "computeLayout.hpp"
 #include "MarkerGraph.hpp"
+#include "platformDependent.hpp"
+#include "runCommandWithTimeout.hpp"
 using namespace shasta;
 
 // Boost libraries.
 #include "boost/graph/iteration_macros.hpp"
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 // Standard library.
 #include "fstream.hpp"
 #include <queue>
+
+#include <chrono>
+#include <thread>
 
 
 
@@ -187,3 +196,102 @@ void LocalMarkerGraph1::writeGfa(const string& fileName) const
         }
     }
 }
+
+
+
+void LocalMarkerGraph1::writeHtml0(
+    ostream& html,
+    uint64_t sizePixels,
+    double timeout) const
+{
+    const LocalMarkerGraph1& graph = *this;
+
+    // Compute the layout.
+    std::map<edge_descriptor, double> edgeLengthMap;
+    BGL_FORALL_EDGES(e, graph, LocalMarkerGraph1) {
+        edgeLengthMap.insert(make_pair(e, 1.));
+    }
+    std::map<vertex_descriptor, array<double, 2> > positionMap;
+    const ComputeLayoutReturnCode returnCode = computeLayoutCustom(
+        graph, edgeLengthMap, positionMap, timeout);
+    if(returnCode == ComputeLayoutReturnCode::Timeout) {
+        throw runtime_error("Graph layout took too long. "
+            "Increase the timeout or decrease the maximum distance.");
+    }
+    if(returnCode != ComputeLayoutReturnCode::Success) {
+        throw runtime_error("Graph layout failed.");
+    }
+
+    // Find minimum and maximum of x and y.
+    double xMin = std::numeric_limits<double>::max();
+    double xMax = std::numeric_limits<double>::min();
+    double yMin = xMin;
+    double yMax = xMax;
+    for(const auto& p: positionMap) {
+        const auto& xy = p.second;
+        const double x = xy[0];
+        const double y = xy[1];
+        xMin = min(xMin, x);
+        xMax = max(xMax, x);
+        yMin = min(yMin, y);
+        yMax = max(yMax, y);
+    }
+    const double range = max(xMax - xMin, yMax - yMin);
+    const double factor = double(sizePixels) / range;
+
+    // Gather positions, discretized to integers.
+    // Each of these will generate a pixel.
+    std::set< pair<int64_t, int64_t> > pixels;
+    for(const auto& p: positionMap) {
+        const auto& xy = p.second;
+        const double x = xy[0];
+        const double y = xy[1];
+        const uint64_t ix = int64_t(x * factor);
+        const uint64_t iy = int64_t(y * factor);
+        pixels.insert({ix, iy});
+    }
+
+    // Find minimum and maximum ix, iy.
+    int64_t ixMin = std::numeric_limits<int64_t>::max();
+    int64_t ixMax = std::numeric_limits<int64_t>::min();
+    int64_t iyMin = ixMin;
+    int64_t iyMax = ixMax;
+    for(const auto& pixel :pixels) {
+        ixMin = min(ixMin, pixel.first);
+        ixMax = max(ixMax, pixel.first);
+        iyMin = min(iyMin, pixel.second);
+        iyMax = max(iyMax, pixel.second);
+    }
+
+
+
+    // Create a canvas and set these pixels.
+    const int64_t width = ixMax - ixMin + 1;
+    const int64_t height = iyMax - iyMin + 1;
+    html <<
+        "\n<br><canvas id=canvas width=" << width << " height=" << height <<
+        ">"
+        "\n <script>"
+        "\n var canvas = document.getElementById('canvas');"
+        "\n var ctx = canvas.getContext('2d');"
+        "\n var i = ctx.createImageData(" << width << "," << height << ");\n";
+    for(const auto& pixel :pixels) {
+        const int64_t ix = pixel.first - ixMin;
+        SHASTA_ASSERT(ix >= 0);
+        SHASTA_ASSERT(ix < width);
+        const int64_t iy = pixel.second - iyMin;
+        SHASTA_ASSERT(iy >= 0);
+        SHASTA_ASSERT(iy < height);
+        const uint64_t index = (4 * width) * iy + 4 * ix;
+        for(uint64_t k=0; k<3; k++) {
+            html << "i.data[" << index+k << "]=0;";
+        }
+        html << "i.data[" << index+3 << "]=255;";
+    }
+    html <<
+        "\n ctx.putImageData(i, 0, 0);"
+        "\n </script>";
+
+}
+
+

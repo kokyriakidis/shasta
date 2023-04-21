@@ -8,6 +8,7 @@
 #include <boost/graph/adjacency_list.hpp>
 
 // Standard library.
+#include "iosfwd.hpp"
 #include <map>
 #include "string.hpp"
 
@@ -82,6 +83,10 @@ public:
     vertex_descriptor addVertex(MarkerGraphVertexId, uint64_t distance);
 
     void writeGfa(const string& fileName) const;
+    void writeHtml0(
+        ostream&,
+        uint64_t sizePixels,
+        double timeout) const;
 };
 
 #endif

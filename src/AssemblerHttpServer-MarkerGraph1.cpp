@@ -38,6 +38,9 @@ void Assembler::exploreMarkerGraph1(
     uint64_t sizePixels = 600;
     getParameterValue(request, "sizePixels", sizePixels);
 
+    double timeout = 300;
+    getParameterValue(request, "timeout", timeout);
+
     string outputType = "createGfa";
     getParameterValue(request, "outputType", outputType);
 
@@ -76,6 +79,11 @@ void Assembler::exploreMarkerGraph1(
         " value='" << sizePixels << "'>"
 
         "<tr>"
+        "<td>Timeout in seconds"
+        "<td class=centered><input type=text required name=timeout size=8 style='text-align:center'"
+        " value='" << timeout << "'>"
+
+        "<tr>"
         "<td>Output"
         "<td>"
         "<input type=radio name=outputType value='noOutput'" <<
@@ -84,9 +92,12 @@ void Assembler::exploreMarkerGraph1(
         "<br><input type=radio name=outputType value='createGfa'" <<
         (outputType == "createGfa" ? " checked=on" : "") <<
         ">Create a GFA file"
-         "<br><input type=radio required name=outputType value='createAndOpenGfa'" <<
-        (outputType == "createAndOpenGfa" ? " checked=on" : "") <<
-        ">Create a GFA file and open it in Bandage"
+        "<br><input type=radio required name=outputType value='createAndOpenGfa'" <<
+       (outputType == "createAndOpenGfa" ? " checked=on" : "") <<
+       ">Create a GFA file and open it in Bandage"
+       "<br><input type=radio required name=outputType value='html0'" <<
+       (outputType == "html0" ? " checked=on" : "") <<
+       ">Display in the browser"
 
         "</table>"
 
@@ -119,6 +130,11 @@ void Assembler::exploreMarkerGraph1(
         " vertices and " << num_edges(graph) << " edges.";
 
     if(outputType == "noOutput") {
+        return;
+    }
+
+    if(outputType == "html0") {
+        graph.writeHtml0(html, sizePixels, timeout);
         return;
     }
 
