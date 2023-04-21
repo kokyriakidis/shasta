@@ -202,7 +202,8 @@ void LocalMarkerGraph1::writeGfa(const string& fileName) const
 void LocalMarkerGraph1::writeHtml0(
     ostream& html,
     uint64_t sizePixels,
-    double timeout) const
+    double timeout,
+    bool useSvg) const
 {
     const LocalMarkerGraph1& graph = *this;
 
@@ -239,17 +240,37 @@ void LocalMarkerGraph1::writeHtml0(
     const double range = max(xMax - xMin, yMax - yMin);
     const double factor = double(sizePixels) / range;
 
+
+
     // Gather positions, discretized to integers.
     // Each of these will generate a pixel.
-    std::set< pair<int64_t, int64_t> > pixels;
+    class PixelInfo {
+    public:
+        uint64_t maxCoverage;
+        MarkerGraphVertexId vertexId;
+    };
+    std::map< pair<int64_t, int64_t>, PixelInfo> pixels;
     for(const auto& p: positionMap) {
+        const vertex_descriptor v = p.first;
         const auto& xy = p.second;
+        const MarkerGraphVertexId vertexId = graph[v].vertexId;
+        const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
         const double x = xy[0];
         const double y = xy[1];
         const uint64_t ix = int64_t(x * factor);
         const uint64_t iy = int64_t(y * factor);
-        pixels.insert({ix, iy});
+        auto it = pixels.find({ix, iy});
+        if(it == pixels.end()) {
+            pixels.insert(make_pair(make_pair(ix, iy), PixelInfo({coverage, vertexId})));
+        } else {
+            if(coverage > it->second.maxCoverage) {
+                it->second.maxCoverage = coverage;
+                it->second.vertexId = vertexId;
+            }
+        }
     }
+
+
 
     // Find minimum and maximum ix, iy.
     int64_t ixMin = std::numeric_limits<int64_t>::max();
@@ -257,40 +278,103 @@ void LocalMarkerGraph1::writeHtml0(
     int64_t iyMin = ixMin;
     int64_t iyMax = ixMax;
     for(const auto& pixel :pixels) {
-        ixMin = min(ixMin, pixel.first);
-        ixMax = max(ixMax, pixel.first);
-        iyMin = min(iyMin, pixel.second);
-        iyMax = max(iyMax, pixel.second);
+        const auto& ixy = pixel.first;
+        ixMin = min(ixMin, ixy.first);
+        ixMax = max(ixMax, ixy.first);
+        iyMin = min(iyMin, ixy.second);
+        iyMax = max(iyMax, ixy.second);
     }
 
-
-
-    // Create a canvas and set these pixels.
     const int64_t width = ixMax - ixMin + 1;
     const int64_t height = iyMax - iyMin + 1;
-    html <<
-        "\n<br><canvas id=canvas width=" << width << " height=" << height <<
-        ">"
-        "\n <script>"
-        "\n var canvas = document.getElementById('canvas');"
-        "\n var ctx = canvas.getContext('2d');"
-        "\n var i = ctx.createImageData(" << width << "," << height << ");\n";
-    for(const auto& pixel :pixels) {
-        const int64_t ix = pixel.first - ixMin;
-        SHASTA_ASSERT(ix >= 0);
-        SHASTA_ASSERT(ix < width);
-        const int64_t iy = pixel.second - iyMin;
-        SHASTA_ASSERT(iy >= 0);
-        SHASTA_ASSERT(iy < height);
-        const uint64_t index = (4 * width) * iy + 4 * ix;
-        for(uint64_t k=0; k<3; k++) {
-            html << "i.data[" << index+k << "]=0;";
+
+
+
+    if(useSvg) {
+
+        // Display using svg.
+        html << "\n<br><svg width=" << width << " height=" << height << ">";
+        const string coverage1Color = "red";
+        const string coverage2Color = "yellow";
+        const string highCoverageColor = "black";
+
+        for(const auto& pixel :pixels) {
+            const auto& ixy = pixel.first;
+            const uint64_t coverage = pixel.second.maxCoverage;
+            const MarkerGraphVertexId vertexId = pixel.second.vertexId;
+            const int64_t ix = ixy.first - ixMin;
+            SHASTA_ASSERT(ix >= 0);
+            SHASTA_ASSERT(ix < width);
+            const int64_t iy = ixy.second - iyMin;
+            SHASTA_ASSERT(iy >= 0);
+            SHASTA_ASSERT(iy < height);
+
+            string color;
+            if(coverage == 1) {
+                color = coverage1Color;
+            } else if(coverage == 2) {
+                color = coverage2Color;
+            } else {
+                color = highCoverageColor;
+            }
+
+            html <<
+                "\n<a href='"
+                "exploreMarkerGraph1?vertexId=" << vertexId << "&outputType=createAndOpenGfa"
+                "'>"
+                "<line x1=" << ix << " y1=" << iy << " x2=" << ix << " y2=" << iy <<
+                " stroke=" << color << " stroke-width=1px stroke-linecap=square />"
+                "</a>";
+
         }
-        html << "i.data[" << index+3 << "]=255;";
+
+
+        html << "</svg>";
+
+
+
+    } else {
+
+        // Display using canvas
+        const array<uint8_t, 3> coverage1Color = {255, 0, 0};
+        const array<uint8_t, 3> coverage2Color = {255, 255, 0};
+        const array<uint8_t, 3> highCoverageColor = {0, 0, 0};
+        html <<
+            "\n<br><canvas id=canvas width=" << width << " height=" << height <<
+            ">"
+            "\n <script>"
+            "\n var canvas = document.getElementById('canvas');"
+            "\n var ctx = canvas.getContext('2d');"
+            "\n var i = ctx.createImageData(" << width << "," << height << ");\n";
+        for(const auto& pixel :pixels) {
+            const auto& ixy = pixel.first;
+            const uint64_t coverage = pixel.second.maxCoverage;
+            const int64_t ix = ixy.first - ixMin;
+            SHASTA_ASSERT(ix >= 0);
+            SHASTA_ASSERT(ix < width);
+            const int64_t iy = ixy.second - iyMin;
+            SHASTA_ASSERT(iy >= 0);
+            SHASTA_ASSERT(iy < height);
+            const uint64_t index = (4 * width) * iy + 4 * ix;
+            if(coverage == 1) {
+                for(uint64_t k=0; k<3; k++) {
+                    html << "i.data[" << index+k << "]=" << int(coverage1Color[k]) << ";";
+                }
+            } else if(coverage == 2) {
+                for(uint64_t k=0; k<3; k++) {
+                    html << "i.data[" << index+k << "]=" << int(coverage2Color[k]) << ";";
+                }
+            } else {
+                for(uint64_t k=0; k<3; k++) {
+                    html << "i.data[" << index+k << "]=" << int(highCoverageColor[k]) << ";";
+                }
+            }
+            html << "i.data[" << index+3 << "]=255;";
+        }
+        html <<
+            "\n ctx.putImageData(i, 0, 0);"
+            "\n </script>";
     }
-    html <<
-        "\n ctx.putImageData(i, 0, 0);"
-        "\n </script>";
 
 }
 

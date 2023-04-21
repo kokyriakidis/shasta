@@ -86,7 +86,8 @@ public:
     void writeHtml0(
         ostream&,
         uint64_t sizePixels,
-        double timeout) const;
+        double timeout,
+        bool useSvg) const;
 };
 
 #endif

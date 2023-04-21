@@ -1,5 +1,6 @@
 // Shasta.
 #include "Assembler.hpp"
+#include "html.hpp"
 #include "invalid.hpp"
 #include "LocalMarkerGraph1.hpp"
 #include "platformDependent.hpp"
@@ -38,7 +39,7 @@ void Assembler::exploreMarkerGraph1(
     uint64_t sizePixels = 600;
     getParameterValue(request, "sizePixels", sizePixels);
 
-    double timeout = 300;
+    double timeout = 30;
     getParameterValue(request, "timeout", timeout);
 
     string outputType = "createGfa";
@@ -94,11 +95,23 @@ void Assembler::exploreMarkerGraph1(
         ">Create a GFA file"
         "<br><input type=radio required name=outputType value='createAndOpenGfa'" <<
        (outputType == "createAndOpenGfa" ? " checked=on" : "") <<
-       ">Create a GFA file and open it in Bandage"
-       "<br><input type=radio required name=outputType value='html0'" <<
-       (outputType == "html0" ? " checked=on" : "") <<
-       ">Display in the browser"
+       ">Create a GFA file and open it in Bandage";
 
+    html <<
+       "<br><input type=radio required name=outputType value='fastCanvas'" <<
+       (outputType == "fastCanvas" ? " checked=on" : "") <<
+       ">Rough display in the browser, not clickable ";
+    writeInformationIcon(html, "The fastest choice. "
+        "Rough but fast display done using canvas. Best for large subgraphs.");
+
+    html <<
+       "<br><input type=radio required name=outputType value='fastSvg'" <<
+       (outputType == "fastSvg" ? " checked=on" : "") <<
+       ">Rough display in the browser, clickable ";
+    writeInformationIcon(html, "Rough but fast display done using svg. Best for large subgraphs.");
+
+
+    html <<
         "</table>"
 
         "<br><input type=submit value='Do it'>"
@@ -133,8 +146,13 @@ void Assembler::exploreMarkerGraph1(
         return;
     }
 
-    if(outputType == "html0") {
-        graph.writeHtml0(html, sizePixels, timeout);
+    if(outputType == "fastCanvas") {
+        graph.writeHtml0(html, sizePixels, timeout, false);
+        return;
+    }
+
+    if(outputType == "fastSvg") {
+        graph.writeHtml0(html, sizePixels, timeout, true);
         return;
     }
 
