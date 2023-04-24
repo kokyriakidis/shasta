@@ -39,6 +39,9 @@ void Assembler::exploreMarkerGraph1(
     uint64_t sizePixels = 600;
     getParameterValue(request, "sizePixels", sizePixels);
 
+    uint64_t layoutQuality = 2;
+    getParameterValue(request, "layoutQuality", layoutQuality);
+
     double timeout = 30;
     getParameterValue(request, "timeout", timeout);
 
@@ -80,6 +83,18 @@ void Assembler::exploreMarkerGraph1(
         " value='" << sizePixels << "'>"
 
         "<tr>"
+        "<td>Layout quality"
+        "<td class=centered>"
+        "<select name=layoutQuality style='text-align:center'>"
+        "<option value=0" << (layoutQuality==0 ? " selected" : "") <<
+        ">Best speed</option>"
+        "<option value=1" << (layoutQuality==1 ? " selected" : "") <<
+        ">Intermediate quality and speed</option>"
+        "<option value=2" << (layoutQuality==2 ? " selected" : "") <<
+        ">Best quality</option>"
+        "</select>"
+
+        "<tr>"
         "<td>Timeout in seconds"
         "<td class=centered><input type=text required name=timeout size=8 style='text-align:center'"
         " value='" << timeout << "'>"
@@ -100,15 +115,16 @@ void Assembler::exploreMarkerGraph1(
     html <<
        "<br><input type=radio required name=outputType value='fastCanvas'" <<
        (outputType == "fastCanvas" ? " checked=on" : "") <<
-       ">Rough display in the browser, not clickable ";
+       ">Display vertices only, not interactive ";
     writeInformationIcon(html, "The fastest choice. "
-        "Rough but fast display done using canvas. Best for large subgraphs.");
+        "Fast display with one pixel per vertex and no edges, done using canvas. "
+        "Best for large subgraphs.");
 
     html <<
        "<br><input type=radio required name=outputType value='fastSvg'" <<
        (outputType == "fastSvg" ? " checked=on" : "") <<
-       ">Rough display in the browser, clickable ";
-    writeInformationIcon(html, "Rough but fast display done using svg. Best for large subgraphs.");
+       ">Display vertices only, interactive ";
+    writeInformationIcon(html, "Fast display with one pixel per vertex and no edges, done using svg.");
 
 
     html <<
@@ -147,12 +163,12 @@ void Assembler::exploreMarkerGraph1(
     }
 
     if(outputType == "fastCanvas") {
-        graph.writeHtml0(html, sizePixels, timeout, false);
+        graph.writeHtml0(html, sizePixels, layoutQuality, timeout, false);
         return;
     }
 
     if(outputType == "fastSvg") {
-        graph.writeHtml0(html, sizePixels, timeout, true);
+        graph.writeHtml0(html, sizePixels, layoutQuality, timeout, true);
         return;
     }
 

@@ -14,6 +14,7 @@ using namespace shasta;
 #include <boost/uuid/uuid_io.hpp>
 
 // Standard library.
+#include "chrono.hpp"
 #include "fstream.hpp"
 #include <queue>
 
@@ -202,6 +203,7 @@ void LocalMarkerGraph1::writeGfa(const string& fileName) const
 void LocalMarkerGraph1::writeHtml0(
     ostream& html,
     uint64_t sizePixels,
+    uint64_t quality,
     double timeout,
     bool useSvg) const
 {
@@ -213,8 +215,11 @@ void LocalMarkerGraph1::writeHtml0(
         edgeLengthMap.insert(make_pair(e, 1.));
     }
     std::map<vertex_descriptor, array<double, 2> > positionMap;
+    const auto t0 = steady_clock::now();
     const ComputeLayoutReturnCode returnCode = computeLayoutCustom(
-        graph, edgeLengthMap, positionMap, timeout);
+        graph, edgeLengthMap, positionMap, quality, timeout);
+    const auto t1 = steady_clock::now();
+    html << "<br>Graph layout computation took " << seconds(t1 - t0) << "s.";
     if(returnCode == ComputeLayoutReturnCode::Timeout) {
         throw runtime_error("Graph layout took too long. "
             "Increase the timeout or decrease the maximum distance.");

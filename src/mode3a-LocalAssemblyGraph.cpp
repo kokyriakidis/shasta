@@ -826,7 +826,8 @@ void LocalAssemblyGraph::computeLayout(
     if(options.layoutMethod == "neato") {
         returnCode = shasta::computeLayoutGraphviz(g, "neato", timeout, positionMap, "", &edgeLengthMap);
     } else if(options.layoutMethod == "custom") {
-        returnCode = shasta::computeLayoutCustom(g, edgeLengthMap, positionMap, timeout);
+        const uint64_t quality = 2;
+        returnCode = shasta::computeLayoutCustom(g, edgeLengthMap, positionMap, quality, timeout);
     } else {
         throw runtime_error("Invalid layout method specified: " + options.layoutMethod);
     }

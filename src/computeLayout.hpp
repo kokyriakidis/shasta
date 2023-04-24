@@ -79,6 +79,7 @@ namespace shasta {
         const Graph&,
         const std::map<typename Graph::edge_descriptor, double>& edgeLengthMap,
         std::map<typename Graph::vertex_descriptor, array<double, 2> >& positionMap,
+        uint64_t quality,
         double timeout);
 
 }
@@ -214,6 +215,7 @@ template<class Graph> shasta::ComputeLayoutReturnCode shasta::computeLayoutCusto
     const Graph& graph,
     const std::map<typename Graph::edge_descriptor, double>& edgeLengthMap,
     std::map<typename Graph::vertex_descriptor, array<double, 2> >& positionMap,
+    uint64_t quality,
     double timeout)
 {
     using vertex_descriptor = typename Graph::vertex_descriptor;
@@ -251,7 +253,8 @@ template<class Graph> shasta::ComputeLayoutReturnCode shasta::computeLayoutCusto
 
     // Invoke the custom graph layout program.
     const string outputFileName = tmpDirectory() + uuid + "-output.txt";
-    const string command = "customLayout -i " + inputFileName + " -o " + outputFileName ;
+    const string command = "customLayout -i " + inputFileName + " -o " + outputFileName +
+        " --quality " + to_string(quality);
     bool timeoutTriggered = false;
     bool signalOccurred = false;
     int returnCode = 0;
