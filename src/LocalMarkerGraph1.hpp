@@ -89,6 +89,12 @@ public:
         uint64_t quality,
         double timeout,
         bool useSvg) const;
+
+    void pruneLowCoverageLeaves(uint64_t maxPruneEdgeCoverage);
+private:
+    void pruneLowCoverageForwardLeaves(uint64_t maxPruneEdgeCoverage);
+    void pruneLowCoverageBackwardLeaves(uint64_t maxPruneEdgeCoverage);
+
 };
 
 #endif

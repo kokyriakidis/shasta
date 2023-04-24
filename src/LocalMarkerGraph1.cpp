@@ -17,9 +17,7 @@ using namespace shasta;
 #include "chrono.hpp"
 #include "fstream.hpp"
 #include <queue>
-
-#include <chrono>
-#include <thread>
+#include <stack>
 
 
 
@@ -383,4 +381,109 @@ void LocalMarkerGraph1::writeHtml0(
 
 }
 
+
+
+void LocalMarkerGraph1::pruneLowCoverageLeaves(uint64_t maxPruneEdgeCoverage)
+{
+    if(maxPruneEdgeCoverage == 0) {
+        return;
+    }
+
+    pruneLowCoverageForwardLeaves(maxPruneEdgeCoverage);
+    pruneLowCoverageBackwardLeaves(maxPruneEdgeCoverage);
+
+}
+
+
+
+void LocalMarkerGraph1::pruneLowCoverageForwardLeaves(uint64_t maxPruneEdgeCoverage)
+{
+    LocalMarkerGraph1& graph = *this;
+
+    // Start will all vertices with out-degree 0 and low coverage.
+    std::stack<vertex_descriptor> leaves;
+    BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
+        const MarkerGraphVertexId vertexId = graph[v].vertexId;
+        const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
+        if(coverage > maxPruneEdgeCoverage) {
+            continue;
+        }
+        if(out_degree(v, graph) == 0) {
+            leaves.push(v);
+        }
+    }
+
+    // Main loop. At each iteration we remove a leaf, and add others as required.
+    while(not leaves.empty()) {
+        const vertex_descriptor leaf = leaves.top();
+        leaves.pop();
+
+        // If any parent has out-degree 1 and low coverage,
+        // it becomes a leaf to be removed when we remove this one.
+        BGL_FORALL_INEDGES(leaf, e, graph, LocalMarkerGraph1) {
+            const vertex_descriptor parent = source(e, graph);
+            if(parent == leaf) {
+                continue;
+            }
+            const MarkerGraphVertexId vertexId = graph[parent].vertexId;
+            const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
+            if(coverage > maxPruneEdgeCoverage) {
+                continue;
+            }
+            if(out_degree(parent, graph) == 1) {
+                leaves.push(parent);
+            }
+        }
+
+        clear_vertex(leaf, graph);
+        remove_vertex(leaf, graph);
+    }
+}
+
+
+
+void LocalMarkerGraph1::pruneLowCoverageBackwardLeaves(uint64_t maxPruneEdgeCoverage)
+{
+    LocalMarkerGraph1& graph = *this;
+
+    // Start will all vertices with in-degree 0 and low coverage.
+    std::stack<vertex_descriptor> leaves;
+    BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
+        const MarkerGraphVertexId vertexId = graph[v].vertexId;
+        const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
+        if(coverage > maxPruneEdgeCoverage) {
+            continue;
+        }
+        if(in_degree(v, graph)==0) {
+            leaves.push(v);
+        }
+    }
+
+    // Main loop. At each iteration we remove a leaf, and add others as required.
+    while(not leaves.empty()) {
+        const vertex_descriptor leaf = leaves.top();
+        leaves.pop();
+
+        // If any child has in-degree 1 and low coverage,
+        // it becomes a leaf to be removed when we remove this one.
+        BGL_FORALL_OUTEDGES(leaf, e, graph, LocalMarkerGraph1) {
+            const vertex_descriptor child = target(e, graph);
+            if(child == leaf) {
+                continue;
+            }
+            const MarkerGraphVertexId vertexId = graph[child].vertexId;
+            const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
+            if(coverage > maxPruneEdgeCoverage) {
+                continue;
+            }
+            if(in_degree(child, graph)==1) {
+                leaves.push(child);
+            }
+        }
+
+        clear_vertex(leaf, graph);
+        remove_vertex(leaf, graph);
+    }
+
+}
 

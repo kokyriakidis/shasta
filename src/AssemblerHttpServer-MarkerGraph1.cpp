@@ -36,6 +36,9 @@ void Assembler::exploreMarkerGraph1(
     uint64_t minEdgeCoverage = 0;
     getParameterValue(request, "minEdgeCoverage", minEdgeCoverage);
 
+    uint64_t maxPruneEdgeCoverage = 0;
+    getParameterValue(request, "maxPruneEdgeCoverage", maxPruneEdgeCoverage);
+
     uint64_t sizePixels = 600;
     getParameterValue(request, "sizePixels", sizePixels);
 
@@ -76,6 +79,11 @@ void Assembler::exploreMarkerGraph1(
         "<td>Minimum edge coverage"
         "<td class=centered><input type=text required name=minEdgeCoverage size=8 style='text-align:center'"
         "value='" << minEdgeCoverage << "'>"
+
+        "<tr>"
+        "<td>Prune leaves with coverage up to"
+        "<td class=centered><input type=text required name=maxPruneEdgeCoverage size=8 style='text-align:center'"
+        "value='" << maxPruneEdgeCoverage << "'>"
 
         "<tr>"
         "<td>Graphics size in pixels"
@@ -155,6 +163,7 @@ void Assembler::exploreMarkerGraph1(
         maxDistance,
         minVertexCoverage,
         minEdgeCoverage);
+    graph.pruneLowCoverageLeaves(maxPruneEdgeCoverage);
     html << "<p>The local marker graph has " << num_vertices(graph) <<
         " vertices and " << num_edges(graph) << " edges.";
 
