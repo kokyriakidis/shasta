@@ -12,6 +12,9 @@ using namespace shasta;
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+// Standard library.
+#include "fstream.hpp"
+
 
 
 void Assembler::exploreMarkerGraph1(
@@ -36,8 +39,14 @@ void Assembler::exploreMarkerGraph1(
     uint64_t minEdgeCoverage = 0;
     getParameterValue(request, "minEdgeCoverage", minEdgeCoverage);
 
-    uint64_t maxPruneEdgeCoverage = 0;
-    getParameterValue(request, "maxPruneEdgeCoverage", maxPruneEdgeCoverage);
+    uint64_t maxPruneCoverage = 0;
+    getParameterValue(request, "maxPruneCoverage", maxPruneCoverage);
+
+    uint64_t maxLongChainCoverage = 0;
+    getParameterValue(request, "maxLongChainCoverage", maxLongChainCoverage);
+
+    uint64_t minLongChainLength = 100;
+    getParameterValue(request, "minLongChainLength", minLongChainLength);
 
     uint64_t sizePixels = 600;
     getParameterValue(request, "sizePixels", sizePixels);
@@ -82,8 +91,16 @@ void Assembler::exploreMarkerGraph1(
 
         "<tr>"
         "<td>Prune leaves with coverage up to"
-        "<td class=centered><input type=text required name=maxPruneEdgeCoverage size=8 style='text-align:center'"
-        "value='" << maxPruneEdgeCoverage << "'>"
+        "<td class=centered><input type=text required name=maxPruneCoverage size=8 style='text-align:center'"
+        "value='" << maxPruneCoverage << "'>"
+
+        "<tr>"
+        "<td>Prune long linear sections<br>with low coverage"
+        "<td>"
+        "<input type=text required name=maxLongChainCoverage size=8 style='text-align:center'"
+        "value='" << maxLongChainCoverage << "'> Maximum coverage"
+        "<br><input type=text required name=minLongChainLength size=8 style='text-align:center'"
+        "value='" << minLongChainLength << "'> Minimum length (markers)"
 
         "<tr>"
         "<td>Graphics size in pixels"
@@ -163,9 +180,18 @@ void Assembler::exploreMarkerGraph1(
         maxDistance,
         minVertexCoverage,
         minEdgeCoverage);
-    graph.pruneLowCoverageLeaves(maxPruneEdgeCoverage);
+
+    // Do the requested graph cleanup.
+    if(maxPruneCoverage > 0) {
+        graph.pruneLowCoverageLeaves(maxPruneCoverage);
+    }
+    if(maxLongChainCoverage > 0) {
+        graph.removeLongLowCoverageChains(maxLongChainCoverage, minLongChainLength);
+    }
+
     html << "<p>The local marker graph has " << num_vertices(graph) <<
         " vertices and " << num_edges(graph) << " edges.";
+
 
     if(outputType == "noOutput") {
         return;

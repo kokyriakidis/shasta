@@ -11,6 +11,7 @@
 #include "iosfwd.hpp"
 #include <map>
 #include "string.hpp"
+#include "vector.hpp"
 
 namespace shasta {
 
@@ -90,10 +91,21 @@ public:
         double timeout,
         bool useSvg) const;
 
-    void pruneLowCoverageLeaves(uint64_t maxPruneEdgeCoverage);
+    void pruneLowCoverageLeaves(uint64_t maxPruneCoverage);
 private:
-    void pruneLowCoverageForwardLeaves(uint64_t maxPruneEdgeCoverage);
-    void pruneLowCoverageBackwardLeaves(uint64_t maxPruneEdgeCoverage);
+    void pruneLowCoverageForwardLeaves(uint64_t maxPruneCoverage);
+    void pruneLowCoverageBackwardLeaves(uint64_t maxPruneCoverage);
+
+public:
+
+    void removeLongLowCoverageChains(
+        uint64_t maxChainCoverage,
+        uint64_t minLength);
+private:
+    void findLowCoverageChains(
+        uint64_t maxChainCoverage,
+        vector< vector<vertex_descriptor> >&
+        ) const;
 
 };
 

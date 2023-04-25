@@ -2,12 +2,15 @@
 #include "LocalMarkerGraph1.hpp"
 #include "Base.hpp"
 #include "computeLayout.hpp"
+#include "findLinearChains.hpp"
+#include "invalid.hpp"
 #include "MarkerGraph.hpp"
 #include "platformDependent.hpp"
 #include "runCommandWithTimeout.hpp"
 using namespace shasta;
 
 // Boost libraries.
+#include "boost/graph/filtered_graph.hpp"
 #include "boost/graph/iteration_macros.hpp"
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -396,7 +399,7 @@ void LocalMarkerGraph1::pruneLowCoverageLeaves(uint64_t maxPruneEdgeCoverage)
 
 
 
-void LocalMarkerGraph1::pruneLowCoverageForwardLeaves(uint64_t maxPruneEdgeCoverage)
+void LocalMarkerGraph1::pruneLowCoverageForwardLeaves(uint64_t maxPruneCoverage)
 {
     LocalMarkerGraph1& graph = *this;
 
@@ -405,7 +408,7 @@ void LocalMarkerGraph1::pruneLowCoverageForwardLeaves(uint64_t maxPruneEdgeCover
     BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
         const MarkerGraphVertexId vertexId = graph[v].vertexId;
         const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
-        if(coverage > maxPruneEdgeCoverage) {
+        if(coverage > maxPruneCoverage) {
             continue;
         }
         if(out_degree(v, graph) == 0) {
@@ -427,7 +430,7 @@ void LocalMarkerGraph1::pruneLowCoverageForwardLeaves(uint64_t maxPruneEdgeCover
             }
             const MarkerGraphVertexId vertexId = graph[parent].vertexId;
             const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
-            if(coverage > maxPruneEdgeCoverage) {
+            if(coverage > maxPruneCoverage) {
                 continue;
             }
             if(out_degree(parent, graph) == 1) {
@@ -442,7 +445,7 @@ void LocalMarkerGraph1::pruneLowCoverageForwardLeaves(uint64_t maxPruneEdgeCover
 
 
 
-void LocalMarkerGraph1::pruneLowCoverageBackwardLeaves(uint64_t maxPruneEdgeCoverage)
+void LocalMarkerGraph1::pruneLowCoverageBackwardLeaves(uint64_t maxPruneCoverage)
 {
     LocalMarkerGraph1& graph = *this;
 
@@ -451,7 +454,7 @@ void LocalMarkerGraph1::pruneLowCoverageBackwardLeaves(uint64_t maxPruneEdgeCove
     BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
         const MarkerGraphVertexId vertexId = graph[v].vertexId;
         const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
-        if(coverage > maxPruneEdgeCoverage) {
+        if(coverage > maxPruneCoverage) {
             continue;
         }
         if(in_degree(v, graph)==0) {
@@ -473,7 +476,7 @@ void LocalMarkerGraph1::pruneLowCoverageBackwardLeaves(uint64_t maxPruneEdgeCove
             }
             const MarkerGraphVertexId vertexId = graph[child].vertexId;
             const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
-            if(coverage > maxPruneEdgeCoverage) {
+            if(coverage > maxPruneCoverage) {
                 continue;
             }
             if(in_degree(child, graph)==1) {
@@ -483,6 +486,66 @@ void LocalMarkerGraph1::pruneLowCoverageBackwardLeaves(uint64_t maxPruneEdgeCove
 
         clear_vertex(leaf, graph);
         remove_vertex(leaf, graph);
+    }
+
+}
+
+
+
+void LocalMarkerGraph1::findLowCoverageChains(
+    uint64_t maxChainCoverage,
+    vector< vector<vertex_descriptor> >& chains
+    ) const
+{
+    const LocalMarkerGraph1& graph = *this;
+
+    // Create a filtered graph containing only the vertices
+    // with coverage up to maxChainCoverage.
+    class VertexPredicate {
+    public:
+        VertexPredicate() : graph(0), maxChainCoverage(invalid<uint64_t>) {}
+        VertexPredicate(
+            const LocalMarkerGraph1& graph,
+            uint64_t maxChainCoverage) :
+            graph(&graph),
+            maxChainCoverage(maxChainCoverage)
+            {}
+        const LocalMarkerGraph1* graph;
+        uint64_t maxChainCoverage;
+        bool operator()(const vertex_descriptor v) const
+        {
+            const MarkerGraphVertexId vertexId = (*graph)[v].vertexId;
+            const uint64_t coverage = graph->markerGraph.vertexCoverage(vertexId);
+            return coverage <= maxChainCoverage;
+        }
+    };
+    boost::filtered_graph<LocalMarkerGraph1, boost::keep_all, VertexPredicate>
+        filteredGraph(graph,  boost::keep_all(), VertexPredicate(graph, maxChainCoverage));
+
+    // Find linear chains in this filtered graph.
+    findLinearVertexChains(filteredGraph, chains);
+}
+
+
+
+void LocalMarkerGraph1::removeLongLowCoverageChains(
+    uint64_t maxChainCoverage,
+    uint64_t minLength)
+{
+    LocalMarkerGraph1& graph = *this;
+
+    // Find low coverage chains.
+    vector< vector<LocalMarkerGraph1::vertex_descriptor> > lowCoverageChains;
+    findLowCoverageChains(1, lowCoverageChains);
+
+    // Remove the long ones.
+    for(const auto& chain: lowCoverageChains) {
+        if(chain.size() >= minLength) {
+            for(const vertex_descriptor v: chain) {
+                clear_vertex(v, graph);
+                remove_vertex(v, graph);
+            }
+        }
     }
 
 }
