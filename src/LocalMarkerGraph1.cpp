@@ -5,6 +5,7 @@
 #include "findLinearChains.hpp"
 #include "invalid.hpp"
 #include "MarkerGraph.hpp"
+#include "MurmurHash2.hpp"
 #include "platformDependent.hpp"
 #include "runCommandWithTimeout.hpp"
 using namespace shasta;
@@ -382,6 +383,163 @@ void LocalMarkerGraph1::writeHtml0(
             "\n </script>";
     }
 
+}
+
+
+
+void LocalMarkerGraph1::writeHtml1(
+    ostream& html,
+    uint64_t sizePixels,
+    uint64_t quality,
+    double timeout) const
+{
+    const LocalMarkerGraph1& graph = *this;
+
+
+
+    // To compute the layout, use an auxiliary graph with a vertex
+    // for each vertex of the LocalMarkerGraph1 plus zero or more vertices
+    // for each edge of the LocalMarkerGraph1.
+    // In this initial implementation we divide each LocalMarkerGraph1 edge into a number
+    // of AuxiliaryGraph edges equal to the number of bases in its sequence.
+    using AuxiliaryGraph = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS>;
+    AuxiliaryGraph auxiliaryGraph;
+
+    // The auxiliary graph vertex corresponding to each vertex of the LocalMarkerGraph1.
+    std::map<vertex_descriptor, AuxiliaryGraph::vertex_descriptor> auxiliaryVertexMap;
+
+    // The auxiliary graph vertices corresponding to each edge of the LocalMarkerGraph1.
+    std::map<edge_descriptor, vector<AuxiliaryGraph::vertex_descriptor> > auxiliaryEdgeMap;
+
+    // The desired length of each edge of the auxiliary graph.
+    std::map<AuxiliaryGraph::edge_descriptor, double> auxiliaryEdgeLengthMap;
+
+    // Create vertices and edges of the AuxiliaryGraph.
+    const uint64_t auxiliaryVertexCount = 1;
+    BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
+        auxiliaryVertexMap.insert({v, add_vertex(auxiliaryGraph)});
+    }
+    vector<AuxiliaryGraph::vertex_descriptor> auxiliaryVertices;
+    BGL_FORALL_EDGES(e, graph, LocalMarkerGraph1) {
+        const vertex_descriptor v0 = source(e, graph);
+        const vertex_descriptor v1 = target(e, graph);
+        const MarkerGraphEdgeId edgeId = graph[e].edgeId;
+        const uint64_t sequenceLength = markerGraph.edgeSequence[edgeId].size();
+        const double edgeLength = double(sequenceLength) / double(auxiliaryVertexCount + 1);
+        auxiliaryVertices.clear();
+        for(uint64_t i=0; i<auxiliaryVertexCount; i++) {
+            auxiliaryVertices.push_back(add_vertex(auxiliaryGraph));
+        }
+        auxiliaryEdgeMap.insert({e, auxiliaryVertices});
+
+        // Add the necessary auxiliary graph edges.
+        AuxiliaryGraph::edge_descriptor ae;
+        if(auxiliaryVertexCount == 0) {
+            tie(ae, ignore) = add_edge(auxiliaryVertexMap[v0], auxiliaryVertexMap[v1], auxiliaryGraph);
+            auxiliaryEdgeLengthMap.insert({ae, edgeLength});
+        } else {
+            tie(ae, ignore) = add_edge(auxiliaryVertexMap[v0], auxiliaryVertices.front(), auxiliaryGraph);
+            auxiliaryEdgeLengthMap.insert({ae, edgeLength});
+            for(uint64_t i=1; i<auxiliaryVertexCount; i++) {
+                tie(ae, ignore) = add_edge(auxiliaryVertices[i-1], auxiliaryVertices[i], auxiliaryGraph);
+                auxiliaryEdgeLengthMap.insert({ae, edgeLength});
+            }
+            tie(ae, ignore) = add_edge(auxiliaryVertices.back(), auxiliaryVertexMap[v1], auxiliaryGraph);
+            auxiliaryEdgeLengthMap.insert({ae, edgeLength});
+        }
+    }
+
+    // Compute the layout of the auxiliary graph.
+    std::map<AuxiliaryGraph::vertex_descriptor, array<double, 2> > positionMap;
+    computeLayoutCustom(auxiliaryGraph, auxiliaryEdgeLengthMap, positionMap, quality, timeout);
+
+
+
+    // Compute the view box.
+    double xMin = std::numeric_limits<double>::max();
+    double xMax = std::numeric_limits<double>::min();
+    double yMin = xMin;
+    double yMax = xMax;
+    for(const auto& p: positionMap) {
+        const array<double, 2>& xy = p.second;
+        const double x = xy[0];
+        const double y = xy[1];
+        xMin = min(xMin, x);
+        xMax = max(xMax, x);
+        yMin = min(yMin, y);
+        yMax = max(yMax, y);
+    }
+    const double extend = 1.;
+    xMin -= extend;
+    xMax += extend;
+    yMin -= extend;
+    yMax += extend;
+
+    // Begin the svg.
+    const string svgId = "LocalMarkerGraph1";
+    html << "\n<br><svg id='" << svgId <<
+        "' width='" <<  sizePixels <<
+        "' height='" << sizePixels <<
+        "' viewbox='" << xMin << " " << yMin << " " <<
+        xMax - xMin << " " <<
+        yMax - yMin << "'"
+        " style='border-style:solid;border-color:Black;'"
+        ">\n";
+
+
+
+    // Write the edges.
+    BGL_FORALL_EDGES(e, graph, LocalMarkerGraph1) {
+        const MarkerGraphEdgeId edgeId = graph[e].edgeId;
+        const vertex_descriptor v0 = source(e, graph);
+        const vertex_descriptor v1 = target(e, graph);
+        const auto& p0 = positionMap[auxiliaryVertexMap[v0]];
+        const auto& p1 = positionMap[auxiliaryVertexMap[v1]];
+        const vector<AuxiliaryGraph::vertex_descriptor>& auxiliaryVertices =  auxiliaryEdgeMap[e];
+
+        const uint32_t hue = MurmurHash2(&edgeId, sizeof(edgeId), 231) % 360;
+        const string color = "hsla(" + to_string(hue) + ",50%,50%)";
+        const string properties = "stroke='" + color + "' stroke-linecap=round stroke-width=2";
+
+        if(auxiliaryVertices.empty()) {
+
+            // This edge has no auxiliary vertices.
+            // Just write a line between p0 and p1.
+            html << "\n<line x1=" << p0[0] << " y1=" << p0[1] <<
+                " x2=" << p1[0] << " y2=" << p1[1] << " " << properties << " />";
+
+        } else {
+
+            // Line from p0 to the first auxiliary vertex.
+            const auto& xyFirst = positionMap[auxiliaryVertices.front()];
+            html << "\n<line x1=" << p0[0] << " y1=" << p0[1] <<
+                " x2=" << xyFirst[0] << " y2=" << xyFirst[1] << " " << properties << " />";
+
+            // Lines between auxiliary vertices.
+            for(uint64_t i=1; i<auxiliaryVertices.size(); i++) {
+                const auto& xyA = positionMap[auxiliaryVertices[i-1]];
+                const auto& xyB = positionMap[auxiliaryVertices[i]];
+                html << "\n<line x1=" << xyA[0] << " y1=" << xyA[1] <<
+                    " x2=" << xyB[0] << " y2=" << xyB[1] << " " << properties << " />";
+            }
+
+            // Line from the last auxiliary vertex to p1.
+            const auto& xyLast = positionMap[auxiliaryVertices.back()];
+            html << "\n<line x1=" << xyLast[0] << " y1=" << xyLast[1] <<
+                " x2=" << p1[0] << " y2=" << p1[1] << " " << properties << " />";
+        }
+    }
+
+    // Write the vertices.
+    const string properties = "stroke='Black' stroke-linecap=round stroke-width=2";
+    BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
+        const auto& p = positionMap[auxiliaryVertexMap[v]];
+        const double x = p[0];
+        const double y = p[1];
+        html << "\n<line x1=" << x << " y1=" << y <<
+            " x2=" << x << " y2=" << y << " " << properties << " />";
+    }
+    html << "\n</svg>";
 }
 
 

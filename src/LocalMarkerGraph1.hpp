@@ -90,6 +90,11 @@ public:
         uint64_t quality,
         double timeout,
         bool useSvg) const;
+    void writeHtml1(
+        ostream&,
+        uint64_t sizePixels,
+        uint64_t quality,
+        double timeout) const;
 
     void pruneLowCoverageLeaves(uint64_t maxPruneCoverage);
 private:

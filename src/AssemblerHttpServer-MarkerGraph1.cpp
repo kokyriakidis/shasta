@@ -57,7 +57,7 @@ void Assembler::exploreMarkerGraph1(
     double timeout = 30;
     getParameterValue(request, "timeout", timeout);
 
-    string outputType = "createGfa";
+    string outputType = "svg";
     getParameterValue(request, "outputType", outputType);
 
 
@@ -133,12 +133,12 @@ void Assembler::exploreMarkerGraph1(
         "<br><input type=radio name=outputType value='createGfa'" <<
         (outputType == "createGfa" ? " checked=on" : "") <<
         ">Create a GFA file"
-        "<br><input type=radio required name=outputType value='createAndOpenGfa'" <<
+        "<br><input type=radio name=outputType value='createAndOpenGfa'" <<
        (outputType == "createAndOpenGfa" ? " checked=on" : "") <<
        ">Create a GFA file and open it in Bandage";
 
     html <<
-       "<br><input type=radio required name=outputType value='fastCanvas'" <<
+       "<br><input type=radio name=outputType value='fastCanvas'" <<
        (outputType == "fastCanvas" ? " checked=on" : "") <<
        ">Display vertices only, not interactive ";
     writeInformationIcon(html, "The fastest choice. "
@@ -146,10 +146,15 @@ void Assembler::exploreMarkerGraph1(
         "Best for large subgraphs.");
 
     html <<
-       "<br><input type=radio required name=outputType value='fastSvg'" <<
+       "<br><input type=radio name=outputType value='fastSvg'" <<
        (outputType == "fastSvg" ? " checked=on" : "") <<
        ">Display vertices only, interactive ";
     writeInformationIcon(html, "Fast display with one pixel per vertex and no edges, done using svg.");
+
+    html <<
+       "<br><input type=radio name=outputType value='svg'" <<
+       (outputType == "svg" ? " checked=on" : "") <<
+       ">Display vertices and edges, interactive ";
 
 
     html <<
@@ -199,54 +204,59 @@ void Assembler::exploreMarkerGraph1(
 
     if(outputType == "fastCanvas") {
         graph.writeHtml0(html, sizePixels, layoutQuality, timeout, false);
-        return;
     }
 
-    if(outputType == "fastSvg") {
+    else if(outputType == "fastSvg") {
         graph.writeHtml0(html, sizePixels, layoutQuality, timeout, true);
-        return;
     }
 
-    // Create a gfa file to represent the local marker graph.
-    const string gfaFileName = tmpDirectory() + to_string(boost::uuids::random_generator()()) + ".gfa";
-    graph.writeGfa(gfaFileName);
-    html << "<p>The local marker graph is in "
-        "<span id='SpanToBeCopied' style='color:Blue'>" << gfaFileName << "</span>"
-        ". Remove it when done with it."
-        "<br><button onClick='copySpanToClipboard()'>Copy GFA file name to clipboard</button>";
-    html << R"###(
-    <script>
-    function copySpanToClipboard()
-    {
-          
-        // Remove any previous selection.
-        var selection = window.getSelection();
-        selection.removeAllRanges();
-        
-        // Select the span.
-        var element = document.getElementById("SpanToBeCopied");
-        var range = document.createRange();
-        range.selectNodeContents(element);
-        selection.addRange(range);
-        
-        // Copy it to the clipboard.
-        document.execCommand("copy");
-
-        // Unselect it.
-        selection.removeAllRanges();
-        
-
+    else if(outputType == "svg") {
+        graph.writeHtml1(html, sizePixels, layoutQuality, timeout);
     }
-    </script>
-    )###";
+
+    else {
+
+        // Create a gfa file to represent the local marker graph.
+        const string gfaFileName = tmpDirectory() + to_string(boost::uuids::random_generator()()) + ".gfa";
+        graph.writeGfa(gfaFileName);
+        html << "<p>The local marker graph is in "
+            "<span id='SpanToBeCopied' style='color:Blue'>" << gfaFileName << "</span>"
+            ". Remove it when done with it."
+            "<br><button onClick='copySpanToClipboard()'>Copy GFA file name to clipboard</button>";
+        html << R"###(
+        <script>
+        function copySpanToClipboard()
+        {
+              
+            // Remove any previous selection.
+            var selection = window.getSelection();
+            selection.removeAllRanges();
+            
+            // Select the span.
+            var element = document.getElementById("SpanToBeCopied");
+            var range = document.createRange();
+            range.selectNodeContents(element);
+            selection.addRange(range);
+            
+            // Copy it to the clipboard.
+            document.execCommand("copy");
+    
+            // Unselect it.
+            selection.removeAllRanges();
+            
+    
+        }
+        </script>
+        )###";
 
 
-    // If requested, open it in Bandage.
-    // This is done on the server side, of course. This can have unexpected
-    // consequences if running remotely.
-    // Also, because of this the connection with the http client is not closed
-    // until Bandage terminates, so the browser thinks ore data are coming.
-    if(outputType == "createAndOpenGfa") {
-        ::system(("Bandage load " + gfaFileName + "&").c_str());
+        // If requested, open it in Bandage.
+        // This is done on the server side, of course. This can have unexpected
+        // consequences if running remotely.
+        // Also, because of this the connection with the http client is not closed
+        // until Bandage terminates, so the browser thinks ore data are coming.
+        if(outputType == "createAndOpenGfa") {
+            ::system(("Bandage load " + gfaFileName + "&").c_str());
+        }
     }
 }
