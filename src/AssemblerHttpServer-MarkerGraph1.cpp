@@ -21,6 +21,10 @@ void Assembler::exploreMarkerGraph1(
     const vector<string>& request,
     ostream& html)
 {
+    if(assemblerInfo->assemblyMode != 3) {
+        throw runtime_error("This is only available for assembly mode 3.");
+    }
+
     // This makes the following assumptions.
     SHASTA_ASSERT(getReads().representation == 0);  // No RLE.
     SHASTA_ASSERT((assemblerInfo->k % 2) == 0);      // Marker length is even.

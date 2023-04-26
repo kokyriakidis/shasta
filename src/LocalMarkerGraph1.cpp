@@ -3,6 +3,7 @@
 #include "Base.hpp"
 #include "computeLayout.hpp"
 #include "findLinearChains.hpp"
+#include "html.hpp"
 #include "invalid.hpp"
 #include "MarkerGraph.hpp"
 #include "MurmurHash2.hpp"
@@ -222,7 +223,7 @@ void LocalMarkerGraph1::writeHtml0(
     const ComputeLayoutReturnCode returnCode = computeLayoutCustom(
         graph, edgeLengthMap, positionMap, quality, timeout);
     const auto t1 = steady_clock::now();
-    html << "<br>Graph layout computation took " << seconds(t1 - t0) << "s.";
+    // html << "<br>Graph layout computation took " << seconds(t1 - t0) << "s.";
     if(returnCode == ComputeLayoutReturnCode::Timeout) {
         throw runtime_error("Graph layout took too long. "
             "Increase the timeout or decrease the maximum distance.");
@@ -479,7 +480,8 @@ void LocalMarkerGraph1::writeHtml1(
 
     // Begin the svg.
     const string svgId = "LocalMarkerGraph1";
-    html << "\n<br><svg id='" << svgId <<
+    html << "\n<div style='display: inline-block; vertical-align:top'>"
+        "<br><svg id='" << svgId <<
         "' width='" <<  sizePixels <<
         "' height='" << sizePixels <<
         "' viewbox='" << xMin << " " << yMin << " " <<
@@ -491,7 +493,7 @@ void LocalMarkerGraph1::writeHtml1(
 
 
     // Write the edges.
-    html << "\n<g id=edges style='stroke-width:" << thicknessScaling << "'>";
+    html << "\n<g id=edges stroke-width='" << thicknessScaling << "'>";
     BGL_FORALL_EDGES(e, graph, LocalMarkerGraph1) {
         const MarkerGraphEdgeId edgeId = graph[e].edgeId;
         const vertex_descriptor v0 = source(e, graph);
@@ -537,7 +539,7 @@ void LocalMarkerGraph1::writeHtml1(
 
 
     // Write the vertices.
-    html << "\n<g id=vertices style='stroke-width:" << thicknessScaling << "'>";
+    html << "\n<g id=vertices stroke-width='" << thicknessScaling << "'>";
     BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
         const auto& p = positionMap[auxiliaryVertexMap[v]];
         const double x = p[0];
@@ -548,7 +550,53 @@ void LocalMarkerGraph1::writeHtml1(
     }
     html << "\n</g>";
 
-    html << "\n</svg>";
+    // Finish the svg.
+    html << "\n</svg></div>";
+
+    // Add drag and zoom.
+    addSvgDragAndZoom(html);
+
+    // Side panel.
+    html << "<div style='display: inline-block'>";
+
+    // Change thickness
+    html << R"stringDelimiter(
+    <p><table>
+    <tr><th class=left>Thickness<td>
+    <button type='button' onClick='changeThickness(0.1)' style='width:3em'>---</button>
+    <button type='button' onClick='changeThickness(0.5)' style='width:3em'>--</button>
+    <button type='button' onClick='changeThickness(0.8)' style='width:3em'>-</button>
+    <button type='button' onClick='changeThickness(1.25)' style='width:3em'>+</button>
+    <button type='button' onClick='changeThickness(2.)' style='width:3em'>++</button>
+    <button type='button' onClick='changeThickness(10.)' style='width:3em'>+++</button>
+        <script>
+        function changeThickness(factor)
+        {
+            edges = document.getElementById('edges');
+            edges.setAttribute('stroke-width', factor * edges.getAttribute('stroke-width'));
+            vertices = document.getElementById('vertices');
+            vertices.setAttribute('stroke-width', factor * vertices.getAttribute('stroke-width'));
+        }
+        </script>
+        )stringDelimiter";
+
+
+
+    // Zoom buttons.
+    html << R"stringDelimiter(
+        <tr title='Or use the mouse wheel.'><th class=left>Zoom<td>
+        <button type='button' onClick='zoomSvg(0.1)' style='width:3em'>---</button>
+        <button type='button' onClick='zoomSvg(0.5)' style='width:3em'>--</button>
+        <button type='button' onClick='zoomSvg(0.8)' style='width:3em'>-</button>
+        <button type='button' onClick='zoomSvg(1.25)' style='width:3em'>+</button>
+        <button type='button' onClick='zoomSvg(2.)' style='width:3em'>++</button>
+        <button type='button' onClick='zoomSvg(10.)' style='width:3em'>+++</button>
+    )stringDelimiter";
+
+
+
+    // End the side panel.
+    html << "</table></div>";
 }
 
 

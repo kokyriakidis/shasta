@@ -451,8 +451,8 @@ void Assembler::writeNavigation(ostream& html) const
         {"Read graph", "exploreReadGraph"},
         });
     writeNavigation(html, "Marker graph", {
-        {"Local marker graph (version 0)", "exploreMarkerGraph0?useBubbleReplacementEdges=on"},
-        {"Local marker graph (version 1)", "exploreMarkerGraph1"},
+        {"Local marker graph", "exploreMarkerGraph0?useBubbleReplacementEdges=on"},
+        {"Local marker graph for mode 3 assembly", "exploreMarkerGraph1"},
         {"Marker graph vertices", "exploreMarkerGraphVertex"},
         {"Marker graph edges", "exploreMarkerGraphEdge"},
         {"Marker coverage", "exploreMarkerCoverage"},
@@ -468,6 +468,7 @@ void Assembler::writeNavigation(ostream& html) const
             {"Compressed assembly graph", "exploreCompressedAssemblyGraph"},
             });
     }
+    /*
     if(assemblerInfo->assemblyMode == 3) {
         if(assemblyGraph3Pointer) {
             // Implementation in the mode3 namespace.
@@ -490,6 +491,7 @@ void Assembler::writeNavigation(ostream& html) const
                 });
         }
     }
+    */
 
     if (!httpServerData.docsDirectory.empty()) {
         writeNavigation(html, "Help", {
