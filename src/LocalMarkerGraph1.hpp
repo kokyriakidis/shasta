@@ -79,6 +79,7 @@ public:
     );
 
     const MarkerGraph& markerGraph;
+    uint64_t maxDistance;
 
     std::map<MarkerGraphVertexId, vertex_descriptor> vertexMap;
     vertex_descriptor addVertex(MarkerGraphVertexId, uint64_t distance);
@@ -93,6 +94,7 @@ public:
     void writeHtml1(
         ostream&,
         uint64_t sizePixels,
+        double thicknessScaling,
         uint64_t quality,
         double timeout) const;
 

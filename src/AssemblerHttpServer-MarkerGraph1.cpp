@@ -51,6 +51,9 @@ void Assembler::exploreMarkerGraph1(
     uint64_t sizePixels = 600;
     getParameterValue(request, "sizePixels", sizePixels);
 
+    double thicknessScaling = 1.;
+    getParameterValue(request, "thicknessScaling", thicknessScaling);
+
     uint64_t layoutQuality = 2;
     getParameterValue(request, "layoutQuality", layoutQuality);
 
@@ -106,6 +109,11 @@ void Assembler::exploreMarkerGraph1(
         "<td>Graphics size in pixels"
         "<td class=centered><input type=text required name=sizePixels size=8 style='text-align:center'"
         " value='" << sizePixels << "'>"
+
+        "<tr>"
+        "<td>Thickness scaling factor"
+        "<td class=centered><input type=text required name=thicknessScaling size=8 style='text-align:center'"
+        " value='" << thicknessScaling << "'>"
 
         "<tr>"
         "<td>Layout quality"
@@ -211,7 +219,7 @@ void Assembler::exploreMarkerGraph1(
     }
 
     else if(outputType == "svg") {
-        graph.writeHtml1(html, sizePixels, layoutQuality, timeout);
+        graph.writeHtml1(html, sizePixels, thicknessScaling, layoutQuality, timeout);
     }
 
     else {

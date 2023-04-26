@@ -31,7 +31,8 @@ LocalMarkerGraph1::LocalMarkerGraph1(
     uint64_t maxDistance,
     uint64_t minVertexCoverage,
     uint64_t minEdgeCoverage) :
-    markerGraph(markerGraph)
+    markerGraph(markerGraph),
+    maxDistance(maxDistance)
 {
     LocalMarkerGraph1& graph = *this;
 
@@ -390,6 +391,7 @@ void LocalMarkerGraph1::writeHtml0(
 void LocalMarkerGraph1::writeHtml1(
     ostream& html,
     uint64_t sizePixels,
+    double thicknessScaling,
     uint64_t quality,
     double timeout) const
 {
@@ -469,7 +471,7 @@ void LocalMarkerGraph1::writeHtml1(
         yMin = min(yMin, y);
         yMax = max(yMax, y);
     }
-    const double extend = 1.;
+    const double extend = thicknessScaling;
     xMin -= extend;
     xMax += extend;
     yMin -= extend;
@@ -483,12 +485,13 @@ void LocalMarkerGraph1::writeHtml1(
         "' viewbox='" << xMin << " " << yMin << " " <<
         xMax - xMin << " " <<
         yMax - yMin << "'"
-        " style='border-style:solid;border-color:Black;'"
+        " style='border-style:solid;border-color:Black;stroke-linecap:round'"
         ">\n";
 
 
 
     // Write the edges.
+    html << "\n<g id=edges style='stroke-width:" << thicknessScaling << "'>";
     BGL_FORALL_EDGES(e, graph, LocalMarkerGraph1) {
         const MarkerGraphEdgeId edgeId = graph[e].edgeId;
         const vertex_descriptor v0 = source(e, graph);
@@ -498,8 +501,8 @@ void LocalMarkerGraph1::writeHtml1(
         const vector<AuxiliaryGraph::vertex_descriptor>& auxiliaryVertices =  auxiliaryEdgeMap[e];
 
         const uint32_t hue = MurmurHash2(&edgeId, sizeof(edgeId), 231) % 360;
-        const string color = "hsla(" + to_string(hue) + ",50%,50%)";
-        const string properties = "stroke='" + color + "' stroke-linecap=round stroke-width=2";
+        const string color = "hsl(" + to_string(hue) + ",50%,50%)";
+        const string properties = "stroke='" + color + "'";
 
         if(auxiliaryVertices.empty()) {
 
@@ -529,16 +532,22 @@ void LocalMarkerGraph1::writeHtml1(
                 " x2=" << p1[0] << " y2=" << p1[1] << " " << properties << " />";
         }
     }
+    html << "\n</g>";
+
+
 
     // Write the vertices.
-    const string properties = "stroke='Black' stroke-linecap=round stroke-width=2";
+    html << "\n<g id=vertices style='stroke-width:" << thicknessScaling << "'>";
     BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
         const auto& p = positionMap[auxiliaryVertexMap[v]];
         const double x = p[0];
         const double y = p[1];
+        const string color = (graph[v].distance == maxDistance ? "Grey" : "Black");
         html << "\n<line x1=" << x << " y1=" << y <<
-            " x2=" << x << " y2=" << y << " " << properties << " />";
+            " x2=" << x << " y2=" << y << " stroke=" << color << " />";
     }
+    html << "\n</g>";
+
     html << "\n</svg>";
 }
 
