@@ -395,6 +395,9 @@ void LocalMarkerGraph1::writeHtml1(
     double thicknessScaling,
     uint64_t quality,
     double edgeResolution,
+    const string& coloring,
+    uint64_t redCoverage,
+    uint64_t greenCoverage,
     double timeout) const
 {
     const LocalMarkerGraph1& graph = *this;
@@ -506,8 +509,24 @@ void LocalMarkerGraph1::writeHtml1(
         const auto& p1 = positionMap[auxiliaryVertexMap[v1]];
         const vector<AuxiliaryGraph::vertex_descriptor>& auxiliaryVertices =  auxiliaryEdgeMap[e];
 
-        const uint32_t hue = MurmurHash2(&edgeId, sizeof(edgeId), 231) % 360;
-        const string color = "hsl(" + to_string(hue) + ",50%,50%)";
+        string color;
+        if(coloring == "random") {
+            const uint32_t hue = MurmurHash2(&edgeId, sizeof(edgeId), 231) % 360;
+            color = "hsl(" + to_string(hue) + ",50%,50%)";
+        } else if(coloring == "byCoverage") {
+            const uint64_t coverage = markerGraph.edgeCoverage(edgeId);
+            if(coverage <= redCoverage) {
+                color = "Red";
+            } else if(coverage >= greenCoverage) {
+                color = "Green";
+            } else {
+                const uint32_t hue = uint32_t(120. *
+                    (double(coverage) - double(redCoverage)) / (double(greenCoverage) - double(redCoverage)));
+                color = "hsl(" + to_string(hue) + ",50%,50%)";
+            }
+        } else {
+            SHASTA_ASSERT(0);
+        }
         const string properties = "stroke='" + color + "'";
 
         if(auxiliaryVertices.empty()) {

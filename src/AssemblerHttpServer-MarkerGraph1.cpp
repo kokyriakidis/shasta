@@ -64,6 +64,15 @@ void Assembler::exploreMarkerGraph1(
     double edgeResolution = 1.;
     getParameterValue(request, "edgeResolution", edgeResolution);
 
+    uint64_t redCoverage = 1;
+    getParameterValue(request, "redCoverage", redCoverage);
+
+    uint64_t greenCoverage = 5;
+    getParameterValue(request, "greenCoverage", greenCoverage);
+
+    string coloring;
+    getParameterValue(request, "coloring", coloring);
+
     double timeout = 30;
     getParameterValue(request, "timeout", timeout);
 
@@ -141,6 +150,20 @@ void Assembler::exploreMarkerGraph1(
     html <<
         "<td class=centered><input type=text required name=edgeResolution size=8 style='text-align:center'"
         " value='" << edgeResolution << "'>"
+
+        "<tr>"
+        "<td>Coloring"
+        "<td>"
+        "<select name=coloring style='text-align:center'>"
+        "<option value=random" << (coloring == "random" ? " selected" : "") <<
+        ">Random</option>"
+        "<option value=byCoverage" << (coloring == "byCoverage" ? " selected" : "") <<
+        ">By coverage</option>"
+        "</select>"
+        "<br><input type=text required name=redCoverage size=8 style='text-align:center'"
+        " value='" << redCoverage << "'> Red coverage"
+        "<br><input type=text required name=greenCoverage size=8 style='text-align:center'"
+        " value='" << greenCoverage << "'> Green coverage"
 
         "<tr>"
         "<td>Timeout in seconds"
@@ -234,7 +257,9 @@ void Assembler::exploreMarkerGraph1(
     }
 
     else if(outputType == "svg") {
-        graph.writeHtml1(html, sizePixels, thicknessScaling, layoutQuality, edgeResolution, timeout);
+        graph.writeHtml1(html, sizePixels, thicknessScaling, layoutQuality, edgeResolution,
+            coloring, redCoverage, greenCoverage,
+            timeout);
     }
 
     else {
