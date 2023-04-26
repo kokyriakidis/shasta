@@ -219,10 +219,10 @@ void LocalMarkerGraph1::writeHtml0(
         edgeLengthMap.insert(make_pair(e, 1.));
     }
     std::map<vertex_descriptor, array<double, 2> > positionMap;
-    const auto t0 = steady_clock::now();
+    // const auto t0 = steady_clock::now();
     const ComputeLayoutReturnCode returnCode = computeLayoutCustom(
         graph, edgeLengthMap, positionMap, quality, timeout);
-    const auto t1 = steady_clock::now();
+    // const auto t1 = steady_clock::now();
     // html << "<br>Graph layout computation took " << seconds(t1 - t0) << "s.";
     if(returnCode == ComputeLayoutReturnCode::Timeout) {
         throw runtime_error("Graph layout took too long. "
@@ -394,6 +394,7 @@ void LocalMarkerGraph1::writeHtml1(
     uint64_t sizePixels,
     double thicknessScaling,
     uint64_t quality,
+    double edgeResolution,
     double timeout) const
 {
     const LocalMarkerGraph1& graph = *this;
@@ -418,7 +419,6 @@ void LocalMarkerGraph1::writeHtml1(
     std::map<AuxiliaryGraph::edge_descriptor, double> auxiliaryEdgeLengthMap;
 
     // Create vertices and edges of the AuxiliaryGraph.
-    const uint64_t auxiliaryVertexCount = 1;
     BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
         auxiliaryVertexMap.insert({v, add_vertex(auxiliaryGraph)});
     }
@@ -428,6 +428,7 @@ void LocalMarkerGraph1::writeHtml1(
         const vertex_descriptor v1 = target(e, graph);
         const MarkerGraphEdgeId edgeId = graph[e].edgeId;
         const uint64_t sequenceLength = markerGraph.edgeSequence[edgeId].size();
+        const uint64_t auxiliaryVertexCount = max(1UL, uint64_t(edgeResolution * double(sequenceLength)));
         const double edgeLength = double(sequenceLength) / double(auxiliaryVertexCount + 1);
         auxiliaryVertices.clear();
         for(uint64_t i=0; i<auxiliaryVertexCount; i++) {
@@ -477,6 +478,9 @@ void LocalMarkerGraph1::writeHtml1(
     xMax += extend;
     yMin -= extend;
     yMax += extend;
+
+    // Make the "arrow" length equal to the desired length of 1 base.
+    const double arrowLength = 1.;
 
     // Begin the svg.
     const string svgId = "LocalMarkerGraph1";
@@ -538,6 +542,32 @@ void LocalMarkerGraph1::writeHtml1(
 
 
 
+    // Write the "arrows".
+    html << "\n<g id=arrows stroke-width='" << thicknessScaling/3. << "'>";
+    BGL_FORALL_EDGES(e, graph, LocalMarkerGraph1) {
+        const vertex_descriptor v1 = target(e, graph);
+        const auto& p1 = positionMap[auxiliaryVertexMap[v1]];
+        const vector<AuxiliaryGraph::vertex_descriptor>& auxiliaryVertices =  auxiliaryEdgeMap[e];
+        SHASTA_ASSERT(not auxiliaryVertices.empty());
+
+        // Position of the last auxiliary vertex.
+        const auto& xyLast = positionMap[auxiliaryVertices.back()];
+
+        // Draw the "arrow".
+        // We need to compute a unit vector in the direction (p1, xyLast).
+        const double vx = xyLast[0] - p1[0];
+        const double vy = xyLast[1] - p1[1];
+        const double v = sqrt(vx*vx + vy * vy);
+        const double ux = vx / v;
+        const double uy = vy / v;
+        const double xArrow = p1[0] + ux * arrowLength;
+        const double yArrow = p1[1] + uy * arrowLength;
+        html << "\n<line x1=" << xArrow << " y1=" << yArrow <<
+            " x2=" << p1[0] << " y2=" << p1[1] << " stroke=Black />";
+    }
+    html << "\n</g>";
+
+
     // Write the vertices.
     html << "\n<g id=vertices stroke-width='" << thicknessScaling << "'>";
     BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
@@ -576,6 +606,8 @@ void LocalMarkerGraph1::writeHtml1(
             edges.setAttribute('stroke-width', factor * edges.getAttribute('stroke-width'));
             vertices = document.getElementById('vertices');
             vertices.setAttribute('stroke-width', factor * vertices.getAttribute('stroke-width'));
+            arrows = document.getElementById('arrows');
+            arrows.setAttribute('stroke-width', factor * arrows.getAttribute('stroke-width'));
         }
         </script>
         )stringDelimiter";

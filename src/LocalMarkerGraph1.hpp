@@ -96,6 +96,7 @@ public:
         uint64_t sizePixels,
         double thicknessScaling,
         uint64_t quality,
+        double edgeResolution,
         double timeout) const;
 
     void pruneLowCoverageLeaves(uint64_t maxPruneCoverage);

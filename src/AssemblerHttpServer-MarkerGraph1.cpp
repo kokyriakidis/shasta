@@ -61,6 +61,9 @@ void Assembler::exploreMarkerGraph1(
     uint64_t layoutQuality = 2;
     getParameterValue(request, "layoutQuality", layoutQuality);
 
+    double edgeResolution = 1.;
+    getParameterValue(request, "edgeResolution", edgeResolution);
+
     double timeout = 30;
     getParameterValue(request, "timeout", timeout);
 
@@ -130,6 +133,14 @@ void Assembler::exploreMarkerGraph1(
         "<option value=2" << (layoutQuality==2 ? " selected" : "") <<
         ">Best quality</option>"
         "</select>"
+
+        "<tr>"
+        "<td>Edge resolution ";
+    writeInformationIcon(html, "Affects edge smoothness and speed of layout computation.");
+
+    html <<
+        "<td class=centered><input type=text required name=edgeResolution size=8 style='text-align:center'"
+        " value='" << edgeResolution << "'>"
 
         "<tr>"
         "<td>Timeout in seconds"
@@ -223,7 +234,7 @@ void Assembler::exploreMarkerGraph1(
     }
 
     else if(outputType == "svg") {
-        graph.writeHtml1(html, sizePixels, thicknessScaling, layoutQuality, timeout);
+        graph.writeHtml1(html, sizePixels, thicknessScaling, layoutQuality, edgeResolution, timeout);
     }
 
     else {
