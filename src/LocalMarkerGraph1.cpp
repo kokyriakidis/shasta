@@ -533,10 +533,17 @@ void LocalMarkerGraph1::writeHtml1(
 
         // Create a group for this edge.
         const auto sequence = markerGraph.edgeSequence[edgeId];
-        html << "<g><title>Edge " << edgeId << ", coverage " << coverage <<
+        html << "<g>";
+
+        // Add a title.
+        html <<
+            "<title>Edge " << edgeId << ", coverage " << coverage <<
             ", " << sequence.size() << " bases: ";
         copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
         html << "</title>";
+
+        // Add a hyperlink.
+        html << "<a href='exploreMarkerGraphEdge?edgeId=" << edgeId << "'>";
 
         // Line from p0 to the first auxiliary vertex.
         const auto& xyFirst = positionMap[auxiliaryVertices.front()];
@@ -557,7 +564,7 @@ void LocalMarkerGraph1::writeHtml1(
             " x2=" << p1[0] << " y2=" << p1[1] << " " << properties << " />";
 
         // End the group for this edge.
-        html << "</g>";
+        html << "</a></g>";
     }
     html << "\n</g>";
 
@@ -602,13 +609,14 @@ void LocalMarkerGraph1::writeHtml1(
         const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
         html << "<g><title>Vertex " << vertexId << ", coverage " << coverage;
         html << "</title>";
+        html << "<a href='exploreMarkerGraphVertex?vertexId=" << vertexId << "'>";
 
         // Write the vertex.
         html << "\n<line x1=" << x << " y1=" << y <<
             " x2=" << x << " y2=" << y << " stroke=" << color << " />";
 
         // End the group.
-        html << "</g>";
+        html << "</a></g>";
     }
     html << "\n</g>";
 
