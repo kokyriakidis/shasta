@@ -503,6 +503,7 @@ void LocalMarkerGraph1::writeHtml1(
     html << "\n<g id=edges stroke-width='" << thicknessScaling << "'>";
     BGL_FORALL_EDGES(e, graph, LocalMarkerGraph1) {
         const MarkerGraphEdgeId edgeId = graph[e].edgeId;
+        const uint64_t coverage = markerGraph.edgeCoverage(edgeId);
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
         const auto& p0 = positionMap[auxiliaryVertexMap[v0]];
@@ -514,7 +515,6 @@ void LocalMarkerGraph1::writeHtml1(
             const uint32_t hue = MurmurHash2(&edgeId, sizeof(edgeId), 231) % 360;
             color = "hsl(" + to_string(hue) + ",50%,50%)";
         } else if(coloring == "byCoverage") {
-            const uint64_t coverage = markerGraph.edgeCoverage(edgeId);
             if(coverage <= redCoverage) {
                 color = "Red";
             } else if(coverage >= greenCoverage) {
@@ -529,33 +529,35 @@ void LocalMarkerGraph1::writeHtml1(
         }
         const string properties = "stroke='" + color + "'";
 
-        if(auxiliaryVertices.empty()) {
+        SHASTA_ASSERT(not auxiliaryVertices.empty());
 
-            // This edge has no auxiliary vertices.
-            // Just write a line between p0 and p1.
-            html << "\n<line x1=" << p0[0] << " y1=" << p0[1] <<
-                " x2=" << p1[0] << " y2=" << p1[1] << " " << properties << " />";
+        // Create a group for this edge.
+        const auto sequence = markerGraph.edgeSequence[edgeId];
+        html << "<g><title>Edge " << edgeId << ", coverage " << coverage <<
+            ", " << sequence.size() << " bases: ";
+        copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
+        html << "</title>";
 
-        } else {
+        // Line from p0 to the first auxiliary vertex.
+        const auto& xyFirst = positionMap[auxiliaryVertices.front()];
+        html << "\n<line x1=" << p0[0] << " y1=" << p0[1] <<
+            " x2=" << xyFirst[0] << " y2=" << xyFirst[1] << " " << properties << " />";
 
-            // Line from p0 to the first auxiliary vertex.
-            const auto& xyFirst = positionMap[auxiliaryVertices.front()];
-            html << "\n<line x1=" << p0[0] << " y1=" << p0[1] <<
-                " x2=" << xyFirst[0] << " y2=" << xyFirst[1] << " " << properties << " />";
-
-            // Lines between auxiliary vertices.
-            for(uint64_t i=1; i<auxiliaryVertices.size(); i++) {
-                const auto& xyA = positionMap[auxiliaryVertices[i-1]];
-                const auto& xyB = positionMap[auxiliaryVertices[i]];
-                html << "\n<line x1=" << xyA[0] << " y1=" << xyA[1] <<
-                    " x2=" << xyB[0] << " y2=" << xyB[1] << " " << properties << " />";
-            }
-
-            // Line from the last auxiliary vertex to p1.
-            const auto& xyLast = positionMap[auxiliaryVertices.back()];
-            html << "\n<line x1=" << xyLast[0] << " y1=" << xyLast[1] <<
-                " x2=" << p1[0] << " y2=" << p1[1] << " " << properties << " />";
+        // Lines between auxiliary vertices.
+        for(uint64_t i=1; i<auxiliaryVertices.size(); i++) {
+            const auto& xyA = positionMap[auxiliaryVertices[i-1]];
+            const auto& xyB = positionMap[auxiliaryVertices[i]];
+            html << "\n<line x1=" << xyA[0] << " y1=" << xyA[1] <<
+                " x2=" << xyB[0] << " y2=" << xyB[1] << " " << properties << " />";
         }
+
+        // Line from the last auxiliary vertex to p1.
+        const auto& xyLast = positionMap[auxiliaryVertices.back()];
+        html << "\n<line x1=" << xyLast[0] << " y1=" << xyLast[1] <<
+            " x2=" << p1[0] << " y2=" << p1[1] << " " << properties << " />";
+
+        // End the group for this edge.
+        html << "</g>";
     }
     html << "\n</g>";
 
@@ -594,8 +596,19 @@ void LocalMarkerGraph1::writeHtml1(
         const double x = p[0];
         const double y = p[1];
         const string color = (graph[v].distance == maxDistance ? "Grey" : "Black");
+
+        // Create a group for this edge.
+        const MarkerGraphVertexId vertexId = graph[v].vertexId;
+        const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
+        html << "<g><title>Vertex " << vertexId << ", coverage " << coverage;
+        html << "</title>";
+
+        // Write the vertex.
         html << "\n<line x1=" << x << " y1=" << y <<
             " x2=" << x << " y2=" << y << " stroke=" << color << " />";
+
+        // End the group.
+        html << "</g>";
     }
     html << "\n</g>";
 
