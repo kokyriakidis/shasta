@@ -100,6 +100,7 @@ public:
         const string& coloring,
         uint64_t redCoverage,
         uint64_t greenCoverage,
+        bool showLabels,
         double timeout) const;
 
     void pruneLowCoverageLeaves(uint64_t maxPruneCoverage);

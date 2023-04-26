@@ -73,6 +73,9 @@ void Assembler::exploreMarkerGraph1(
     string coloring;
     getParameterValue(request, "coloring", coloring);
 
+    string showLabelsString;
+    const bool showLabels = getParameterValue(request, "showLabels", showLabelsString);
+
     double timeout = 30;
     getParameterValue(request, "timeout", timeout);
 
@@ -164,6 +167,12 @@ void Assembler::exploreMarkerGraph1(
         " value='" << redCoverage << "'> Red coverage"
         "<br><input type=text required name=greenCoverage size=8 style='text-align:center'"
         " value='" << greenCoverage << "'> Green coverage"
+
+        "<tr>"
+        "<td>Show labels"
+        "<td class=centered><input type=checkbox name=showLabels" <<
+             (showLabels ? " checked" : "") <<
+             ">"
 
         "<tr>"
         "<td>Timeout in seconds"
@@ -258,7 +267,7 @@ void Assembler::exploreMarkerGraph1(
 
     else if(outputType == "svg") {
         graph.writeHtml1(html, sizePixels, thicknessScaling, layoutQuality, edgeResolution,
-            coloring, redCoverage, greenCoverage,
+            coloring, redCoverage, greenCoverage, showLabels,
             timeout);
     }
 

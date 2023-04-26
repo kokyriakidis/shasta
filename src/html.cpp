@@ -176,6 +176,7 @@ function zoomSvg(factor)
     y = yCenter - 0.5 * height;
 
     svg.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
+    svg.setAttribute('font-size', svg.getAttribute('font-size') / factor);
 
     return false;
 }

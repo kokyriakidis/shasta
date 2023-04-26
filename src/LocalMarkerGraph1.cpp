@@ -398,6 +398,7 @@ void LocalMarkerGraph1::writeHtml1(
     const string& coloring,
     uint64_t redCoverage,
     uint64_t greenCoverage,
+    bool showLabels,
     double timeout) const
 {
     const LocalMarkerGraph1& graph = *this;
@@ -481,6 +482,7 @@ void LocalMarkerGraph1::writeHtml1(
     xMax += extend;
     yMin -= extend;
     yMax += extend;
+    const double fontSize = 16. * max(xMax-xMin, yMax-yMin) / double(sizePixels);
 
     // Make the "arrow" length equal to the desired length of 1 base.
     const double arrowLength = 1.;
@@ -494,7 +496,8 @@ void LocalMarkerGraph1::writeHtml1(
         "' viewbox='" << xMin << " " << yMin << " " <<
         xMax - xMin << " " <<
         yMax - yMin << "'"
-        " style='border-style:solid;border-color:Black;stroke-linecap:round'"
+        " font-size='" << fontSize << "' style='border-style:solid;border-color:Black;stroke-linecap:round'"
+        " font-family=monospace"
         ">\n";
 
 
@@ -562,9 +565,28 @@ void LocalMarkerGraph1::writeHtml1(
         const auto& xyLast = positionMap[auxiliaryVertices.back()];
         html << "\n<line x1=" << xyLast[0] << " y1=" << xyLast[1] <<
             " x2=" << p1[0] << " y2=" << p1[1] << " " << properties << " />";
+        html << "</a>";
+
+        // Label.
+        if(showLabels) {
+            double x, y;
+            if((auxiliaryVertices.size() %2) == 0) {
+                const auto positionA = positionMap[auxiliaryVertices[auxiliaryVertices.size()/2 -1]];
+                const auto positionB = positionMap[auxiliaryVertices[auxiliaryVertices.size()/2]];
+                x = (positionA[0] + positionB[0]) / 2;
+                y = (positionA[1] + positionB[1]) / 2;
+            } else {
+                const auto position = positionMap[auxiliaryVertices[auxiliaryVertices.size()/2]];
+                x = position[0];
+                y = position[1];
+            }
+            html << "<text x='" << x << "' << y='" << y << "' dominant-baseline=middle text-anchor=middle>";
+            copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
+            html << "</text>";
+        }
 
         // End the group for this edge.
-        html << "</a></g>";
+        html << "</g>";
     }
     html << "\n</g>";
 
