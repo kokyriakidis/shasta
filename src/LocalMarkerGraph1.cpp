@@ -608,6 +608,10 @@ void LocalMarkerGraph1::writeHtml1(
         const double vx = xyLast[0] - p1[0];
         const double vy = xyLast[1] - p1[1];
         const double v = sqrt(vx*vx + vy * vy);
+        if(v < 1.e-3) {
+            // Trouble. This can happen if two vertices are very close. Skip the arrow.
+            continue;
+        }
         const double ux = vx / v;
         const double uy = vy / v;
         const double xArrow = p1[0] + ux * arrowLength;
