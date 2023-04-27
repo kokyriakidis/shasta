@@ -8,6 +8,7 @@
 #include "Marker.hpp"
 #include "MarkerGraph.hpp"
 #include "MurmurHash2.hpp"
+#include "orderPairs.hpp"
 #include "platformDependent.hpp"
 #include "runCommandWithTimeout.hpp"
 using namespace shasta;
@@ -602,9 +603,34 @@ void LocalMarkerGraph1::writeHtml1(
 
 
 
+    // Create a vector to contain edges in the order in which we write them out.
+    // Edges written last are less likely to be superimposed by other edges.
+    vector< pair<edge_descriptor, uint64_t> > allEdges;
+    if(coloring == "readFollowing") {
+        BGL_FORALL_EDGES(e, graph, LocalMarkerGraph1) {
+            uint64_t readFollowingCoverage = 0;
+            auto it = readFollowingCoverageMap.find(e);
+            if(it != readFollowingCoverageMap.end()) {
+                readFollowingCoverage = it->second;
+            }
+            allEdges.push_back({e, readFollowingCoverage});
+        }
+    } else {
+        BGL_FORALL_EDGES(e, graph, LocalMarkerGraph1) {
+            const MarkerGraphEdgeId edgeId = graph[e].edgeId;
+            const uint64_t coverage = markerGraph.edgeCoverage(edgeId);
+            allEdges.push_back({e, coverage});
+        }
+    }
+    sort(allEdges.begin(), allEdges.end(),
+        OrderPairsBySecondOnly<edge_descriptor, uint64_t>());
+
+
+
     // Write the edges.
     html << "\n<g id=edges stroke-width='" << thicknessScaling << "'>";
-    BGL_FORALL_EDGES(e, graph, LocalMarkerGraph1) {
+    for(const auto& p: allEdges) {
+        const edge_descriptor e = p.first;
         const MarkerGraphEdgeId edgeId = graph[e].edgeId;
         const uint64_t coverage = markerGraph.edgeCoverage(edgeId);
         const vertex_descriptor v0 = source(e, graph);
@@ -631,7 +657,7 @@ void LocalMarkerGraph1::writeHtml1(
         } else if(coloring == "readFollowing") {
             auto it = readFollowingCoverageMap.find(e);
             if(it == readFollowingCoverageMap.end()) {
-                color = "rgba(192,192,192,0.4)";    // Transparent grey
+                color = "LightGrey";
             } else {
                 const uint64_t coverage = it->second;
                 readFollowingCoverage = coverage;
@@ -745,28 +771,32 @@ void LocalMarkerGraph1::writeHtml1(
 
 
     // Write the vertices.
-    html << "\n<g id=vertices stroke-width='" << thicknessScaling << "'>";
-    BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
-        const auto& p = positionMap[auxiliaryVertexMap[v]];
-        const double x = p[0];
-        const double y = p[1];
-        const string color = (graph[v].distance == maxDistance ? "Grey" : "Black");
+    // Don't write them out for the other two coloring methods because they obscure
+    // coverage coloring.
+    if(coloring == "random") {
+        html << "\n<g id=vertices stroke-width='" << thicknessScaling << "'>";
+        BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
+            const auto& p = positionMap[auxiliaryVertexMap[v]];
+            const double x = p[0];
+            const double y = p[1];
+            const string color = (graph[v].distance == maxDistance ? "Grey" : "Black");
 
-        // Create a group for this edge.
-        const MarkerGraphVertexId vertexId = graph[v].vertexId;
-        const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
-        html << "<g><title>Vertex " << vertexId << ", coverage " << coverage;
-        html << "</title>";
-        html << "<a href='exploreMarkerGraphVertex?vertexId=" << vertexId << "'>";
+            // Create a group for this edge.
+            const MarkerGraphVertexId vertexId = graph[v].vertexId;
+            const uint64_t coverage = markerGraph.vertexCoverage(vertexId);
+            html << "<g><title>Vertex " << vertexId << ", coverage " << coverage;
+            html << "</title>";
+            html << "<a href='exploreMarkerGraphVertex?vertexId=" << vertexId << "'>";
 
-        // Write the vertex.
-        html << "\n<line x1=" << x << " y1=" << y <<
-            " x2=" << x << " y2=" << y << " stroke=" << color << " />";
+            // Write the vertex.
+            html << "\n<line x1=" << x << " y1=" << y <<
+                " x2=" << x << " y2=" << y << " stroke=" << color << " />";
 
-        // End the group.
-        html << "</a></g>";
+            // End the group.
+            html << "</a></g>";
+        }
+        html << "\n</g>";
     }
-    html << "\n</g>";
 
     // Finish the svg.
     html << "\n</svg></div>";
