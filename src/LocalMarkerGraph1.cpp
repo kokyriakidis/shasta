@@ -5,6 +5,7 @@
 #include "findLinearChains.hpp"
 #include "html.hpp"
 #include "invalid.hpp"
+#include "Marker.hpp"
 #include "MarkerGraph.hpp"
 #include "MurmurHash2.hpp"
 #include "platformDependent.hpp"
@@ -27,11 +28,13 @@ using namespace shasta;
 
 
 LocalMarkerGraph1::LocalMarkerGraph1(
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     const MarkerGraph& markerGraph,
     MarkerGraphVertexId startVertexId,
     uint64_t maxDistance,
     uint64_t minVertexCoverage,
     uint64_t minEdgeCoverage) :
+    markers(markers),
     markerGraph(markerGraph),
     maxDistance(maxDistance)
 {
@@ -136,8 +139,9 @@ LocalMarkerGraph1::LocalMarkerGraph1(
             auto it = vertexMap.find(vertexId1);
             if(it != vertexMap.end()) {
                 const vertex_descriptor v1 = it->second;
-                add_edge(v0, v1, LocalMarkerGraph1Edge(edgeId), graph);
-            } else {
+                edge_descriptor e;
+                tie(e, ignore) = add_edge(v0, v1, LocalMarkerGraph1Edge(edgeId), graph);
+                edgeMap.insert({edgeId, e});
             }
         }
     }
@@ -398,6 +402,9 @@ void LocalMarkerGraph1::writeHtml1(
     const string& coloring,
     uint64_t redCoverage,
     uint64_t greenCoverage,
+    MarkerGraphEdgeId readFollowingStartEdgeId,
+    int64_t firstMarkerOffset,
+    int64_t lastMarkerOffset,
     bool showLabels,
     double timeout) const
 {
@@ -463,6 +470,100 @@ void LocalMarkerGraph1::writeHtml1(
 
 
 
+    // If we are doing read following, we need to compute
+    // followed read coverage for each edge.
+    std::map<edge_descriptor, uint64_t> readFollowingCoverageMap;
+    uint64_t readFollowingStartEdgeCoverage = 0;
+    if(coloring == "readFollowing") {
+        readFollowingStartEdgeCoverage = markerGraph.edgeCoverage(readFollowingStartEdgeId);
+
+        // Loop over the MarkerIntervals of the start edge for read following.
+        for(const MarkerInterval& startMarkerInterval:
+            markerGraph.edgeMarkerIntervals[readFollowingStartEdgeId]) {
+            const OrientedReadId orientedReadId = startMarkerInterval.orientedReadId;
+            const int64_t startOrdinal0 = int64_t(startMarkerInterval.ordinals[0]);
+
+            // The number of markers in this oriented read.
+            const int64_t orientedReadMarkerCount = int64_t(markers.size(orientedReadId.getValue()));
+
+            // Get the MarkerId of the first marker of this oriented read.
+            // We can use this later to easily get the MarkerId corresponding to any
+            // marker in the same oriented read.
+            const MarkerId firstOrientedReadMarkerId =
+                markers.begin(orientedReadId.getValue()) - markers.begin();
+
+            // Loop over the requested range of offsets.
+            for(int64_t offset=firstMarkerOffset; offset<=lastMarkerOffset; offset++) {
+                const int64_t ordinal0 = startOrdinal0 + offset;
+                if(ordinal0 < 0) {
+                    // This offset takes us before the beginning of this oriented read.
+                    continue;
+                }
+                const int64_t ordinal1 = ordinal0 + 1;
+                if(ordinal1 > orientedReadMarkerCount-1) {
+                    // This offset takes us past the end of this oriented read.
+                    continue;
+                }
+
+                // Find the MarkerIds corresponding to these two ordinals.
+                const MarkerId markerId0 = firstOrientedReadMarkerId + ordinal0;
+                const MarkerId markerId1 = firstOrientedReadMarkerId + ordinal1;
+
+                // Find the corresponding marker graph vertices.
+                // We are using the complete marker graph, so the vertices must exist.
+                const MarkerGraph::CompressedVertexId compressedVertexId0 = markerGraph.vertexTable[markerId0];
+                const MarkerGraph::CompressedVertexId compressedVertexId1 = markerGraph.vertexTable[markerId1];
+                SHASTA_ASSERT(compressedVertexId0 != MarkerGraph::invalidCompressedVertexId);
+                SHASTA_ASSERT(compressedVertexId1 != MarkerGraph::invalidCompressedVertexId);
+                const MarkerGraphVertexId vertexId0 = compressedVertexId0;
+                // const MarkerGraphVertexId vertexId1 = compressedVertexId1;
+
+                // Find the edge vertexId0->vertexId1 that contains the MarkerInterval
+                // with these oriented read and ordinals.
+                MarkerInterval targetMarkerInterval(orientedReadId, uint32_t(ordinal0), uint32_t(ordinal1));
+                MarkerGraphEdgeId edgeId = invalid<MarkerGraphEdgeId>;
+                for(const MarkerGraphEdgeId candidateEdgeId: markerGraph.edgesBySource[vertexId0]) {
+                    const auto edgeMarkerIntervals = markerGraph.edgeMarkerIntervals[candidateEdgeId];
+                    if(find(edgeMarkerIntervals.begin(), edgeMarkerIntervals.end(), targetMarkerInterval)
+                        != edgeMarkerIntervals.end()) {
+                        edgeId = candidateEdgeId;
+                        break;
+                    }
+                }
+                SHASTA_ASSERT(edgeId != invalid<MarkerGraphEdgeId>);
+
+                // cout << orientedReadId << " at offset " << offset << endl;
+
+                // If this edge is in the LocalMarkerGraph1, increment its read following coverage.
+                auto it = edgeMap.find(edgeId);
+                if(it != edgeMap.end()) {
+                    cout << "Found in the edge map" << endl;
+                    const edge_descriptor e = it->second;
+                    auto jt = readFollowingCoverageMap.find(e);
+                    if(jt == readFollowingCoverageMap.end()){
+                        readFollowingCoverageMap.insert({e, 1});
+                        // cout << "Added a new entry in the readFollowingCoverageMap." << endl;
+                    } else {
+                        ++jt->second;
+                        // cout << "Incremented readFollowingCoverageMap to " << jt->second << endl;
+                    }
+                } else {
+                    // cout << "Not found in the edge map." << endl;
+                }
+            }
+        }
+
+        /*
+        for(const auto& p: readFollowingCoverageMap) {
+            const edge_descriptor e = p.first;
+            const uint64_t coverage = p.second;
+            cout << graph[e].edgeId << " " << coverage << endl;
+        }
+        */
+    }
+
+
+
     // Compute the view box.
     double xMin = std::numeric_limits<double>::max();
     double xMax = std::numeric_limits<double>::min();
@@ -514,6 +615,7 @@ void LocalMarkerGraph1::writeHtml1(
         const vector<AuxiliaryGraph::vertex_descriptor>& auxiliaryVertices =  auxiliaryEdgeMap[e];
 
         string color;
+        uint64_t readFollowingCoverage = 0;
         if(coloring == "random") {
             const uint32_t hue = MurmurHash2(&edgeId, sizeof(edgeId), 231) % 360;
             color = "hsl(" + to_string(hue) + ",50%,50%)";
@@ -526,6 +628,23 @@ void LocalMarkerGraph1::writeHtml1(
                 const uint32_t hue = uint32_t(120. *
                     (double(coverage) - double(redCoverage)) / (double(greenCoverage) - double(redCoverage)));
                 color = "hsl(" + to_string(hue) + ",50%,50%)";
+            }
+        } else if(coloring == "readFollowing") {
+            auto it = readFollowingCoverageMap.find(e);
+            if(it == readFollowingCoverageMap.end()) {
+                color = "rgba(192,192,192,0.4)";    // Transparent grey
+            } else {
+                const uint64_t coverage = it->second;
+                readFollowingCoverage = coverage;
+                if(coverage <= redCoverage) {
+                    color = "Red";
+                } else if(coverage >= greenCoverage) {
+                    color = "Green";
+                } else {
+                    const uint32_t hue = uint32_t(120. *
+                        (double(coverage) - double(redCoverage)) / (double(greenCoverage) - double(redCoverage)));
+                    color = "hsl(" + to_string(hue) + ",50%,50%)";
+                }
             }
         } else {
             SHASTA_ASSERT(0);
@@ -543,6 +662,10 @@ void LocalMarkerGraph1::writeHtml1(
             "<title>Edge " << edgeId << ", coverage " << coverage <<
             ", " << sequence.size() << " bases: ";
         copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
+        if(coloring == "readFollowing") {
+            html << ", read following coverage " << readFollowingCoverage << "/" <<
+                readFollowingStartEdgeCoverage;
+        }
         html << "</title>";
 
         // Add a hyperlink.

@@ -26,7 +26,11 @@ namespace shasta {
         LocalMarkerGraph1Edge
         >;
 
+    class CompressedMarker;
     class MarkerGraph;
+    namespace MemoryMapped {
+        template<class T, class Int> class VectorOfVectors;
+    }
 }
 
 
@@ -71,6 +75,7 @@ class shasta::LocalMarkerGraph1 :
 public:
 
     LocalMarkerGraph1(
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         const MarkerGraph&,
         MarkerGraphVertexId,
         uint64_t maxDistance,
@@ -78,10 +83,12 @@ public:
         uint64_t minEdgeCoverage
     );
 
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
     const MarkerGraph& markerGraph;
     uint64_t maxDistance;
 
     std::map<MarkerGraphVertexId, vertex_descriptor> vertexMap;
+    std::map<MarkerGraphEdgeId, edge_descriptor> edgeMap;
     vertex_descriptor addVertex(MarkerGraphVertexId, uint64_t distance);
 
     void writeGfa(const string& fileName) const;
@@ -100,6 +107,9 @@ public:
         const string& coloring,
         uint64_t redCoverage,
         uint64_t greenCoverage,
+        MarkerGraphEdgeId readFollowingStartEdgeId,
+        int64_t firstMarkerOffset,
+        int64_t lastMarkerOffset,
         bool showLabels,
         double timeout) const;
 

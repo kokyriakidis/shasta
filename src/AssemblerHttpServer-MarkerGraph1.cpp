@@ -73,6 +73,15 @@ void Assembler::exploreMarkerGraph1(
     string coloring;
     getParameterValue(request, "coloring", coloring);
 
+    uint64_t readFollowingStartEdgeId = 0;
+    getParameterValue(request, "readFollowingStartEdgeId", readFollowingStartEdgeId);
+
+    int64_t firstMarkerOffset = 0;
+    getParameterValue(request, "firstMarkerOffset", firstMarkerOffset);
+
+    int64_t lastMarkerOffset = 0;
+    getParameterValue(request, "lastMarkerOffset", lastMarkerOffset);
+
     string showLabelsString;
     const bool showLabels = getParameterValue(request, "showLabels", showLabelsString);
 
@@ -162,11 +171,20 @@ void Assembler::exploreMarkerGraph1(
         ">Random</option>"
         "<option value=byCoverage" << (coloring == "byCoverage" ? " selected" : "") <<
         ">By coverage</option>"
+        "<option value=readFollowing" << (coloring == "readFollowing" ? " selected" : "") <<
+        ">Read following</option>"
         "</select>"
         "<br><input type=text required name=redCoverage size=8 style='text-align:center'"
         " value='" << redCoverage << "'> Red coverage"
         "<br><input type=text required name=greenCoverage size=8 style='text-align:center'"
         " value='" << greenCoverage << "'> Green coverage"
+        "<hr><span style='text-align:center'>Read following</span>"
+        "<br><input type=text required name=readFollowingStartEdgeId size=8 style='text-align:center'"
+        " value='" << readFollowingStartEdgeId << "'> Start edge for read following"
+        "<br><input type=text required name=firstMarkerOffset size=8 style='text-align:center'"
+        " value='" << firstMarkerOffset << "'> First marker offset"
+        "<br><input type=text required name=lastMarkerOffset size=8 style='text-align:center'"
+        " value='" << lastMarkerOffset << "'> Last marker offset"
 
         "<tr>"
         "<td>Show labels"
@@ -235,6 +253,7 @@ void Assembler::exploreMarkerGraph1(
 
     // Create the local marker graph.
     LocalMarkerGraph1 graph(
+        markers,
         markerGraph,
         vertexId,
         maxDistance,
@@ -267,7 +286,9 @@ void Assembler::exploreMarkerGraph1(
 
     else if(outputType == "svg") {
         graph.writeHtml1(html, sizePixels, thicknessScaling, layoutQuality, edgeResolution,
-            coloring, redCoverage, greenCoverage, showLabels,
+            coloring, redCoverage, greenCoverage,
+            readFollowingStartEdgeId, firstMarkerOffset, lastMarkerOffset,
+            showLabels,
             timeout);
     }
 
