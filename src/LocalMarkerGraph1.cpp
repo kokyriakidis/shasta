@@ -537,7 +537,6 @@ void LocalMarkerGraph1::writeHtml1(
                 // If this edge is in the LocalMarkerGraph1, increment its read following coverage.
                 auto it = edgeMap.find(edgeId);
                 if(it != edgeMap.end()) {
-                    cout << "Found in the edge map" << endl;
                     const edge_descriptor e = it->second;
                     auto jt = readFollowingCoverageMap.find(e);
                     if(jt == readFollowingCoverageMap.end()){
