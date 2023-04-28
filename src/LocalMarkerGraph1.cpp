@@ -695,25 +695,26 @@ void LocalMarkerGraph1::writeHtml1(
 
         // Add a hyperlink.
         html << "<a href='exploreMarkerGraphEdge?edgeId=" << edgeId << "'>";
+        html << "<g id='Edge-"<< edgeId << "' " << properties << " >";
 
         // Line from p0 to the first auxiliary vertex.
         const auto& xyFirst = positionMap[auxiliaryVertices.front()];
         html << "\n<line x1=" << p0[0] << " y1=" << p0[1] <<
-            " x2=" << xyFirst[0] << " y2=" << xyFirst[1] << " " << properties << " />";
+            " x2=" << xyFirst[0] << " y2=" << xyFirst[1] << " />";
 
         // Lines between auxiliary vertices.
         for(uint64_t i=1; i<auxiliaryVertices.size(); i++) {
             const auto& xyA = positionMap[auxiliaryVertices[i-1]];
             const auto& xyB = positionMap[auxiliaryVertices[i]];
             html << "\n<line x1=" << xyA[0] << " y1=" << xyA[1] <<
-                " x2=" << xyB[0] << " y2=" << xyB[1] << " " << properties << " />";
+                " x2=" << xyB[0] << " y2=" << xyB[1] << " />";
         }
 
         // Line from the last auxiliary vertex to p1.
         const auto& xyLast = positionMap[auxiliaryVertices.back()];
         html << "\n<line x1=" << xyLast[0] << " y1=" << xyLast[1] <<
-            " x2=" << p1[0] << " y2=" << p1[1] << " " << properties << " />";
-        html << "</a>";
+            " x2=" << p1[0] << " y2=" << p1[1] << " />";
+        html << "</g></a>";
 
         // Label.
         if(showLabels) {
@@ -840,6 +841,54 @@ void LocalMarkerGraph1::writeHtml1(
         <button type='button' onClick='zoomSvg(1.25)' style='width:3em'>+</button>
         <button type='button' onClick='zoomSvg(2.)' style='width:3em'>++</button>
         <button type='button' onClick='zoomSvg(10.)' style='width:3em'>+++</button>
+    )stringDelimiter";
+
+
+
+    // Buttons to highlight an edge and zoom to an edge.
+    html << R"stringDelimiter(
+        <tr><td colspan=2>
+        <button onClick='highlightEdge()'>Highlight</button>
+        <button onClick='zoomToEdge()'>Zoom to</button>edge
+        <input id=selectedEdgeId type=text size=10 style='text-align:center'>
+    <script>
+    function zoomToEdge()
+    {
+        // Get the edge id from the input field.
+        var edgeId = document.getElementById("selectedEdgeId").value;
+        zoomToGivenEdge(edgeId);
+    }
+    function zoomToGivenEdge(edgeId)
+    {
+        var element = document.getElementById("Edge-" + edgeId);
+
+        // Find the bounding box and its center.
+        var box = element.getBBox();
+        var xCenter = box.x + 0.5 * box.width;
+        var yCenter = box.y + 0.5 * box.height;
+
+        // Change the viewbox of the svg to be a bit larger than a square
+        // containing the bounding box.
+        var enlargeFactor = 2.;
+        var size = enlargeFactor * Math.max(box.width, box.height);
+        width = size;
+        height = size;
+        x = xCenter - 0.5 * size;
+        y = yCenter - 0.5 * size;
+        var svg = document.querySelector('svg');
+        svg.setAttribute('viewBox', `${x} ${y} ${size} ${size}`);
+        ratio = size / svg.getBoundingClientRect().width;
+
+    }
+    function highlightEdge()
+    {
+        // Get the edge id  from the input field.
+        var edgeId = document.getElementById("selectedEdgeId").value;
+        var element = document.getElementById("Edge-" + edgeId);
+
+        element.style.stroke = "Magenta";
+    }
+    </script>
     )stringDelimiter";
 
 
