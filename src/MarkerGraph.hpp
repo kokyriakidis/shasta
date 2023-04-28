@@ -275,6 +275,16 @@ public:
     EdgeId getFirstNonRemovedOutEdge(VertexId) const;
     EdgeId getFirstNonRemovedInEdge(VertexId) const;
 
+    // Apply an ordinal offset in the specified direction to a given MarkerInterval
+    // and find the edge that contains the offset MarkerInterval.
+    // This assumes that we have the complete marker graph.
+    EdgeId locateMarkerIntervalWithOffset(
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+        MarkerInterval,
+        uint32_t ordinalOffset,
+        uint64_t direction // 0=forward, 1=backward.
+        ) const;
+
     // The reverse complement of each edge.
     // Indexed by EdgeId.
     MemoryMapped::Vector<EdgeId> reverseComplementEdge;

@@ -618,6 +618,8 @@ PYBIND11_MODULE(shasta, shastaModule)
         .def("mode3aAssembly",
             &Assembler::mode3aAssembly,
             arg("threadCount") = 0)
+        .def("findCompleteMarkerGraphPath",
+            &Assembler::findCompleteMarkerGraphPath)
 
 
 

@@ -2,6 +2,7 @@
 #include "MarkerGraph.hpp"
 #include "Coverage.hpp"
 #include "findMarkerId.hpp"
+#include "invalid.hpp"
 #include "markerAccessFunctions.hpp"
 using namespace shasta;
 
@@ -637,4 +638,55 @@ KmerId MarkerGraph::getVertexKmerId(
         reads,
         markers
         );
+}
+
+
+
+// Apply an ordinal offset in the specified direction to a given MarkerInterval
+// and find the edge that contains the offset MarkerInterval.
+// This assumes that we have the complete marker graph.
+MarkerGraphEdgeId MarkerGraph::locateMarkerIntervalWithOffset(
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+    MarkerInterval markerInterval,
+    uint32_t ordinalOffset,
+    uint64_t direction // 0=forward, 1=backward.
+    ) const
+{
+    const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+    const uint64_t firstOrientedReadMarkerId =
+        markers.begin(orientedReadId.getValue()) - markers.begin();
+
+    // Construct the offset MarkerInterval.
+    // If we end up outside the oriented read, return invalid<MarkerGraphEdgeId>.
+    if(direction == 0) {
+        markerInterval.ordinals[0] += ordinalOffset;
+        markerInterval.ordinals[1] += ordinalOffset;
+        if(markerInterval.ordinals[1] >= markers.size(orientedReadId.getValue())) {
+            return invalid<MarkerGraphEdgeId>;
+        }
+    } else {
+        if(ordinalOffset > markerInterval.ordinals[0]) {
+            return invalid<MarkerGraphEdgeId>;
+        }
+        markerInterval.ordinals[0] -= ordinalOffset;
+        markerInterval.ordinals[1] -= ordinalOffset;
+    }
+
+
+    // Now locate this marker interval.
+    const uint64_t markerId0 = firstOrientedReadMarkerId + markerInterval.ordinals[0];
+    const uint64_t markerId1 = firstOrientedReadMarkerId + markerInterval.ordinals[1];
+    const MarkerGraphVertexId vertexId0 = vertexTable[markerId0];
+    const MarkerGraphVertexId vertexId1 = vertexTable[markerId1];
+
+    for(const auto edgeId: edgesBySource[vertexId0]) {
+        const auto markerIntervals = edgeMarkerIntervals[edgeId];
+        if(find(markerIntervals.begin(), markerIntervals.end(), markerInterval) !=
+            markerIntervals.end()) {
+            return edgeId;
+        }
+    }
+
+    // If this happens, we don't have a complete marker graph.
+    SHASTA_ASSERT(0);
 }

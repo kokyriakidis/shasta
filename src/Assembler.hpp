@@ -2321,6 +2321,14 @@ public:
     void exploreMode3aTangleMatrix(const vector<string>& request, ostream& html);
 
 
+
+    // Mode 3 assembly.
+    // Version in namespace mode3b that uses the complete marker graph.
+    void findCompleteMarkerGraphPath(
+        MarkerGraphEdgeId startEdgeId,  // The path starts here.
+        uint64_t direction              // 0=forward, 1=backward
+        ) const;
+
 public:
     void test();
 };

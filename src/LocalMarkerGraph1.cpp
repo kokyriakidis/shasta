@@ -771,9 +771,8 @@ void LocalMarkerGraph1::writeHtml1(
 
 
     // Write the vertices.
-    // Don't write them out for the other two coloring methods because they obscure
-    // coverage coloring.
-    if(coloring == "random") {
+    // They can obscure coverage coloring.
+    if(true /*coloring == "random"*/) {
         html << "\n<g id=vertices stroke-width='" << thicknessScaling << "'>";
         BGL_FORALL_VERTICES(v, graph, LocalMarkerGraph1) {
             const auto& p = positionMap[auxiliaryVertexMap[v]];
