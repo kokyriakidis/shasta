@@ -428,7 +428,9 @@ private:
     uint32_t hashKmerId(KmerId) const;
 
     // The markers on all oriented reads. Indexed by OrientedReadId::getValue().
+public:
     MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t> markers;
+private:
     void checkMarkersAreOpen() const;
 
     // Get markers sorted by KmerId for a given OrientedReadId.
@@ -1394,6 +1396,26 @@ public:
         // The number of onlyB reads which are too short to be on edge A,
         // based on the above estimated offset.
         uint64_t onlyBShort = invalid<uint64_t>;
+
+        uint64_t intersectionCount() const
+        {
+            return common;
+        }
+        uint64_t unionCount() const {
+            return totalA + totalB - common;
+        }
+        uint64_t correctedUnionCount() const
+        {
+            return unionCount() - onlyAShort - onlyBShort;
+        }
+        double jaccard() const
+        {
+            return double(intersectionCount()) / double(unionCount());
+        }
+        double correctedJaccard() const
+        {
+            return double(intersectionCount()) / double(correctedUnionCount());
+        }
 
     };
     bool analyzeMarkerGraphEdgePair(
