@@ -871,6 +871,7 @@ void LocalMarkerGraph1::writeHtml1(
         // containing the bounding box.
         var enlargeFactor = 2.;
         var size = enlargeFactor * Math.max(box.width, box.height);
+        var factor = size / width;
         width = size;
         height = size;
         x = xCenter - 0.5 * size;
@@ -878,6 +879,7 @@ void LocalMarkerGraph1::writeHtml1(
         var svg = document.querySelector('svg');
         svg.setAttribute('viewBox', `${x} ${y} ${size} ${size}`);
         ratio = size / svg.getBoundingClientRect().width;
+        svg.setAttribute('font-size', svg.getAttribute('font-size') * factor);
 
     }
     function highlightEdge()
