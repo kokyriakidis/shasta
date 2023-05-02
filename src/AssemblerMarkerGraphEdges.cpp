@@ -980,3 +980,182 @@ void Assembler::assembleMarkerGraphEdgesMode3()
     }
 
 }
+
+
+
+// Analyze and compare the read compositions of two marker graph edges.
+// This can only be done if the two edges have no duplicate OrientedReadIds
+// in the markers. In that case, each OrientedReadId of an edge
+// corresponds to one and only one markerInterval for each edge.
+bool Assembler::analyzeMarkerGraphEdgePair(
+    MarkerGraphEdgeId edgeIdA,
+    MarkerGraphEdgeId edgeIdB,
+    MarkerGraphEdgePairInfo& info
+    ) const
+{
+
+    // Check for duplicate OrientedReadIds on the two edges.
+    if(markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdA)) {
+        return false;
+    }
+    if(markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdB)) {
+        return false;
+    }
+
+    // Prepare for the joint loop over OrientedReadIds of the two edges.
+    const auto markerIntervalsA = markerGraph.edgeMarkerIntervals[edgeIdA];
+    const auto markerIntervalsB = markerGraph.edgeMarkerIntervals[edgeIdB];
+    const auto beginA = markerIntervalsA.begin();
+    const auto beginB = markerIntervalsB.begin();
+    const auto endA = markerIntervalsA.end();
+    const auto endB = markerIntervalsB.end();
+
+    // Store the total number of OrientedReadIds on the two edges.
+    info.totalA = endA - beginA;
+    info.totalB = endB - beginB;
+
+
+
+    // Joint loop over the MarkerIntervals of the two edges,
+    // to count the common  reads and compute average offsets.
+    info.common = 0;
+    int64_t sumMarkerOffsets = 0;
+    int64_t sumTwiceBaseOffsets = 0;
+    auto itA = beginA;
+    auto itB = beginB;
+    while(itA != endA and itB != endB) {
+
+        if(itA->orientedReadId < itB->orientedReadId) {
+            ++itA;
+            continue;
+        }
+
+        if(itB->orientedReadId < itA->orientedReadId) {
+            ++itB;
+            continue;
+        }
+
+        // We found a common OrientedReadId.
+        ++info.common;
+        const OrientedReadId orientedReadId = itA->orientedReadId;
+        const auto orientedReadMarkers = markers[orientedReadId.getValue()];
+
+        // Compute the offset in markers.
+        SHASTA_ASSERT(itA->ordinals[1] == itA->ordinals[0] + 1);
+        SHASTA_ASSERT(itB->ordinals[1] == itB->ordinals[0] + 1);
+        const uint32_t ordinalA = itA->ordinals[0];
+        const uint32_t ordinalB = itB->ordinals[0];
+        const int64_t markerOffset = int64_t(ordinalB) - int64_t(ordinalA);
+        sumMarkerOffsets += markerOffset;
+
+        // Compute the offset in bases.
+        const int64_t positionA0 = int64_t(orientedReadMarkers[ordinalA].position);
+        const int64_t positionA1 = int64_t(orientedReadMarkers[ordinalA+1].position);
+        const int64_t positionB0 = int64_t(orientedReadMarkers[ordinalB].position);
+        const int64_t positionB1 = int64_t(orientedReadMarkers[ordinalB+1].position);
+        sumTwiceBaseOffsets -= positionA0;
+        sumTwiceBaseOffsets -= positionA1;
+        sumTwiceBaseOffsets += positionB0;
+        sumTwiceBaseOffsets += positionB1;
+
+        // Continue the joint loop.
+        ++itA;
+        ++itB;
+
+    }
+    info.onlyA = info.totalA - info.common;
+    info.onlyB = info.totalB - info.common;
+
+    // If there are no common reads, this is all we can do.
+    if(info.common == 0) {
+        info.offsetInMarkers = invalid<int64_t>;
+        info.offsetInBases = invalid<int64_t>;
+        info.onlyAShort = invalid<uint64_t>;
+        info.onlyBShort = invalid<uint64_t>;
+        return true;
+    }
+
+    // Compute the estimated offsets.
+    info.offsetInMarkers = uint64_t(std::round(double(sumMarkerOffsets) / double(info.common)));
+    info.offsetInBases = uint64_t(0.5 * std::round(double(sumTwiceBaseOffsets) / double(info.common)));
+
+
+    // Now do the joint loop again, and count the onlyA and onlyB oriented reads
+    // that are too short to appear in the other edge.
+    itA = beginA;
+    itB = beginB;
+    uint64_t onlyACheck = 0;
+    uint64_t onlyBCheck = 0;
+    info.onlyAShort = 0;
+    info.onlyBShort = 0;
+    while(true) {
+        if(itA == endA and itB == endB) {
+            break;
+        }
+
+        else if(itB == endB or ((itA!=endA) and (itA->orientedReadId < itB->orientedReadId))) {
+            // This oriented read only appears in edge A.
+            ++onlyACheck;
+            const OrientedReadId orientedReadId = itA->orientedReadId;
+            const auto orientedReadMarkers = markers[orientedReadId.getValue()];
+            const int64_t lengthInBases = int64_t(getReads().getReadRawSequenceLength(orientedReadId.getReadId()));
+
+            // Get the positions of edge A in this oriented read.
+            const uint32_t ordinalA0 = itA->ordinals[0];
+            const uint32_t ordinalA1 = itA->ordinals[1];
+            const int64_t positionA0 = int64_t(orientedReadMarkers[ordinalA0].position);
+            const int64_t positionA1 = int64_t(orientedReadMarkers[ordinalA1].position);
+
+            // Find the hypothetical positions of edge B, assuming the estimated base offset.
+            const int64_t positionB0 = positionA0 + info.offsetInBases;
+            const int64_t positionB1 = positionA1 + info.offsetInBases;
+
+            // If this ends up outside the read, this counts as onlyAShort.
+            if(positionB0 < 0 or positionB1 >= lengthInBases) {
+                ++info.onlyAShort;
+            }
+
+            ++itA;
+            continue;
+        }
+
+        else if(itA == endA or ((itB!=endB) and (itB->orientedReadId < itA->orientedReadId))) {
+            // This oriented read only appears in edge B.
+            ++onlyBCheck;
+            const OrientedReadId orientedReadId = itB->orientedReadId;
+            const auto orientedReadMarkers = markers[orientedReadId.getValue()];
+            const int64_t lengthInBases = int64_t(getReads().getReadRawSequenceLength(orientedReadId.getReadId()));
+
+            // Get the positions of edge B in this oriented read.
+            const uint32_t ordinalB0 = itB->ordinals[0];
+            const uint32_t ordinalB1 = itB->ordinals[1];
+            const int64_t positionB0 = int64_t(orientedReadMarkers[ordinalB0].position);
+            const int64_t positionB1 = int64_t(orientedReadMarkers[ordinalB1].position);
+
+            // Find the hypothetical positions of edge A, assuming the estimated base offset.
+            const int64_t positionA0 = positionB0 - info.offsetInBases;
+            const int64_t positionA1 = positionB1 - info.offsetInBases;
+
+            // If this ends up outside the read, this counts as onlyBShort.
+            if(positionA0 < 0 or positionA1 >= lengthInBases) {
+                ++info.onlyBShort;
+            }
+
+            ++itB;
+            continue;
+        }
+
+        else {
+            // This oriented read appears in both edges. In this loop, we
+            // don't need to do anything.
+            ++itA;
+            ++itB;
+        }
+    }
+    SHASTA_ASSERT(onlyACheck == info.onlyA);
+    SHASTA_ASSERT(onlyBCheck == info.onlyB);
+
+
+    return true;
+}
+

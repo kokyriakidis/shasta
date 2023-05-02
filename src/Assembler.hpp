@@ -6,6 +6,7 @@
 #include "AlignmentCandidates.hpp"
 #include "AssemblyGraph2Statistics.hpp"
 #include "HttpServer.hpp"
+#include "invalid.hpp"
 #include "Kmer.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "Marker.hpp"
@@ -1358,6 +1359,57 @@ public:
 
 
 
+    // Analyze and compare the read compositions of two marker graph edges.
+    // This can only be done if the two edges have no duplicate OrientedReadIds
+    // in the markers. In that case, each OrientedReadId of an edge
+    // corresponds to one and only one markerInterval for each edge.
+    class MarkerGraphEdgePairInfo {
+    public:
+
+        // The total number of OrientedReadIds in each of the edges A and B.
+        uint64_t totalA = 0;
+        uint64_t totalB = 0;
+
+        // The number of common oriented reads.
+        uint64_t common = 0;
+
+        // The number of oriented reads present in A but not in B.
+        uint64_t onlyA = 0;
+
+        // The number of oriented reads present in B but not in A.
+        uint64_t onlyB = 0;
+
+        // The rest of the statistics are only valid if the number
+        // of common oriented reads is not 0.
+
+        // The estimated offset between the two edges.
+        // The estimate is done using the common oriented reads.
+        int64_t offsetInMarkers = invalid<int64_t>;
+        int64_t offsetInBases = invalid<int64_t>;
+
+        // The number of onlyA reads which are too short to be on edge B,
+        // based on the above estimated offset.
+        uint64_t onlyAShort = invalid<uint64_t>;
+
+        // The number of onlyB reads which are too short to be on edge A,
+        // based on the above estimated offset.
+        uint64_t onlyBShort = invalid<uint64_t>;
+
+    };
+    bool analyzeMarkerGraphEdgePair(
+        MarkerGraphEdgeId,
+        MarkerGraphEdgeId,
+        MarkerGraphEdgePairInfo&
+        ) const;
+    void writeHtmlMarkerGraphEdgePairInfo(
+        ostream& html,
+        MarkerGraphEdgeId,
+        MarkerGraphEdgeId,
+        const MarkerGraphEdgePairInfo&
+        ) const;
+
+
+
     // Function createMarkerGraphSecondaryEdges can be called after createMarkerGraphEdgesStrict
     // to create a minimal amount of additional non-strict edges (secondary edges)
     // sufficient to restore contiguity.
@@ -2132,6 +2184,7 @@ public:
         LocalMarkerGraph0RequestParameters&) const;
     void exploreMarkerGraphVertex(const vector<string>&, ostream&);
     void exploreMarkerGraphEdge(const vector<string>&, ostream&);
+    void exploreMarkerGraphEdgePair(const vector<string>&, ostream&);
     void exploreMarkerCoverage(const vector<string>&, ostream&);
     void exploreMarkerGraphInducedAlignment(const vector<string>&, ostream&);
     void followReadInMarkerGraph(const vector<string>&, ostream&);

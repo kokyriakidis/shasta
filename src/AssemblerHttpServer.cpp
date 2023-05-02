@@ -234,6 +234,7 @@ void Assembler::fillServerFunctionTable()
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerGraph1);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerGraphVertex);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerGraphEdge);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerGraphEdgePair);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerCoverage);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerGraphInducedAlignment);
     SHASTA_ADD_TO_FUNCTION_TABLE(followReadInMarkerGraph);
@@ -455,6 +456,7 @@ void Assembler::writeNavigation(ostream& html) const
         {"Local marker graph for mode 3 assembly", "exploreMarkerGraph1"},
         {"Marker graph vertices", "exploreMarkerGraphVertex"},
         {"Marker graph edges", "exploreMarkerGraphEdge"},
+        {"Marker graph edge pairs", "exploreMarkerGraphEdgePair"},
         {"Marker coverage", "exploreMarkerCoverage"},
         {"Induced alignments", "exploreMarkerGraphInducedAlignment"},
         {"Follow a read in the marker graph", "followReadInMarkerGraph"},
