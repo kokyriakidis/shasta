@@ -285,6 +285,10 @@ public:
         uint64_t direction // 0=forward, 1=backward.
         ) const;
 
+    // Find out if an edge has duplicate oriented reads
+    // in its MarkerIntervals.
+    bool edgeHasDuplicateOrientedReadIds(EdgeId) const;
+
     // The reverse complement of each edge.
     // Indexed by EdgeId.
     MemoryMapped::Vector<EdgeId> reverseComplementEdge;

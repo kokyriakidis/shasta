@@ -671,6 +671,7 @@ MarkerGraphEdgeId MarkerGraph::locateMarkerIntervalWithOffset(
         markerInterval.ordinals[0] -= ordinalOffset;
         markerInterval.ordinals[1] -= ordinalOffset;
     }
+    SHASTA_ASSERT(markerInterval.ordinals[1] == markerInterval.ordinals[0] + 1);
 
 
     // Now locate this marker interval.
@@ -680,6 +681,9 @@ MarkerGraphEdgeId MarkerGraph::locateMarkerIntervalWithOffset(
     const MarkerGraphVertexId vertexId1 = vertexTable[markerId1];
 
     for(const auto edgeId: edgesBySource[vertexId0]) {
+        if(edges[edgeId].target != vertexId1) {
+            continue;
+        }
         const auto markerIntervals = edgeMarkerIntervals[edgeId];
         if(find(markerIntervals.begin(), markerIntervals.end(), markerInterval) !=
             markerIntervals.end()) {
@@ -689,4 +693,21 @@ MarkerGraphEdgeId MarkerGraph::locateMarkerIntervalWithOffset(
 
     // If this happens, we don't have a complete marker graph.
     SHASTA_ASSERT(0);
+}
+
+
+
+// Find out if an edge has duplicate oriented reads
+// in its MarkerIntervals.
+bool MarkerGraph::edgeHasDuplicateOrientedReadIds(EdgeId edgeId) const
+{
+    const auto markerIntervals = edgeMarkerIntervals[edgeId];
+    SHASTA_ASSERT(markerIntervals.size() > 0);
+    for(uint64_t i=1; i<markerIntervals.size(); i++) {
+        if(markerIntervals[i-1].orientedReadId == markerIntervals[i].orientedReadId) {
+            return true;
+        }
+    }
+
+    return false;
 }
