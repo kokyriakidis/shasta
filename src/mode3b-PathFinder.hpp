@@ -21,12 +21,16 @@ class shasta::mode3b::PathFinder {
 public:
 
     PathFinder(
+        uint64_t k,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         const MarkerGraph&,
         MarkerGraphEdgeId startEdgeId,  // The path starts here.
         uint64_t direction              // 0=forward, 1=backward
         );
 private:
+
+    // Thinsg we get from the constructor.
+    uint64_t k;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
     const MarkerGraph& markerGraph;
 
@@ -34,6 +38,10 @@ private:
     // Move in the specified direction until we find an edge with similar
     // read composition which is suitable to becoe the next primary vertex.
     MarkerGraphEdgeId findNextPrimaryEdge(MarkerGraphEdgeId, uint64_t direction);
+
+    // Given two marker graph edges, figure out if they have
+    // similar read compositions.
+    bool haveSimilarCompositions(MarkerGraphEdgeId, MarkerGraphEdgeId) const;
 };
 
 #endif

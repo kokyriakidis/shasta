@@ -148,6 +148,7 @@ void Assembler::findCompleteMarkerGraphPath(
 
     // Do it.
     mode3b::PathFinder pathFinder(
+        assemblerInfo->k,
         markers,
         markerGraph,
         startEdgeId,
