@@ -3,6 +3,8 @@
 
 #include "shastaTypes.hpp"
 
+#include "vector.hpp"
+
 namespace shasta {
     namespace mode3b {
         class PathFinder;
@@ -21,6 +23,8 @@ public:
         MarkerGraphEdgeId startEdgeId,  // The path starts here.
         uint64_t direction              // 0=forward, 1=backward
         );
+
+    PathFinder(const Assembler&);
 private:
 
     // Things we get from the constructor.
@@ -28,7 +32,7 @@ private:
 
 
     // Move in the specified direction until we find an edge with similar
-    // read composition which is suitable to becoe the next primary vertex.
+    // read composition which is suitable to become the next primary vertex.
     MarkerGraphEdgeId findNextPrimaryEdge(
         MarkerGraphEdgeId,
         uint64_t direction,
@@ -36,6 +40,16 @@ private:
         uint64_t minCommonCount,
         double minCorrectedJaccard) const;
 
+    void findNextPrimaryEdges(
+        MarkerGraphEdgeId,
+        uint64_t direction,
+        uint64_t minCoverage,
+        uint64_t maxCoverage,
+        uint64_t maxEdgeCount,
+        uint64_t maxMarkerOffset,
+        uint64_t minCommonCount,
+        double minCorrectedJaccard,
+        vector<MarkerGraphEdgeId>&) const;
 };
 
 #endif

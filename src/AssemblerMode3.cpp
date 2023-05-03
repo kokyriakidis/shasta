@@ -152,3 +152,10 @@ void Assembler::findCompleteMarkerGraphPath(
         startEdgeId,
         direction);
 }
+
+
+
+void Assembler::findCompleteMarkerGraphPaths() const
+{
+    mode3b::PathFinder pathFinder(*this);
+}
