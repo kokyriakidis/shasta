@@ -29,8 +29,11 @@ PathFinder::PathFinder(
     const uint64_t minCommonCount = 6;
     const double minCorrectedJaccard = 0.75;
 
-    // Move in the specified direction until we find an edge with similar
-    // read composition which is suitable to becoe the next primary vertex.
+    // To create the primary edges, move in the specified direction
+    // until we find an edge with similar read composition
+    // that is suitable to become the next primary vertex.
+    vector<MarkerGraphEdgeId> primaryEdges;
+    primaryEdges.push_back(startEdgeId);
     MarkerGraphEdgeId edgeId = startEdgeId;
     while(true) {
         const MarkerGraphEdgeId nextEdgeId = findNextPrimaryEdge(
@@ -38,9 +41,10 @@ PathFinder::PathFinder(
         if(nextEdgeId == invalid<MarkerGraphEdgeId>) {
             break;
         }
-        // cout << "Next primary edge is " << nextEdgeId << endl;
         edgeId = nextEdgeId;
+        primaryEdges.push_back(edgeId);
     }
+    cout << "Found " << primaryEdges.size() << " primary edges." << endl;
 }
 
 
