@@ -2405,6 +2405,10 @@ public:
         ) const;
     void findCompleteMarkerGraphPaths() const;
 
+    // Given two consecutive primary edges, find the secondary edges
+    // in between.
+    void fillMode3bAssemblyPathStep(const vector<string>&, ostream&);
+
 public:
     void test();
 };

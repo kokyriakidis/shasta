@@ -258,6 +258,7 @@ void Assembler::fillServerFunctionTable()
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3aAssemblyGraphLink);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3aAssemblyPath);
 
+    SHASTA_ADD_TO_FUNCTION_TABLE(fillMode3bAssemblyPathStep);
 }
 #undef SHASTA_ADD_TO_FUNCTION_TABLE
 
@@ -451,17 +452,36 @@ void Assembler::writeNavigation(ostream& html) const
     writeNavigation(html, "Read graph", {
         {"Read graph", "exploreReadGraph"},
         });
-    writeNavigation(html, "Marker graph", {
-        {"Local marker graph", "exploreMarkerGraph0?useBubbleReplacementEdges=on"},
-        {"Local marker graph for mode 3 assembly", "exploreMarkerGraph1"},
-        {"Marker graph vertices", "exploreMarkerGraphVertex"},
-        {"Marker graph edges", "exploreMarkerGraphEdge"},
-        {"Marker graph edge pairs", "exploreMarkerGraphEdgePair"},
-        {"Marker coverage", "exploreMarkerCoverage"},
-        {"Induced alignments", "exploreMarkerGraphInducedAlignment"},
-        {"Follow a read in the marker graph", "followReadInMarkerGraph"},
-        {"Marker connectivity", "exploreMarkerConnectivity"},
-        });
+
+
+
+    if(assemblerInfo->assemblyMode == 3) {
+        writeNavigation(html, "Marker graph", {
+            {"Local marker graph", "exploreMarkerGraph0?useBubbleReplacementEdges=on"},
+            {"Local marker graph for mode 3 assembly", "exploreMarkerGraph1"},
+            {"Marker graph vertices", "exploreMarkerGraphVertex"},
+            {"Marker graph edges", "exploreMarkerGraphEdge"},
+            {"Marker graph edge pairs", "exploreMarkerGraphEdgePair"},
+            {"Marker coverage", "exploreMarkerCoverage"},
+            {"Induced alignments", "exploreMarkerGraphInducedAlignment"},
+            {"Follow a read in the marker graph", "followReadInMarkerGraph"},
+            {"Marker connectivity", "exploreMarkerConnectivity"},
+            {"Assembly path step", "fillMode3bAssemblyPathStep"},
+            });
+    } else {
+        writeNavigation(html, "Marker graph", {
+            {"Local marker graph", "exploreMarkerGraph0?useBubbleReplacementEdges=on"},
+            {"Marker graph vertices", "exploreMarkerGraphVertex"},
+            {"Marker graph edges", "exploreMarkerGraphEdge"},
+            {"Marker coverage", "exploreMarkerCoverage"},
+            {"Induced alignments", "exploreMarkerGraphInducedAlignment"},
+            {"Follow a read in the marker graph", "followReadInMarkerGraph"},
+            {"Marker connectivity", "exploreMarkerConnectivity"},
+            });
+    }
+
+
+
     if(assemblerInfo->assemblyMode == 0) {
         writeNavigation(html, "Assembly graph", {
             {"Local assembly graph", "exploreAssemblyGraph"},

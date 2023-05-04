@@ -128,34 +128,3 @@ void Assembler::accessMode3aAssemblyData()
     cout << "Found " << mode3aAssemblyData.assemblyGraphSnapshots.size() <<
         " assembly graph snapshots." << endl;
 }
-
-
-
-void Assembler::findCompleteMarkerGraphPath(
-    MarkerGraphEdgeId startEdgeId,  // The path starts here.
-    uint64_t direction              // 0=forward, 1=backward
-    ) const
-{
-    // Check our assumptions.
-    SHASTA_ASSERT(assemblerInfo->assemblyMode == 3);    // Complete assembly graph.
-    SHASTA_ASSERT(getReads().representation == 0);      // No RLE
-
-
-    // Check that we have what we need.
-    checkMarkersAreOpen();
-    checkMarkerGraphVerticesAreAvailable();
-    checkMarkerGraphEdgesIsOpen();
-
-    // Do it.
-    mode3b::PathFinder pathFinder(
-        *this,
-        startEdgeId,
-        direction);
-}
-
-
-
-void Assembler::findCompleteMarkerGraphPaths() const
-{
-    mode3b::PathFinder pathFinder(*this);
-}
