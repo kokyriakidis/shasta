@@ -642,6 +642,36 @@ KmerId MarkerGraph::getVertexKmerId(
 
 
 
+// Find the edge that contains a given MarkerInterval.
+MarkerGraphEdgeId MarkerGraph::locateMarkerInterval(
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+    const MarkerInterval& markerInterval) const
+{
+    const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+    const uint64_t firstOrientedReadMarkerId =
+        markers.begin(orientedReadId.getValue()) - markers.begin();
+
+    // Now locate this marker interval.
+    const uint64_t markerId0 = firstOrientedReadMarkerId + markerInterval.ordinals[0];
+    const uint64_t markerId1 = firstOrientedReadMarkerId + markerInterval.ordinals[1];
+    const MarkerGraphVertexId vertexId0 = vertexTable[markerId0];
+    const MarkerGraphVertexId vertexId1 = vertexTable[markerId1];
+
+    for(const auto edgeId: edgesBySource[vertexId0]) {
+        if(edges[edgeId].target != vertexId1) {
+            continue;
+        }
+        const auto markerIntervals = edgeMarkerIntervals[edgeId];
+        if(find(markerIntervals.begin(), markerIntervals.end(), markerInterval) !=
+            markerIntervals.end()) {
+            return edgeId;
+        }
+    }
+
+    return invalid<MarkerGraphEdgeId>;
+}
+
+
 // Apply an ordinal offset in the specified direction to a given MarkerInterval
 // and find the edge that contains the offset MarkerInterval.
 // This assumes that we have the complete marker graph.

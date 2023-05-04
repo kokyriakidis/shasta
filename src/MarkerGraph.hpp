@@ -275,6 +275,11 @@ public:
     EdgeId getFirstNonRemovedOutEdge(VertexId) const;
     EdgeId getFirstNonRemovedInEdge(VertexId) const;
 
+    // Find the edge that contains a given MarkerInterval.
+    EdgeId locateMarkerInterval(
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+       const MarkerInterval&) const;
+
     // Apply an ordinal offset in the specified direction to a given MarkerInterval
     // and find the edge that contains the offset MarkerInterval.
     // This assumes that we have the complete marker graph.
