@@ -91,7 +91,7 @@ private:
         std::map<MarkerGraphEdgeId, edge_descriptor> edgeMap;
         edge_descriptor addEdgeIfNecessary(MarkerGraphEdgeId);
 
-        void writeGraphviz(ostream&) const;
+        void writeGraphviz(ostream&, uint64_t peakCoverage) const;
 
     private:
         const Assembler& assembler;

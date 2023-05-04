@@ -212,9 +212,11 @@ void PathFiller::createGraph()
 
 
 
-void PathFiller::Graph::writeGraphviz(ostream& out) const
+void PathFiller::Graph::writeGraphviz(ostream& out, uint64_t peakCoverage) const
 {
     const Graph& graph = *this;
+    const double S = 0.7;
+    const double V = 1.;
 
     out <<
         "digraph PathFillerGraph {\n"
@@ -226,11 +228,20 @@ void PathFiller::Graph::writeGraphviz(ostream& out) const
 
         const Edge& edge = graph[e];
         const uint64_t coverage = edge.markerIntervals.size();
-        const bool isLowCoverage = coverage < minEdgeCoverage;
         const auto v0 = source(e, graph);
         const auto v1 = target(e, graph);
         const MarkerGraphVertexId vertexId0 = graph[v0].vertexId;
         const MarkerGraphVertexId vertexId1 = graph[v1].vertexId;
+
+        // Compute the hue based on coverage.
+        double H;
+        if(coverage >= peakCoverage) {
+            H = 1./3.;
+        } else {
+            H = (double(coverage-1) / (3. * double(peakCoverage - 1)));
+        }
+        const string colorString = "\"" + to_string(H) + " " + to_string(S) + " " + to_string(V) + "\"";
+
 
         // Write it as an intermediate vertex, for better readability.
         out <<
@@ -240,15 +251,11 @@ void PathFiller::Graph::writeGraphviz(ostream& out) const
         out << "\"];\n";
 
         out << vertexId0 << "->E" << edge.edgeId << " [dir=none";
-        if(isLowCoverage) {
-            out << " color=red";
-        }
+        out << " color=" << colorString;
         out << "];\n";
         out << "E" << edge.edgeId << "->" << vertexId1;
-        if(isLowCoverage) {
-            out << "[color=red]";
-        }
-        out << ";\n";
+        out << "[color=" << colorString;
+        out << "];\n";
     }
 
     out << "}\n";
@@ -274,7 +281,7 @@ void PathFiller::writeGraph(ostream& html) const
     const string dotFileName = tmpDirectory() + uuid + ".dot";
     {
         ofstream dotFile(dotFileName);
-        graph.writeGraphviz(dotFile);
+        graph.writeGraphviz(dotFile, orientedReadInfos.size());
     }
 
     // Compute layout in svg format.
