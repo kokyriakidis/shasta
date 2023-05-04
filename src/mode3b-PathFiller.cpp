@@ -40,18 +40,22 @@ PathFiller::PathFiller(
     }
 
     createGraph();
+    fillPathGreedy(html);
+    assembleSequence(html);
     if(html) {
         html << "<p>The local marker graph for this step assembly has " <<
             num_vertices(graph) << " vertices and " <<
             num_edges(graph) << " edges." << endl;
         writeGraph(html);
     }
+
 }
 
 
 
 void PathFiller::checkAssumptions() const
 {
+    SHASTA_ASSERT(edgeIdA != edgeIdB);
     SHASTA_ASSERT(assembler.assemblerInfo->assemblyMode == 3);
     SHASTA_ASSERT(assembler.getReads().representation == 0);
     SHASTA_ASSERT(not assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdA));
@@ -310,4 +314,85 @@ void PathFiller::writeGraph(ostream& html) const
 
     // Remove the .svg file.
     std::filesystem::remove(svgFileName);
+}
+
+
+
+void PathFiller::fillPathGreedy(ostream& html)
+{
+    const MarkerGraph::Edge markerGraphEdgeA = assembler.markerGraph.edges[edgeIdA];
+    const MarkerGraph::Edge markerGraphEdgeB = assembler.markerGraph.edges[edgeIdB];
+    const Graph::vertex_descriptor vA = graph.vertexMap[markerGraphEdgeA.source];
+    const Graph::vertex_descriptor vB = graph.vertexMap[markerGraphEdgeB.target];
+
+    std::set<Graph::edge_descriptor> edgesUsed;
+
+    // Main iteration loop.
+    Graph::vertex_descriptor v = vA;
+    while(v != vB) {
+
+        // Find the edge with the most coverage.
+        Graph::edge_descriptor eNext;
+        uint64_t bestCoverage = 0;
+        BGL_FORALL_OUTEDGES(v, e, graph, Graph) {
+            if(edgesUsed.contains(e)) {
+                continue;
+            }
+            const uint64_t coverage = graph[e].markerIntervals.size();
+            if(coverage > bestCoverage) {
+                eNext = e;
+                bestCoverage = coverage;
+            }
+        }
+        if(bestCoverage == 0) {
+            throw runtime_error("Unable to fill assembly path.");
+        }
+
+        edgesUsed.insert(eNext);
+        pathEdges.push_back(graph[eNext].edgeId);
+        v = target(eNext, graph);
+    }
+
+    if(html) {
+        html << "<p>Path edges:";
+        for(const MarkerGraphEdgeId edgeId: pathEdges) {
+            html << " " << edgeId;
+        }
+    }
+
+    SHASTA_ASSERT(pathEdges.size() >= 2);
+    SHASTA_ASSERT(pathEdges.front() == edgeIdA);
+    SHASTA_ASSERT(pathEdges.back() == edgeIdB);
+
+    pathEdges.resize(pathEdges.size() - 1);
+    pathEdges.erase(pathEdges.begin());
+}
+
+
+
+void PathFiller::assembleSequence(ostream& html)
+{
+    for(const MarkerGraphEdgeId edgeId: pathEdges) {
+        const Graph::edge_descriptor e = graph.edgeMap[edgeId];
+        const vector<shasta::Base>& edgeSequence = graph[e].sequence;
+        copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
+    }
+
+    if(html) {
+        const auto sequenceA = graph[graph.edgeMap[edgeIdA]].sequence;
+        const auto sequenceB = graph[graph.edgeMap[edgeIdB]].sequence;
+        html << "<pre style='font-family:monospace'>\n";
+        html << ">" << edgeIdA << " length " << sequenceA.size() << "\n";
+        copy(sequenceA.begin(), sequenceA.end(), ostream_iterator<shasta::Base>(html));
+        html << "\n>Intervening length " << sequence.size() << "\n";
+        copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
+        html << "\n>" << edgeIdB << " length " << sequenceB.size() << "\n";
+        copy(sequenceB.begin(), sequenceB.end(), ostream_iterator<shasta::Base>(html));
+        html << "\n>Combined length " << sequenceA.size() + sequence.size() + sequenceB.size() << "\n";
+        copy(sequenceA.begin(), sequenceA.end(), ostream_iterator<shasta::Base>(html));
+        copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
+        copy(sequenceB.begin(), sequenceB.end(), ostream_iterator<shasta::Base>(html));
+        html << "\n</pre>";
+    }
+
 }

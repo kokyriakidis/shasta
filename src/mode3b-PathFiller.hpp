@@ -39,6 +39,10 @@ public:
         MarkerGraphEdgeId edgeIdB,
         ostream& html);
 
+    // The path edges, excluding edgeIdA and edgeIdB.
+    vector<MarkerGraphEdgeId> pathEdges;
+
+
 private:
     const Assembler& assembler;
     MarkerGraphEdgeId edgeIdA;
@@ -100,9 +104,11 @@ private:
     void createGraph();
     void writeGraph(ostream& html) const;
 
-    // EXPOSE WHEN CODE STABILIZES.
-    static const uint64_t minEdgeCoverage = 6;
+    void fillPathGreedy(ostream& html);
 
+    // The sequence, excluding the sequence of edgeIdA and edgeIdB.
+    vector<Base> sequence;
+    void assembleSequence(ostream& html);
 };
 
 #endif
