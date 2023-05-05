@@ -3,6 +3,7 @@
 #include "LocalMarkerGraph1.hpp"
 #include "mode3b-PathFiller.hpp"
 #include "mode3b-PathFinder.hpp"
+#include "mode3b-AssemblyPath.hpp"
 #include "Reads.hpp"
 using namespace shasta;
 
@@ -31,10 +32,12 @@ void Assembler::findCompleteMarkerGraphPath(
     checkMarkerGraphEdgesIsOpen();
 
     // Do it.
-    mode3b::PathFinder pathFinder(
+    mode3b::AssemblyPath assemblyPath(
         *this,
         startEdgeId,
         direction);
+    ofstream fasta("AssemblyPath.fasta");
+    assemblyPath.writeFasta(fasta);
 }
 
 

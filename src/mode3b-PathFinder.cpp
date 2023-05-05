@@ -20,7 +20,8 @@ using namespace mode3b;
 PathFinder::PathFinder(
     const Assembler& assembler,
     MarkerGraphEdgeId startEdgeId,  // The path starts here.
-    uint64_t direction              // 0=forward, 1=backward
+    uint64_t direction,            // 0=forward, 1=backward
+    vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >& primaryEdges
     ) :
     assembler(assembler)
 {
@@ -32,26 +33,26 @@ PathFinder::PathFinder(
     // To create the primary edges, move in the specified direction
     // until we find an edge with similar read composition
     // that is suitable to become the next primary vertex.
-    vector<MarkerGraphEdgeId> primaryEdges;
-    primaryEdges.push_back(startEdgeId);
+    primaryEdges.clear();
     MarkerGraphEdgeId edgeId = startEdgeId;
     while(true) {
-        const MarkerGraphEdgeId nextEdgeId = findNextPrimaryEdge(
+        const pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> p = findNextPrimaryEdge(
             edgeId, direction, maxMarkerOffset, minCommonCount, minCorrectedJaccard);
+        const MarkerGraphEdgeId nextEdgeId = p.first;
         if(nextEdgeId == invalid<MarkerGraphEdgeId>) {
             break;
         }
         edgeId = nextEdgeId;
-        primaryEdges.push_back(edgeId);
+        primaryEdges.push_back(p);
     }
-    cout << "Found " << primaryEdges.size() << " primary edges." << endl;
+    cout << "Found " << primaryEdges.size() + 1 << " primary edges including the starting edge." << endl;
 }
 
 
 
 // Move in the specified direction until we find an edge with similar
 // read composition which is suitable to becoe the next primary vertex.
-MarkerGraphEdgeId PathFinder::findNextPrimaryEdge(
+pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> PathFinder::findNextPrimaryEdge(
     MarkerGraphEdgeId edgeId0,
     uint64_t direction,
     uint64_t maxMarkerOffset,
@@ -60,7 +61,7 @@ MarkerGraphEdgeId PathFinder::findNextPrimaryEdge(
 {
 
     if(assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeId0)) {
-        return invalid<MarkerGraphEdgeId>;
+        return make_pair(invalid<MarkerGraphEdgeId>, MarkerGraphEdgePairInfo());
     }
 
     const auto markerIntervals0 = assembler.markerGraph.edgeMarkerIntervals[edgeId0];
@@ -99,7 +100,7 @@ MarkerGraphEdgeId PathFinder::findNextPrimaryEdge(
 
             edgeIds.insert(edgeId1);
 
-            Assembler::MarkerGraphEdgePairInfo info;
+            MarkerGraphEdgePairInfo info;
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
             const double correctedJaccard = info.correctedJaccard();
             if(info.common >= minCommonCount and correctedJaccard >= minCorrectedJaccard) {
@@ -107,14 +108,14 @@ MarkerGraphEdgeId PathFinder::findNextPrimaryEdge(
                     info.offsetInBases << ", common " << info.common <<
                     ", corrected jaccard " <<
                     " " << info.correctedJaccard() << endl;
-                return edgeId1;
+                return make_pair(edgeId1, info);
             }
         }
 
     }
 
 
-    return invalid<MarkerGraphEdgeId>;
+    return make_pair(invalid<MarkerGraphEdgeId>, MarkerGraphEdgePairInfo());
 }
 
 
@@ -174,7 +175,7 @@ void PathFinder::findNextPrimaryEdges(
 
             edgeIds.insert(edgeId1);
 
-            Assembler::MarkerGraphEdgePairInfo info;
+            MarkerGraphEdgePairInfo info;
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
             const double correctedJaccard = info.correctedJaccard();
             if(info.common >= minCommonCount and correctedJaccard >= minCorrectedJaccard) {

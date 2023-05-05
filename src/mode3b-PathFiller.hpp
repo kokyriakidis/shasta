@@ -41,7 +41,7 @@ public:
         ostream& html);
 
     // The path secondary edges. This excludes the primary edges edgeIdA and edgeIdB.
-    vector<MarkerGraphEdgeId> pathSecondaryEdges;
+    vector<MarkerGraphEdgeId> secondaryEdges;
 
 
 private:
@@ -113,7 +113,7 @@ private:
     void createGraph();
     void writeGraph(ostream& html) const;
 
-    void fillPathGreedy(ostream& html);
+    bool fillPathGreedy(ostream& html);
 
     // Get the sequence.
     // The sequences of edgeIdA and edgeIdB are only included if

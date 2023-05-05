@@ -1,8 +1,10 @@
 #ifndef SHASTA_MODE3B_PATH_FINDER_HPP
 #define SHASTA_MODE3B_PATH_FINDER_HPP
 
+#include "MarkerGraphEdgePairInfo.hpp"
 #include "shastaTypes.hpp"
 
+#include "utility.hpp"
 #include "vector.hpp"
 
 namespace shasta {
@@ -21,7 +23,8 @@ public:
     PathFinder(
         const Assembler&,
         MarkerGraphEdgeId startEdgeId,  // The path starts here.
-        uint64_t direction              // 0=forward, 1=backward
+        uint64_t direction,             // 0=forward, 1=backward
+        vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >& primaryEdges
         );
 
     PathFinder(const Assembler&);
@@ -33,7 +36,7 @@ private:
 
     // Move in the specified direction until we find an edge with similar
     // read composition which is suitable to become the next primary vertex.
-    MarkerGraphEdgeId findNextPrimaryEdge(
+    pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> findNextPrimaryEdge(
         MarkerGraphEdgeId,
         uint64_t direction,
         uint64_t maxMarkerOffset,

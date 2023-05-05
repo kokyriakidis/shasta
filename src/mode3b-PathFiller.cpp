@@ -40,14 +40,24 @@ PathFiller::PathFiller(
     }
 
     createGraph();
-    fillPathGreedy(html);
+    const bool success = fillPathGreedy(html);
 
     if(html) {
-        writeSequence(html);
-        html << "<p>The local marker graph for this step assembly has " <<
-            num_vertices(graph) << " vertices and " <<
-            num_edges(graph) << " edges." << endl;
+        if(success) {
+            writeSequence(html);
+            html << "<p>The local marker graph for this step assembly has " <<
+                num_vertices(graph) << " vertices and " <<
+                num_edges(graph) << " edges." << endl;
+        } else {
+            cout << "Unable to fill assembly path between primary edges " <<
+            edgeIdA << " " << edgeIdB << endl;
+        }
         writeGraph(html);
+    }
+
+    if(not success) {
+        throw runtime_error("Unable to fill assembly path between primary edges " +
+            to_string(edgeIdA) + " " + to_string(edgeIdB));
     }
 
 }
@@ -300,7 +310,7 @@ void PathFiller::writeGraph(ostream& html) const
     const string dotFileName = tmpDirectory() + uuid + ".dot";
     {
         ofstream dotFile(dotFileName);
-        graph.writeGraphviz(dotFile, orientedReadInfos.size(), edgeIdA, edgeIdB, pathSecondaryEdges);
+        graph.writeGraphviz(dotFile, orientedReadInfos.size(), edgeIdA, edgeIdB, secondaryEdges);
     }
 
     // Compute layout in svg format.
@@ -333,7 +343,7 @@ void PathFiller::writeGraph(ostream& html) const
 
 
 
-void PathFiller::fillPathGreedy(ostream& html)
+bool PathFiller::fillPathGreedy(ostream& html)
 {
     const MarkerGraph::Edge markerGraphEdgeA = assembler.markerGraph.edges[edgeIdA];
     const MarkerGraph::Edge markerGraphEdgeB = assembler.markerGraph.edges[edgeIdB];
@@ -360,29 +370,30 @@ void PathFiller::fillPathGreedy(ostream& html)
             }
         }
         if(bestCoverage == 0) {
-            throw runtime_error("Unable to fill assembly path.");
+            return false;
         }
 
         edgesUsed.insert(eNext);
-        pathSecondaryEdges.push_back(graph[eNext].edgeId);
+        secondaryEdges.push_back(graph[eNext].edgeId);
         v = target(eNext, graph);
     }
 
     // As constructed, pathSecondaryEdges includes edgeIdA and edgeIB.
     // Check that this is the case, then remove them.
-    SHASTA_ASSERT(pathSecondaryEdges.size() >= 2);
-    SHASTA_ASSERT(pathSecondaryEdges.front() == edgeIdA);
-    SHASTA_ASSERT(pathSecondaryEdges.back() == edgeIdB);
-    pathSecondaryEdges.resize(pathSecondaryEdges.size() - 1);
-    pathSecondaryEdges.erase(pathSecondaryEdges.begin());
+    SHASTA_ASSERT(secondaryEdges.size() >= 2);
+    SHASTA_ASSERT(secondaryEdges.front() == edgeIdA);
+    SHASTA_ASSERT(secondaryEdges.back() == edgeIdB);
+    secondaryEdges.resize(secondaryEdges.size() - 1);
+    secondaryEdges.erase(secondaryEdges.begin());
 
     if(html) {
         html << "<p>Path secondary edges:";
-        for(const MarkerGraphEdgeId edgeId: pathSecondaryEdges) {
+        for(const MarkerGraphEdgeId edgeId: secondaryEdges) {
             html << " " << edgeId;
         }
     }
 
+    return true;
 }
 
 
@@ -417,7 +428,7 @@ void PathFiller::getSequence(
         copy(sequenceA.begin(), sequenceA.end(), back_inserter(sequence));
     }
 
-    for(const MarkerGraphEdgeId edgeId: pathSecondaryEdges) {
+    for(const MarkerGraphEdgeId edgeId: secondaryEdges) {
         const auto edgeSequence = graph.edgeSequence(edgeId);
         copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
     }
