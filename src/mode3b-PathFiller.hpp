@@ -11,6 +11,7 @@
 // Standard library.
 #include "iosfwd.hpp"
 #include <map>
+#include "span.hpp"
 #include "vector.hpp"
 
 
@@ -29,7 +30,7 @@ namespace shasta {
 // Given the two marker graph that are primary for an assembly path,
 // find the secondary edges in between and assemble the sequence.
 // This works with mode3b assembly and the complete marker graph.
-// This assumes that the two edges have no duplicate oriented read ids.
+// This assumes that the two primary edges have no duplicate oriented read ids.
 class shasta::mode3b::PathFiller {
 public:
 
@@ -39,8 +40,8 @@ public:
         MarkerGraphEdgeId edgeIdB,
         ostream& html);
 
-    // The path edges, excluding edgeIdA and edgeIdB.
-    vector<MarkerGraphEdgeId> pathEdges;
+    // The path secondary edges. This excludes the primary edges edgeIdA and edgeIdB.
+    vector<MarkerGraphEdgeId> pathSecondaryEdges;
 
 
 private:
@@ -76,7 +77,6 @@ private:
     public:
         MarkerGraphEdgeId edgeId;
         vector<MarkerInterval> markerIntervals;
-        vector<Base> sequence;
     };
     using GraphBaseClass = boost::adjacency_list<
         boost::listS,
@@ -95,7 +95,16 @@ private:
         std::map<MarkerGraphEdgeId, edge_descriptor> edgeMap;
         edge_descriptor addEdgeIfNecessary(MarkerGraphEdgeId);
 
-        void writeGraphviz(ostream&, uint64_t peakCoverage) const;
+        void writeGraphviz(
+            ostream&,
+            uint64_t peakCoverage,
+            MarkerGraphEdgeId edgeIdA,
+            MarkerGraphEdgeId edgeIdB,
+            const vector<MarkerGraphEdgeId>& pathSecondaryEdges
+            ) const;
+
+        span<const shasta::Base> edgeSequence(edge_descriptor) const;
+        span<const shasta::Base> edgeSequence(MarkerGraphEdgeId) const;
 
     private:
         const Assembler& assembler;
@@ -106,9 +115,12 @@ private:
 
     void fillPathGreedy(ostream& html);
 
-    // The sequence, excluding the sequence of edgeIdA and edgeIdB.
-    vector<Base> sequence;
-    void assembleSequence(ostream& html);
+    // Get the sequence.
+    // The sequences of edgeIdA and edgeIdB are only included if
+    // includePrimary is true.
+    void getSequence(vector<Base>&, bool includePrimary) const;
+
+    void writeSequence(ostream& html) const;
 };
 
 #endif

@@ -41,8 +41,9 @@ PathFiller::PathFiller(
 
     createGraph();
     fillPathGreedy(html);
-    assembleSequence(html);
+
     if(html) {
+        writeSequence(html);
         html << "<p>The local marker graph for this step assembly has " <<
             num_vertices(graph) << " vertices and " <<
             num_edges(graph) << " edges." << endl;
@@ -173,15 +174,11 @@ PathFiller::Graph::edge_descriptor PathFiller::Graph::addEdgeIfNecessary(
         // Add it to the edge map.
         edgeMap.insert(make_pair(edgeId, e));
 
-        // Get the sequence from the marker graph and store it.
-        const auto sequence = assembler.markerGraph.edgeSequence[edgeId];
-        copy(sequence.begin(), sequence.end(), back_inserter((*this)[e].sequence));
-
         return e;
 
     } else {
 
-        // we already have this edge.
+        // We already have this edge.
         return it->second;
     }
 }
@@ -216,11 +213,23 @@ void PathFiller::createGraph()
 
 
 
-void PathFiller::Graph::writeGraphviz(ostream& out, uint64_t peakCoverage) const
+void PathFiller::Graph::writeGraphviz(
+    ostream& out,
+    uint64_t peakCoverage,
+    MarkerGraphEdgeId edgeIdA,
+    MarkerGraphEdgeId edgeIdB,
+    const vector<MarkerGraphEdgeId>& pathSecondaryEdges
+    ) const
 {
     const Graph& graph = *this;
     const double S = 0.7;
     const double V = 1.;
+
+    // Gather the path edges so we can color them differently.
+    vector<MarkerGraphEdgeId> sortedPathEdges = pathSecondaryEdges;
+    sortedPathEdges.push_back(edgeIdA);
+    sortedPathEdges.push_back(edgeIdB);
+    sort(sortedPathEdges.begin(), sortedPathEdges.end());
 
     out <<
         "digraph PathFillerGraph {\n"
@@ -232,6 +241,7 @@ void PathFiller::Graph::writeGraphviz(ostream& out, uint64_t peakCoverage) const
 
         const Edge& edge = graph[e];
         const uint64_t coverage = edge.markerIntervals.size();
+        const bool isOnPath = find(sortedPathEdges.begin(), sortedPathEdges.end(), edge.edgeId) != sortedPathEdges.end();
         const auto v0 = source(e, graph);
         const auto v1 = target(e, graph);
         const MarkerGraphVertexId vertexId0 = graph[v0].vertexId;
@@ -251,8 +261,13 @@ void PathFiller::Graph::writeGraphviz(ostream& out, uint64_t peakCoverage) const
         out <<
             "E" << edge.edgeId <<
             "[ shape=rectangle label=\"" << edge.edgeId << "\\n" << coverage << "\\n";
-        copy(edge.sequence.begin(), edge.sequence.end(), ostream_iterator<shasta::Base>(out));
-        out << "\"];\n";
+        auto sequence = edgeSequence(e);
+        copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(out));
+        out << "\"";
+        if(isOnPath) {
+            out << " style=filled fillcolor=LightCyan";
+        }
+        out << "];\n";
 
         out << vertexId0 << "->E" << edge.edgeId << " [dir=none";
         out << " color=" << colorString;
@@ -285,7 +300,7 @@ void PathFiller::writeGraph(ostream& html) const
     const string dotFileName = tmpDirectory() + uuid + ".dot";
     {
         ofstream dotFile(dotFileName);
-        graph.writeGraphviz(dotFile, orientedReadInfos.size());
+        graph.writeGraphviz(dotFile, orientedReadInfos.size(), edgeIdA, edgeIdB, pathSecondaryEdges);
     }
 
     // Compute layout in svg format.
@@ -349,50 +364,93 @@ void PathFiller::fillPathGreedy(ostream& html)
         }
 
         edgesUsed.insert(eNext);
-        pathEdges.push_back(graph[eNext].edgeId);
+        pathSecondaryEdges.push_back(graph[eNext].edgeId);
         v = target(eNext, graph);
     }
 
+    // As constructed, pathSecondaryEdges includes edgeIdA and edgeIB.
+    // Check that this is the case, then remove them.
+    SHASTA_ASSERT(pathSecondaryEdges.size() >= 2);
+    SHASTA_ASSERT(pathSecondaryEdges.front() == edgeIdA);
+    SHASTA_ASSERT(pathSecondaryEdges.back() == edgeIdB);
+    pathSecondaryEdges.resize(pathSecondaryEdges.size() - 1);
+    pathSecondaryEdges.erase(pathSecondaryEdges.begin());
+
     if(html) {
-        html << "<p>Path edges:";
-        for(const MarkerGraphEdgeId edgeId: pathEdges) {
+        html << "<p>Path secondary edges:";
+        for(const MarkerGraphEdgeId edgeId: pathSecondaryEdges) {
             html << " " << edgeId;
         }
     }
 
-    SHASTA_ASSERT(pathEdges.size() >= 2);
-    SHASTA_ASSERT(pathEdges.front() == edgeIdA);
-    SHASTA_ASSERT(pathEdges.back() == edgeIdB);
-
-    pathEdges.resize(pathEdges.size() - 1);
-    pathEdges.erase(pathEdges.begin());
 }
 
 
 
-void PathFiller::assembleSequence(ostream& html)
+span<const shasta::Base> PathFiller::Graph::edgeSequence(
+    edge_descriptor e) const
 {
-    for(const MarkerGraphEdgeId edgeId: pathEdges) {
-        const Graph::edge_descriptor e = graph.edgeMap[edgeId];
-        const vector<shasta::Base>& edgeSequence = graph[e].sequence;
+    return edgeSequence((*this)[e].edgeId);
+}
+
+
+
+span<const shasta::Base> PathFiller::Graph::edgeSequence(
+    MarkerGraphEdgeId edgeId) const
+{
+    return assembler.markerGraph.edgeSequence[edgeId];
+}
+
+
+
+// Get the sequence.
+// The sequences of edgeIdA and edgeIdB are only included if
+// includePrimary is true.
+void PathFiller::getSequence(
+    vector<Base>& sequence,
+    bool includePrimary) const
+{
+    sequence.clear();
+
+    if(includePrimary) {
+        const auto sequenceA = graph.edgeSequence(edgeIdA);
+        copy(sequenceA.begin(), sequenceA.end(), back_inserter(sequence));
+    }
+
+    for(const MarkerGraphEdgeId edgeId: pathSecondaryEdges) {
+        const auto edgeSequence = graph.edgeSequence(edgeId);
         copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
     }
 
-    if(html) {
-        const auto sequenceA = graph[graph.edgeMap[edgeIdA]].sequence;
-        const auto sequenceB = graph[graph.edgeMap[edgeIdB]].sequence;
-        html << "<pre style='font-family:monospace'>\n";
-        html << ">" << edgeIdA << " length " << sequenceA.size() << "\n";
-        copy(sequenceA.begin(), sequenceA.end(), ostream_iterator<shasta::Base>(html));
-        html << "\n>Intervening length " << sequence.size() << "\n";
-        copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
-        html << "\n>" << edgeIdB << " length " << sequenceB.size() << "\n";
-        copy(sequenceB.begin(), sequenceB.end(), ostream_iterator<shasta::Base>(html));
-        html << "\n>Combined length " << sequenceA.size() + sequence.size() + sequenceB.size() << "\n";
-        copy(sequenceA.begin(), sequenceA.end(), ostream_iterator<shasta::Base>(html));
-        copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
-        copy(sequenceB.begin(), sequenceB.end(), ostream_iterator<shasta::Base>(html));
-        html << "\n</pre>";
+    if(includePrimary) {
+        const auto sequenceB = graph.edgeSequence(edgeIdB);
+        copy(sequenceB.begin(), sequenceB.end(), back_inserter(sequence));
+    }
+}
+
+
+
+void PathFiller::writeSequence(ostream& html) const
+{
+    if(not html) {
+        return;
     }
 
+    const auto sequenceA = graph.edgeSequence(edgeIdA);
+    const auto sequenceB = graph.edgeSequence(edgeIdB);
+    vector<Base> sequence;
+    getSequence(sequence, false);
+
+    html << "<pre style='font-family:monospace'>\n";
+    html << ">" << edgeIdA << " length " << sequenceA.size() << "\n";
+    copy(sequenceA.begin(), sequenceA.end(), ostream_iterator<shasta::Base>(html));
+    html << "\n>Intervening length " << sequence.size() << "\n";
+    copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
+    html << "\n>" << edgeIdB << " length " << sequenceB.size() << "\n";
+    copy(sequenceB.begin(), sequenceB.end(), ostream_iterator<shasta::Base>(html));
+    html << "\n>Combined length " << sequenceA.size() + sequence.size() + sequenceB.size() << "\n";
+    copy(sequenceA.begin(), sequenceA.end(), ostream_iterator<shasta::Base>(html));
+    copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
+    copy(sequenceB.begin(), sequenceB.end(), ostream_iterator<shasta::Base>(html));
+    html << "\n</pre>";
 }
