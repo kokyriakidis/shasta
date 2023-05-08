@@ -51,6 +51,7 @@ Only the last edge processed will be classified as causing a cycle.
 #include <boost/graph/iteration_macros.hpp>
 
 #include <stack>
+#include "utility.hpp"
 #include "vector.hpp"
 
 namespace shasta {
