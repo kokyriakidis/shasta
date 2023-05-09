@@ -12,6 +12,7 @@ using namespace mode3b;
 
 // Boost libraries.
 #include <boost/graph/iteration_macros.hpp>
+#include <boost/graph/strong_components.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -47,6 +48,7 @@ PathFiller::PathFiller(
     }
 
     createGraph(maxBaseSkip);
+    computeStrongComponents();
     writeVerticesCsv();
     approximateTopologicalSort();
     if(html) {
@@ -543,7 +545,22 @@ void PathFiller::writeGraphviz(ostream& out) const
         OrderPairsBySecondOnly<vertex_descriptor, uint64_t>());
     for(const auto& p: verticesWithRank) {
         const vertex_descriptor v = p.first;
-        out << "\"" << graph[v].stringId() << "\";\n";
+        const PathFillerVertex& vertex = graph[v];
+        out << "\"" << vertex.stringId() << "\"";
+        if(vertex.isStrongComponentVertex()) {
+            out << "[style=solid width=0.2;";
+            if(vertex.isStrongComponentEntrance) {
+                if(vertex.isStrongComponentExit) {
+                    out << " color=Magenta"; // Entrance and exit.
+                } else {
+                    out << " color=Cyan";   // Entrance only.
+                }
+            } else if(vertex.isStrongComponentExit) {
+                out << " color=Gold";       // Exit only.
+            }
+            out << "]"; // Override invisible style set above.
+        }
+        out << ";\n";
     }
 
 
@@ -555,6 +572,12 @@ void PathFiller::writeGraphviz(ostream& out) const
         const uint64_t coverage = edge.coverage();
         const auto v0 = source(e, graph);
         const auto v1 = target(e, graph);
+        const auto& vertex0 = graph[v0];
+        const auto& vertex1 = graph[v1];
+        const bool isStrongComponentEdge =
+            vertex0.isStrongComponentVertex() and
+            vertex1.isStrongComponentVertex() and
+            vertex0.strongComponentId == vertex1.strongComponentId;
 
         // Compute the hue based on coverage.
         double H;
@@ -568,7 +591,7 @@ void PathFiller::writeGraphviz(ostream& out) const
         out << "\"" << graph[v0].stringId() << "\"->\"" << graph[v1].stringId() << "\" [";
         out << " color=" << colorString;
         out << " tooltip=\"Coverage " << coverage << "\"";
-        if(edge.hasDuplicateOrientedReads() or not edge.isDagEdge) {
+        if(isStrongComponentEdge) {
             out << " style=dashed";
         }
         if(not edge.isDagEdge) {
@@ -900,3 +923,73 @@ void PathFiller::writeSequence(ostream& html) const
 #endif
 
 
+
+void PathFiller::computeStrongComponents()
+{
+    PathFiller& graph = *this;
+
+    // Map the vertices to integers.
+    uint64_t vertexIndex = 0;
+    std::map<vertex_descriptor, uint64_t> vertexMap;
+    BGL_FORALL_VERTICES(v, graph, PathFiller) {
+        vertexMap.insert({v, vertexIndex++});
+    }
+
+    // Compute strong components.
+    std::map<vertex_descriptor, uint64_t> componentMap;
+    boost::strong_components(
+        graph,
+        boost::make_assoc_property_map(componentMap),
+        boost::vertex_index_map(boost::make_assoc_property_map(vertexMap)));
+
+    // Gather the vertices in each strong component.
+    std::map<uint64_t, vector<vertex_descriptor> > componentVertices;
+    for(const auto& p: componentMap) {
+        componentVertices[p.second].push_back(p.first);
+    }
+
+    // Keep the non-trivial ones.
+    strongComponents.clear();
+    for(const auto& p: componentVertices) {
+        if(p.second.size() > 1) {
+            strongComponents.push_back(p.second);
+        }
+    }
+    cout << "Found " << strongComponents.size() <<
+        " non-trivial strongly connected components." << endl;
+
+    // Mark the vertices in the non-trivial strongly connected components.
+    uint64_t strongComponentId = 0;
+    for(const auto& strongComponent: strongComponents) {
+        for(const vertex_descriptor v: strongComponent) {
+            graph[v].strongComponentId = strongComponentId;
+        }
+        ++strongComponentId;
+    }
+
+    // Mark the entrances of each strong component.
+    for(const auto& strongComponent: strongComponents) {
+        for(const vertex_descriptor v0: strongComponent) {
+            BGL_FORALL_INEDGES(v0, e, graph, PathFiller) {
+                const vertex_descriptor v1 = source(e, graph);
+                if(graph[v1].strongComponentId != graph[v0].strongComponentId) {
+                    graph[v0].isStrongComponentEntrance = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // Mark the exits of each strong component.
+    for(const auto& strongComponent: strongComponents) {
+        for(const vertex_descriptor v0: strongComponent) {
+            BGL_FORALL_OUTEDGES(v0, e, graph, PathFiller) {
+                const vertex_descriptor v1 = target(e, graph);
+                if(graph[v1].strongComponentId != graph[v0].strongComponentId) {
+                    graph[v0].isStrongComponentExit = true;
+                    break;
+                }
+            }
+        }
+    }
+}

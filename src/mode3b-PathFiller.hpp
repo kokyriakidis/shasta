@@ -62,6 +62,14 @@ public:
     uint64_t color;
     uint64_t rank;
 
+    // Set if this vertex is part of a non-trivial strongly connected component.
+    uint64_t strongComponentId = invalid<uint64_t>;
+    bool isStrongComponentVertex() const {
+        return strongComponentId != invalid<uint64_t>;
+    }
+    bool isStrongComponentEntrance = false;
+    bool isStrongComponentExit = false;
+
     PathFillerVertex(MarkerGraphVertexId, uint64_t orientedReadCount);
     PathFillerVertex() {}
 };
@@ -168,6 +176,9 @@ private:
     void splitVertices(uint64_t maxBaseSkip);
     void createEdges();
     void approximateTopologicalSort();
+
+    void computeStrongComponents();
+    vector< vector<vertex_descriptor> > strongComponents;
 
     void writeGraph(ostream& html) const;
     void writeVerticesCsv() const;
