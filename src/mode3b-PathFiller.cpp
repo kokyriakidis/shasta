@@ -1,7 +1,10 @@
 // Shasta.
 #include "mode3b-PathFiller.hpp"
+#include "approximateTopologicalSort.hpp"
 #include "Assembler.hpp"
+#include "deduplicate.hpp"
 #include "platformDependent.hpp"
+#include "orderPairs.hpp"
 #include "Reads.hpp"
 #include "runCommandWithTimeout.hpp"
 using namespace shasta;
@@ -25,9 +28,13 @@ PathFiller::PathFiller(
     ostream& html) :
     assembler(assembler),
     edgeIdA(edgeIdA),
-    edgeIdB(edgeIdB),
-    graph(assembler)
+    edgeIdB(edgeIdB)
 {
+    const PathFiller& graph = *this;
+
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t maxBaseSkip = 300;
+
     checkAssumptions();
     if(html) {
         html << "<h1>Assembly path step between marker graph edges " <<
@@ -36,30 +43,50 @@ PathFiller::PathFiller(
 
     gatherOrientedReads();
     if(html) {
-        html << "<p>Coverage " << orientedReadInfos.size();
+        writeOrientedReads(html);
     }
 
-    createGraph();
+    createGraph(maxBaseSkip);
+    writeVerticesCsv();
+    approximateTopologicalSort();
+    if(html) {
+        html << "<p>The local marker graph for this step assembly has " <<
+            num_vertices(graph) << " vertices and " <<
+            num_edges(graph) << " edges." << endl;
+        uint64_t nonDagEdgeCount = 0;
+        BGL_FORALL_EDGES(e, graph, PathFiller) {
+            if(not graph[e].isDagEdge) {
+                ++nonDagEdgeCount;
+            }
+        }
+        html << "<p>There are " << nonDagEdgeCount << " non-DAG edges.";
+        writeGraph(html);
+    }
+
+#if 0
+    writeVerticesCsv();
+
     const bool success = fillPathGreedy(html);
 
     if(html) {
+        html << "<p>The local marker graph for this step assembly has " <<
+            num_vertices(graph) << " vertices and " <<
+            num_edges(graph) << " edges." << endl;
+        writeGraph(html);
+
         if(success) {
             writeSequence(html);
-            html << "<p>The local marker graph for this step assembly has " <<
-                num_vertices(graph) << " vertices and " <<
-                num_edges(graph) << " edges." << endl;
         } else {
             cout << "Unable to fill assembly path between primary edges " <<
             edgeIdA << " " << edgeIdB << endl;
         }
-        writeGraph(html);
     }
 
     if(not success) {
         throw runtime_error("Unable to fill assembly path between primary edges " +
             to_string(edgeIdA) + " " + to_string(edgeIdB));
     }
-
+#endif
 }
 
 
@@ -118,189 +145,491 @@ void PathFiller::gatherOrientedReads()
         // Store it.
         orientedReadInfos.push_back(info);
 
+        // Fill in the rest of the information.
+        {
+            OrientedReadInfo& info = orientedReadInfos.back();
+            const OrientedReadId orientedReadId = info.orientedReadId;
+
+            info.ordinalOffset = info.ordinalB1 - info.ordinalA0;
+
+            const MarkerId markerIdA0 =assembler.getMarkerId(orientedReadId, info.ordinalA0);
+            const MarkerId markerIdA1 =assembler.getMarkerId(orientedReadId, info.ordinalA1);
+            const MarkerId markerIdB0 =assembler.getMarkerId(orientedReadId, info.ordinalB0);
+            const MarkerId markerIdB1 =assembler.getMarkerId(orientedReadId, info.ordinalB1);
+
+            info.positionA0 = assembler.markers.begin()[markerIdA0].position;
+            info.positionA1 = assembler.markers.begin()[markerIdA1].position;
+            info.positionB0 = assembler.markers.begin()[markerIdB0].position;
+            info.positionB1 = assembler.markers.begin()[markerIdB1].position;
+
+            info.baseOffset = info.positionB1 - info.positionA0;
+        }
+
         // Continue the joint loop.
         ++itA;
         ++itB;
     }
 
-}
 
-
-
-PathFiller::Graph::Graph(const Assembler& assembler) :
-    assembler(assembler)
-{
-}
-
-
-
-PathFiller::Graph::vertex_descriptor PathFiller::Graph::addVertexIfNecessary(
-    MarkerGraphVertexId vertexId)
-{
-    // See if we already have this vertex.
-    const auto it = vertexMap.find(vertexId);
-
-    if(it == vertexMap.end()) {
-
-        // This vertex does not exist. Create it.
-        const vertex_descriptor v = add_vertex(Vertex({vertexId}), *this);
-
-        // Add it to the vertex map.
-        vertexMap.insert(make_pair(vertexId, v));
-
-        return v;
-
-    } else {
-
-        // we already have this vertex.
-        return it->second;
-    }
-}
-
-
-
-PathFiller::Graph::edge_descriptor PathFiller::Graph::addEdgeIfNecessary(
-    MarkerGraphEdgeId edgeId)
-{
-    // See if we already have this edge.
-    const auto it = edgeMap.find(edgeId);
-
-    if(it == edgeMap.end()) {
-
-        // This edge does not exist.
-        // Before we can create, we need to create its vertices, if necessary.
-        const MarkerGraph::Edge& markerGraphEdge = assembler.markerGraph.edges[edgeId];
-        const MarkerGraphVertexId vertexId0 = markerGraphEdge.source;
-        const MarkerGraphVertexId vertexId1 = markerGraphEdge.target;
-        const vertex_descriptor v0 = addVertexIfNecessary(vertexId0);
-        const vertex_descriptor v1 = addVertexIfNecessary(vertexId1);
-
-        // Now we can create the edge.
-        edge_descriptor e;
-        bool edgeWasAdded = false;
-        tie(e, edgeWasAdded) = add_edge(v0, v1, Edge({edgeId}), *this);
-        SHASTA_ASSERT(edgeWasAdded);
-
-        // Add it to the edge map.
-        edgeMap.insert(make_pair(edgeId, e));
-
-        return e;
-
-    } else {
-
-        // We already have this edge.
-        return it->second;
-    }
-}
-
-
-
-void PathFiller::createGraph()
-{
-    // Loop over all oriented reads and marker intervals that contribute
-    // to assembling this step.
+    // Compute average ordinal and base offsets.
+    uint64_t ordinalOffsetSum = 0.;
+    uint64_t baseOffsetSum = 0;
     for(const OrientedReadInfo& info: orientedReadInfos) {
-        for(uint32_t ordinal0=info.ordinalA0; ordinal0!=info.ordinalB1; ordinal0++) {
+        ordinalOffsetSum += info.ordinalOffset;
+        baseOffsetSum += info.baseOffset;
+    }
+    ordinalOffset = uint32_t(std::round(double(ordinalOffsetSum) / double(orientedReadInfos.size())));
+    baseOffset = uint32_t(std::round(double(baseOffsetSum) / double(orientedReadInfos.size())));
+
+}
+
+
+
+void PathFiller::writeOrientedReads(ostream& html) const
+{
+    html <<
+        "<p><table>"
+        "<tr><th class=left>Coverage<td class=centered>" << orientedReadInfos.size() <<
+        "<tr><th class=left>Ordinal offset<td class=centered>" << ordinalOffset <<
+        "<tr><th class=left>Base offset<td class=centered>" << baseOffset <<
+        "</table>";
+
+    html <<
+        "<p><table>"
+        "<tr>"
+        "<th>Oriented<br>read"
+        "<th>OrdinalA0"
+        "<th>OrdinalA1"
+        "<th>OrdinalB0"
+        "<th>OrdinalB1"
+        "<th>PositionA0"
+        "<th>PositionA1"
+        "<th>PositionB0"
+        "<th>PositionB1"
+        "<th>OrdinalOffset"
+        "<th>BaseOffset";
+
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        const OrientedReadInfo& info = orientedReadInfos[i];
+
+        html <<
+            "<tr>"
+            "<td class=centered>" << info.orientedReadId <<
+            "<td class=centered>" << info.ordinalA0 <<
+            "<td class=centered>" << info.ordinalA1 <<
+            "<td class=centered>" << info.ordinalB0 <<
+            "<td class=centered>" << info.ordinalB1 <<
+            "<td class=centered>" << info.positionA0 <<
+            "<td class=centered>" << info.positionA1 <<
+            "<td class=centered>" << info.positionB0 <<
+            "<td class=centered>" << info.positionB1 <<
+            "<td class=centered>" << info.ordinalOffset <<
+            "<td class=centered>" << info.baseOffset;
+    }
+    html << "</table>";
+}
+
+
+
+void PathFiller::createGraph(uint64_t maxBaseSkip)
+{
+    createVertices();
+    splitVertices(maxBaseSkip);
+    createEdges();
+}
+
+
+
+// Approximate topological sort is only use to improve the
+// display of the graph and make it faster.
+// It sets the isDagEdge flags in the edges.
+void PathFiller::approximateTopologicalSort()
+{
+    PathFiller& graph = *this;
+
+    vector< pair<edge_descriptor, uint64_t> > edgesWithCoverage;
+    BGL_FORALL_EDGES(e, graph, PathFiller) {
+        edgesWithCoverage.push_back({e, graph[e].coverage()});
+    }
+    sort(edgesWithCoverage.begin(), edgesWithCoverage.end(),
+        OrderPairsBySecondOnlyGreater<edge_descriptor, uint64_t>());
+
+    vector<edge_descriptor> sortedEdges;
+    for(const auto& p: edgesWithCoverage) {
+        sortedEdges.push_back(p.first);
+    }
+
+    shasta::approximateTopologicalSort(graph, sortedEdges);
+}
+
+
+
+void PathFiller::createVertices()
+{
+    PathFiller& graph = *this;
+
+    // During this phase there is at most one vertex corresponding to
+    // each marker graph vertex.
+    std::map<MarkerGraphVertexId, vertex_descriptor> vertexMap;
+
+
+    // Loop over our oriented reads.
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        OrientedReadInfo& info = orientedReadInfos[i];
+        const OrientedReadId orientedReadId = info.orientedReadId;
+        SHASTA_ASSERT(info.vertices.empty());
+
+        // For each ordinal between ordinalA0 and ordinalB1 included,
+        // make sure we have a vertex and store it.
+        for(uint32_t ordinal=info.ordinalA0; ordinal<=info.ordinalB1; ordinal++) {
+
+            // Find the marker graph vertex that contains this ordinal.
+            const MarkerGraphVertexId vertexId =
+                assembler.getGlobalMarkerGraphVertex(orientedReadId, ordinal);
+            SHASTA_ASSERT(vertexId != invalid<MarkerGraphVertexId>);
+
+            // Get the corresponding vertex descriptor, creating the vertex
+            // if necessary.
+            vertex_descriptor v;
+            auto it = vertexMap.find(vertexId);
+            if(it == vertexMap.end()) {
+                v = add_vertex(PathFillerVertex(vertexId, orientedReadInfos.size()), graph);
+                vertexMap.insert(make_pair(vertexId, v));
+            } else {
+                v = it->second;
+            }
+
+            // Store this ordinal in the vertex.
+            PathFillerVertex& vertex = graph[v];
+            vertex.ordinals[i].push_back(ordinal);
+
+            // Store this vertex in the OrientedReadInfo.
+            info.vertices.push_back(v);
+        }
+    }
+}
+
+
+
+void PathFiller::splitVertices(uint64_t maxBaseSkip)
+{
+    PathFiller& graph = *this;
+
+    // Gather the vertices we have now so we can safely iterate over them.
+    vector<vertex_descriptor> initialVertices;
+    BGL_FORALL_VERTICES(v, graph, PathFiller) {
+        initialVertices.push_back(v);
+    }
+
+    class OrdinalInfo {
+    public:
+        uint64_t i;
+        uint32_t ordinal;
+        int32_t estimatedOffset;
+        bool operator<(const OrdinalInfo& that) const
+        {
+            return estimatedOffset < that.estimatedOffset;
+        }
+    };
+
+    // Loop over our initial vertices.
+    vector<OrdinalInfo> ordinalInfos;
+    vector<uint64_t> splitPositions;
+    for(const vertex_descriptor v: initialVertices) {
+        const PathFillerVertex& vertex = graph[v];
+        SHASTA_ASSERT(vertex.ordinals.size() == orientedReadInfos.size());
+
+        // Loop over all ordinals of all oriented reads in this vertex.
+        ordinalInfos.clear();
+        for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+            const OrientedReadInfo& info = orientedReadInfos[i];
+            const OrientedReadId orientedReadId = info.orientedReadId;
+
+            for(const uint32_t ordinal: vertex.ordinals[i]) {
+                // Get the position of this marker.
+                const MarkerId markerId =assembler.getMarkerId(orientedReadId, ordinal);
+                const uint32_t position = assembler.markers.begin()[markerId].position;
+
+                // Base offsets from A0 and to B1.
+                const int32_t offsetFromA0 = int32_t(position - info.positionA0);
+                const int32_t offsetToB1 = int32_t(info.positionB1 - position);
+
+                // Estimated offset from A0.
+                const int32_t estimatedOffset = (offsetFromA0 + int32_t(baseOffset) - offsetToB1) / 2;
+
+                ordinalInfos.push_back({i, ordinal, estimatedOffset});
+            }
+        }
+
+        // Sort them by estimated offset.
+        sort(ordinalInfos.begin(), ordinalInfos.end());
+
+        /*
+        cout << vertex.vertexId << ":";
+        for(const auto& info: ordinalInfos) {
+            cout << " " << info.estimatedOffset;
+        }
+        cout << endl;
+        */
+
+        // Look for skips larger than maxBaseSkip.
+        splitPositions.clear();
+        splitPositions.push_back(0);
+        for(uint64_t i=1; i<ordinalInfos.size(); i++) {
+            const int32_t baseSkip = ordinalInfos[i].estimatedOffset - ordinalInfos[i-1].estimatedOffset;
+            if(baseSkip > int32_t(maxBaseSkip)) {
+                splitPositions.push_back(i);
+            }
+        }
+        splitPositions.push_back(ordinalInfos.size());
+
+        if(splitPositions.size() == 2) {
+            // cout << "No skips found." << endl;
+            continue;
+        }
+        // cout << "Found " << splitPositions.size() - 2 << " skips." << endl;
+        // cout << "This vertex will be split in " << splitPositions.size() - 1 << "." << endl;
+
+        // Create the new vertices.
+        for(uint64_t i=0; i<splitPositions.size()-1; i++) {
+            const vertex_descriptor vNew = add_vertex(graph);
+            PathFillerVertex& vertexNew = graph[vNew];
+            vertexNew.vertexId = vertex.vertexId;
+            vertexNew.replicaIndex = i + 1;
+            vertexNew.ordinals.resize(orientedReadInfos.size());
+
+            // Loop over the ordinals that go in this new vertex.
+            const uint64_t begin = splitPositions[i];
+            const uint64_t end = splitPositions[i+1];
+            for(uint64_t j=begin; j!=end; j++) {
+                const OrdinalInfo& ordinalInfo = ordinalInfos[j];
+                const uint64_t i = ordinalInfo.i;
+                vertexNew.ordinals[i].push_back(ordinalInfo.ordinal);
+
+                // Store this vertex in the OrientedReadInfo.
+                OrientedReadInfo& info = orientedReadInfos[i];
+                info.vertices[ordinalInfo.ordinal - info.ordinalA0] = vNew;
+            }
+        }
+
+        // Remove the initial vertex.
+        remove_vertex(v, graph);
+    }
+}
+
+
+
+void PathFiller::createEdges()
+{
+    PathFiller& graph = *this;
+
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        const OrientedReadInfo& info = orientedReadInfos[i];
+        for(uint32_t ordinal0=info.ordinalA0; ordinal0<info.ordinalB1; ordinal0++) {
             const uint32_t ordinal1 = ordinal0 + 1;
-            MarkerInterval markerInterval(info.orientedReadId, ordinal0, ordinal1);
+
+            const vertex_descriptor v0 = info.getVertex(ordinal0);
+            const vertex_descriptor v1 = info.getVertex(ordinal1);
 
             // Find the marker graph edge that contains this MarkerInterval.
             const MarkerGraphEdgeId edgeId =
-                assembler.markerGraph.locateMarkerInterval(assembler.markers, markerInterval);
+                assembler.markerGraph.locateMarkerInterval(assembler.markers,
+                    MarkerInterval(info.orientedReadId, ordinal0, ordinal1));
             SHASTA_ASSERT(edgeId != invalid<MarkerGraphEdgeId>);
 
-            // Create an edge corresponding to this marker graph edge,
-            // if we don't already have one.
-            const Graph::edge_descriptor e = graph.addEdgeIfNecessary(edgeId);
+            // If we already have this edge, add this ordinal to it.
+            bool done = false;
+            BGL_FORALL_OUTEDGES(v0, e, graph, PathFiller) {
+                if(target(e, graph) != v1) {
+                    continue;
+                }
+                if(graph[e].edgeId != edgeId) {
+                    continue;
+                }
+                graph[e].markerIntervals[i].push_back({ordinal0, ordinal1});
+                done = true;
+                break;
+            }
 
-            // Add this marker interval to that edge.
-            graph[e].markerIntervals.push_back(markerInterval);
+            // If we did not find this edge, we have to create it.
+            if(not done) {
+                edge_descriptor e;
+                bool edgeWasAdded = false;
+                tie(e, edgeWasAdded) = add_edge(v0, v1, graph);
+                SHASTA_ASSERT(edgeWasAdded);
+                PathFillerEdge& edge = graph[e];
+                edge.edgeId = edgeId;
+                edge.markerIntervals.resize(orientedReadInfos.size());
+                edge.markerIntervals[i].push_back({ordinal0, ordinal1});
+            }
 
         }
-
     }
 }
 
 
 
-void PathFiller::Graph::writeGraphviz(
-    ostream& out,
-    uint64_t peakCoverage,
-    MarkerGraphEdgeId edgeIdA,
-    MarkerGraphEdgeId edgeIdB,
-    const vector<MarkerGraphEdgeId>& pathSecondaryEdges
-    ) const
+PathFillerVertex::PathFillerVertex(
+    MarkerGraphVertexId vertexId,
+    uint64_t orientedReadCount) :
+    vertexId(vertexId),
+    ordinals(orientedReadCount)
 {
-    const Graph& graph = *this;
+}
+
+
+
+PathFiller::vertex_descriptor PathFiller::OrientedReadInfo::getVertex(uint32_t ordinal) const
+{
+    SHASTA_ASSERT(ordinal >= ordinalA0);
+    SHASTA_ASSERT(ordinal <= ordinalB1);
+    const uint32_t index = ordinal - ordinalA0;
+    SHASTA_ASSERT(index < vertices.size());
+    return vertices[index];
+
+}
+
+
+
+// Return true if any oriented reads have more than one ordinal on this vertex.
+bool PathFillerVertex::hasDuplicateOrientedReads() const
+{
+    for(const auto& v: ordinals) {
+        if(v.size() > 1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+
+// Return true if any oriented reads have more than one
+// MarkerInterval on this edge.
+bool PathFillerEdge::hasDuplicateOrientedReads() const
+{
+    for(const auto& v: markerIntervals) {
+        if(v.size() > 1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+
+void PathFiller::writeGraphviz(ostream& out) const
+{
+    const PathFiller& graph = *this;
+
     const double S = 0.7;
     const double V = 1.;
 
-    // Gather the path edges so we can color them differently.
-    vector<MarkerGraphEdgeId> sortedPathEdges = pathSecondaryEdges;
-    sortedPathEdges.push_back(edgeIdA);
-    sortedPathEdges.push_back(edgeIdB);
-    sort(sortedPathEdges.begin(), sortedPathEdges.end());
-
     out <<
         "digraph PathFillerGraph {\n"
-        "ranksep=0.3;\n"
-        "node [shape=point fontname=\"Courier New\"];\n"
-        "edge [decorate=true penwidth=10 arrowsize=0.5];\n";
+        "mclimit=0.01;\n"       // For layout speed
+        // "maxiter=1;\n"       // For layout speed (?)
+        "node [shape=point style=invis];\n"
+        "edge [penwidth=5];\n";
 
-    BGL_FORALL_EDGES(e, graph, Graph) {
 
-        const Edge& edge = graph[e];
-        const uint64_t coverage = edge.markerIntervals.size();
-        const bool isOnPath = find(sortedPathEdges.begin(), sortedPathEdges.end(), edge.edgeId) != sortedPathEdges.end();
+
+    // To help Graphviz compute the layout, write vertices in rank order.
+    vector< pair<vertex_descriptor, uint64_t> > verticesWithRank;
+    BGL_FORALL_VERTICES(v, graph, PathFiller) {
+        verticesWithRank.push_back({v, graph[v].rank});
+    }
+    sort(verticesWithRank.begin(), verticesWithRank.end(),
+        OrderPairsBySecondOnly<vertex_descriptor, uint64_t>());
+    for(const auto& p: verticesWithRank) {
+        const vertex_descriptor v = p.first;
+        out << "\"" << graph[v].stringId() << "\";\n";
+    }
+
+
+
+    // Write the edges.
+    BGL_FORALL_EDGES(e, graph, PathFiller) {
+
+        const PathFillerEdge& edge = graph[e];
+        const uint64_t coverage = edge.coverage();
         const auto v0 = source(e, graph);
         const auto v1 = target(e, graph);
-        const MarkerGraphVertexId vertexId0 = graph[v0].vertexId;
-        const MarkerGraphVertexId vertexId1 = graph[v1].vertexId;
 
         // Compute the hue based on coverage.
         double H;
-        if(coverage >= peakCoverage) {
+        if(coverage >= orientedReadInfos.size()) {
             H = 1./3.;
         } else {
-            H = (double(coverage-1) / (3. * double(peakCoverage - 1)));
+            H = (double(coverage - 1) / (3. * double(orientedReadInfos.size() - 1)));
         }
         const string colorString = "\"" + to_string(H) + " " + to_string(S) + " " + to_string(V) + "\"";
 
-
-        // Write it as an intermediate vertex, for better readability.
-        out <<
-            "E" << edge.edgeId <<
-            "[ shape=rectangle label=\"" << edge.edgeId << "\\n" << coverage << "\\n";
-        auto sequence = edgeSequence(e);
-        copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(out));
-        out << "\"";
-        if(isOnPath) {
-            out << " style=filled fillcolor=LightCyan";
+        out << "\"" << graph[v0].stringId() << "\"->\"" << graph[v1].stringId() << "\" [";
+        out << " color=" << colorString;
+        out << " tooltip=\"Coverage " << coverage << "\"";
+        if(edge.hasDuplicateOrientedReads() or not edge.isDagEdge) {
+            out << " style=dashed";
+        }
+        if(not edge.isDagEdge) {
+            out << " constraint=false";
         }
         out << "];\n";
 
-        out << vertexId0 << "->E" << edge.edgeId << " [dir=none";
-        out << " color=" << colorString;
-        out << "];\n";
-        out << "E" << edge.edgeId << "->" << vertexId1;
-        out << "[color=" << colorString;
-        out << "];\n";
     }
 
     out << "}\n";
 
 }
 
-#if 0
-s << " label=<<font color=\"black\">";
-s << "<table";
-s << " color=\"black\"";
-s << " bgcolor=\"" << labelColor << "\"";
-s << " border=\"1\"";
-s << " cellborder=\"0\"";
-s << " cellspacing=\"2\"";
-s << ">";
-#endif
+
+
+string PathFillerVertex::stringId() const
+{
+    string s = to_string(vertexId);
+    if(replicaIndex) {
+        s += "." + to_string(replicaIndex);
+    }
+    return s;
+}
+
+
+
+void PathFiller::writeVerticesCsv() const
+{
+    const PathFiller& graph = *this;
+
+    ofstream csv("PathFiller-vertices.csv");
+    csv << "Vertex,i,OrientedReadId,Offsets\n";
+    BGL_FORALL_VERTICES(v, graph, PathFiller) {
+        const PathFillerVertex& vertex = graph[v];
+        for(uint64_t i=0; i<vertex.ordinals.size(); i++) {
+            const vector<uint32_t>& ordinals = vertex.ordinals[i];
+            const auto& info = orientedReadInfos[i];
+            csv << vertex.stringId() << ",";
+            csv << i << ",";
+            csv << info.orientedReadId << ",";
+            for(const uint32_t ordinal: ordinals) {
+                const uint64_t offset = ordinal - info.ordinalA0;
+                csv << offset << ",";
+            }
+            csv << "\n";
+        }
+    }
+}
+
+
+
+// Return the total number of marker intervals.
+uint64_t PathFillerEdge::coverage() const
+{
+    uint64_t c = 0;
+    for(const auto& v: markerIntervals) {
+        c += v.size();
+    }
+    return c;
+}
+
 
 
 void PathFiller::writeGraph(ostream& html) const
@@ -310,15 +639,15 @@ void PathFiller::writeGraph(ostream& html) const
     const string dotFileName = tmpDirectory() + uuid + ".dot";
     {
         ofstream dotFile(dotFileName);
-        graph.writeGraphviz(dotFile, orientedReadInfos.size(), edgeIdA, edgeIdB, secondaryEdges);
+        writeGraphviz(dotFile);
     }
 
     // Compute layout in svg format.
-    const string command = timeoutCommand() + " 30 dot -O -T svg " + dotFileName;
+    const string command = "dot -O -T svg " + dotFileName;
     bool timeoutTriggered = false;
     bool signalOccurred = false;
     int returnCode = 0;
-    const double timeout = 30;
+    const double timeout = 600;
     runCommandWithTimeout(command, timeout, timeoutTriggered, signalOccurred, returnCode);
     if(returnCode!=0 or signalOccurred) {
         throw runtime_error("An error occurred while running the following command: " + command);
@@ -343,15 +672,122 @@ void PathFiller::writeGraph(ostream& html) const
 
 
 
+#if 0
 bool PathFiller::fillPathGreedy(ostream& html)
 {
+    const bool debug = true;
+
+    using vertex_descriptor = Graph::vertex_descriptor;
+    using edge_descriptor = Graph::edge_descriptor;
     const MarkerGraph::Edge markerGraphEdgeA = assembler.markerGraph.edges[edgeIdA];
     const MarkerGraph::Edge markerGraphEdgeB = assembler.markerGraph.edges[edgeIdB];
-    const Graph::vertex_descriptor vA = graph.vertexMap[markerGraphEdgeA.source];
-    const Graph::vertex_descriptor vB = graph.vertexMap[markerGraphEdgeB.target];
+    const Graph::edge_descriptor eA = graph.edgeMap[edgeIdA];
+    // const Graph::edge_descriptor eB = graph.edgeMap[edgeIdB];
+    const Edge& edgeA = graph[eA];
+    // const Edge& edgeB = graph[eB];
 
-    std::set<Graph::edge_descriptor> edgesUsed;
+    // The path we are looking for begins at vA and ends at vB.
+    const vertex_descriptor vA = graph.vertexMap[markerGraphEdgeA.target];
+    const vertex_descriptor vB = graph.vertexMap[markerGraphEdgeB.target];
 
+    // The last MarkerInterval used for each of the oriented reads.
+    // We will use this to make sure we only move forward.
+    vector<uint32_t> lastMarkerInterval;
+    SHASTA_ASSERT(not edgeA.hasCycle());    // True by construction.
+    for(const auto& v: edgeA.markerIntervals) {
+        SHASTA_ASSERT(v.size() == 1);
+        lastMarkerInterval.push_back(v.front().first);
+    }
+
+
+
+    // Main iteration loop.
+    vertex_descriptor v = vA;
+    while(v != vB) {
+
+        if(debug) {
+            cout << "At vertex " << graph[v].vertexId << "\n";
+            for(uint64_t i=0; i<lastMarkerInterval.size(); i++) {
+                cout << i << " " << lastMarkerInterval[i] << "\n";
+            }
+        }
+
+        // For each of our oriented reads,
+        // find which of the possible out-edges it wants to go to,
+        // if any, based on the ordinals stored in lastMarkerInterval.
+        vector< pair<edge_descriptor, uint32_t> > nextEdgesAndOrdinals(orientedReadInfos.size());
+        for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+            // There is no null_edge, so this can be uninitialized and it's ok,
+            // but we have to suppress the warning.
+            edge_descriptor eNext;
+#pragma GCC diagnostic pop
+            uint32_t nextOrdinal0 = std::numeric_limits<uint32_t>::max();
+            BGL_FORALL_OUTEDGES(v, e, graph, Graph) {
+                const auto& markerIntervals = graph[e].markerIntervals[i];
+                for(const auto& p: markerIntervals) {
+                    const uint32_t ordinal0 = p.first;
+                    if(ordinal0 > lastMarkerInterval[i]) {
+                        if(ordinal0 < nextOrdinal0) {
+                            eNext = e;
+                            nextOrdinal0 = ordinal0;
+                        }
+                    }
+                }
+            }
+            nextEdgesAndOrdinals[i] = {eNext, nextOrdinal0};
+        }
+
+
+        // Pick the next edge that most oriented reads prefer.
+        vector<edge_descriptor> nextEdges;
+        vector<uint64_t> nextEdgesFrequency;
+        for(const auto& p: nextEdgesAndOrdinals) {
+            if(p.second != std::numeric_limits<uint32_t>::max()) {
+                nextEdges.push_back(p.first);
+            }
+        }
+        SHASTA_ASSERT(not nextEdges.empty());
+        deduplicateAndCount(nextEdges, nextEdgesFrequency);
+        auto it = max_element(nextEdgesFrequency.begin(), nextEdgesFrequency.end());
+        edge_descriptor eNext = nextEdges[it - nextEdgesFrequency.begin()];
+
+        if(debug) {
+            cout << "Next edge " << graph[eNext].edgeId << "\n";
+        }
+
+
+        // This edge gets added to the path.
+        secondaryEdges.push_back(graph[eNext].edgeId);
+        v = target(eNext, graph);
+
+        // Update the lastMarkerInterval vector.
+        for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+            const auto& p = nextEdgesAndOrdinals[i];
+            if(eNext == p.first) {
+                lastMarkerInterval[i] = p.second;
+            }
+        }
+    }
+    cout << flush;
+
+    if(html) {
+        html << "<p>Path secondary edges:";
+        for(const MarkerGraphEdgeId edgeId: secondaryEdges) {
+            html << " " << edgeId;
+        }
+    }
+
+    // As constructed, pathSecondaryEdges includes edgeIB.
+    // Check that this is the case, then remove it.
+    SHASTA_ASSERT(secondaryEdges.size() >= 1);
+    // SHASTA_ASSERT(secondaryEdges.front() == edgeIdA);
+    SHASTA_ASSERT(secondaryEdges.back() == edgeIdB);
+    secondaryEdges.resize(secondaryEdges.size() - 1);
+    // secondaryEdges.erase(secondaryEdges.begin());
+
+    /*
     // Main iteration loop.
     Graph::vertex_descriptor v = vA;
     while(v != vB) {
@@ -386,19 +822,14 @@ bool PathFiller::fillPathGreedy(ostream& html)
     secondaryEdges.resize(secondaryEdges.size() - 1);
     secondaryEdges.erase(secondaryEdges.begin());
 
-    if(html) {
-        html << "<p>Path secondary edges:";
-        for(const MarkerGraphEdgeId edgeId: secondaryEdges) {
-            html << " " << edgeId;
-        }
-    }
+    */
 
     return true;
 }
+#endif
 
 
-
-span<const shasta::Base> PathFiller::Graph::edgeSequence(
+span<const shasta::Base> PathFiller::edgeSequence(
     edge_descriptor e) const
 {
     return edgeSequence((*this)[e].edgeId);
@@ -406,7 +837,7 @@ span<const shasta::Base> PathFiller::Graph::edgeSequence(
 
 
 
-span<const shasta::Base> PathFiller::Graph::edgeSequence(
+span<const shasta::Base> PathFiller::edgeSequence(
     MarkerGraphEdgeId edgeId) const
 {
     return assembler.markerGraph.edgeSequence[edgeId];
@@ -414,6 +845,7 @@ span<const shasta::Base> PathFiller::Graph::edgeSequence(
 
 
 
+#if 0
 // Get the sequence.
 // The sequences of edgeIdA and edgeIdB are only included if
 // includePrimary is true.
@@ -465,3 +897,6 @@ void PathFiller::writeSequence(ostream& html) const
     copy(sequenceB.begin(), sequenceB.end(), ostream_iterator<shasta::Base>(html));
     html << "\n</pre>";
 }
+#endif
+
+

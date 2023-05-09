@@ -441,7 +441,9 @@ private:
 
     // Given a marker by its OrientedReadId and ordinal,
     // return the corresponding global marker id.
+public:
     MarkerId getMarkerId(OrientedReadId, uint32_t ordinal) const;
+private:
     MarkerId getReverseComplementMarkerId(OrientedReadId, uint32_t ordinal) const;
     MarkerId getMarkerId(const MarkerDescriptor& m) const
     {
@@ -1482,9 +1484,11 @@ private:
     // it belongs to, plus the ordinal of the marker in the oriented read.
     // If the marker is not contained in any vertex, return
     // MarkerGraph::invalidVertexId.
+public:
     MarkerGraph::VertexId getGlobalMarkerGraphVertex(
         OrientedReadId,
         uint32_t ordinal) const;
+private:
 
     // Get pairs (ordinal, marker graph vertex id) for all markers of an oriented read.
     // The pairs are returned sorted by ordinal.
