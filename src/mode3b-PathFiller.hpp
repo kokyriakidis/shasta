@@ -54,6 +54,7 @@ public:
     // This has the same size as the orientedReadInfos vector above
     // and is indexed in the same way.
     vector< vector<uint32_t> > ordinals;
+    uint64_t coverage() const;
 
     // Return true if any oriented reads have more than one ordinal.
     bool hasDuplicateOrientedReads() const;
@@ -177,6 +178,15 @@ private:
     void createEdges();
     void approximateTopologicalSort();
 
+    // Find the edge v0->v1 that contains the specified MarkerInterval
+    // for the i-th oriented read.
+    edge_descriptor findEdge(
+        vertex_descriptor v0,
+        vertex_descriptor v1,
+        uint64_t i,
+        uint32_t ordinal0,
+        uint32_t ordinal1) const;
+
     class StrongComponent {
     public:
         vector<vertex_descriptor> vertices;
@@ -214,13 +224,7 @@ private:
         vertex_descriptor entrance;
         vertex_descriptor exit;
 
-        // The MarkerIntervals used to assemble this VirtualEdge.
-        // Stored in the same way as the MarkerIntervals in PathFillerEdge,
-        // But only one MarkerInterval is allowed for each oriented read.
-        // In each MarkerInterval, the first ordinal corresponds
-        // to the entrance and the second ordinal corresponds to the exit.
-        vector< pair<uint32_t, uint32_t> > markerIntervals;
-        bool coverage() const;
+        uint64_t coverage;
 
         // The sequence of marker graph edges computed by the MSA
         // for this virtual edge.
@@ -234,7 +238,7 @@ private:
 
     void writeGraph(ostream& html) const;
     void writeVerticesCsv() const;
-    void writeGraphviz(ostream&) const;
+    void writeGraphviz(ostream&, bool showVirtualEdges) const;
 
     bool fillPathGreedy(ostream& html);
 

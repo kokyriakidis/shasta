@@ -49,6 +49,10 @@ PathFiller::PathFiller(
 
     createGraph(maxBaseSkip);
     computeStrongComponents();
+    createVirtualEdges();
+    if(html) {
+        html << "<br>There are " << virtualEdges.size() << " virtual edges.";
+    }
     writeVerticesCsv();
     approximateTopologicalSort();
     if(html) {
@@ -520,7 +524,7 @@ bool PathFillerEdge::hasDuplicateOrientedReads() const
 
 
 
-void PathFiller::writeGraphviz(ostream& out) const
+void PathFiller::writeGraphviz(ostream& out, bool showVirtualEdges) const
 {
     const PathFiller& graph = *this;
 
@@ -569,6 +573,10 @@ void PathFiller::writeGraphviz(ostream& out) const
     BGL_FORALL_EDGES(e, graph, PathFiller) {
 
         const PathFillerEdge& edge = graph[e];
+        if(showVirtualEdges and isStrongComponentEdge(e)) {
+            // Skip it.
+            continue;
+        }
         const uint64_t coverage = edge.coverage();
         const auto v0 = source(e, graph);
         const auto v1 = target(e, graph);
@@ -593,6 +601,31 @@ void PathFiller::writeGraphviz(ostream& out) const
         }
         out << "];\n";
 
+    }
+
+
+
+    // Write virtual edges, if requested.
+    if(showVirtualEdges) {
+        for(const VirtualEdge& virtualEdge: virtualEdges) {
+
+            // Compute the hue based on coverage.
+            const uint64_t coverage = virtualEdge.coverage;
+            double H;
+            if(coverage >= orientedReadInfos.size()) {
+                H = 1./3.;
+            } else {
+                H = (double(coverage - 1) / (3. * double(orientedReadInfos.size() - 1)));
+            }
+            const string colorString = "\"" + to_string(H) + " " + to_string(S) + " " + to_string(V) + "\"";
+
+            out << "\"" << graph[virtualEdge.entrance].stringId() << "\"->\"" <<
+                graph[virtualEdge.exit].stringId() << "\" [";
+            out << " color=" << colorString;
+            out << " tooltip=\"Coverage " << coverage << "\"";
+            out << " style=dashed";
+            out << "];\n";
+        }
     }
 
     out << "}\n";
@@ -649,6 +682,18 @@ uint64_t PathFillerEdge::coverage() const
 
 
 
+// Return the total number of ordinals.
+uint64_t PathFillerVertex::coverage() const
+{
+    uint64_t c = 0;
+    for(const auto& v: ordinals) {
+        c += v.size();
+    }
+    return c;
+}
+
+
+
 void PathFiller::writeGraph(ostream& html) const
 {
     // Write out the graph in graphviz format.
@@ -656,7 +701,8 @@ void PathFiller::writeGraph(ostream& html) const
     const string dotFileName = tmpDirectory() + uuid + ".dot";
     {
         ofstream dotFile(dotFileName);
-        writeGraphviz(dotFile);
+        const bool showVirtualEdges = true;
+        writeGraphviz(dotFile, showVirtualEdges);
     }
 
     // Compute layout in svg format.
@@ -775,7 +821,7 @@ void PathFiller::writeStrongComponentGraphviz(
         out << " [";
 
         // Label.
-        out << "label=\"" << vertex.stringId();
+        out << "label=\"" << vertex.stringId() << "\\n" << vertex.coverage();
         if(vertex.isStrongComponentEntrance) {
             out << "\\nEntrance";
         }
@@ -1190,5 +1236,160 @@ void PathFiller::createVirtualEdges()
 
 void PathFiller::createVirtualEdges(uint64_t strongComponentId)
 {
-    // const StrongComponent& strongComponent = strongComponents[strongComponentId];
+    const bool debug = true;
+    const PathFiller& graph = *this;
+    const StrongComponent& strongComponent = strongComponents[strongComponentId];
+
+    if(debug) {
+        cout << "Creating virtual edges for strong component " << strongComponentId << endl;
+    }
+
+
+
+    // Construct the path of each oriented read in this strong components.
+    // Each oriented read can only enter and exit this strong component once.
+    // (If it did exit and then reenter it, the vertices in-between
+    // would also be part of the strong component).
+    vector< vector<edge_descriptor> > paths(orientedReadInfos.size());
+    vector< vector<vertex_descriptor> > pathVertices(orientedReadInfos.size());
+    vector<uint32_t> pathOrdinals;
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        const OrientedReadInfo& info = orientedReadInfos[i];
+
+        // Gather the ordinals.
+        pathOrdinals.clear();
+        for(const vertex_descriptor v: strongComponent.vertices) {
+            const PathFillerVertex& vertex = graph[v];
+            copy(vertex.ordinals[i].begin(), vertex.ordinals[i].end(),
+                back_inserter(pathOrdinals));
+        }
+
+        // If this oriented read is not present in this strong component,
+        // it does not contribute to this virtual edge.
+        if(pathOrdinals.empty()) {
+            continue;
+        }
+
+        // If this oriented read only touches this strong component
+        // at a single vertex, it does not contribute to this virtual edge.
+        if(pathOrdinals.size() == 1) {
+            continue;
+        }
+
+        // Sort the ordinals and verify that they are all contiguous.
+        sort(pathOrdinals.begin(), pathOrdinals.end());
+        for(uint64_t i=1; i<pathOrdinals.size(); i++) {
+            SHASTA_ASSERT(pathOrdinals[i] == pathOrdinals[i-1] + 1);
+        }
+
+        // Sanity checks and debug output.
+        {
+            // The first and last ordinals are the ones where
+            // this oriented read enters and exits this strong component.
+            const uint32_t ordinal0 = pathOrdinals.front();
+            const uint32_t ordinal1 = pathOrdinals.back();
+
+            // Find the corresponding vertices.
+            const vertex_descriptor v0 = info.getVertex(ordinal0);
+            const vertex_descriptor v1 = info.getVertex(ordinal1);
+
+            if(debug) {
+                cout << info.orientedReadId << ":" << endl;
+                cout << "    Enters at " << ordinal0 << " " << graph[v0].stringId() << endl;
+                cout << "    Exits  at " << ordinal1 << " " << graph[v1].stringId() << endl;
+            }
+            SHASTA_ASSERT(graph[v0].isStrongComponentEntrance);
+            SHASTA_ASSERT(graph[v1].isStrongComponentExit);
+        }
+
+        // Construct the path vertices.
+        for(const uint32_t ordinal: pathOrdinals) {
+            pathVertices[i].push_back(info.getVertex(ordinal));
+        }
+        if(debug) {
+            cout << "Path vertices:" << endl;
+            for(const vertex_descriptor v: pathVertices[i]) {
+                cout << graph[v].stringId() << " ";
+            }
+            cout << endl;
+        }
+
+        // Construct the path edges.
+        vector<edge_descriptor>& path = paths[i];
+        for(uint64_t j=1; j<pathVertices[i].size(); j++) {
+            const uint32_t ordinal0 = pathOrdinals[j-1];
+            const uint32_t ordinal1 = pathOrdinals[j];
+            const vertex_descriptor v0 = pathVertices[i][j-1];
+            const vertex_descriptor v1 = pathVertices[i][j];
+            const edge_descriptor e = findEdge(v0, v1, i, ordinal0, ordinal1);
+            path.push_back(e);
+        }
+        if(debug) {
+            cout << "Path edges:" << endl;
+            for(const edge_descriptor e: path) {
+                cout << graph[e].edgeId << " ";
+            }
+            cout << endl;
+        }
+    }
+
+
+
+    // Gather oriented read paths for each entrance/exit combination.
+    // Each of these combinations will generate a virtual edge.
+    std::map< pair<vertex_descriptor, vertex_descriptor>, vector<uint64_t> > pathMap;
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        pathMap[{pathVertices[i].front(), pathVertices[i].back()}].push_back(i);
+    }
+    if(debug) {
+        cout << "Will generate " << pathMap.size() << " virtual edges:" << endl;
+        for(const auto& p: pathMap) {
+            const vertex_descriptor entrance = p.first.first;
+            const vertex_descriptor exit = p.first.second;
+            cout << graph[entrance].stringId() << " to ";
+            cout << graph[exit].stringId();
+            cout << " coverage " << p.second.size() << endl;
+        }
+    }
+
+
+    // Generate the virtual edges.
+    for(const auto& p: pathMap) {
+        VirtualEdge virtualEdge;
+        virtualEdge.strongComponentId = strongComponentId;
+        virtualEdge.entrance = p.first.first;
+        virtualEdge.exit = p.first.second;
+        virtualEdge.coverage = p.second.size();
+        virtualEdges.push_back(virtualEdge);
+    }
+
 }
+
+
+
+// Find the edge v0->v1 that contains the specified MarkerInterval
+// for the i-th oriented read.
+PathFiller::edge_descriptor PathFiller::findEdge(
+    vertex_descriptor v0,
+    vertex_descriptor v1,
+    uint64_t i,
+    uint32_t ordinal0,
+    uint32_t ordinal1) const
+{
+    const PathFiller& graph = *this;
+
+    BGL_FORALL_OUTEDGES(v0, e, graph, PathFiller) {
+        if(target(e, graph) != v1) {
+            continue;
+        }
+        const PathFillerEdge& edge = graph[e];
+        const auto& markerIntervals = edge.markerIntervals[i];
+        if(find(markerIntervals.begin(), markerIntervals.end(),
+            make_pair(ordinal0, ordinal1)) != markerIntervals.end()) {
+            return e;
+        }
+    }
+
+    SHASTA_ASSERT(0);
+}
+
