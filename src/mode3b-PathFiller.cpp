@@ -61,7 +61,7 @@ PathFiller::PathFiller(
                 ++nonDagEdgeCount;
             }
         }
-        html << "<p>There are " << nonDagEdgeCount << " non-DAG edges.";
+        writeStrongComponents(html);
         writeGraph(html);
     }
 
@@ -689,6 +689,172 @@ void PathFiller::writeGraph(ostream& html) const
 
 
 
+void PathFiller::writeStrongComponents(ostream& html) const
+{
+    html << "<br>Found " << strongComponents.size() <<
+        " non-trivial strongly connected components.";
+    for(uint64_t strongComponentId=0; strongComponentId<strongComponents.size(); strongComponentId++) {
+        writeStrongComponent(html, strongComponentId);
+    }
+
+}
+
+
+
+void PathFiller::writeStrongComponent(ostream& html, uint64_t strongComponentId) const
+{
+    const StrongComponent& strongComponent = strongComponents[strongComponentId];
+    html << "<br>Strong component " << strongComponentId << " with " <<
+        strongComponent.vertices.size() << " vertices.";
+
+    // Write out this strong component in graphviz format.
+    const string uuid = to_string(boost::uuids::random_generator()());
+    const string dotFileName = tmpDirectory() + uuid + ".dot";
+    {
+        ofstream dotFile(dotFileName);
+        writeStrongComponentGraphviz(dotFile, strongComponentId);
+    }
+
+    // Compute layout in svg format.
+    const string command = "dot -O -T svg " + dotFileName;
+    bool timeoutTriggered = false;
+    bool signalOccurred = false;
+    int returnCode = 0;
+    const double timeout = 600;
+    runCommandWithTimeout(command, timeout, timeoutTriggered, signalOccurred, returnCode);
+    if(returnCode!=0 or signalOccurred) {
+        throw runtime_error("An error occurred while running the following command: " + command);
+    }
+    if(timeoutTriggered) {
+        std::filesystem::remove(dotFileName);
+        throw runtime_error("Timeout during graph layout computation.");
+    }
+
+    // Remove the .dot file.
+    std::filesystem::remove(dotFileName);
+
+    // Copy the svg file to html.
+    const string svgFileName = dotFileName + ".svg";
+    ifstream svgFile(svgFileName);
+    html << "<p>" << svgFile.rdbuf();
+    svgFile.close();
+
+    // Remove the .svg file.
+    std::filesystem::remove(svgFileName);
+}
+
+
+
+void PathFiller::writeStrongComponentGraphviz(
+    ostream& out,
+    uint64_t strongComponentId) const
+{
+    const PathFiller& graph = *this;
+
+    const double S = 0.7;
+    const double V = 1.;
+
+    const StrongComponent& strongComponent = strongComponents[strongComponentId];
+    out << "digraph StrongComponent" << strongComponentId << "{\n"
+        "node [shape=rectangle style=filled fontname=\"Courier New\"];\n"
+        "edge [penwidth=5 fontname=\"Courier New\"];\n";
+
+    // For consistency with the display of the entire graph,
+    // write the vertices in rank order.
+    vector< pair<vertex_descriptor, uint64_t> > verticesWithRank;
+    for(const vertex_descriptor v: strongComponent.vertices) {
+        verticesWithRank.push_back({v, graph[v].rank});
+    }
+    sort(verticesWithRank.begin(), verticesWithRank.end(),
+        OrderPairsBySecondOnly<vertex_descriptor, uint64_t>());
+    for(const auto& p: verticesWithRank) {
+        const vertex_descriptor v = p.first;
+        const PathFillerVertex& vertex = graph[v];
+        SHASTA_ASSERT(vertex.strongComponentId == strongComponentId);
+        out << "\"" << vertex.stringId() << "\"";
+        out << " [";
+
+        // Label.
+        out << "label=\"" << vertex.stringId();
+        if(vertex.isStrongComponentEntrance) {
+            out << "\\nEntrance";
+        }
+        if(vertex.isStrongComponentExit) {
+            out << "\\nExit";
+        }
+        for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+            const auto& ordinals = vertex.ordinals[i];
+            if(not ordinals.empty()) {
+                out << "\\n" << i << " " << orientedReadInfos[i].orientedReadId;
+                for(const uint32_t ordinal: ordinals) {
+                    out << " " << ordinal;
+                }
+            }
+        }
+        out << "\"";
+
+        // Color.
+        if(vertex.isStrongComponentEntrance) {
+            if(vertex.isStrongComponentExit) {
+                out << " fillcolor=Magenta"; // Entrance and exit.
+            } else {
+                out << " fillcolor=Cyan";   // Entrance only.
+            }
+        } else if(vertex.isStrongComponentExit) {
+            out << " fillcolor=Gold";       // Exit only.
+        }
+
+        out << "]";
+        out << ";\n";
+    }
+
+    // Write the edges.
+    for(const vertex_descriptor v0: strongComponent.vertices) {
+        const PathFillerVertex& vertex0 = graph[v0];
+        SHASTA_ASSERT(vertex0.strongComponentId == strongComponentId);
+
+        BGL_FORALL_OUTEDGES(v0, e, graph, PathFiller) {
+            const PathFillerEdge& edge = graph[e];
+            const uint64_t coverage = edge.coverage();
+            const vertex_descriptor v1 = target(e, graph);
+            const PathFillerVertex& vertex1 = graph[v1];
+            if(vertex1.strongComponentId != strongComponentId) {
+                continue;
+            }
+
+            // Compute the hue based on coverage.
+            double H;
+            if(coverage >= orientedReadInfos.size()) {
+                H = 1./3.;
+            } else {
+                H = (double(coverage - 1) / (3. * double(orientedReadInfos.size() - 1)));
+            }
+            const string colorString = "\"" + to_string(H) + " " + to_string(S) + " " + to_string(V) + "\"";
+
+            out <<
+                "\"" << vertex0.stringId() << "\""
+                "->"
+                "\"" << vertex1.stringId() << "\"";
+            out << "[";
+            out << " color=" << colorString;
+            out << " label=\"" << edge.edgeId << "\\n" << coverage << "\"";
+
+            if(not edge.isDagEdge) {
+                out << " constraint=false";
+            }
+
+            out << "]";
+            out << ";\n";
+        }
+
+    }
+
+
+    out << "}\n";
+}
+
+
+
 #if 0
 bool PathFiller::fillPathGreedy(ostream& html)
 {
@@ -946,27 +1112,25 @@ void PathFiller::computeStrongComponents()
     strongComponents.clear();
     for(const auto& p: componentVertices) {
         if(p.second.size() > 1) {
-            strongComponents.push_back(p.second);
+            strongComponents.push_back(StrongComponent(p.second));
         }
     }
-    cout << "Found " << strongComponents.size() <<
-        " non-trivial strongly connected components." << endl;
 
     // Mark the vertices in the non-trivial strongly connected components.
-    uint64_t strongComponentId = 0;
-    for(const auto& strongComponent: strongComponents) {
-        for(const vertex_descriptor v: strongComponent) {
+    for(uint64_t strongComponentId=0; strongComponentId<strongComponents.size(); strongComponentId++) {
+        const auto& strongComponent = strongComponents[strongComponentId];
+        for(const vertex_descriptor v: strongComponent.vertices) {
             graph[v].strongComponentId = strongComponentId;
         }
-        ++strongComponentId;
     }
 
     // Mark the entrances of each strong component.
-    for(const auto& strongComponent: strongComponents) {
-        for(const vertex_descriptor v0: strongComponent) {
+    for(StrongComponent& strongComponent: strongComponents) {
+        for(const vertex_descriptor v0: strongComponent.vertices) {
             BGL_FORALL_INEDGES(v0, e, graph, PathFiller) {
                 const vertex_descriptor v1 = source(e, graph);
                 if(graph[v1].strongComponentId != graph[v0].strongComponentId) {
+                    strongComponent.entrances.push_back(v0);
                     graph[v0].isStrongComponentEntrance = true;
                     break;
                 }
@@ -975,11 +1139,12 @@ void PathFiller::computeStrongComponents()
     }
 
     // Mark the exits of each strong component.
-    for(const auto& strongComponent: strongComponents) {
-        for(const vertex_descriptor v0: strongComponent) {
+    for(StrongComponent& strongComponent: strongComponents) {
+        for(const vertex_descriptor v0: strongComponent.vertices) {
             BGL_FORALL_OUTEDGES(v0, e, graph, PathFiller) {
                 const vertex_descriptor v1 = target(e, graph);
                 if(graph[v1].strongComponentId != graph[v0].strongComponentId) {
+                    strongComponent.exits.push_back(v0);
                     graph[v0].isStrongComponentExit = true;
                     break;
                 }
@@ -1003,4 +1168,27 @@ bool PathFiller::isStrongComponentEdge(edge_descriptor e) const
         (c0 != invalid<uint64_t>) and
         (c1 != invalid<uint64_t>) and
         (c0 == c1);
+}
+
+
+
+PathFiller::StrongComponent::StrongComponent(
+    const vector<vertex_descriptor>& vertices) :
+    vertices(vertices)
+{}
+
+
+
+void PathFiller::createVirtualEdges()
+{
+    for(uint64_t strongComponentId=0; strongComponentId<strongComponents.size(); strongComponentId++) {
+        createVirtualEdges(strongComponentId);
+    }
+}
+
+
+
+void PathFiller::createVirtualEdges(uint64_t strongComponentId)
+{
+    // const StrongComponent& strongComponent = strongComponents[strongComponentId];
 }

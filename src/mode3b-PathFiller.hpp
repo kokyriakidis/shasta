@@ -177,12 +177,60 @@ private:
     void createEdges();
     void approximateTopologicalSort();
 
+    class StrongComponent {
+    public:
+        vector<vertex_descriptor> vertices;
+        vector<vertex_descriptor> entrances;
+        vector<vertex_descriptor> exits;
+        StrongComponent(const vector<vertex_descriptor>& vertices);
+    };
     void computeStrongComponents();
-    vector< vector<vertex_descriptor> > strongComponents;
+    vector<StrongComponent> strongComponents;
+    void writeStrongComponents(ostream&) const;
+    void writeStrongComponent(ostream&, uint64_t strongComponentId) const;
+    void writeStrongComponentGraphviz(ostream&, uint64_t strongComponentId) const;
 
     // This returns true if the specified edge is internal to a
     // strongly connected component.
     bool isStrongComponentEdge(edge_descriptor) const;
+
+
+
+    // Virtual edges are used as a replacement for edges
+    // internal to strongly connected components,
+    // and as a way to avoid cycles during assembly.
+    // A virtual edge joins an entrance of a strongly connected
+    // component with an exit of the same strongly connected component.
+    // It stores a sequence of marker graph edges obtained by MSA
+    // of thew oriented reads that enter/exit the strongly connected component
+    // at the entrance/exit joined by the virtual edge.
+    // Virtual edges are not stored in the boost graph. They are stored here instead.
+    class VirtualEdge {
+    public:
+        // The strong component, entrance, and exit that generated this virtual edge.
+        // The entrance is the source vertex of the virtual edge.
+        // The exit is the target vertex of the virtual edge.
+        uint64_t strongComponentId;
+        vertex_descriptor entrance;
+        vertex_descriptor exit;
+
+        // The MarkerIntervals used to assemble this VirtualEdge.
+        // Stored in the same way as the MarkerIntervals in PathFillerEdge,
+        // But only one MarkerInterval is allowed for each oriented read.
+        // In each MarkerInterval, the first ordinal corresponds
+        // to the entrance and the second ordinal corresponds to the exit.
+        vector< pair<uint32_t, uint32_t> > markerIntervals;
+        bool coverage() const;
+
+        // The sequence of marker graph edges computed by the MSA
+        // for this virtual edge.
+        vector<MarkerGraphEdgeId> markerGraphEdges;
+    };
+    vector<VirtualEdge> virtualEdges;
+    void createVirtualEdges();
+    void createVirtualEdges(uint64_t strongComponentId);
+
+
 
     void writeGraph(ostream& html) const;
     void writeVerticesCsv() const;
