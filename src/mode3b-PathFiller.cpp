@@ -572,12 +572,6 @@ void PathFiller::writeGraphviz(ostream& out) const
         const uint64_t coverage = edge.coverage();
         const auto v0 = source(e, graph);
         const auto v1 = target(e, graph);
-        const auto& vertex0 = graph[v0];
-        const auto& vertex1 = graph[v1];
-        const bool isStrongComponentEdge =
-            vertex0.isStrongComponentVertex() and
-            vertex1.isStrongComponentVertex() and
-            vertex0.strongComponentId == vertex1.strongComponentId;
 
         // Compute the hue based on coverage.
         double H;
@@ -591,7 +585,7 @@ void PathFiller::writeGraphviz(ostream& out) const
         out << "\"" << graph[v0].stringId() << "\"->\"" << graph[v1].stringId() << "\" [";
         out << " color=" << colorString;
         out << " tooltip=\"Coverage " << coverage << "\"";
-        if(isStrongComponentEdge) {
+        if(isStrongComponentEdge(e)) {
             out << " style=dashed";
         }
         if(not edge.isDagEdge) {
@@ -992,4 +986,21 @@ void PathFiller::computeStrongComponents()
             }
         }
     }
+}
+
+
+
+// This returns true if the specified edge is internal to a
+// strongly connected component.
+bool PathFiller::isStrongComponentEdge(edge_descriptor e) const
+{
+    const PathFiller& graph = *this;
+    const vertex_descriptor v0 = source(e, graph);
+    const vertex_descriptor v1 = target(e, graph);
+    const uint64_t c0 = graph[v0].strongComponentId;
+    const uint64_t c1 = graph[v1].strongComponentId;
+    return
+        (c0 != invalid<uint64_t>) and
+        (c1 != invalid<uint64_t>) and
+        (c0 == c1);
 }

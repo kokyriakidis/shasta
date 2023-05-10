@@ -180,6 +180,10 @@ private:
     void computeStrongComponents();
     vector< vector<vertex_descriptor> > strongComponents;
 
+    // This returns true if the specified edge is internal to a
+    // strongly connected component.
+    bool isStrongComponentEdge(edge_descriptor) const;
+
     void writeGraph(ostream& html) const;
     void writeVerticesCsv() const;
     void writeGraphviz(ostream&) const;
