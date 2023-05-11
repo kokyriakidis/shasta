@@ -7,6 +7,7 @@
 #include "orderPairs.hpp"
 #include "Reads.hpp"
 #include "runCommandWithTimeout.hpp"
+#include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3b;
 
@@ -896,6 +897,11 @@ bool PathFiller::fillPathGreedy(ostream& html)
 {
     const PathFiller& graph = *this;
 
+    const bool debug = true;
+    if(debug) {
+        cout << timestamp << "PathFiller::fillPathGreedy begins." << endl;
+    }
+
     // Find the first and last vertex of the path we are looking for.
     const OrientedReadInfo& firstInfo = orientedReadInfos.front();
     const vertex_descriptor vA = firstInfo.vertices.front();
@@ -906,6 +912,9 @@ bool PathFiller::fillPathGreedy(ostream& html)
     // Main iteration loop.
     vertex_descriptor v = vA;
     while(v != vB) {
+        if(debug) {
+            cout << "At vertex " << graph[v].stringId() << endl;
+        }
 
         // Find the edge with the most coverage.
         // Don't consider strong component edges.
@@ -914,6 +923,13 @@ bool PathFiller::fillPathGreedy(ostream& html)
         uint64_t bestCoverage = 0;
         BGL_FORALL_OUTEDGES(v, e, graph, PathFiller) {
             if(isStrongComponentEdge(e)) {
+                continue;
+            }
+            if(target(e, graph) == source(e, graph)) {
+                // We have to ignore it to avoid an infinite loop
+                // when constructing the assembly path.
+                // This can cause deletions in low complexity sequence.
+                // We can probably do better.
                 continue;
             }
             const uint64_t coverage = graph[e].coverage();
@@ -928,6 +944,13 @@ bool PathFiller::fillPathGreedy(ostream& html)
         uint64_t bestVirtualEdgeCoverage = 0;
         for(uint64_t virtualEdgeIndex: graph[v].virtualEdgeIndexes) {
             const VirtualEdge& virtualEdge = virtualEdges[virtualEdgeIndex];
+            if(virtualEdge.exit == virtualEdge.entrance) {
+                // We have to ignore it to avoid an infinite loop
+                // when constructing the assembly path.
+                // This can cause deletions in low complexity sequence.
+                // We can probably do better.
+                continue;
+            }
             if(virtualEdge.coverage > bestVirtualEdgeCoverage) {
                 bestVirtualEdgeCoverage = virtualEdge.coverage;
                 bestVirtualEdgeIndex = virtualEdgeIndex;
@@ -945,6 +968,9 @@ bool PathFiller::fillPathGreedy(ostream& html)
         // If there are no usable edges, declare failure.
         // This should never happen.
         if(bestCoverage == 0) {
+            if(debug) {
+                cout << timestamp << "PathFiller::fillPathGreedy ends with failure." << endl;
+            }
             return false;
         }
 
@@ -960,6 +986,9 @@ bool PathFiller::fillPathGreedy(ostream& html)
     secondaryEdges.resize(secondaryEdges.size() - 1);
     secondaryEdges.erase(secondaryEdges.begin());
 
+    if(debug) {
+        cout << timestamp << "PathFiller::fillPathGreedy ends with success." << endl;
+    }
     return true;
 }
 
@@ -1147,7 +1176,7 @@ void PathFiller::createVirtualEdges()
 
 void PathFiller::createVirtualEdges(uint64_t strongComponentId)
 {
-    const bool debug = true;
+    const bool debug = false;
     PathFiller& graph = *this;
     const StrongComponent& strongComponent = strongComponents[strongComponentId];
 
