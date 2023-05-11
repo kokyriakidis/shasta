@@ -17,6 +17,10 @@ using namespace mode3b;
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+// Seqan
+#include <seqan/align.h>
+#include <seqan/graph_msa.h>
+
 // Standard library.
 #include "fstream.hpp"
 
@@ -1342,7 +1346,7 @@ void PathFiller::createVirtualEdges(uint64_t strongComponentId)
         pathMap[{pathVertices[i].front(), pathVertices[i].back()}].push_back(i);
     }
     if(debug) {
-        cout << "Will generate " << pathMap.size() << " virtual edges:" << endl;
+        cout << "Will generate " << pathMap.size() << " virtual edges." << endl;
         for(const auto& p: pathMap) {
             const vertex_descriptor entrance = p.first.first;
             const vertex_descriptor exit = p.first.second;
@@ -1355,12 +1359,110 @@ void PathFiller::createVirtualEdges(uint64_t strongComponentId)
 
     // Generate the virtual edges.
     for(const auto& p: pathMap) {
+        const vector<uint64_t>& orientedReadIndexes = p.second;
         VirtualEdge virtualEdge;
         virtualEdge.strongComponentId = strongComponentId;
         virtualEdge.entrance = p.first.first;
         virtualEdge.exit = p.first.second;
-        virtualEdge.coverage = p.second.size();
+        virtualEdge.coverage = orientedReadIndexes.size();
         virtualEdges.push_back(virtualEdge);
+
+        // Gather the sequence of MargerGraphEdgeIds seen by each of the
+        // oriented reads that contribute to this virtual edge.
+        // SeqAN uses 0 to represent gaps, so we add 1
+        // to the edge ids.
+        vector< vector<MarkerGraphEdgeId> > sequences;
+        for(uint64_t i: orientedReadIndexes) {
+            sequences.resize(sequences.size() + 1);
+            for(const edge_descriptor e: paths[i]) {
+                sequences.back().push_back(graph[e].edgeId + 1);
+            }
+            cout << endl;
+        }
+
+        if(debug) {
+            const vertex_descriptor entrance = p.first.first;
+            const vertex_descriptor exit = p.first.second;
+            cout << "Virtual edge ";
+            cout << graph[entrance].stringId() << " to ";
+            cout << graph[exit].stringId();
+            cout << " coverage " << p.second.size() << endl;
+
+            for(const auto& v: sequences) {
+                for(const auto value: v) {
+                    cout << " " << value - 1;
+                }
+                cout << endl;
+            }
+        }
+
+        // Use Seqan to do an MSA of these sequences.
+        {
+            using namespace seqan;
+            Align< String<MarkerGraphEdgeId> > align;
+            const uint64_t n = sequences.size();
+            resize(rows(align), n);
+            for(uint64_t i=0; i<n; i++) {
+                assignSource(row(align, i), sequences[i]);
+            }
+            globalMsaAlignment(align, Score<int64_t, Simple>(0, -1, -4));
+
+            if(debug) {
+                cout << "MSA:" << endl;
+                for(uint64_t rowNumber=0; rowNumber<n; rowNumber++) {
+                    for(uint64_t j=0; j<length(row(align, rowNumber)); j++) {
+                        const auto value = getValue(row(align, rowNumber), j);
+                        if(value != 0) {
+                            cout << value - 1;
+                        }
+                        cout << ",";
+                    }
+                    cout << endl;
+                }
+            }
+
+            // Compute the consensus.
+            vector<uint64_t> values;
+            vector<uint64_t> frequencies;
+            vector<uint64_t> consensusValues;
+            const uint64_t alignmentLength = length(row(align, 0));
+            for(uint64_t j=0; j<alignmentLength; j++) {
+                values.clear();
+                frequencies.clear();
+                for(uint64_t rowNumber=0; rowNumber<n; rowNumber++) {
+                    const auto value = getValue(row(align, rowNumber), j);
+                    values.push_back(value);
+                }
+                deduplicateAndCount(values, frequencies);
+
+                // Find the value with the highest frequency.
+                const uint64_t maxFrequencyIndex =
+                    max_element(frequencies.begin(), frequencies.end()) - frequencies.begin();
+                const uint64_t consensusValue = values[maxFrequencyIndex];
+
+                // Store it.
+                consensusValues.push_back(consensusValue);
+                if(consensusValue > 0) {
+                    virtualEdges.back().markerGraphEdges.push_back(consensusValue - 1);
+                }
+            }
+
+            if(debug) {
+                cout << "Aligned consensus:" << endl;
+                for(const uint64_t value: consensusValues) {
+                    if(value) {
+                        cout << value - 1;
+                    }
+                    cout << ",";
+                }
+                cout << endl;
+                cout << "VirtualEdge consensus:" << endl;
+                for(const MarkerGraphEdgeId edgeId: virtualEdges.back().markerGraphEdges) {
+                    cout << edgeId << " ";
+                }
+                cout << endl;
+            }
+        }
     }
 
 }
