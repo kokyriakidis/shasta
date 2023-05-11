@@ -73,30 +73,17 @@ PathFiller::PathFiller(
         writeGraph(html);
     }
 
-#if 0
-    writeVerticesCsv();
-
+    // Fill the path between edgeIdA and edgeIdB with the
+    // locally best choice at each vertex.
     const bool success = fillPathGreedy(html);
-
-    if(html) {
-        html << "<p>The local marker graph for this step assembly has " <<
-            num_vertices(graph) << " vertices and " <<
-            num_edges(graph) << " edges." << endl;
-        writeGraph(html);
-
-        if(success) {
+    if(success) {
+        if(html) {
             writeSequence(html);
-        } else {
-            cout << "Unable to fill assembly path between primary edges " <<
-            edgeIdA << " " << edgeIdB << endl;
         }
-    }
-
-    if(not success) {
+    } else {
         throw runtime_error("Unable to fill assembly path between primary edges " +
             to_string(edgeIdA) + " " + to_string(edgeIdB));
     }
-#endif
 }
 
 
@@ -905,32 +892,14 @@ void PathFiller::writeStrongComponentGraphviz(
 
 
 
-#if 0
 bool PathFiller::fillPathGreedy(ostream& html)
 {
-    const bool debug = true;
+    const PathFiller& graph = *this;
 
-    using vertex_descriptor = Graph::vertex_descriptor;
-    using edge_descriptor = Graph::edge_descriptor;
-    const MarkerGraph::Edge markerGraphEdgeA = assembler.markerGraph.edges[edgeIdA];
-    const MarkerGraph::Edge markerGraphEdgeB = assembler.markerGraph.edges[edgeIdB];
-    const Graph::edge_descriptor eA = graph.edgeMap[edgeIdA];
-    // const Graph::edge_descriptor eB = graph.edgeMap[edgeIdB];
-    const Edge& edgeA = graph[eA];
-    // const Edge& edgeB = graph[eB];
-
-    // The path we are looking for begins at vA and ends at vB.
-    const vertex_descriptor vA = graph.vertexMap[markerGraphEdgeA.target];
-    const vertex_descriptor vB = graph.vertexMap[markerGraphEdgeB.target];
-
-    // The last MarkerInterval used for each of the oriented reads.
-    // We will use this to make sure we only move forward.
-    vector<uint32_t> lastMarkerInterval;
-    SHASTA_ASSERT(not edgeA.hasCycle());    // True by construction.
-    for(const auto& v: edgeA.markerIntervals) {
-        SHASTA_ASSERT(v.size() == 1);
-        lastMarkerInterval.push_back(v.front().first);
-    }
+    // Find the first and last vertex of the path we are looking for.
+    const OrientedReadInfo& firstInfo = orientedReadInfos.front();
+    const vertex_descriptor vA = firstInfo.vertices.front();
+    const vertex_descriptor vB = firstInfo.vertices.back();
 
 
 
@@ -938,111 +907,47 @@ bool PathFiller::fillPathGreedy(ostream& html)
     vertex_descriptor v = vA;
     while(v != vB) {
 
-        if(debug) {
-            cout << "At vertex " << graph[v].vertexId << "\n";
-            for(uint64_t i=0; i<lastMarkerInterval.size(); i++) {
-                cout << i << " " << lastMarkerInterval[i] << "\n";
-            }
-        }
-
-        // For each of our oriented reads,
-        // find which of the possible out-edges it wants to go to,
-        // if any, based on the ordinals stored in lastMarkerInterval.
-        vector< pair<edge_descriptor, uint32_t> > nextEdgesAndOrdinals(orientedReadInfos.size());
-        for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
-            // There is no null_edge, so this can be uninitialized and it's ok,
-            // but we have to suppress the warning.
-            edge_descriptor eNext;
-#pragma GCC diagnostic pop
-            uint32_t nextOrdinal0 = std::numeric_limits<uint32_t>::max();
-            BGL_FORALL_OUTEDGES(v, e, graph, Graph) {
-                const auto& markerIntervals = graph[e].markerIntervals[i];
-                for(const auto& p: markerIntervals) {
-                    const uint32_t ordinal0 = p.first;
-                    if(ordinal0 > lastMarkerInterval[i]) {
-                        if(ordinal0 < nextOrdinal0) {
-                            eNext = e;
-                            nextOrdinal0 = ordinal0;
-                        }
-                    }
-                }
-            }
-            nextEdgesAndOrdinals[i] = {eNext, nextOrdinal0};
-        }
-
-
-        // Pick the next edge that most oriented reads prefer.
-        vector<edge_descriptor> nextEdges;
-        vector<uint64_t> nextEdgesFrequency;
-        for(const auto& p: nextEdgesAndOrdinals) {
-            if(p.second != std::numeric_limits<uint32_t>::max()) {
-                nextEdges.push_back(p.first);
-            }
-        }
-        SHASTA_ASSERT(not nextEdges.empty());
-        deduplicateAndCount(nextEdges, nextEdgesFrequency);
-        auto it = max_element(nextEdgesFrequency.begin(), nextEdgesFrequency.end());
-        edge_descriptor eNext = nextEdges[it - nextEdgesFrequency.begin()];
-
-        if(debug) {
-            cout << "Next edge " << graph[eNext].edgeId << "\n";
-        }
-
-
-        // This edge gets added to the path.
-        secondaryEdges.push_back(graph[eNext].edgeId);
-        v = target(eNext, graph);
-
-        // Update the lastMarkerInterval vector.
-        for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
-            const auto& p = nextEdgesAndOrdinals[i];
-            if(eNext == p.first) {
-                lastMarkerInterval[i] = p.second;
-            }
-        }
-    }
-    cout << flush;
-
-    if(html) {
-        html << "<p>Path secondary edges:";
-        for(const MarkerGraphEdgeId edgeId: secondaryEdges) {
-            html << " " << edgeId;
-        }
-    }
-
-    // As constructed, pathSecondaryEdges includes edgeIB.
-    // Check that this is the case, then remove it.
-    SHASTA_ASSERT(secondaryEdges.size() >= 1);
-    // SHASTA_ASSERT(secondaryEdges.front() == edgeIdA);
-    SHASTA_ASSERT(secondaryEdges.back() == edgeIdB);
-    secondaryEdges.resize(secondaryEdges.size() - 1);
-    // secondaryEdges.erase(secondaryEdges.begin());
-
-    /*
-    // Main iteration loop.
-    Graph::vertex_descriptor v = vA;
-    while(v != vB) {
-
         // Find the edge with the most coverage.
-        Graph::edge_descriptor eNext;
+        // Don't consider strong component edges.
+        // In their place, we will consider virtual edges below.
+        edge_descriptor eNext;
         uint64_t bestCoverage = 0;
-        BGL_FORALL_OUTEDGES(v, e, graph, Graph) {
-            if(edgesUsed.contains(e)) {
+        BGL_FORALL_OUTEDGES(v, e, graph, PathFiller) {
+            if(isStrongComponentEdge(e)) {
                 continue;
             }
-            const uint64_t coverage = graph[e].markerIntervals.size();
+            const uint64_t coverage = graph[e].coverage();
             if(coverage > bestCoverage) {
                 eNext = e;
                 bestCoverage = coverage;
             }
         }
+
+        // See if we can do better with a VirtualEdge.
+        uint64_t bestVirtualEdgeIndex = invalid<uint64_t>;
+        uint64_t bestVirtualEdgeCoverage = 0;
+        for(uint64_t virtualEdgeIndex: graph[v].virtualEdgeIndexes) {
+            const VirtualEdge& virtualEdge = virtualEdges[virtualEdgeIndex];
+            if(virtualEdge.coverage > bestVirtualEdgeCoverage) {
+                bestVirtualEdgeCoverage = virtualEdge.coverage;
+                bestVirtualEdgeIndex = virtualEdgeIndex;
+            }
+        }
+        if(bestVirtualEdgeCoverage > bestCoverage) {
+            const VirtualEdge& bestVirtualEdge = virtualEdges[bestVirtualEdgeIndex];
+            for(const MarkerGraphEdgeId edgeId: bestVirtualEdge.markerGraphEdges) {
+                secondaryEdges.push_back(edgeId);
+            }
+            v = bestVirtualEdge.exit;
+            continue;
+        }
+
+        // If there are no usable edges, declare failure.
+        // This should never happen.
         if(bestCoverage == 0) {
             return false;
         }
 
-        edgesUsed.insert(eNext);
         secondaryEdges.push_back(graph[eNext].edgeId);
         v = target(eNext, graph);
     }
@@ -1055,11 +960,9 @@ bool PathFiller::fillPathGreedy(ostream& html)
     secondaryEdges.resize(secondaryEdges.size() - 1);
     secondaryEdges.erase(secondaryEdges.begin());
 
-    */
-
     return true;
 }
-#endif
+
 
 
 span<const shasta::Base> PathFiller::edgeSequence(
@@ -1078,7 +981,6 @@ span<const shasta::Base> PathFiller::edgeSequence(
 
 
 
-#if 0
 // Get the sequence.
 // The sequences of edgeIdA and edgeIdB are only included if
 // includePrimary is true.
@@ -1089,17 +991,17 @@ void PathFiller::getSequence(
     sequence.clear();
 
     if(includePrimary) {
-        const auto sequenceA = graph.edgeSequence(edgeIdA);
+        const auto sequenceA = edgeSequence(edgeIdA);
         copy(sequenceA.begin(), sequenceA.end(), back_inserter(sequence));
     }
 
     for(const MarkerGraphEdgeId edgeId: secondaryEdges) {
-        const auto edgeSequence = graph.edgeSequence(edgeId);
-        copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
+        const auto thisEdgeSequence = edgeSequence(edgeId);
+        copy(thisEdgeSequence.begin(), thisEdgeSequence.end(), back_inserter(sequence));
     }
 
     if(includePrimary) {
-        const auto sequenceB = graph.edgeSequence(edgeIdB);
+        const auto sequenceB = edgeSequence(edgeIdB);
         copy(sequenceB.begin(), sequenceB.end(), back_inserter(sequence));
     }
 }
@@ -1112,25 +1014,30 @@ void PathFiller::writeSequence(ostream& html) const
         return;
     }
 
-    const auto sequenceA = graph.edgeSequence(edgeIdA);
-    const auto sequenceB = graph.edgeSequence(edgeIdB);
+    const auto sequenceA = edgeSequence(edgeIdA);
+    const auto sequenceB = edgeSequence(edgeIdB);
     vector<Base> sequence;
     getSequence(sequence, false);
 
     html << "<pre style='font-family:monospace'>\n";
+
     html << ">" << edgeIdA << " length " << sequenceA.size() << "\n";
     copy(sequenceA.begin(), sequenceA.end(), ostream_iterator<shasta::Base>(html));
+
     html << "\n>Intervening length " << sequence.size() << "\n";
     copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
+
     html << "\n>" << edgeIdB << " length " << sequenceB.size() << "\n";
     copy(sequenceB.begin(), sequenceB.end(), ostream_iterator<shasta::Base>(html));
+
     html << "\n>Combined length " << sequenceA.size() + sequence.size() + sequenceB.size() << "\n";
     copy(sequenceA.begin(), sequenceA.end(), ostream_iterator<shasta::Base>(html));
     copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
     copy(sequenceB.begin(), sequenceB.end(), ostream_iterator<shasta::Base>(html));
+
     html << "\n</pre>";
 }
-#endif
+
 
 
 
@@ -1241,7 +1148,7 @@ void PathFiller::createVirtualEdges()
 void PathFiller::createVirtualEdges(uint64_t strongComponentId)
 {
     const bool debug = true;
-    const PathFiller& graph = *this;
+    PathFiller& graph = *this;
     const StrongComponent& strongComponent = strongComponents[strongComponentId];
 
     if(debug) {
@@ -1365,6 +1272,7 @@ void PathFiller::createVirtualEdges(uint64_t strongComponentId)
         virtualEdge.entrance = p.first.first;
         virtualEdge.exit = p.first.second;
         virtualEdge.coverage = orientedReadIndexes.size();
+        graph[virtualEdge.entrance].virtualEdgeIndexes.push_back(virtualEdges.size());
         virtualEdges.push_back(virtualEdge);
 
         // Gather the sequence of MargerGraphEdgeIds seen by each of the

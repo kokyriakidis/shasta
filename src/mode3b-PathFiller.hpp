@@ -60,8 +60,8 @@ public:
     bool hasDuplicateOrientedReads() const;
 
     // Required by approximateTopologicalSort.
-    uint64_t color;
-    uint64_t rank;
+    uint64_t color = invalid<uint64_t>;
+    uint64_t rank = invalid<uint64_t>;
 
     // Set if this vertex is part of a non-trivial strongly connected component.
     uint64_t strongComponentId = invalid<uint64_t>;
@@ -70,6 +70,9 @@ public:
     }
     bool isStrongComponentEntrance = false;
     bool isStrongComponentExit = false;
+
+    // The indexes of the VirtualEdges that have this vertex as their source.
+    vector<uint64_t> virtualEdgeIndexes;
 
     PathFillerVertex(MarkerGraphVertexId, uint64_t orientedReadCount);
     PathFillerVertex() {}
