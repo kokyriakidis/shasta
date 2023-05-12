@@ -43,7 +43,8 @@ class shasta::mode3b::PathFillerVertex {
 public:
     // The corresponding vertex in the global marker graph.
     // There can be more than one PathFillerVertex corresponding to
-    // a given marker graph vertex.
+    // a given marker graph vertex. The replicaIndex is used to
+    // identify them.
     MarkerGraphVertexId vertexId;
     uint64_t replicaIndex = 0;
     string stringId() const;
@@ -56,30 +57,24 @@ public:
     vector< vector<uint32_t> > ordinals;
     uint64_t coverage() const;
 
-    // Return true if any oriented reads have more than one ordinal.
-    bool hasDuplicateOrientedReads() const;
-
-    // Required by approximateTopologicalSort.
-    uint64_t color = invalid<uint64_t>;
-    uint64_t rank = invalid<uint64_t>;
-
     // Set if this vertex is part of a non-trivial strongly connected component.
     uint64_t strongComponentId = invalid<uint64_t>;
     bool isStrongComponentVertex() const {
         return strongComponentId != invalid<uint64_t>;
     }
-    bool isStrongComponentEntrance = false;
-    bool isStrongComponentExit = false;
 
-    // The indexes of the VirtualEdges that have this vertex as their source.
-    vector<uint64_t> virtualEdgeIndexes;
+    // Required by approximateTopologicalSort and only used for display.
+    uint64_t color = invalid<uint64_t>;
+    uint64_t rank = invalid<uint64_t>;
 
     PathFillerVertex(MarkerGraphVertexId, uint64_t orientedReadCount);
     PathFillerVertex() {}
 };
 
 
-
+// If an edge was created using multiple sequence alignment,
+// it is called a virtual edge.
+// A virtual edge only stores a sequence of MarkerGraphEdgeIds.
 class shasta::mode3b::PathFillerEdge {
 public:
     // The corresponding edge in the global marker graph.
@@ -90,19 +85,31 @@ public:
     // The MarkerIntervals in this edges for each of the oriented reads.
     // If cycles are present within this local marker graph,
     // an oriented read can have more than one MarkerInterval in an edge.
-    // This vector has the same size as the orientedReadInfos vector above
+    // This vector has the same size as the PathFiller::orientedReadInfos vector
     // and is indexed in the same way.
     // This only stores the ordinals for the MarkerInterval as
     // the OrientedReadId is stored in the orientedReadInfos vector.
+    // For non-virtual edges, for each marker interval,
+    // the second ordinal equals the first ordinal plus one,
+    // so we could store just the first one.
     vector< vector< pair<uint32_t, uint32_t> > > markerIntervals;
 
-    // Return the total number of marker intervals.
-    uint64_t coverage() const;
+    // Fields only stored for a virtual edge.
+    // The sequence of MarkerGraphEdges is obtained via MSA.
+    vector<MarkerGraphEdgeId> edgeIds;
+    uint64_t virtualCoverage = invalid<uint64_t>;
+    bool isVirtual = false;
 
-    // Return true if any oriented reads have more than one ordinal.
-    bool hasDuplicateOrientedReads() const;
+    uint64_t coverage() const
+    {
+        uint64_t c = 0;
+        for(const auto& v: markerIntervals) {
+            c += v.size();
+        }
+        return c;
+    }
 
-    // Set by approximateTopologicalSort.
+    // Set by approximateTopologicalSort and only used for display.
     bool isDagEdge = false;
 };
 
@@ -122,6 +129,7 @@ public:
 
 
 private:
+
     // Hide class Base defined in boost::adjacency_list.
     using Base = shasta::Base;
 
@@ -171,85 +179,65 @@ private:
     uint32_t ordinalOffset;
     uint32_t baseOffset;
 
-
-    span<const shasta::Base> edgeSequence(edge_descriptor) const;
-    span<const shasta::Base> edgeSequence(MarkerGraphEdgeId) const;
+    // Get the base sequence corresponding to an edge.
+    // The edge can be virtual.
+    void getEdgeSequence(edge_descriptor, vector<Base>&) const;
+    void getEdgeSequence(MarkerGraphEdgeId, vector<Base>&) const;
 
     void createGraph(uint64_t maxBaseSkip);
     void createVertices();
     void splitVertices(uint64_t maxBaseSkip);
     void createEdges();
+
+    // Approximate topological sort is only used for better and
+    // faster display in Graphviz. It sets rank and color in vertices
+    // and isDagEdge in edges.
     void approximateTopologicalSort();
 
+#if 0
     // Find the edge v0->v1 that contains the specified MarkerInterval
     // for the i-th oriented read.
-    edge_descriptor findEdge(
+    // If no such edge, the second field of the return value is false.
+    pair<edge_descriptor, bool> findEdge(
         vertex_descriptor v0,
         vertex_descriptor v1,
         uint64_t i,
         uint32_t ordinal0,
         uint32_t ordinal1) const;
+#endif
 
+    // Strongly connected component.
+    // Only store the non-trivial ones.
+    // A non-trivial strong component has at least one internal edge.
+    // This means that it either has more than one vertex,
+    // or it consists of a single vertex with a self-edge.
     class StrongComponent {
     public:
         vector<vertex_descriptor> vertices;
-        vector<vertex_descriptor> entrances;
-        vector<vertex_descriptor> exits;
         StrongComponent(const vector<vertex_descriptor>& vertices);
     };
     void computeStrongComponents();
     vector<StrongComponent> strongComponents;
-    void writeStrongComponents(ostream&) const;
-    void writeStrongComponent(ostream&, uint64_t strongComponentId) const;
-    void writeStrongComponentGraphviz(ostream&, uint64_t strongComponentId) const;
 
-    // This returns true if the specified edge is internal to a
-    // strongly connected component.
-    bool isStrongComponentEdge(edge_descriptor) const;
-
-
-
-    // Virtual edges are used as a replacement for edges
-    // internal to strongly connected components,
-    // and as a way to avoid cycles during assembly.
-    // A virtual edge joins an entrance of a strongly connected
-    // component with an exit of the same strongly connected component.
-    // It stores a sequence of marker graph edges obtained by MSA
-    // of thew oriented reads that enter/exit the strongly connected component
-    // at the entrance/exit joined by the virtual edge.
-    // Virtual edges are not stored in the boost graph. They are stored here instead.
-    class VirtualEdge {
-    public:
-        // The strong component, entrance, and exit that generated this virtual edge.
-        // The entrance is the source vertex of the virtual edge.
-        // The exit is the target vertex of the virtual edge.
-        uint64_t strongComponentId;
-        vertex_descriptor entrance;
-        vertex_descriptor exit;
-
-        uint64_t coverage;
-
-        // The sequence of marker graph edges computed by the MSA
-        // for this virtual edge.
-        vector<MarkerGraphEdgeId> markerGraphEdges;
-    };
-    vector<VirtualEdge> virtualEdges;
+    // Remove all strong component vertices and the edges that involve them,
+    // and create virtual edges to replace the removed edges.
     void createVirtualEdges();
-    void createVirtualEdges(uint64_t strongComponentId);
 
+    // Assemble a virtual edge.
+    // This uses MSA so compute optimal MarkerGraphEdgeIds.
+    void assembleVirtualEdge(edge_descriptor);
 
+    bool assemble(ostream& html);
 
-    void writeGraph(ostream& html) const;
-    void writeVerticesCsv() const;
-    void writeGraphviz(ostream&, bool showVirtualEdges) const;
-
-    bool fillPathGreedy(ostream& html);
-
-    // Get the sequence.
+    // Get the assembled sequence.
     // The sequences of edgeIdA and edgeIdB are only included if
     // includePrimary is true.
     void getSequence(vector<Base>&, bool includePrimary) const;
 
+    // Output.
+    void writeGraph(ostream& html) const;
+    void writeVerticesCsv() const;
+    void writeGraphviz(ostream&) const;
     void writeSequence(ostream& html) const;
 };
 

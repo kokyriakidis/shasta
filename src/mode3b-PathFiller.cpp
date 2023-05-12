@@ -55,36 +55,31 @@ PathFiller::PathFiller(
     createGraph(maxBaseSkip);
     computeStrongComponents();
     createVirtualEdges();
-    if(html) {
-        html << "<br>There are " << virtualEdges.size() << " virtual edges.";
-    }
     writeVerticesCsv();
     approximateTopologicalSort();
     if(html) {
         html << "<p>The local marker graph for this step assembly has " <<
             num_vertices(graph) << " vertices and " <<
             num_edges(graph) << " edges." << endl;
-        uint64_t nonDagEdgeCount = 0;
-        BGL_FORALL_EDGES(e, graph, PathFiller) {
-            if(not graph[e].isDagEdge) {
-                ++nonDagEdgeCount;
-            }
-        }
-        writeStrongComponents(html);
-        writeGraph(html);
     }
 
-    // Fill the path between edgeIdA and edgeIdB with the
-    // locally best choice at each vertex.
-    const bool success = fillPathGreedy(html);
+    // Assemble the path between edgeIdA and edgeIdB.
+    const bool success = assemble(html);
     if(success) {
         if(html) {
             writeSequence(html);
         }
-    } else {
+    }
+
+    if(html) {
+        writeGraph(html);
+    }
+
+    if(not success) {
         throw runtime_error("Unable to fill assembly path between primary edges " +
             to_string(edgeIdA) + " " + to_string(edgeIdB));
     }
+
 }
 
 
@@ -489,34 +484,7 @@ PathFiller::vertex_descriptor PathFiller::OrientedReadInfo::getVertex(uint32_t o
 
 
 
-// Return true if any oriented reads have more than one ordinal on this vertex.
-bool PathFillerVertex::hasDuplicateOrientedReads() const
-{
-    for(const auto& v: ordinals) {
-        if(v.size() > 1) {
-            return true;
-        }
-    }
-    return false;
-}
-
-
-
-// Return true if any oriented reads have more than one
-// MarkerInterval on this edge.
-bool PathFillerEdge::hasDuplicateOrientedReads() const
-{
-    for(const auto& v: markerIntervals) {
-        if(v.size() > 1) {
-            return true;
-        }
-    }
-    return false;
-}
-
-
-
-void PathFiller::writeGraphviz(ostream& out, bool showVirtualEdges) const
+void PathFiller::writeGraphviz(ostream& out) const
 {
     const PathFiller& graph = *this;
 
@@ -526,7 +494,6 @@ void PathFiller::writeGraphviz(ostream& out, bool showVirtualEdges) const
     out <<
         "digraph PathFillerGraph {\n"
         "mclimit=0.01;\n"       // For layout speed
-        // "maxiter=1;\n"       // For layout speed (?)
         "node [shape=point style=invis];\n"
         "edge [penwidth=5];\n";
 
@@ -544,17 +511,7 @@ void PathFiller::writeGraphviz(ostream& out, bool showVirtualEdges) const
         const PathFillerVertex& vertex = graph[v];
         out << "\"" << vertex.stringId() << "\"";
         if(vertex.isStrongComponentVertex()) {
-            out << "[style=solid width=0.2;";
-            if(vertex.isStrongComponentEntrance) {
-                if(vertex.isStrongComponentExit) {
-                    out << " color=Magenta"; // Entrance and exit.
-                } else {
-                    out << " color=Cyan";   // Entrance only.
-                }
-            } else if(vertex.isStrongComponentExit) {
-                out << " color=Gold";       // Exit only.
-            }
-            out << "]"; // Override invisible style set above.
+            out << "[style=solid width=0.2]"; // Override invisible style set above.
         }
         out << ";\n";
     }
@@ -565,10 +522,6 @@ void PathFiller::writeGraphviz(ostream& out, bool showVirtualEdges) const
     BGL_FORALL_EDGES(e, graph, PathFiller) {
 
         const PathFillerEdge& edge = graph[e];
-        if(showVirtualEdges and isStrongComponentEdge(e)) {
-            // Skip it.
-            continue;
-        }
         const uint64_t coverage = edge.coverage();
         const auto v0 = source(e, graph);
         const auto v1 = target(e, graph);
@@ -583,11 +536,21 @@ void PathFiller::writeGraphviz(ostream& out, bool showVirtualEdges) const
         const string colorString = "\"" + to_string(H) + " " + to_string(S) + " " + to_string(V) + "\"";
 
         out << "\"" << graph[v0].stringId() << "\"->\"" << graph[v1].stringId() << "\" [";
+
+        // Color is based on coverage.
         out << " color=" << colorString;
+
+        // Tooltip.
         out << " tooltip=\"Coverage " << coverage << "\"";
-        if(isStrongComponentEdge(e)) {
+
+        // Virtual edges and edges with source or target in a strong component
+        // are shown dashed.
+        if(edge.isVirtual or
+            graph[v0].isStrongComponentVertex() or
+            graph[v1].isStrongComponentVertex()) {
             out << " style=dashed";
         }
+
         if(not edge.isDagEdge) {
             out << " constraint=false";
         }
@@ -595,33 +558,7 @@ void PathFiller::writeGraphviz(ostream& out, bool showVirtualEdges) const
 
     }
 
-
-
-    // Write virtual edges, if requested.
-    if(showVirtualEdges) {
-        for(const VirtualEdge& virtualEdge: virtualEdges) {
-
-            // Compute the hue based on coverage.
-            const uint64_t coverage = virtualEdge.coverage;
-            double H;
-            if(coverage >= orientedReadInfos.size()) {
-                H = 1./3.;
-            } else {
-                H = (double(coverage - 1) / (3. * double(orientedReadInfos.size() - 1)));
-            }
-            const string colorString = "\"" + to_string(H) + " " + to_string(S) + " " + to_string(V) + "\"";
-
-            out << "\"" << graph[virtualEdge.entrance].stringId() << "\"->\"" <<
-                graph[virtualEdge.exit].stringId() << "\" [";
-            out << " color=" << colorString;
-            out << " tooltip=\"Coverage " << coverage << "\"";
-            out << " style=dashed";
-            out << "];\n";
-        }
-    }
-
     out << "}\n";
-
 }
 
 
@@ -662,18 +599,6 @@ void PathFiller::writeVerticesCsv() const
 
 
 
-// Return the total number of marker intervals.
-uint64_t PathFillerEdge::coverage() const
-{
-    uint64_t c = 0;
-    for(const auto& v: markerIntervals) {
-        c += v.size();
-    }
-    return c;
-}
-
-
-
 // Return the total number of ordinals.
 uint64_t PathFillerVertex::coverage() const
 {
@@ -693,8 +618,7 @@ void PathFiller::writeGraph(ostream& html) const
     const string dotFileName = tmpDirectory() + uuid + ".dot";
     {
         ofstream dotFile(dotFileName);
-        const bool showVirtualEdges = true;
-        writeGraphviz(dotFile, showVirtualEdges);
+        writeGraphviz(dotFile);
     }
 
     // Compute layout in svg format.
@@ -727,177 +651,11 @@ void PathFiller::writeGraph(ostream& html) const
 
 
 
-void PathFiller::writeStrongComponents(ostream& html) const
-{
-    html << "<br>Found " << strongComponents.size() <<
-        " non-trivial strongly connected components.";
-    for(uint64_t strongComponentId=0; strongComponentId<strongComponents.size(); strongComponentId++) {
-        writeStrongComponent(html, strongComponentId);
-    }
-
-}
-
-
-
-void PathFiller::writeStrongComponent(ostream& html, uint64_t strongComponentId) const
-{
-    const StrongComponent& strongComponent = strongComponents[strongComponentId];
-    html << "<br>Strong component " << strongComponentId << " with " <<
-        strongComponent.vertices.size() << " vertices.";
-
-    // Write out this strong component in graphviz format.
-    const string uuid = to_string(boost::uuids::random_generator()());
-    const string dotFileName = tmpDirectory() + uuid + ".dot";
-    {
-        ofstream dotFile(dotFileName);
-        writeStrongComponentGraphviz(dotFile, strongComponentId);
-    }
-
-    // Compute layout in svg format.
-    const string command = "dot -O -T svg " + dotFileName;
-    bool timeoutTriggered = false;
-    bool signalOccurred = false;
-    int returnCode = 0;
-    const double timeout = 600;
-    runCommandWithTimeout(command, timeout, timeoutTriggered, signalOccurred, returnCode);
-    if(returnCode!=0 or signalOccurred) {
-        throw runtime_error("An error occurred while running the following command: " + command);
-    }
-    if(timeoutTriggered) {
-        std::filesystem::remove(dotFileName);
-        throw runtime_error("Timeout during graph layout computation.");
-    }
-
-    // Remove the .dot file.
-    std::filesystem::remove(dotFileName);
-
-    // Copy the svg file to html.
-    const string svgFileName = dotFileName + ".svg";
-    ifstream svgFile(svgFileName);
-    html << "<p>" << svgFile.rdbuf();
-    svgFile.close();
-
-    // Remove the .svg file.
-    std::filesystem::remove(svgFileName);
-}
-
-
-
-void PathFiller::writeStrongComponentGraphviz(
-    ostream& out,
-    uint64_t strongComponentId) const
+bool PathFiller::assemble(ostream& html)
 {
     const PathFiller& graph = *this;
 
-    const double S = 0.7;
-    const double V = 1.;
-
-    const StrongComponent& strongComponent = strongComponents[strongComponentId];
-    out << "digraph StrongComponent" << strongComponentId << "{\n"
-        "node [shape=rectangle style=filled fontname=\"Courier New\"];\n"
-        "edge [penwidth=5 fontname=\"Courier New\"];\n";
-
-    // For consistency with the display of the entire graph,
-    // write the vertices in rank order.
-    vector< pair<vertex_descriptor, uint64_t> > verticesWithRank;
-    for(const vertex_descriptor v: strongComponent.vertices) {
-        verticesWithRank.push_back({v, graph[v].rank});
-    }
-    sort(verticesWithRank.begin(), verticesWithRank.end(),
-        OrderPairsBySecondOnly<vertex_descriptor, uint64_t>());
-    for(const auto& p: verticesWithRank) {
-        const vertex_descriptor v = p.first;
-        const PathFillerVertex& vertex = graph[v];
-        SHASTA_ASSERT(vertex.strongComponentId == strongComponentId);
-        out << "\"" << vertex.stringId() << "\"";
-        out << " [";
-
-        // Label.
-        out << "label=\"" << vertex.stringId() << "\\n" << vertex.coverage();
-        if(vertex.isStrongComponentEntrance) {
-            out << "\\nEntrance";
-        }
-        if(vertex.isStrongComponentExit) {
-            out << "\\nExit";
-        }
-        for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
-            const auto& ordinals = vertex.ordinals[i];
-            if(not ordinals.empty()) {
-                out << "\\n" << i << " " << orientedReadInfos[i].orientedReadId;
-                for(const uint32_t ordinal: ordinals) {
-                    out << " " << ordinal;
-                }
-            }
-        }
-        out << "\"";
-
-        // Color.
-        if(vertex.isStrongComponentEntrance) {
-            if(vertex.isStrongComponentExit) {
-                out << " fillcolor=Magenta"; // Entrance and exit.
-            } else {
-                out << " fillcolor=Cyan";   // Entrance only.
-            }
-        } else if(vertex.isStrongComponentExit) {
-            out << " fillcolor=Gold";       // Exit only.
-        }
-
-        out << "]";
-        out << ";\n";
-    }
-
-    // Write the edges.
-    for(const vertex_descriptor v0: strongComponent.vertices) {
-        const PathFillerVertex& vertex0 = graph[v0];
-        SHASTA_ASSERT(vertex0.strongComponentId == strongComponentId);
-
-        BGL_FORALL_OUTEDGES(v0, e, graph, PathFiller) {
-            const PathFillerEdge& edge = graph[e];
-            const uint64_t coverage = edge.coverage();
-            const vertex_descriptor v1 = target(e, graph);
-            const PathFillerVertex& vertex1 = graph[v1];
-            if(vertex1.strongComponentId != strongComponentId) {
-                continue;
-            }
-
-            // Compute the hue based on coverage.
-            double H;
-            if(coverage >= orientedReadInfos.size()) {
-                H = 1./3.;
-            } else {
-                H = (double(coverage - 1) / (3. * double(orientedReadInfos.size() - 1)));
-            }
-            const string colorString = "\"" + to_string(H) + " " + to_string(S) + " " + to_string(V) + "\"";
-
-            out <<
-                "\"" << vertex0.stringId() << "\""
-                "->"
-                "\"" << vertex1.stringId() << "\"";
-            out << "[";
-            out << " color=" << colorString;
-            out << " label=\"" << edge.edgeId << "\\n" << coverage << "\"";
-
-            if(not edge.isDagEdge) {
-                out << " constraint=false";
-            }
-
-            out << "]";
-            out << ";\n";
-        }
-
-    }
-
-
-    out << "}\n";
-}
-
-
-
-bool PathFiller::fillPathGreedy(ostream& html)
-{
-    const PathFiller& graph = *this;
-
-    const bool debug = true;
+    const bool debug = false;
     if(debug) {
         cout << timestamp << "PathFiller::fillPathGreedy begins." << endl;
     }
@@ -917,52 +675,14 @@ bool PathFiller::fillPathGreedy(ostream& html)
         }
 
         // Find the edge with the most coverage.
-        // Don't consider strong component edges.
-        // In their place, we will consider virtual edges below.
         edge_descriptor eNext;
         uint64_t bestCoverage = 0;
         BGL_FORALL_OUTEDGES(v, e, graph, PathFiller) {
-            if(isStrongComponentEdge(e)) {
-                continue;
-            }
-            if(target(e, graph) == source(e, graph)) {
-                // We have to ignore it to avoid an infinite loop
-                // when constructing the assembly path.
-                // This can cause deletions in low complexity sequence.
-                // We can probably do better.
-                continue;
-            }
             const uint64_t coverage = graph[e].coverage();
             if(coverage > bestCoverage) {
                 eNext = e;
                 bestCoverage = coverage;
             }
-        }
-
-        // See if we can do better with a VirtualEdge.
-        uint64_t bestVirtualEdgeIndex = invalid<uint64_t>;
-        uint64_t bestVirtualEdgeCoverage = 0;
-        for(uint64_t virtualEdgeIndex: graph[v].virtualEdgeIndexes) {
-            const VirtualEdge& virtualEdge = virtualEdges[virtualEdgeIndex];
-            if(virtualEdge.exit == virtualEdge.entrance) {
-                // We have to ignore it to avoid an infinite loop
-                // when constructing the assembly path.
-                // This can cause deletions in low complexity sequence.
-                // We can probably do better.
-                continue;
-            }
-            if(virtualEdge.coverage > bestVirtualEdgeCoverage) {
-                bestVirtualEdgeCoverage = virtualEdge.coverage;
-                bestVirtualEdgeIndex = virtualEdgeIndex;
-            }
-        }
-        if(bestVirtualEdgeCoverage > bestCoverage) {
-            const VirtualEdge& bestVirtualEdge = virtualEdges[bestVirtualEdgeIndex];
-            for(const MarkerGraphEdgeId edgeId: bestVirtualEdge.markerGraphEdges) {
-                secondaryEdges.push_back(edgeId);
-            }
-            v = bestVirtualEdge.exit;
-            continue;
         }
 
         // If there are no usable edges, declare failure.
@@ -974,7 +694,13 @@ bool PathFiller::fillPathGreedy(ostream& html)
             return false;
         }
 
-        secondaryEdges.push_back(graph[eNext].edgeId);
+        const PathFillerEdge& nextEdge = graph[eNext];
+        if(nextEdge.isVirtual) {
+            copy(nextEdge.edgeIds.begin(), nextEdge.edgeIds.end(),
+                back_inserter(secondaryEdges));
+        } else {
+            secondaryEdges.push_back(nextEdge.edgeId);
+        }
         v = target(eNext, graph);
     }
 
@@ -994,22 +720,6 @@ bool PathFiller::fillPathGreedy(ostream& html)
 
 
 
-span<const shasta::Base> PathFiller::edgeSequence(
-    edge_descriptor e) const
-{
-    return edgeSequence((*this)[e].edgeId);
-}
-
-
-
-span<const shasta::Base> PathFiller::edgeSequence(
-    MarkerGraphEdgeId edgeId) const
-{
-    return assembler.markerGraph.edgeSequence[edgeId];
-}
-
-
-
 // Get the sequence.
 // The sequences of edgeIdA and edgeIdB are only included if
 // includePrimary is true.
@@ -1020,17 +730,17 @@ void PathFiller::getSequence(
     sequence.clear();
 
     if(includePrimary) {
-        const auto sequenceA = edgeSequence(edgeIdA);
+        const auto sequenceA = assembler.markerGraph.edgeSequence[edgeIdA];
         copy(sequenceA.begin(), sequenceA.end(), back_inserter(sequence));
     }
 
     for(const MarkerGraphEdgeId edgeId: secondaryEdges) {
-        const auto thisEdgeSequence = edgeSequence(edgeId);
+        const auto thisEdgeSequence = assembler.markerGraph.edgeSequence[edgeId];
         copy(thisEdgeSequence.begin(), thisEdgeSequence.end(), back_inserter(sequence));
     }
 
     if(includePrimary) {
-        const auto sequenceB = edgeSequence(edgeIdB);
+        const auto sequenceB = assembler.markerGraph.edgeSequence[edgeIdB];
         copy(sequenceB.begin(), sequenceB.end(), back_inserter(sequence));
     }
 }
@@ -1043,8 +753,8 @@ void PathFiller::writeSequence(ostream& html) const
         return;
     }
 
-    const auto sequenceA = edgeSequence(edgeIdA);
-    const auto sequenceB = edgeSequence(edgeIdB);
+    const auto sequenceA = assembler.markerGraph.edgeSequence[edgeIdA];
+    const auto sequenceB = assembler.markerGraph.edgeSequence[edgeIdB];
     vector<Base> sequence;
     getSequence(sequence, false);
 
@@ -1094,10 +804,36 @@ void PathFiller::computeStrongComponents()
         componentVertices[p.second].push_back(p.first);
     }
 
+
+
     // Keep the non-trivial ones.
+    // A non-trivial strong component has at least one internal edge.
+    // This means that it either has more than one vertex,
+    // or it consists of a single vertex with a self-edge.
     strongComponents.clear();
     for(const auto& p: componentVertices) {
+
+        // Figure out if it is non-trivial.
+        bool isNonTrivial;
         if(p.second.size() > 1) {
+
+            // More than one vertex. Certainly non-trivial.
+            isNonTrivial = true;
+        } else if (p.second.size() == 1) {
+
+            // Only one vertex. Non-trivial if self-edge present.
+            const vertex_descriptor v = p.second.front();
+            bool selfEdgeExists = false;
+            tie(ignore, selfEdgeExists) = edge(v, v, graph);
+            isNonTrivial = selfEdgeExists;
+        } else {
+
+            // Empty. This should never happen.
+            SHASTA_ASSERT(0);
+        }
+
+        // If non-trivial, store it.
+        if(isNonTrivial) {
             strongComponents.push_back(StrongComponent(p.second));
         }
     }
@@ -1110,50 +846,6 @@ void PathFiller::computeStrongComponents()
         }
     }
 
-    // Mark the entrances of each strong component.
-    for(StrongComponent& strongComponent: strongComponents) {
-        for(const vertex_descriptor v0: strongComponent.vertices) {
-            BGL_FORALL_INEDGES(v0, e, graph, PathFiller) {
-                const vertex_descriptor v1 = source(e, graph);
-                if(graph[v1].strongComponentId != graph[v0].strongComponentId) {
-                    strongComponent.entrances.push_back(v0);
-                    graph[v0].isStrongComponentEntrance = true;
-                    break;
-                }
-            }
-        }
-    }
-
-    // Mark the exits of each strong component.
-    for(StrongComponent& strongComponent: strongComponents) {
-        for(const vertex_descriptor v0: strongComponent.vertices) {
-            BGL_FORALL_OUTEDGES(v0, e, graph, PathFiller) {
-                const vertex_descriptor v1 = target(e, graph);
-                if(graph[v1].strongComponentId != graph[v0].strongComponentId) {
-                    strongComponent.exits.push_back(v0);
-                    graph[v0].isStrongComponentExit = true;
-                    break;
-                }
-            }
-        }
-    }
-}
-
-
-
-// This returns true if the specified edge is internal to a
-// strongly connected component.
-bool PathFiller::isStrongComponentEdge(edge_descriptor e) const
-{
-    const PathFiller& graph = *this;
-    const vertex_descriptor v0 = source(e, graph);
-    const vertex_descriptor v1 = target(e, graph);
-    const uint64_t c0 = graph[v0].strongComponentId;
-    const uint64_t c1 = graph[v1].strongComponentId;
-    return
-        (c0 != invalid<uint64_t>) and
-        (c1 != invalid<uint64_t>) and
-        (c0 == c1);
 }
 
 
@@ -1167,25 +859,104 @@ PathFiller::StrongComponent::StrongComponent(
 
 void PathFiller::createVirtualEdges()
 {
-    for(uint64_t strongComponentId=0; strongComponentId<strongComponents.size(); strongComponentId++) {
-        createVirtualEdges(strongComponentId);
-    }
-}
-
-
-
-void PathFiller::createVirtualEdges(uint64_t strongComponentId)
-{
     const bool debug = false;
     PathFiller& graph = *this;
-    const StrongComponent& strongComponent = strongComponents[strongComponentId];
+    const uint64_t coverage = orientedReadInfos.size();
 
-    if(debug) {
-        cout << "Creating virtual edges for strong component " << strongComponentId << endl;
+    // Gather all the ordinals that will go away when we remove
+    // the strong component vertices.
+    vector< vector<uint32_t> > ordinalsToBeRemoved(coverage);
+    BGL_FORALL_VERTICES(v, graph, PathFiller) {
+        const PathFillerVertex& vertex = graph[v];
+        if(not vertex.isStrongComponentVertex()) {
+            continue;
+        }
+        for(uint64_t i=0; i<coverage; i++) {
+            copy(vertex.ordinals[i].begin(), vertex.ordinals[i].end(),
+                back_inserter(ordinalsToBeRemoved[i]));
+        }
     }
 
 
+    // For each oriented read, find consecutive streaks of ordinals
+    // that will be removed. Each of these streaks will contribute to one
+    // virtual edge.
+    std::map<pair<vertex_descriptor, vertex_descriptor>, edge_descriptor> virtualEdges;
+    for(uint64_t i=0; i<coverage; i++) {
+        vector<uint32_t>& o = ordinalsToBeRemoved[i];
+        sort(o.begin(), o.end());
 
+        if(debug) {
+            cout << "Ordinals to be removed for " << orientedReadInfos[i].orientedReadId << ":" << endl;
+            copy(o.begin(), o.end(), ostream_iterator<uint32_t>(cout, " "));
+            cout << endl;
+        }
+
+        for(uint64_t j=0; j<o.size(); /* Increment later */) {
+            const uint64_t streakBegin = j;
+            uint64_t streakEnd = j;
+            while(streakEnd < o.size() and o[streakEnd+1] == o[streakEnd] + 1) {
+                ++streakEnd;
+            }
+            cout << "Streak " << streakBegin << " " << streakEnd << " ordinals: " <<
+                o[streakBegin] << " to " << o[streakEnd] << endl;
+            j = streakEnd + 1;
+
+            // We will remove all the vertices at these ordinals.
+            // Therefore this oriented read needs a virtual edge
+            // with source one position earlier than streakBegin and
+            // target one position past streakEnd.
+            const uint32_t ordinal0 = o[streakBegin] - 1;
+            const uint32_t ordinal1 = o[streakEnd] + 1;
+            if(debug) {
+                cout << "ordinal0 " << ordinal0 << ", ordinal1 " << ordinal1 << endl;
+            }
+
+            // The vertices corresponding to these ordinals are
+            // the source and target of the virtual edge.
+            const vertex_descriptor v0 = orientedReadInfos[i].getVertex(ordinal0);
+            const vertex_descriptor v1 = orientedReadInfos[i].getVertex(ordinal1);
+
+            // Locate this virtual edge in our map, creating it if necessary.
+            auto it = virtualEdges.find({v0, v1});
+            edge_descriptor e;
+            if(it == virtualEdges.end()) {
+                bool edgeWasAdded = false;
+                tie(e, edgeWasAdded) = add_edge(v0, v1, graph);
+                SHASTA_ASSERT(edgeWasAdded);
+                virtualEdges.insert({{v0, v1}, e});
+                PathFillerEdge& edge = graph[e];
+                edge.isVirtual = true;
+                edge.markerIntervals.resize(coverage);
+            } else {
+                e = it->second;
+            }
+            graph[e].markerIntervals[i].push_back({ordinal0, ordinal1});
+        }
+    }
+    if(debug) {
+        cout << "Added " << virtualEdges.size() << " virtual edges." << endl;
+    }
+
+    // Remove all the vertices in strong components ands the
+    // edges that have them as source or target.
+    // Those edges were replaced by the virtual edges.
+    for(const StrongComponent& strongComponent: strongComponents) {
+        for(const vertex_descriptor v: strongComponent.vertices) {
+            clear_vertex(v, graph);
+            remove_vertex(v, graph);
+        }
+    }
+    strongComponents.clear();
+
+    // Assemble the virtual edges.
+    // This uses MSA so compute optimal MarkerGraphEdgeIds
+    // for each virtual edge.
+    for(const auto& p: virtualEdges) {
+        assembleVirtualEdge(p.second);
+    }
+
+#if 0
     // Construct the path of each oriented read in this strong components.
     // Each oriented read can only enter and exit this strong component once.
     // (If it did exit and then reenter it, the vertices in-between
@@ -1401,14 +1172,138 @@ void PathFiller::createVirtualEdges(uint64_t strongComponentId)
             }
         }
     }
-
+#endif
 }
 
 
 
+// Assemble a virtual edge.
+// This uses MSA so compute optimal MarkerGraphEdgeIds.
+void PathFiller::assembleVirtualEdge(edge_descriptor e)
+{
+    const bool debug = false;
+    PathFiller& graph = *this;
+    PathFillerEdge& edge = graph[e];
+    SHASTA_ASSERT(edge.isVirtual);
+
+
+    // Gather the marker graph paths of the contributing oriented reads.
+    // This contains MarkerGraphEdgeIds incremented by 1.
+    // We need this because SeqAn uses 0 to represent gaps.
+    vector< vector<MarkerGraphEdgeId> > sequences;
+
+    // Loop over oriented reads.
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        const OrientedReadId orientedReadId = orientedReadInfos[i].orientedReadId;
+        const vector< pair<uint32_t, uint32_t> >& orientedReadMarkerIntervals = edge.markerIntervals[i];
+
+        // Loop over MarkerIntervals of this oriented read.
+        for(const pair<uint32_t, uint32_t>& markerInterval: orientedReadMarkerIntervals) {
+            const uint32_t ordinal0 = markerInterval.first;
+            const uint32_t ordinal1 = markerInterval.second;
+
+            sequences.resize(sequences.size() + 1);
+            vector<MarkerGraphEdgeId>& sequence = sequences.back();
+
+            // Follow the marker graph edges in this range.
+            for(uint32_t ordinal=ordinal0; ordinal<ordinal1; ordinal++) {
+                const MarkerGraphEdgeId edgeId = assembler.markerGraph.locateMarkerInterval(assembler.markers,
+                    MarkerInterval(orientedReadId, ordinal, ordinal+1));
+                SHASTA_ASSERT(edgeId != invalid<MarkerGraphEdgeId>);
+                sequence.push_back(edgeId + 1);
+            }
+        }
+    }
+
+    if(debug) {
+        cout << "Virtual edge ";
+        cout << graph[source(e, graph)].stringId() << " to ";
+        cout << graph[target(e, graph)].stringId();
+        cout << " coverage " << edge.coverage() << endl;
+
+        for(const auto& v: sequences) {
+            for(const auto value: v) {
+                cout << " " << value - 1;   // Subtract 1 to get the actual edgeId
+            }
+            cout << endl;
+        }
+    }
+
+    // Use Seqan to do an MSA of these sequences.
+    {
+        using namespace seqan;
+        Align< String<MarkerGraphEdgeId> > align;
+        const uint64_t n = sequences.size();
+        resize(rows(align), n);
+        for(uint64_t i=0; i<n; i++) {
+            assignSource(row(align, i), sequences[i]);
+        }
+        globalMsaAlignment(align, Score<int64_t, Simple>(0, -1, -4));
+
+        if(debug) {
+            cout << "MSA:" << endl;
+            for(uint64_t rowNumber=0; rowNumber<n; rowNumber++) {
+                for(uint64_t j=0; j<length(row(align, rowNumber)); j++) {
+                    const auto value = getValue(row(align, rowNumber), j);
+                    if(value != 0) {
+                        cout << value - 1; // Subtract 1 to get the actual edgeId
+                    }
+                    cout << ",";
+                }
+                cout << endl;
+            }
+        }
+
+        // Compute the consensus.
+        vector<uint64_t> values;
+        vector<uint64_t> frequencies;
+        vector<uint64_t> consensusValues;
+        const uint64_t alignmentLength = length(row(align, 0));
+        for(uint64_t j=0; j<alignmentLength; j++) {
+            values.clear();
+            frequencies.clear();
+            for(uint64_t rowNumber=0; rowNumber<n; rowNumber++) {
+                const auto value = getValue(row(align, rowNumber), j);
+                values.push_back(value);
+            }
+            deduplicateAndCount(values, frequencies);
+
+            // Find the value with the highest frequency.
+            const uint64_t maxFrequencyIndex =
+                max_element(frequencies.begin(), frequencies.end()) - frequencies.begin();
+            const uint64_t consensusValue = values[maxFrequencyIndex];
+
+            // Store it.
+            consensusValues.push_back(consensusValue);
+            if(consensusValue > 0) {
+                edge.edgeIds.push_back(consensusValue - 1);
+            }
+        }
+
+        if(debug) {
+            cout << "Aligned consensus:" << endl;
+            for(const uint64_t value: consensusValues) {
+                if(value) {
+                    cout << value - 1;
+                }
+                cout << ",";
+            }
+            cout << endl;
+            cout << "VirtualEdge consensus:" << endl;
+            for(const MarkerGraphEdgeId edgeId: edge.edgeIds) {
+                cout << edgeId << " ";
+            }
+            cout << endl;
+        }
+    }
+}
+
+
+
+#if 0
 // Find the edge v0->v1 that contains the specified MarkerInterval
 // for the i-th oriented read.
-PathFiller::edge_descriptor PathFiller::findEdge(
+pair<PathFiller::edge_descriptor, bool> PathFiller::findEdge(
     vertex_descriptor v0,
     vertex_descriptor v1,
     uint64_t i,
@@ -1425,10 +1320,10 @@ PathFiller::edge_descriptor PathFiller::findEdge(
         const auto& markerIntervals = edge.markerIntervals[i];
         if(find(markerIntervals.begin(), markerIntervals.end(),
             make_pair(ordinal0, ordinal1)) != markerIntervals.end()) {
-            return e;
+            return make_pair(e, true);
         }
     }
 
-    SHASTA_ASSERT(0);
+    return make_pair(edge_descriptor(), false);
 }
-
+#endif
