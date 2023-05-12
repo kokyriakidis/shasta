@@ -898,8 +898,10 @@ void PathFiller::createVirtualEdges()
             while(streakEnd < o.size() and o[streakEnd+1] == o[streakEnd] + 1) {
                 ++streakEnd;
             }
-            cout << "Streak " << streakBegin << " " << streakEnd << " ordinals: " <<
-                o[streakBegin] << " to " << o[streakEnd] << endl;
+            if(debug) {
+                cout << "Streak " << streakBegin << " " << streakEnd << " ordinals: " <<
+                    o[streakBegin] << " to " << o[streakEnd] << endl;
+            }
             j = streakEnd + 1;
 
             // We will remove all the vertices at these ordinals.
