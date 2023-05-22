@@ -68,6 +68,10 @@ PathFiller::PathFiller(
     if(success) {
         if(html) {
             writeSequence(html);
+            ofstream fasta("AssemblyPath.fasta");
+            writeSequenceFasta(fasta);
+            ofstream csv("AssemblyPath.csv");
+            writeAssemblyDetails(csv);
         }
     }
 
@@ -775,6 +779,26 @@ void PathFiller::writeSequence(ostream& html) const
     copy(sequenceB.begin(), sequenceB.end(), ostream_iterator<shasta::Base>(html));
 
     html << "\n</pre>";
+}
+
+
+
+void PathFiller::writeSequenceFasta(ostream& fasta) const
+{
+    vector<Base> sequence;
+    getSequence(sequence, true);
+
+    fasta << ">Path " << sequence.size() << "\n";
+    copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(fasta));
+    fasta << endl;
+
+}
+
+
+
+void PathFiller::writeAssemblyDetails(ostream& csv) const
+{
+
 }
 
 

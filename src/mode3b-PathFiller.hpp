@@ -239,6 +239,8 @@ private:
     void writeVerticesCsv() const;
     void writeGraphviz(ostream&) const;
     void writeSequence(ostream& html) const;
+    void writeSequenceFasta(ostream& html) const;
+    void writeAssemblyDetails(ostream& csv) const;
 };
 
 #endif
