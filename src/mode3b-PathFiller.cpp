@@ -578,7 +578,7 @@ void PathFiller::writeGraphviz(
 
         // Tooltip.
         out << " tooltip=\"";
-        if(edge.isVirtual) {
+        if(edge.isVirtual()) {
             out << "Virtual";
         } else {
             out << edge.edgeId;
@@ -595,7 +595,7 @@ void PathFiller::writeGraphviz(
         // Label.
         if(showEdgeLabels) {
             out << " label=\"";
-            if(edge.isVirtual) {
+            if(edge.isVirtual()) {
                 out << "Virtual";
             } else {
                 out << edge.edgeId;
@@ -612,7 +612,7 @@ void PathFiller::writeGraphviz(
 
         // Virtual edges and edges with source or target in a strong component
         // are shown dashed.
-        if(edge.isVirtual or
+        if(edge.isVirtual() or
             graph[v0].isStrongComponentVertex() or
             graph[v1].isStrongComponentVertex()) {
             out << " style=dashed";
@@ -829,7 +829,7 @@ span<const Base> PathFiller::getEdgeSequence(edge_descriptor e) const
 {
     const PathFiller& graph = *this;
     const PathFillerEdge& edge = graph[e];
-    if(edge.isVirtual) {
+    if(edge.isVirtual()) {
         return span<const Base>(edge.sequence.begin(), edge.sequence.end());
     } else {
         return assembler.markerGraph.edgeSequence[edge.edgeId];
@@ -901,7 +901,9 @@ void PathFiller::writeAssemblyDetails(ostream& csv) const
         csv << assembledPosition + edgeSequence.size() << ",";
         csv << graph[v0].vertexId << ",";
         csv << graph[v1].vertexId << ",";
-        if(not edge.isVirtual) {
+        if(edge.isVirtual()) {
+            csv << "Virtual";
+        } else {
             csv << edge.edgeId;
         }
         csv << ",";
@@ -1063,7 +1065,6 @@ void PathFiller::createVirtualEdges()
                 SHASTA_ASSERT(edgeWasAdded);
                 virtualEdges.insert({{v0, v1}, e});
                 PathFillerEdge& edge = graph[e];
-                edge.isVirtual = true;
                 edge.markerIntervals.resize(coverage);
             } else {
                 e = it->second;
@@ -1321,7 +1322,7 @@ void PathFiller::assembleVirtualEdge(edge_descriptor e)
     const bool debug = false;
     PathFiller& graph = *this;
     PathFillerEdge& edge = graph[e];
-    SHASTA_ASSERT(edge.isVirtual);
+    SHASTA_ASSERT(edge.isVirtual());
 
 
     // Gather the marker graph paths of the contributing oriented reads.

@@ -91,6 +91,10 @@ public:
     // There can be more than one PathFillerEdge corresponding to
     // a given marker graph edge.
     MarkerGraphEdgeId edgeId = invalid<MarkerGraphEdgeId>;
+    bool isVirtual() const
+    {
+        return edgeId == invalid<MarkerGraphEdgeId>;
+    }
 
     // The MarkerIntervals in this edge for each of the oriented reads.
     // If cycles are present within this local marker graph,
@@ -108,7 +112,6 @@ public:
     // The sequence of MarkerGraphEdges is obtained via MSA.
     vector<Base> sequence;
     uint64_t virtualCoverage = invalid<uint64_t>;
-    bool isVirtual = false;
 
     uint64_t coverage() const
     {
