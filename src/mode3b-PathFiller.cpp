@@ -499,10 +499,21 @@ void PathFiller::writeGraphviz(
     const double S = 0.7;
     const double V = 1.;
 
+    // Prepare a map describing the assembly path.
+    // For each edge on the assembly path we store the
+    // position in assembled sequence.
+    std::map<edge_descriptor, uint64_t> assemblyPathMap;
+    uint64_t assembledPosition = 0;
+    for(const edge_descriptor e: assemblyPath) {
+        const auto edgeSequence = getEdgeSequence(e);
+        assemblyPathMap.insert(make_pair(e, assembledPosition));
+        assembledPosition += edgeSequence.size();
+    }
+
     out <<
         "digraph PathFillerGraph {\n"
         "mclimit=0.01;\n"       // For layout speed
-        "edge [penwidth=5];\n"
+        "edge [penwidth=2];\n"
         "node [fontname=\"Courier New\"];\n"
         "edge [fontname=\"Courier New\"];\n";
 
@@ -549,6 +560,8 @@ void PathFiller::writeGraphviz(
         const auto v1 = target(e, graph);
         const auto edgeSequence = getEdgeSequence(e);
 
+        auto it = assemblyPathMap.find(e);
+
         // Compute the hue based on coverage.
         double H;
         if(coverage >= orientedReadInfos.size()) {
@@ -572,6 +585,11 @@ void PathFiller::writeGraphviz(
         }
         out << "\\n" << coverage << "\\n";
         copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(out));
+        if(it != assemblyPathMap.end()) {
+            const uint64_t assembledPosition = it->second;
+            out << "\\n" << assembledPosition << "-" <<
+                assembledPosition+edgeSequence.size();
+        }
         out << "\"";
 
         // Label.
@@ -584,6 +602,11 @@ void PathFiller::writeGraphviz(
             }
             out << "\\n" << coverage << "\\n";
             copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(out));
+            if(it != assemblyPathMap.end()) {
+                const uint64_t assembledPosition = it->second;
+                out << "\\n" << assembledPosition << "-" <<
+                    assembledPosition+edgeSequence.size();
+            }
             out << "\"";
         }
 
@@ -593,6 +616,11 @@ void PathFiller::writeGraphviz(
             graph[v0].isStrongComponentVertex() or
             graph[v1].isStrongComponentVertex()) {
             out << " style=dashed";
+        }
+
+        // Edges on the path are shown thicker.
+        if(it != assemblyPathMap.end()) {
+            out << " penwidth=6";
         }
 
         if(not edge.isDagEdge) {
@@ -685,7 +713,7 @@ void PathFiller::writeGraph(
     }
 
     // Remove the .dot file.
-    std::filesystem::remove(dotFileName);
+    // std::filesystem::remove(dotFileName);
 
     // Copy the svg file to html.
     const string svgFileName = dotFileName + ".svg";
