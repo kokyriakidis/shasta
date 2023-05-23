@@ -31,7 +31,11 @@ PathFiller::PathFiller(
     const Assembler& assembler,
     MarkerGraphEdgeId edgeIdA,
     MarkerGraphEdgeId edgeIdB,
-    ostream& html) :
+    ostream& html,
+    bool showGraph,
+    bool showVertices,
+    bool showVertexLabels,
+    bool showEdgeLabels) :
     assembler(assembler),
     edgeIdA(edgeIdA),
     edgeIdB(edgeIdB)
@@ -65,24 +69,19 @@ PathFiller::PathFiller(
 
     // Assemble the path between edgeIdA and edgeIdB.
     findAssemblyPath();
-    const bool success = true; // assemble(html);
-    if(success) {
-        if(html) {
-            writeSequence(html);
-            ofstream fasta("AssemblyPath.fasta");
-            writeSequenceFasta(fasta);
-            ofstream csv("AssemblyPath.csv");
-            writeAssemblyDetails(csv);
-        }
-    }
-
     if(html) {
-        writeGraph(html);
-    }
-
-    if(not success) {
-        throw runtime_error("Unable to fill assembly path between primary edges " +
-            to_string(edgeIdA) + " " + to_string(edgeIdB));
+        writeSequence(html);
+        ofstream fasta("AssemblyPath.fasta");
+        writeSequenceFasta(fasta);
+        ofstream csv("AssemblyPath.csv");
+        writeAssemblyDetails(csv);
+        if(showGraph) {
+            writeGraph(
+                html,
+                showVertices,
+                showVertexLabels,
+                showEdgeLabels);
+        }
     }
 
 }
@@ -489,7 +488,11 @@ PathFiller::vertex_descriptor PathFiller::OrientedReadInfo::getVertex(uint32_t o
 
 
 
-void PathFiller::writeGraphviz(ostream& out) const
+void PathFiller::writeGraphviz(
+    ostream& out,
+    bool showVertices,
+    bool showVertexLabels,
+    bool showEdgeLabels) const
 {
     const PathFiller& graph = *this;
 
@@ -499,9 +502,19 @@ void PathFiller::writeGraphviz(ostream& out) const
     out <<
         "digraph PathFillerGraph {\n"
         "mclimit=0.01;\n"       // For layout speed
-        "node [shape=point style=invis];\n"
-        "edge [penwidth=5];\n";
+        "edge [penwidth=5];\n"
+        "node [fontname=\"Courier New\"];\n"
+        "edge [fontname=\"Courier New\"];\n";
 
+    if(showVertices) {
+        if(showVertexLabels) {
+            out << "node [shape=rectangle];\n";
+        } else {
+            out << "node [shape=point width=0.2];\n";
+        }
+    } else {
+        out << "node [shape=point style=invis];\n";
+    }
 
 
     // To help Graphviz compute the layout, write vertices in rank order.
@@ -514,11 +527,15 @@ void PathFiller::writeGraphviz(ostream& out) const
     for(const auto& p: verticesWithRank) {
         const vertex_descriptor v = p.first;
         const PathFillerVertex& vertex = graph[v];
-        out << "\"" << vertex.stringId() << "\"";
-        if(vertex.isStrongComponentVertex()) {
-            out << "[style=solid width=0.2]"; // Override invisible style set above.
+        out << "\"" << vertex.stringId() << "\" [";
+        out << "tooltip=\"" << vertex.stringId() << "\\n" << vertex.coverage() << "\"";
+        if(showVertexLabels) {
+            out << " label=\"" << vertex.stringId() << "\\n" << vertex.coverage() << "\"";
         }
-        out << ";\n";
+        if(vertex.isStrongComponentVertex()) {
+            out << " color=purple";
+        }
+        out << "];\n";
     }
 
 
@@ -530,6 +547,7 @@ void PathFiller::writeGraphviz(ostream& out) const
         const uint64_t coverage = edge.coverage();
         const auto v0 = source(e, graph);
         const auto v1 = target(e, graph);
+        const auto edgeSequence = getEdgeSequence(e);
 
         // Compute the hue based on coverage.
         double H;
@@ -546,7 +564,28 @@ void PathFiller::writeGraphviz(ostream& out) const
         out << " color=" << colorString;
 
         // Tooltip.
-        out << " tooltip=\"Coverage " << coverage << "\"";
+        out << " tooltip=\"";
+        if(edge.isVirtual) {
+            out << "Virtual";
+        } else {
+            out << edge.edgeId;
+        }
+        out << "\\n" << coverage << "\\n";
+        copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(out));
+        out << "\"";
+
+        // Label.
+        if(showEdgeLabels) {
+            out << " label=\"";
+            if(edge.isVirtual) {
+                out << "Virtual";
+            } else {
+                out << edge.edgeId;
+            }
+            out << "\\n" << coverage << "\\n";
+            copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(out));
+            out << "\"";
+        }
 
         // Virtual edges and edges with source or target in a strong component
         // are shown dashed.
@@ -616,14 +655,18 @@ uint64_t PathFillerVertex::coverage() const
 
 
 
-void PathFiller::writeGraph(ostream& html) const
+void PathFiller::writeGraph(
+    ostream& html,
+    bool showVertices,
+    bool showVertexLabels,
+    bool showEdgeLabels) const
 {
     // Write out the graph in graphviz format.
     const string uuid = to_string(boost::uuids::random_generator()());
     const string dotFileName = tmpDirectory() + uuid + ".dot";
     {
         ofstream dotFile(dotFileName);
-        writeGraphviz(dotFile);
+        writeGraphviz(dotFile, showVertices, showVertexLabels, showEdgeLabels);
     }
 
     // Compute layout in svg format.
@@ -653,80 +696,6 @@ void PathFiller::writeGraph(ostream& html) const
     // Remove the .svg file.
     std::filesystem::remove(svgFileName);
 }
-
-
-
-#if 0
-bool PathFiller::assemble(ostream& html)
-{
-    const PathFiller& graph = *this;
-
-    const bool debug = false;
-    if(debug) {
-        cout << timestamp << "PathFiller::fillPathGreedy begins." << endl;
-    }
-
-    // Find the first and last vertex of the path we are looking for.
-    const OrientedReadInfo& firstInfo = orientedReadInfos.front();
-    const vertex_descriptor vA = firstInfo.vertices.front();
-    const vertex_descriptor vB = firstInfo.vertices.back();
-
-
-
-    // Main iteration loop.
-    vertex_descriptor v = vA;
-    while(v != vB) {
-        if(debug) {
-            cout << "At vertex " << graph[v].stringId() << endl;
-        }
-
-        // Find the edge with the most coverage.
-        edge_descriptor eNext;
-        uint64_t bestCoverage = 0;
-        BGL_FORALL_OUTEDGES(v, e, graph, PathFiller) {
-            const uint64_t coverage = graph[e].coverage();
-            if(coverage > bestCoverage) {
-                eNext = e;
-                bestCoverage = coverage;
-            }
-        }
-
-        // If there are no usable edges, declare failure.
-        // This should never happen.
-        if(bestCoverage == 0) {
-            if(debug) {
-                cout << timestamp << "PathFiller::fillPathGreedy ends with failure." << endl;
-            }
-            return false;
-        }
-
-        const PathFillerEdge& nextEdge = graph[eNext];
-        if(nextEdge.isVirtual) {
-            copy(nextEdge.edgeIds.begin(), nextEdge.edgeIds.end(),
-                back_inserter(secondaryEdges));
-        } else {
-            secondaryEdges.push_back(nextEdge.edgeId);
-        }
-        v = target(eNext, graph);
-    }
-
-    // As constructed, pathSecondaryEdges includes edgeIdA and edgeIB.
-    // Check that this is the case, then remove them.
-    SHASTA_ASSERT(secondaryEdges.size() >= 2);
-    SHASTA_ASSERT(secondaryEdges.front() == edgeIdA);
-    SHASTA_ASSERT(secondaryEdges.back() == edgeIdB);
-    secondaryEdges.resize(secondaryEdges.size() - 1);
-    secondaryEdges.erase(secondaryEdges.begin());
-
-    // Store the intervening sequence.
-    getSequence(sequence, false);
-
-    if(debug) {
-        cout << timestamp << "PathFiller::fillPathGreedy ends with success." << endl;
-    }
-    return true;
-}
-#endif
 
 
 
@@ -887,7 +856,32 @@ void PathFiller::writeSequenceFasta(ostream& fasta) const
 
 void PathFiller::writeAssemblyDetails(ostream& csv) const
 {
+    const PathFiller& graph = *this;
 
+    csv << "Index,Begin,End,VertexId0,VertexId1,EdgeId,Sequence\n";
+
+    uint64_t assembledPosition = 0;
+    for(uint64_t i=0; i<assemblyPath.size(); i++) {
+        const edge_descriptor e = assemblyPath[i];
+        const PathFillerEdge& edge = graph[e];
+        const vertex_descriptor v0 = source(e, graph);
+        const vertex_descriptor v1 = target(e, graph);
+        const auto edgeSequence = getEdgeSequence(e);
+
+        csv << i << ",";
+        csv << assembledPosition << ",";
+        csv << assembledPosition + edgeSequence.size() << ",";
+        csv << graph[v0].vertexId << ",";
+        csv << graph[v1].vertexId << ",";
+        if(not edge.isVirtual) {
+            csv << edge.edgeId;
+        }
+        csv << ",";
+        copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(csv));
+        csv << "\n";
+
+        assembledPosition += edgeSequence.size();
+    }
 }
 
 

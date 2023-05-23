@@ -185,28 +185,69 @@ void Assembler::fillMode3bAssemblyPathStep(const vector<string>& request, ostrea
     SHASTA_ASSERT(getReads().representation == 0);      // No RLE.
     SHASTA_ASSERT((assemblerInfo->k % 2) == 0);         // Marker length is even.
 
-    // Get the parameters for the request
+
+
+    // Get the parameters for the request.
     uint64_t edgeIdA = invalid<uint64_t>;
     getParameterValue(request, "edgeIdA", edgeIdA);
 
     uint64_t edgeIdB = invalid<uint64_t>;
     getParameterValue(request, "edgeIdB", edgeIdB);
 
+    string showGraphString;
+    const bool showGraph = getParameterValue(request, "showGraph", showGraphString);
+
+    string showVerticesString;
+    const bool showVertices = getParameterValue(request, "showVertices", showVerticesString);
+
+    string showVertexLabelsString;
+    const bool showVertexLabels = getParameterValue(request, "showVertexLabels", showVertexLabelsString);
+
+    string showEdgeLabelsString;
+    const bool showEdgeLabels = getParameterValue(request, "showEdgeLabels", showEdgeLabelsString);
+
+
+
     // Write the form.
     html <<
         "<form>"
         "<table>"
-        "<tr><td class=centered>Edge A<td class=centered>"
+
+        "<tr><th class=left>Edge A<td class=centered>"
         "<input type=text required name=edgeIdA size=8 style='text-align:center' " <<
         ((edgeIdA == invalid<uint64_t>) ? "" : ("value='" + to_string(edgeIdA) + "'")) << ">"
-        "<tr><td class=centered>Edge B<td class=centered>"
+
+        "<tr><th class=left>Edge B<td class=centered>"
         "<input type=text required name=edgeIdB size=8 style='text-align:center' " <<
         ((edgeIdB == invalid<uint64_t>) ? "" : ("value='" + to_string(edgeIdB) + "'")) << ">"
+
+        "<tr>"
+        "<th class=left>Display the graph"
+        "<td class=centered><input type=checkbox name=showGraph" <<
+        (showGraph ? " checked" : "") << ">"
+
+        "<tr>"
+        "<th class=left>Display the vertices"
+        "<td class=centered><input type=checkbox name=showVertices" <<
+        (showVertices ? " checked" : "") << ">"
+
+        "<tr>"
+        "<th class=left>Display vertex labels"
+        "<td class=centered><input type=checkbox name=showVertexLabels" <<
+        (showVertexLabels ? " checked" : "") << ">"
+
+        "<tr>"
+        "<th class=left>Display edge labels"
+        "<td class=centered><input type=checkbox name=showEdgeLabels" <<
+        (showEdgeLabels ? " checked" : "") << ">"
+
         "</table>"
         "<br><input type=submit value='Do it'>"
         "</form>";
 
-    // If the edge id are missing, do nothing.
+
+
+    // If the edge ids are missing, do nothing.
     if(edgeIdA == invalid<uint64_t> or edgeIdB == invalid<uint64_t>) {
         return;
     }
@@ -228,7 +269,7 @@ void Assembler::fillMode3bAssemblyPathStep(const vector<string>& request, ostrea
         return;
     }
 
-    // Check that there are common reds..
+    // Check that there are common reads.
     MarkerGraphEdgePairInfo info;
     SHASTA_ASSERT(analyzeMarkerGraphEdgePair(edgeIdA, edgeIdB, info));
     if(info.common == 0) {
@@ -237,5 +278,9 @@ void Assembler::fillMode3bAssemblyPathStep(const vector<string>& request, ostrea
     }
 
     // Fill this assembly step.
-    mode3b::PathFiller filler(*this, edgeIdA, edgeIdB, html);
+    mode3b::PathFiller filler(*this, edgeIdA, edgeIdB, html,
+        showGraph,
+        showVertices,
+        showVertexLabels,
+        showEdgeLabels);
 }

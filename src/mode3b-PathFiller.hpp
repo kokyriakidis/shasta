@@ -135,7 +135,11 @@ public:
         const Assembler&,
         MarkerGraphEdgeId edgeIdA,
         MarkerGraphEdgeId edgeIdB,
-        ostream& html);
+        ostream& html,
+        bool showGraph = false,
+        bool showVertices = false,
+        bool showVertexLabels = false,
+        bool showEdgeLabels = false);
 
     // Get the assembled sequence.
     // The sequences of edgeIdA and edgeIdB are only included if
@@ -208,18 +212,6 @@ private:
     // and isDagEdge in edges.
     void approximateTopologicalSort();
 
-#if 0
-    // Find the edge v0->v1 that contains the specified MarkerInterval
-    // for the i-th oriented read.
-    // If no such edge, the second field of the return value is false.
-    pair<edge_descriptor, bool> findEdge(
-        vertex_descriptor v0,
-        vertex_descriptor v1,
-        uint64_t i,
-        uint32_t ordinal0,
-        uint32_t ordinal1) const;
-#endif
-
     // Strongly connected component.
     // Only store the non-trivial ones.
     // A non-trivial strong component has at least one internal edge.
@@ -250,12 +242,19 @@ private:
     vector<edge_descriptor> assemblyPath;
     void findAssemblyPath();
 
-    // bool assemble(ostream& html);
-
     // Output.
-    void writeGraph(ostream& html) const;
+    void writeGraph(
+        ostream& html,
+        bool showVertices,
+        bool showVertexLabels,
+        bool showEdgeLabels) const;
     void writeVerticesCsv() const;
-    void writeGraphviz(ostream&) const;
+    void writeGraphviz(
+        ostream&,
+        bool showVertices,
+        bool showVertexLabels,
+        bool showEdgeLabels) const;
+
     void writeSequence(ostream& html) const;
     void writeSequenceFasta(ostream& html) const;
     void writeAssemblyDetails(ostream& csv) const;

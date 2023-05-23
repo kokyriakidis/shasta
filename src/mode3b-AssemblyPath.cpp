@@ -33,7 +33,7 @@ AssemblyPath::AssemblyPath(
         const MarkerGraphEdgeId edgeIdA = primaryEdges[i];
         const MarkerGraphEdgeId edgeIdB = primaryEdges[i+1];
         Step& step = steps[i];
-        ostream html(0);  // Causes output to be skipped.
+        ostream html(0);
         PathFiller pathFiller(assembler, edgeIdA, edgeIdB, html);
         pathFiller.getSequence(step.sequence, false);
         cout << "Assembled length between primary edges " <<
