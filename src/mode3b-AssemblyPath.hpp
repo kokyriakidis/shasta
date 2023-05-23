@@ -48,10 +48,13 @@ private:
     // The i-th step goes from primary edge i
     // to primary edge i+1.
     vector<MarkerGraphEdgeId> primaryEdges;
+
+    // Each of the N steps stores the assembled
+    // sequence intervening between the trimary edges for the step.
     class Step {
     public:
         MarkerGraphEdgePairInfo info;
-        vector<MarkerGraphEdgeId> secondaryEdges;
+        vector<Base> sequence;
         Step(const MarkerGraphEdgePairInfo& info);
     };
     vector<Step> steps;

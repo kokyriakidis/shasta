@@ -64,7 +64,8 @@ PathFiller::PathFiller(
     }
 
     // Assemble the path between edgeIdA and edgeIdB.
-    const bool success = assemble(html);
+    findAssemblyPath();
+    const bool success = true; // assemble(html);
     if(success) {
         if(html) {
             writeSequence(html);
@@ -655,6 +656,7 @@ void PathFiller::writeGraph(ostream& html) const
 
 
 
+#if 0
 bool PathFiller::assemble(ostream& html)
 {
     const PathFiller& graph = *this;
@@ -716,10 +718,67 @@ bool PathFiller::assemble(ostream& html)
     secondaryEdges.resize(secondaryEdges.size() - 1);
     secondaryEdges.erase(secondaryEdges.begin());
 
+    // Store the intervening sequence.
+    getSequence(sequence, false);
+
     if(debug) {
         cout << timestamp << "PathFiller::fillPathGreedy ends with success." << endl;
     }
     return true;
+}
+#endif
+
+
+
+void PathFiller::findAssemblyPath()
+{
+    const PathFiller& graph = *this;
+    assemblyPath.clear();
+
+    const bool debug = false;
+    if(debug) {
+        cout << timestamp << "PathFiller::findAssemblyPath begins." << endl;
+    }
+
+    // Find the first and last vertex of the path we are looking for.
+    const OrientedReadInfo& firstInfo = orientedReadInfos.front();
+    const vertex_descriptor vA = firstInfo.vertices.front();
+    const vertex_descriptor vB = firstInfo.vertices.back();
+
+
+
+    // Main iteration loop.
+    vertex_descriptor v = vA;
+    while(v != vB) {
+        if(debug) {
+            cout << "At vertex " << graph[v].stringId() << endl;
+        }
+
+        // Find the edge with the most coverage.
+        edge_descriptor eNext;
+        uint64_t bestCoverage = 0;
+        BGL_FORALL_OUTEDGES(v, e, graph, PathFiller) {
+            const uint64_t coverage = graph[e].coverage();
+            if(coverage > bestCoverage) {
+                eNext = e;
+                bestCoverage = coverage;
+            }
+        }
+        SHASTA_ASSERT(bestCoverage > 0);
+
+        // Store this edge.
+        assemblyPath.push_back(eNext);
+        v = target(eNext, graph);
+    }
+
+    // As constructed, the assemblyPath includes edgeIdA and edgeIB.
+    SHASTA_ASSERT(assemblyPath.size() >= 2);
+    SHASTA_ASSERT(graph[assemblyPath.front()].edgeId == edgeIdA);
+    SHASTA_ASSERT(graph[assemblyPath.back()].edgeId == edgeIdB);
+
+    if(debug) {
+        cout << timestamp << "PathFiller::findAssemblyPath ends." << endl;
+    }
 }
 
 
@@ -733,6 +792,7 @@ void PathFiller::getSequence(
 {
     sequence.clear();
 
+#if 0
     if(includePrimary) {
         const auto sequenceA = assembler.markerGraph.edgeSequence[edgeIdA];
         copy(sequenceA.begin(), sequenceA.end(), back_inserter(sequence));
@@ -747,8 +807,37 @@ void PathFiller::getSequence(
         const auto sequenceB = assembler.markerGraph.edgeSequence[edgeIdB];
         copy(sequenceB.begin(), sequenceB.end(), back_inserter(sequence));
     }
+#endif
+
+
+    // Use the assemblyPath to assemble sequence.
+    for(uint64_t i=0; i<assemblyPath.size(); i++) {
+
+        // Skip edgeIdA and edgeIdB if so requested.
+        if(not includePrimary) {
+            if(i == 0 or i==assemblyPath.size() - 1) {
+                continue;
+            }
+        }
+
+        // Append the sequence contributed by this edge, virtual or not.
+        const auto edgeSequence = getEdgeSequence(assemblyPath[i]);
+        copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
+    }
 }
 
+// Get the edge sequence from the marker graph, for a regular edge,
+// or from the edge itself, for a virtual edge.
+span<const Base> PathFiller::getEdgeSequence(edge_descriptor e) const
+{
+    const PathFiller& graph = *this;
+    const PathFillerEdge& edge = graph[e];
+    if(edge.isVirtual) {
+        return span<const Base>(edge.sequence.begin(), edge.sequence.end());
+    } else {
+        return assembler.markerGraph.edgeSequence[edge.edgeId];
+    }
+}
 
 
 void PathFiller::writeSequence(ostream& html) const
@@ -1256,6 +1345,7 @@ void PathFiller::assembleVirtualEdge(edge_descriptor e)
     }
 
     // Use Seqan to do an MSA of these sequences.
+    vector<MarkerGraphEdgeId> edgeIds;
     {
         using namespace seqan;
         Align< String<MarkerGraphEdgeId> > align;
@@ -1302,7 +1392,7 @@ void PathFiller::assembleVirtualEdge(edge_descriptor e)
             // Store it.
             consensusValues.push_back(consensusValue);
             if(consensusValue > 0) {
-                edge.edgeIds.push_back(consensusValue - 1);
+                edgeIds.push_back(consensusValue - 1);
             }
         }
 
@@ -1316,12 +1406,22 @@ void PathFiller::assembleVirtualEdge(edge_descriptor e)
             }
             cout << endl;
             cout << "VirtualEdge consensus:" << endl;
-            for(const MarkerGraphEdgeId edgeId: edge.edgeIds) {
+            for(const MarkerGraphEdgeId edgeId: edgeIds) {
                 cout << edgeId << " ";
             }
             cout << endl;
         }
     }
+
+    // Store the sequence.
+    // It is obtained from the consensus edgeIds.
+    edge.sequence.clear();
+    for(const MarkerGraphEdgeId edgeId: edgeIds) {
+        const auto thisEdgeSequence = assembler.markerGraph.edgeSequence[edgeId];
+        copy(thisEdgeSequence.begin(), thisEdgeSequence.end(),
+            back_inserter(edge.sequence));
+    }
+
 }
 
 

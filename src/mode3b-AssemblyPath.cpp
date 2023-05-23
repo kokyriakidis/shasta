@@ -28,16 +28,16 @@ AssemblyPath::AssemblyPath(
     }
     SHASTA_ASSERT(primaryEdges.size() == steps.size() + 1);
 
-    // Fill in the secondary edges for each Step.
+    // Fill in intervening assembled sequence for each Step.
     for(uint64_t i=0; i<steps.size(); i++) {
         const MarkerGraphEdgeId edgeIdA = primaryEdges[i];
         const MarkerGraphEdgeId edgeIdB = primaryEdges[i+1];
-        cout << "Filling in secondary edges between primary edges " <<
-            edgeIdA << " " << edgeIdB << endl;
         Step& step = steps[i];
         ostream html(0);  // Causes output to be skipped.
         PathFiller pathFiller(assembler, edgeIdA, edgeIdB, html);
-        step.secondaryEdges = pathFiller.secondaryEdges;
+        pathFiller.getSequence(step.sequence, false);
+        cout << "Assembled length between primary edges " <<
+            edgeIdA << " " << edgeIdB << " is " << step.sequence.size() << endl;
     }
 }
 
@@ -64,12 +64,9 @@ void AssemblyPath::getSequence(vector<Base>& sequence) const
             break;
         }
 
-        // Append the secondary edge sequences.
+        // Append the step sequence.
         const Step& step = steps[i];
-        for(const MarkerGraphEdgeId edgeId: step.secondaryEdges) {
-            const auto edgeSequence = assembler.markerGraph.edgeSequence[edgeId];
-            copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
-        }
+        copy(step.sequence.begin(), step.sequence.end(), back_inserter(sequence));
     }
 }
 

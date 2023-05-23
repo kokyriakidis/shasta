@@ -72,9 +72,19 @@ public:
 };
 
 
-// If an edge was created using multiple sequence alignment,
-// it is called a virtual edge.
-// A virtual edge only stores a sequence of MarkerGraphEdgeIds.
+
+// Most edges correspond to a marker graph edge.
+// Some edges are "virtual" which means they do not have
+// a corresponding marker graph edge.
+// For a regular (non-virtual) edge:
+// - edgeId contains the MarkerGraphEdgeId of the corresponding
+//   marker graph edge.
+// - The sequence is obtained from that marker graph edge
+//   abd PathFillerEdge::sequence is empty.
+// For a virtual edge:
+// - edgeId is invalid<MarkerGraphEdgeId>.
+// - The sequence is stored in PathFillerEdge::sequence.
+//   It is computed by assembleVirtualEdge using MSA.
 class shasta::mode3b::PathFillerEdge {
 public:
     // The corresponding edge in the global marker graph.
@@ -82,7 +92,7 @@ public:
     // a given marker graph edge.
     MarkerGraphEdgeId edgeId = invalid<MarkerGraphEdgeId>;
 
-    // The MarkerIntervals in this edges for each of the oriented reads.
+    // The MarkerIntervals in this edge for each of the oriented reads.
     // If cycles are present within this local marker graph,
     // an oriented read can have more than one MarkerInterval in an edge.
     // This vector has the same size as the PathFiller::orientedReadInfos vector
@@ -96,7 +106,7 @@ public:
 
     // Fields only stored for a virtual edge.
     // The sequence of MarkerGraphEdges is obtained via MSA.
-    vector<MarkerGraphEdgeId> edgeIds;
+    vector<Base> sequence;
     uint64_t virtualCoverage = invalid<uint64_t>;
     bool isVirtual = false;
 
@@ -118,20 +128,24 @@ public:
 class shasta::mode3b::PathFiller: public PathFillerBaseClass {
 public:
 
+    // Hide class Base defined in boost::adjacency_list.
+    using Base = shasta::Base;
+
     PathFiller(
         const Assembler&,
         MarkerGraphEdgeId edgeIdA,
         MarkerGraphEdgeId edgeIdB,
         ostream& html);
 
-    // The path secondary edges. This excludes the primary edges edgeIdA and edgeIdB.
-    vector<MarkerGraphEdgeId> secondaryEdges;
-
+    // Get the assembled sequence.
+    // The sequences of edgeIdA and edgeIdB are only included if
+    // includePrimary is true.
+    void getSequence(vector<Base>&, bool includePrimary) const;
 
 private:
 
-    // Hide class Base defined in boost::adjacency_list.
-    using Base = shasta::Base;
+    // The path secondary edges. This excludes the primary edges edgeIdA and edgeIdB.
+    vector<MarkerGraphEdgeId> secondaryEdges;
 
     // Store constructor arguments.
     const Assembler& assembler;
@@ -227,12 +241,16 @@ private:
     // This uses MSA so compute optimal MarkerGraphEdgeIds.
     void assembleVirtualEdge(edge_descriptor);
 
-    bool assemble(ostream& html);
+    // Get the edge sequence from the marker graph, for a regular edge,
+    // or from the edge itself, for a virtual edge.
+    span<const Base> getEdgeSequence(edge_descriptor) const;
 
-    // Get the assembled sequence.
-    // The sequences of edgeIdA and edgeIdB are only included if
-    // includePrimary is true.
-    void getSequence(vector<Base>&, bool includePrimary) const;
+    // The assembly path, including edgeIdA at the beginning
+    // and edgeIdB at the end.
+    vector<edge_descriptor> assemblyPath;
+    void findAssemblyPath();
+
+    // bool assemble(ostream& html);
 
     // Output.
     void writeGraph(ostream& html) const;
