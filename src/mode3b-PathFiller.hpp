@@ -232,9 +232,14 @@ private:
     // and create virtual edges to replace the removed edges.
     void createVirtualEdges();
 
-    // Assemble a virtual edge.
-    // This uses MSA so compute optimal MarkerGraphEdgeIds.
+    // Assemble a virtual edge using multiple sequence alignment
+    // of the sequences contributed by each oriented read.
+    // The 0 version does the MSA using the sequence of marker graph edges
+    // reached by each oriented read.
+    // The 1 version does the MSA in base space.
     void assembleVirtualEdge(edge_descriptor);
+    void assembleVirtualEdge0(edge_descriptor);
+    void assembleVirtualEdge1(edge_descriptor);
 
     // Get the edge sequence from the marker graph, for a regular edge,
     // or from the edge itself, for a virtual edge.

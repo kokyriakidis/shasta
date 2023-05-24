@@ -3,6 +3,7 @@
 #include "approximateTopologicalSort.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
+#include "globalMsa.hpp"
 #include "platformDependent.hpp"
 #include "orderPairs.hpp"
 #include "Reads.hpp"
@@ -899,8 +900,8 @@ void PathFiller::writeAssemblyDetails(ostream& csv) const
         csv << i << ",";
         csv << assembledPosition << ",";
         csv << assembledPosition + edgeSequence.size() << ",";
-        csv << graph[v0].vertexId << ",";
-        csv << graph[v1].vertexId << ",";
+        csv << graph[v0].stringId() << ",";
+        csv << graph[v1].stringId() << ",";
         if(edge.isVirtual()) {
             csv << "Virtual";
         } else {
@@ -1315,9 +1316,24 @@ void PathFiller::createVirtualEdges()
 
 
 
-// Assemble a virtual edge.
-// This uses MSA so compute optimal MarkerGraphEdgeIds.
+// Assemble a virtual edge using multiple sequence alignment
+// of the sequences contributed by each oriented read.
+// The 0 version does the MSA using the sequence of marker graph edges
+// reached by each oriented read.
+// The 1 version does the MSA in base space.
 void PathFiller::assembleVirtualEdge(edge_descriptor e)
+{
+    assembleVirtualEdge1(e);
+}
+
+
+
+
+// Assemble a virtual edge using multiple sequence alignment
+// of the sequences contributed by each oriented read.
+// The 0 version does the MSA using the sequence of marker graph edges
+// reached by each oriented read.
+void PathFiller::assembleVirtualEdge0(edge_descriptor e)
 {
     const bool debug = false;
     PathFiller& graph = *this;
@@ -1449,30 +1465,98 @@ void PathFiller::assembleVirtualEdge(edge_descriptor e)
 
 
 
-#if 0
-// Find the edge v0->v1 that contains the specified MarkerInterval
-// for the i-th oriented read.
-pair<PathFiller::edge_descriptor, bool> PathFiller::findEdge(
-    vertex_descriptor v0,
-    vertex_descriptor v1,
-    uint64_t i,
-    uint32_t ordinal0,
-    uint32_t ordinal1) const
+// Assemble a virtual edge using multiple sequence alignment
+// of the sequences contributed by each oriented read.
+// The 1 version does the MSA in base space.
+void PathFiller::assembleVirtualEdge1(edge_descriptor e)
 {
-    const PathFiller& graph = *this;
+    const bool debug = false;
+    PathFiller& graph = *this;
+    PathFillerEdge& edge = graph[e];
+    SHASTA_ASSERT(edge.isVirtual());
 
-    BGL_FORALL_OUTEDGES(v0, e, graph, PathFiller) {
-        if(target(e, graph) != v1) {
+    const uint64_t k = assembler.assemblerInfo->k;
+    SHASTA_ASSERT((k % 2) == 0);
+    const uint64_t kHalf = k / 2;
+
+    if(debug) {
+        const vertex_descriptor v0 = source(e, graph);
+        const vertex_descriptor v1 = target(e, graph);
+        cout << "PathFiller::assembleVirtualEdge1 begins for virtual edge " <<
+            graph[v0].stringId() << " " << graph[v1].stringId() << endl;
+    }
+
+
+    // Gather the sequences of the contributing oriented reads.
+    // Each sequence is stored with the number of distinct reads that
+    // have that sequence.
+    vector< pair<vector<Base>, uint64_t> > orientedReadSequences;
+
+    // Loop over oriented reads.
+    vector<Base> orientedReadSequence;
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        const OrientedReadId orientedReadId = orientedReadInfos[i].orientedReadId;
+        const vector< pair<uint32_t, uint32_t> >& orientedReadMarkerIntervals = edge.markerIntervals[i];
+        if(orientedReadMarkerIntervals.empty()) {
             continue;
         }
-        const PathFillerEdge& edge = graph[e];
-        const auto& markerIntervals = edge.markerIntervals[i];
-        if(find(markerIntervals.begin(), markerIntervals.end(),
-            make_pair(ordinal0, ordinal1)) != markerIntervals.end()) {
-            return make_pair(e, true);
+
+        // Find the first and last ordinals of this oriented read on this edge.
+        const uint32_t ordinal0 = orientedReadMarkerIntervals.front().first;
+        const uint32_t ordinal1 = orientedReadMarkerIntervals.back().second;
+
+        // Find the corresponding MarkerIds.
+        const MarkerId markerId0 = assembler.getMarkerId(orientedReadId, ordinal0);
+        const MarkerId markerId1 = assembler.getMarkerId(orientedReadId, ordinal1);
+
+        // And the corresponding positions in the oriented reads.
+        const uint64_t position0 = assembler.markers.begin()[markerId0].position + kHalf;
+        const uint64_t position1 = assembler.markers.begin()[markerId1].position + kHalf;
+
+        // Now we can get the sequence contributed by this oriented read.
+        orientedReadSequence.clear();
+        for(uint64_t position=position0; position!=position1; position++) {
+            const Base base = assembler.getReads().getOrientedReadBase(orientedReadId, uint32_t(position));
+            orientedReadSequence.push_back(base);
+        }
+
+        if(debug) {
+            copy(orientedReadSequence.begin(), orientedReadSequence.end(),
+                ostream_iterator<Base>(cout));
+            cout << " " << orientedReadId << endl;
+        }
+
+        // Store it.
+        bool found = false;
+        for(auto& p: orientedReadSequences) {
+            if(p.first == orientedReadSequence) {
+                ++p.second;
+                found = true;
+                break;
+            }
+        }
+        if(not found) {
+            orientedReadSequences.push_back(make_pair(orientedReadSequence, 1));
         }
     }
 
-    return make_pair(edge_descriptor(), false);
+    // Do the MSA.
+    vector<Base> consensus;
+    globalMsaSpoa(orientedReadSequences, consensus);
+    if(debug) {
+        copy(consensus.begin(), consensus.end(), ostream_iterator<Base>(cout));
+        cout << " Consensus" << endl;
+    }
+
+    // Store the consensus in the edge.
+    edge.sequence = consensus;
+
+    if(debug) {
+        const vertex_descriptor v0 = source(e, graph);
+        const vertex_descriptor v1 = target(e, graph);
+        cout << "PathFiller::assembleVirtualEdge1 ends for virtual edge " <<
+            graph[v0].stringId() << " " << graph[v1].stringId() << endl;
+    }
+
 }
-#endif
+
