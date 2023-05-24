@@ -87,14 +87,6 @@ public:
 //   It is computed by assembleVirtualEdge using MSA.
 class shasta::mode3b::PathFiller1Edge {
 public:
-    // The corresponding edge in the global marker graph.
-    // There can be more than one PathFillerEdge corresponding to
-    // a given marker graph edge.
-    MarkerGraphEdgeId edgeId = invalid<MarkerGraphEdgeId>;
-    bool isVirtual() const
-    {
-        return edgeId == invalid<MarkerGraphEdgeId>;
-    }
 
     // The MarkerIntervals in this edge for each of the oriented reads.
     // If cycles are present within this local marker graph,
@@ -103,9 +95,6 @@ public:
     // and is indexed in the same way.
     // This only stores the ordinals for the MarkerInterval as
     // the OrientedReadId is stored in the orientedReadInfos vector.
-    // For non-virtual edges, for each marker interval,
-    // the second ordinal equals the first ordinal plus one,
-    // so we could store just the first one.
     vector< vector< pair<uint32_t, uint32_t> > > markerIntervals;
 
     // Fields only stored for a virtual edge.
@@ -205,8 +194,11 @@ private:
     void getEdgeSequence(edge_descriptor, vector<Base>&) const;
     void getEdgeSequence(MarkerGraphEdgeId, vector<Base>&) const;
 
-    void createGraph(uint64_t maxBaseSkip);
+    void createGraph(
+        uint64_t maxBaseSkip,
+        uint64_t minVertexCoverage);
     void createVertices();
+    void removeLowCoverageVertices(uint64_t minVertexCoverage);
     void splitVertices(uint64_t maxBaseSkip);
     void createEdges();
 

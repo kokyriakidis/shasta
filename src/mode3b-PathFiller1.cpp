@@ -45,6 +45,7 @@ PathFiller1::PathFiller1(
 
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t maxBaseSkip = 300;
+    const uint64_t minVertexCoverage = 4;
 
     checkAssumptions();
     if(html) {
@@ -57,7 +58,25 @@ PathFiller1::PathFiller1(
         writeOrientedReads(html);
     }
 
-    createGraph(maxBaseSkip);
+    createGraph(maxBaseSkip, minVertexCoverage);
+
+    if(html) {
+        html << "<p>The graph has " << num_vertices(graph) <<
+            " vertices and " << num_edges(graph) << " edges.";
+    }
+
+    if(html) {
+        if(showGraph) {
+            approximateTopologicalSort();
+            writeGraph(
+                html,
+                showVertices,
+                showVertexLabels,
+                showEdgeLabels);
+        }
+    }
+
+#if 0
     computeStrongComponents();
     createVirtualEdges();
     writeVerticesCsv();
@@ -84,7 +103,7 @@ PathFiller1::PathFiller1(
                 showEdgeLabels);
         }
     }
-
+#endif
 }
 
 
@@ -229,9 +248,12 @@ void PathFiller1::writeOrientedReads(ostream& html) const
 
 
 
-void PathFiller1::createGraph(uint64_t maxBaseSkip)
+void PathFiller1::createGraph(
+    uint64_t maxBaseSkip,
+    uint64_t minVertexCoverage)
 {
     createVertices();
+    removeLowCoverageVertices(minVertexCoverage);
     splitVertices(maxBaseSkip);
     createEdges();
 }
@@ -306,6 +328,38 @@ void PathFiller1::createVertices()
         }
     }
 }
+
+
+
+void PathFiller1::removeLowCoverageVertices(uint64_t minVertexCoverage)
+{
+    PathFiller1& graph = *this;
+
+    vector<vertex_descriptor> verticesToBeRemoved;
+    BGL_FORALL_VERTICES(v, graph, PathFiller1) {
+        if(graph[v].coverage() < minVertexCoverage) {
+            verticesToBeRemoved.push_back(v);
+        }
+    }
+
+
+    // Before removing each vertex, we have to record this fact
+    // in the oriented reads that visit this vertex.
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        const PathFiller1Vertex& vertex = graph[v];
+
+        for(uint64_t i=0; i<vertex.ordinals.size(); i++) {
+            OrientedReadInfo& info = orientedReadInfos[i];
+            for(const uint32_t ordinal: vertex.ordinals[i]) {
+                info.vertices[ordinal - info.ordinalA0] = null_vertex();
+            }
+        }
+
+        // Now we can remove the vertex.
+        remove_vertex(v, graph);
+    }
+}
+
 
 
 
@@ -421,12 +475,52 @@ void PathFiller1::createEdges()
 {
     PathFiller1& graph = *this;
 
+    // Loop over oriented reads.
+    // Follow each oriented read over the vertices it visits.
     for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
         const OrientedReadInfo& info = orientedReadInfos[i];
-        for(uint32_t ordinal0=info.ordinalA0; ordinal0<info.ordinalB1; ordinal0++) {
-            const uint32_t ordinal1 = ordinal0 + 1;
 
-            const vertex_descriptor v0 = info.getVertex(ordinal0);
+        vertex_descriptor vPrevious = null_vertex();
+        uint32_t ordinalPrevious = invalid<uint32_t>;
+
+        // Loop over the vertices visited by this oriented read.
+        for(uint32_t ordinal=info.ordinalA0; ordinal<=info.ordinalB1; ordinal++) {
+            const vertex_descriptor v = info.getVertex(ordinal);
+
+            // No vertex. Skip.
+            if(v == null_vertex()) {
+                continue;
+            }
+
+            // We found a vertex, and we don't have a previous vertex.
+            // Store this vertex as the previous vertex.
+            if(vPrevious == null_vertex()) {
+                vPrevious = v;
+                ordinalPrevious = ordinal;
+                continue;
+            }
+
+            // We found a vertex, and we also have a previous vertex.
+            // Add an edge between these two vertices if necessary,
+            // then add a MarkerInterval to it to describe the
+            // transition of this oriented read from vPrevious to v.
+            edge_descriptor e;
+            bool edgeExists = false;
+            tie(e, edgeExists) = edge(vPrevious, v, graph);
+            if(not edgeExists) {
+                bool edgeWasAdded = false;
+                tie(e, edgeWasAdded) = add_edge(vPrevious, v, graph);
+                SHASTA_ASSERT(edgeWasAdded);
+                graph[e].markerIntervals.resize(orientedReadInfos.size());
+            }
+            graph[e].markerIntervals[i].push_back({ordinalPrevious, ordinal});
+
+            // Replace the previous vertex with this one.
+            vPrevious = v;
+            ordinalPrevious = ordinal;
+
+
+#if 0
             const vertex_descriptor v1 = info.getVertex(ordinal1);
 
             // Find the marker graph edge that contains this MarkerInterval.
@@ -460,7 +554,7 @@ void PathFiller1::createEdges()
                 edge.markerIntervals.resize(orientedReadInfos.size());
                 edge.markerIntervals[i].push_back({ordinal0, ordinal1});
             }
-
+#endif
         }
     }
 }
@@ -579,12 +673,7 @@ void PathFiller1::writeGraphviz(
 
         // Tooltip.
         out << " tooltip=\"";
-        if(edge.isVirtual()) {
-            out << "Virtual";
-        } else {
-            out << edge.edgeId;
-        }
-        out << "\\n" << coverage << "\\n";
+        out << coverage << "\\n";
         copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(out));
         if(it != assemblyPathMap.end()) {
             const uint64_t assembledPosition = it->second;
@@ -596,12 +685,7 @@ void PathFiller1::writeGraphviz(
         // Label.
         if(showEdgeLabels) {
             out << " label=\"";
-            if(edge.isVirtual()) {
-                out << "Virtual";
-            } else {
-                out << edge.edgeId;
-            }
-            out << "\\n" << coverage << "\\n";
+            out << coverage << "\\n";
             copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(out));
             if(it != assemblyPathMap.end()) {
                 const uint64_t assembledPosition = it->second;
@@ -611,9 +695,8 @@ void PathFiller1::writeGraphviz(
             out << "\"";
         }
 
-        // Virtual edges and edges with source or target in a strong component
-        // are shown dashed.
-        if(edge.isVirtual() or
+        // Edges with source or target in a strong component are shown dashed.
+        if(
             graph[v0].isStrongComponentVertex() or
             graph[v1].isStrongComponentVertex()) {
             out << " style=dashed";
@@ -771,8 +854,6 @@ void PathFiller1::findAssemblyPath()
 
     // As constructed, the assemblyPath includes edgeIdA and edgeIB.
     SHASTA_ASSERT(assemblyPath.size() >= 2);
-    SHASTA_ASSERT(graph[assemblyPath.front()].edgeId == edgeIdA);
-    SHASTA_ASSERT(graph[assemblyPath.back()].edgeId == edgeIdB);
 
     if(debug) {
         cout << timestamp << "PathFiller1::findAssemblyPath ends." << endl;
@@ -824,18 +905,17 @@ void PathFiller1::getSequence(
     }
 }
 
+
+
 // Get the edge sequence from the marker graph, for a regular edge,
 // or from the edge itself, for a virtual edge.
 span<const Base> PathFiller1::getEdgeSequence(edge_descriptor e) const
 {
     const PathFiller1& graph = *this;
     const PathFiller1Edge& edge = graph[e];
-    if(edge.isVirtual()) {
-        return span<const Base>(edge.sequence.begin(), edge.sequence.end());
-    } else {
-        return assembler.markerGraph.edgeSequence[edge.edgeId];
-    }
+    return span<const Base>(edge.sequence.begin(), edge.sequence.end());
 }
+
 
 
 void PathFiller1::writeSequence(ostream& html) const
@@ -887,12 +967,11 @@ void PathFiller1::writeAssemblyDetails(ostream& csv) const
 {
     const PathFiller1& graph = *this;
 
-    csv << "Index,Begin,End,VertexId0,VertexId1,EdgeId,Sequence\n";
+    csv << "Index,Begin,End,VertexId0,VertexId1,Sequence\n";
 
     uint64_t assembledPosition = 0;
     for(uint64_t i=0; i<assemblyPath.size(); i++) {
         const edge_descriptor e = assemblyPath[i];
-        const PathFiller1Edge& edge = graph[e];
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
         const auto edgeSequence = getEdgeSequence(e);
@@ -902,12 +981,6 @@ void PathFiller1::writeAssemblyDetails(ostream& csv) const
         csv << assembledPosition + edgeSequence.size() << ",";
         csv << graph[v0].stringId() << ",";
         csv << graph[v1].stringId() << ",";
-        if(edge.isVirtual()) {
-            csv << "Virtual";
-        } else {
-            csv << edge.edgeId;
-        }
-        csv << ",";
         copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(csv));
         csv << "\n";
 
@@ -1338,7 +1411,6 @@ void PathFiller1::assembleVirtualEdge0(edge_descriptor e)
     const bool debug = false;
     PathFiller1& graph = *this;
     PathFiller1Edge& edge = graph[e];
-    SHASTA_ASSERT(edge.isVirtual());
 
 
     // Gather the marker graph paths of the contributing oriented reads.
@@ -1473,7 +1545,6 @@ void PathFiller1::assembleVirtualEdge1(edge_descriptor e)
     const bool debug = false;
     PathFiller1& graph = *this;
     PathFiller1Edge& edge = graph[e];
-    SHASTA_ASSERT(edge.isVirtual());
 
     const uint64_t k = assembler.assemblerInfo->k;
     SHASTA_ASSERT((k % 2) == 0);
