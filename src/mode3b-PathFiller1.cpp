@@ -13,6 +13,7 @@ using namespace shasta;
 using namespace mode3b;
 
 // Boost libraries.
+#include <boost/graph/dominator_tree.hpp>
 #include <boost/graph/iteration_macros.hpp>
 #include <boost/graph/strong_components.hpp>
 #include <boost/uuid/uuid.hpp>
@@ -59,6 +60,7 @@ PathFiller1::PathFiller1(
     }
 
     createGraph(maxBaseSkip, minVertexCoverage);
+    // linearize();
     assembleEdges();
     findAssemblyPath();
 
@@ -1508,5 +1510,87 @@ void PathFiller1::assembleEdge(edge_descriptor e)
             graph[v0].stringId() << " " << graph[v1].stringId() << endl;
     }
 
+}
+
+
+
+
+// Linearize the graph by keeping only vertices on the dominator tree path
+// from edgeIdA to edgeIdB.
+void PathFiller1::linearize()
+{
+    using namespace boost;
+    PathFiller1& graph = *this;
+    const vertex_descriptor entrance = getEntrance();
+    const vertex_descriptor exit = getExit();
+
+    // Map verties to integers.
+    std::map<vertex_descriptor, uint64_t> indexMap;
+    uint64_t vertexIndex = 0;
+    BGL_FORALL_VERTICES(v, graph, PathFiller1) {
+        indexMap.insert({v, vertexIndex++});
+    }
+    auto associativeIndexMap = make_assoc_property_map(indexMap);
+
+
+    // Compute the dominator tree.
+    vector<uint64_t> dfnum(indexMap.size(), invalid<uint64_t>);
+    vector<vertex_descriptor> parent(indexMap.size(), null_vertex());
+    vector<vertex_descriptor> verticesByDFNum = parent;
+    std::map<vertex_descriptor, vertex_descriptor> predecessorMap;
+
+    make_iterator_property_map(dfnum.begin(), associativeIndexMap);
+    make_iterator_property_map(parent.begin(), associativeIndexMap);
+    lengauer_tarjan_dominator_tree(
+        graph,
+        entrance,
+        associativeIndexMap,
+        make_iterator_property_map(dfnum.begin(), associativeIndexMap),
+        make_iterator_property_map(parent.begin(), associativeIndexMap),
+        verticesByDFNum,
+        make_assoc_property_map(predecessorMap));
+
+    // Find the vertices on the dominator tree path between the
+    // entrance and the exit.
+    std::set<vertex_descriptor> treePathVertices;
+    vertex_descriptor v = exit;
+    while(v != entrance) {
+        treePathVertices.insert(v);
+        v = predecessorMap[v];
+    }
+    treePathVertices.insert(entrance);
+
+    // Only keep these vertices.
+    removeAllEdges();
+    vector<vertex_descriptor> verticesToBeRemoved;
+    BGL_FORALL_VERTICES(v, graph, PathFiller1) {
+        if(not treePathVertices.contains(v)) {
+            verticesToBeRemoved.push_back(v);
+        }
+    }
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        removeVertex(v);
+    }
+    createEdges();
+}
+
+
+
+PathFiller1::vertex_descriptor PathFiller1::getEntrance() const
+{
+    SHASTA_ASSERT(not orientedReadInfos.empty());
+    const OrientedReadInfo& info = orientedReadInfos.front();
+    SHASTA_ASSERT(not info.vertices.empty());
+    return info.vertices.front();
+}
+
+
+
+PathFiller1::vertex_descriptor PathFiller1::getExit() const
+{
+    SHASTA_ASSERT(not orientedReadInfos.empty());
+    const OrientedReadInfo& info = orientedReadInfos.front();
+    SHASTA_ASSERT(not info.vertices.empty());
+    return info.vertices.back();
 }
 

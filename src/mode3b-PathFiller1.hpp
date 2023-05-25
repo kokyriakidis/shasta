@@ -190,12 +190,19 @@ private:
     void createEdges();
     void removeAllEdges();
 
+    vertex_descriptor getEntrance() const;
+    vertex_descriptor getExit() const;
+
     // Approximate topological sort is only used for better and
     // faster display in Graphviz. It sets rank and color in vertices
     // and isDagEdge in edges.
     void approximateTopologicalSort();
 
     void removeStrongComponents();
+
+    // Linearize the graph by keeping only vertices on the dominator tree path
+    // from edgeIdA to edgeIdB.
+    void linearize();
 
     // Assemble edges using MSA.
     // Sequences stored in the marker graph are not used.

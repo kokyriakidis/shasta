@@ -38,7 +38,7 @@ AssemblyPath::AssemblyPath(
         pathFiller.getSequence(step.sequence, false);
         cout << "Assembly primary edges " <<
             edgeIdA << " " << edgeIdB << ": coverage " << pathFiller.coverage() <<
-            ", assembled length" << step.sequence.size() << endl;
+            ", assembled length " << step.sequence.size() << endl;
     }
 }
 
