@@ -57,12 +57,6 @@ public:
     vector< vector<uint32_t> > ordinals;
     uint64_t coverage() const;
 
-    // Set if this vertex is part of a non-trivial strongly connected component.
-    uint64_t strongComponentId = invalid<uint64_t>;
-    bool isStrongComponentVertex() const {
-        return strongComponentId != invalid<uint64_t>;
-    }
-
     // Required by approximateTopologicalSort and only used for display.
     uint64_t color = invalid<uint64_t>;
     uint64_t rank = invalid<uint64_t>;
@@ -73,18 +67,6 @@ public:
 
 
 
-// Most edges correspond to a marker graph edge.
-// Some edges are "virtual" which means they do not have
-// a corresponding marker graph edge.
-// For a regular (non-virtual) edge:
-// - edgeId contains the MarkerGraphEdgeId of the corresponding
-//   marker graph edge.
-// - The sequence is obtained from that marker graph edge
-//   abd PathFillerEdge::sequence is empty.
-// For a virtual edge:
-// - edgeId is invalid<MarkerGraphEdgeId>.
-// - The sequence is stored in PathFillerEdge::sequence.
-//   It is computed by assembleVirtualEdge using MSA.
 class shasta::mode3b::PathFiller1Edge {
 public:
 
@@ -97,10 +79,9 @@ public:
     // the OrientedReadId is stored in the orientedReadInfos vector.
     vector< vector< pair<uint32_t, uint32_t> > > markerIntervals;
 
-    // Fields only stored for a virtual edge.
-    // The sequence of MarkerGraphEdges is obtained via MSA.
+    // Sequence assembled using MSA of the sequences contributes by each
+    // MarkerInterval.
     vector<Base> sequence;
-    uint64_t virtualCoverage = invalid<uint64_t>;
 
     uint64_t coverage() const
     {
@@ -198,40 +179,23 @@ private:
         uint64_t maxBaseSkip,
         uint64_t minVertexCoverage);
     void createVertices();
+    void removeVertex(vertex_descriptor);
     void removeLowCoverageVertices(uint64_t minVertexCoverage);
     void splitVertices(uint64_t maxBaseSkip);
     void createEdges();
+    void removeAllEdges();
 
     // Approximate topological sort is only used for better and
     // faster display in Graphviz. It sets rank and color in vertices
     // and isDagEdge in edges.
     void approximateTopologicalSort();
 
-    // Strongly connected component.
-    // Only store the non-trivial ones.
-    // A non-trivial strong component has at least one internal edge.
-    // This means that it either has more than one vertex,
-    // or it consists of a single vertex with a self-edge.
-    class StrongComponent {
-    public:
-        vector<vertex_descriptor> vertices;
-        StrongComponent(const vector<vertex_descriptor>& vertices);
-    };
-    void computeStrongComponents();
-    vector<StrongComponent> strongComponents;
+    void removeStrongComponents();
 
-    // Remove all strong component vertices and the edges that involve them,
-    // and create virtual edges to replace the removed edges.
-    void createVirtualEdges();
-
-    // Assemble a virtual edge using multiple sequence alignment
-    // of the sequences contributed by each oriented read.
-    // The 0 version does the MSA using the sequence of marker graph edges
-    // reached by each oriented read.
-    // The 1 version does the MSA in base space.
-    void assembleVirtualEdge(edge_descriptor);
-    void assembleVirtualEdge0(edge_descriptor);
-    void assembleVirtualEdge1(edge_descriptor);
+    // Assemble edges using MSA.
+    // Sequences stored in the marker graph are not used.
+    void assembleEdges();
+    void assembleEdge(edge_descriptor);
 
     // Get the edge sequence from the marker graph, for a regular edge,
     // or from the edge itself, for a virtual edge.

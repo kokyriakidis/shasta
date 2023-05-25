@@ -59,6 +59,8 @@ PathFiller1::PathFiller1(
     }
 
     createGraph(maxBaseSkip, minVertexCoverage);
+    assembleEdges();
+    findAssemblyPath();
 
     if(html) {
         html << "<p>The graph has " << num_vertices(graph) <<
@@ -66,6 +68,11 @@ PathFiller1::PathFiller1(
     }
 
     if(html) {
+        writeSequence(html);
+        ofstream fasta("AssemblyPath.fasta");
+        writeSequenceFasta(fasta);
+        ofstream csv("AssemblyPath.csv");
+        writeAssemblyDetails(csv);
         if(showGraph) {
             approximateTopologicalSort();
             writeGraph(
@@ -256,6 +263,12 @@ void PathFiller1::createGraph(
     removeLowCoverageVertices(minVertexCoverage);
     splitVertices(maxBaseSkip);
     createEdges();
+
+    // Remove strongly connected components, then regerenerate
+    // edges with the remaining vertices.
+    removeStrongComponents();
+    removeAllEdges();
+    createEdges();
 }
 
 
@@ -342,21 +355,8 @@ void PathFiller1::removeLowCoverageVertices(uint64_t minVertexCoverage)
         }
     }
 
-
-    // Before removing each vertex, we have to record this fact
-    // in the oriented reads that visit this vertex.
     for(const vertex_descriptor v: verticesToBeRemoved) {
-        const PathFiller1Vertex& vertex = graph[v];
-
-        for(uint64_t i=0; i<vertex.ordinals.size(); i++) {
-            OrientedReadInfo& info = orientedReadInfos[i];
-            for(const uint32_t ordinal: vertex.ordinals[i]) {
-                info.vertices[ordinal - info.ordinalA0] = null_vertex();
-            }
-        }
-
-        // Now we can remove the vertex.
-        remove_vertex(v, graph);
+        removeVertex(v);
     }
 }
 
@@ -561,6 +561,21 @@ void PathFiller1::createEdges()
 
 
 
+void PathFiller1::removeAllEdges()
+{
+    PathFiller1& graph = *this;
+    vector<edge_descriptor> allEdges;
+    BGL_FORALL_EDGES(e, graph, PathFiller1) {
+        allEdges.push_back(e);
+    }
+
+    for(const edge_descriptor e: allEdges) {
+        boost::remove_edge(e, graph);
+    }
+}
+
+
+
 PathFiller1Vertex::PathFiller1Vertex(
     MarkerGraphVertexId vertexId,
     uint64_t orientedReadCount) :
@@ -608,7 +623,7 @@ void PathFiller1::writeGraphviz(
     out <<
         "digraph PathFiller1Graph {\n"
         "mclimit=0.01;\n"       // For layout speed
-        "edge [penwidth=2];\n"
+        "edge [penwidth=6];\n"
         "node [fontname=\"Courier New\"];\n"
         "edge [fontname=\"Courier New\"];\n";
 
@@ -637,9 +652,6 @@ void PathFiller1::writeGraphviz(
         out << "tooltip=\"" << vertex.stringId() << "\\n" << vertex.coverage() << "\"";
         if(showVertexLabels) {
             out << " label=\"" << vertex.stringId() << "\\n" << vertex.coverage() << "\"";
-        }
-        if(vertex.isStrongComponentVertex()) {
-            out << " color=purple";
         }
         out << "];\n";
     }
@@ -685,8 +697,13 @@ void PathFiller1::writeGraphviz(
         // Label.
         if(showEdgeLabels) {
             out << " label=\"";
-            out << coverage << "\\n";
-            copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(out));
+            out << coverage;
+            for(uint64_t i=0; i<edgeSequence.size(); i++) {
+                if((i % 10) == 0) {
+                    out << "\\n";
+                }
+                out << edgeSequence[i];
+            }
             if(it != assemblyPathMap.end()) {
                 const uint64_t assembledPosition = it->second;
                 out << "\\n" << assembledPosition << "-" <<
@@ -695,16 +712,9 @@ void PathFiller1::writeGraphviz(
             out << "\"";
         }
 
-        // Edges with source or target in a strong component are shown dashed.
-        if(
-            graph[v0].isStrongComponentVertex() or
-            graph[v1].isStrongComponentVertex()) {
-            out << " style=dashed";
-        }
-
-        // Edges on the path are shown thicker.
+        // Edges on the path are shown dashed.
         if(it != assemblyPathMap.end()) {
-            out << " penwidth=6";
+            out << " style=dashed";
         }
 
         if(not edge.isDagEdge) {
@@ -991,7 +1001,7 @@ void PathFiller1::writeAssemblyDetails(ostream& csv) const
 
 
 
-void PathFiller1::computeStrongComponents()
+void PathFiller1::removeStrongComponents()
 {
     PathFiller1& graph = *this;
 
@@ -1021,7 +1031,6 @@ void PathFiller1::computeStrongComponents()
     // A non-trivial strong component has at least one internal edge.
     // This means that it either has more than one vertex,
     // or it consists of a single vertex with a self-edge.
-    strongComponents.clear();
     for(const auto& p: componentVertices) {
 
         // Figure out if it is non-trivial.
@@ -1043,17 +1052,11 @@ void PathFiller1::computeStrongComponents()
             SHASTA_ASSERT(0);
         }
 
-        // If non-trivial, store it.
+        // If non-trivial, remove all of its vertices.
         if(isNonTrivial) {
-            strongComponents.push_back(StrongComponent(p.second));
-        }
-    }
-
-    // Mark the vertices in the non-trivial strongly connected components.
-    for(uint64_t strongComponentId=0; strongComponentId<strongComponents.size(); strongComponentId++) {
-        const auto& strongComponent = strongComponents[strongComponentId];
-        for(const vertex_descriptor v: strongComponent.vertices) {
-            graph[v].strongComponentId = strongComponentId;
+            for(const vertex_descriptor v: p.second) {
+                removeVertex(v);
+            }
         }
     }
 
@@ -1061,13 +1064,29 @@ void PathFiller1::computeStrongComponents()
 
 
 
-PathFiller1::StrongComponent::StrongComponent(
-    const vector<vertex_descriptor>& vertices) :
-    vertices(vertices)
-{}
+void PathFiller1::removeVertex(vertex_descriptor v)
+{
+    PathFiller1& graph = *this;
+
+    // Before removing the vertex, we have to record this fact
+    // in the oriented reads that visit this vertex.
+    const PathFiller1Vertex& vertex = graph[v];
+    for(uint64_t i=0; i<vertex.ordinals.size(); i++) {
+        OrientedReadInfo& info = orientedReadInfos[i];
+        for(const uint32_t ordinal: vertex.ordinals[i]) {
+            info.vertices[ordinal - info.ordinalA0] = null_vertex();
+        }
+    }
+
+    // Now we can remove the vertex.
+    clear_vertex(v, graph);
+    remove_vertex(v, graph);
+
+}
 
 
 
+#if 0
 void PathFiller1::createVirtualEdges()
 {
     const bool debug = false;
@@ -1386,162 +1405,22 @@ void PathFiller1::createVirtualEdges()
     }
 #endif
 }
+#endif
 
 
 
-// Assemble a virtual edge using multiple sequence alignment
-// of the sequences contributed by each oriented read.
-// The 0 version does the MSA using the sequence of marker graph edges
-// reached by each oriented read.
-// The 1 version does the MSA in base space.
-void PathFiller1::assembleVirtualEdge(edge_descriptor e)
+// Assemble edges using MSA.
+// Sequences stored in the marker graph are not used.
+void PathFiller1::assembleEdges()
 {
-    assembleVirtualEdge1(e);
-}
-
-
-
-
-// Assemble a virtual edge using multiple sequence alignment
-// of the sequences contributed by each oriented read.
-// The 0 version does the MSA using the sequence of marker graph edges
-// reached by each oriented read.
-void PathFiller1::assembleVirtualEdge0(edge_descriptor e)
-{
-    const bool debug = false;
     PathFiller1& graph = *this;
-    PathFiller1Edge& edge = graph[e];
-
-
-    // Gather the marker graph paths of the contributing oriented reads.
-    // This contains MarkerGraphEdgeIds incremented by 1.
-    // We need this because SeqAn uses 0 to represent gaps.
-    vector< vector<MarkerGraphEdgeId> > sequences;
-
-    // Loop over oriented reads.
-    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
-        const OrientedReadId orientedReadId = orientedReadInfos[i].orientedReadId;
-        const vector< pair<uint32_t, uint32_t> >& orientedReadMarkerIntervals = edge.markerIntervals[i];
-
-        // Loop over MarkerIntervals of this oriented read.
-        for(const pair<uint32_t, uint32_t>& markerInterval: orientedReadMarkerIntervals) {
-            const uint32_t ordinal0 = markerInterval.first;
-            const uint32_t ordinal1 = markerInterval.second;
-
-            sequences.resize(sequences.size() + 1);
-            vector<MarkerGraphEdgeId>& sequence = sequences.back();
-
-            // Follow the marker graph edges in this range.
-            for(uint32_t ordinal=ordinal0; ordinal<ordinal1; ordinal++) {
-                const MarkerGraphEdgeId edgeId = assembler.markerGraph.locateMarkerInterval(assembler.markers,
-                    MarkerInterval(orientedReadId, ordinal, ordinal+1));
-                SHASTA_ASSERT(edgeId != invalid<MarkerGraphEdgeId>);
-                sequence.push_back(edgeId + 1);
-            }
-        }
+    BGL_FORALL_EDGES(e, graph, PathFiller1) {
+        assembleEdge(e);
     }
-
-    if(debug) {
-        cout << "Virtual edge ";
-        cout << graph[source(e, graph)].stringId() << " to ";
-        cout << graph[target(e, graph)].stringId();
-        cout << " coverage " << edge.coverage() << endl;
-
-        for(const auto& v: sequences) {
-            for(const auto value: v) {
-                cout << " " << value - 1;   // Subtract 1 to get the actual edgeId
-            }
-            cout << endl;
-        }
-    }
-
-    // Use Seqan to do an MSA of these sequences.
-    vector<MarkerGraphEdgeId> edgeIds;
-    {
-        using namespace seqan;
-        Align< String<MarkerGraphEdgeId> > align;
-        const uint64_t n = sequences.size();
-        resize(rows(align), n);
-        for(uint64_t i=0; i<n; i++) {
-            assignSource(row(align, i), sequences[i]);
-        }
-        globalMsaAlignment(align, Score<int64_t, Simple>(0, -1, -4));
-
-        if(debug) {
-            cout << "MSA:" << endl;
-            for(uint64_t rowNumber=0; rowNumber<n; rowNumber++) {
-                for(uint64_t j=0; j<length(row(align, rowNumber)); j++) {
-                    const auto value = getValue(row(align, rowNumber), j);
-                    if(value != 0) {
-                        cout << value - 1; // Subtract 1 to get the actual edgeId
-                    }
-                    cout << ",";
-                }
-                cout << endl;
-            }
-        }
-
-        // Compute the consensus.
-        vector<uint64_t> values;
-        vector<uint64_t> frequencies;
-        vector<uint64_t> consensusValues;
-        const uint64_t alignmentLength = length(row(align, 0));
-        for(uint64_t j=0; j<alignmentLength; j++) {
-            values.clear();
-            frequencies.clear();
-            for(uint64_t rowNumber=0; rowNumber<n; rowNumber++) {
-                const auto value = getValue(row(align, rowNumber), j);
-                values.push_back(value);
-            }
-            deduplicateAndCount(values, frequencies);
-
-            // Find the value with the highest frequency.
-            const uint64_t maxFrequencyIndex =
-                max_element(frequencies.begin(), frequencies.end()) - frequencies.begin();
-            const uint64_t consensusValue = values[maxFrequencyIndex];
-
-            // Store it.
-            consensusValues.push_back(consensusValue);
-            if(consensusValue > 0) {
-                edgeIds.push_back(consensusValue - 1);
-            }
-        }
-
-        if(debug) {
-            cout << "Aligned consensus:" << endl;
-            for(const uint64_t value: consensusValues) {
-                if(value) {
-                    cout << value - 1;
-                }
-                cout << ",";
-            }
-            cout << endl;
-            cout << "VirtualEdge consensus:" << endl;
-            for(const MarkerGraphEdgeId edgeId: edgeIds) {
-                cout << edgeId << " ";
-            }
-            cout << endl;
-        }
-    }
-
-    // Store the sequence.
-    // It is obtained from the consensus edgeIds.
-    edge.sequence.clear();
-    for(const MarkerGraphEdgeId edgeId: edgeIds) {
-        const auto thisEdgeSequence = assembler.markerGraph.edgeSequence[edgeId];
-        copy(thisEdgeSequence.begin(), thisEdgeSequence.end(),
-            back_inserter(edge.sequence));
-    }
-
 }
-
-
-
-// Assemble a virtual edge using multiple sequence alignment
-// of the sequences contributed by each oriented read.
-// The 1 version does the MSA in base space.
-void PathFiller1::assembleVirtualEdge1(edge_descriptor e)
+void PathFiller1::assembleEdge(edge_descriptor e)
 {
+
     const bool debug = false;
     PathFiller1& graph = *this;
     PathFiller1Edge& edge = graph[e];
@@ -1553,7 +1432,7 @@ void PathFiller1::assembleVirtualEdge1(edge_descriptor e)
     if(debug) {
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
-        cout << "PathFiller1::assembleVirtualEdge1 begins for virtual edge " <<
+        cout << "PathFiller1::assembleEdge begins for edge " <<
             graph[v0].stringId() << " " << graph[v1].stringId() << endl;
     }
 
@@ -1625,7 +1504,7 @@ void PathFiller1::assembleVirtualEdge1(edge_descriptor e)
     if(debug) {
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
-        cout << "PathFiller1::assembleVirtualEdge1 ends for virtual edge " <<
+        cout << "PathFiller1::assembleEdge ends for edge " <<
             graph[v0].stringId() << " " << graph[v1].stringId() << endl;
     }
 
