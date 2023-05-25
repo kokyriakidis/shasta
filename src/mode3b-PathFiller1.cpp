@@ -60,7 +60,7 @@ PathFiller1::PathFiller1(
     }
 
     createGraph(maxBaseSkip, minVertexCoverage);
-    // linearize();
+    linearize();
     assembleEdges();
     findAssemblyPath();
 
