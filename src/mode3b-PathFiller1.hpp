@@ -119,6 +119,11 @@ public:
     // includePrimary is true.
     void getSequence(vector<Base>&, bool includePrimary) const;
 
+    uint64_t coverage() const
+    {
+        return orientedReadInfos.size();
+    }
+
 private:
 
     // The path secondary edges. This excludes the primary edges edgeIdA and edgeIdB.

@@ -1,5 +1,5 @@
 #include "mode3b-AssemblyPath.hpp"
-#include "mode3b-PathFiller.hpp"
+#include "mode3b-PathFiller1.hpp"
 #include "mode3b-PathFinder.hpp"
 #include "Assembler.hpp"
 #include "MarkerInterval.hpp"
@@ -34,10 +34,11 @@ AssemblyPath::AssemblyPath(
         const MarkerGraphEdgeId edgeIdB = primaryEdges[i+1];
         Step& step = steps[i];
         ostream html(0);
-        PathFiller pathFiller(assembler, edgeIdA, edgeIdB, html);
+        PathFiller1 pathFiller(assembler, edgeIdA, edgeIdB, html);
         pathFiller.getSequence(step.sequence, false);
-        cout << "Assembled length between primary edges " <<
-            edgeIdA << " " << edgeIdB << " is " << step.sequence.size() << endl;
+        cout << "Assembly primary edges " <<
+            edgeIdA << " " << edgeIdB << ": coverage " << pathFiller.coverage() <<
+            ", assembled length" << step.sequence.size() << endl;
     }
 }
 
