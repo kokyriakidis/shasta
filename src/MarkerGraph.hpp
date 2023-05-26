@@ -82,6 +82,11 @@ public:
         return vertices()[vertexId];
     }
 
+    // Find out if a vertex has more than one marker on the same oriented read.
+    bool vertexHasDuplicateOrientedReadIds(
+        VertexId,
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) const;
+
     void remove();
 
     // The global marker graph vertex corresponding to each marker.

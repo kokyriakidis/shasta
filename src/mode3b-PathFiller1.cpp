@@ -124,6 +124,37 @@ void PathFiller1::checkAssumptions() const
     SHASTA_ASSERT(assembler.getReads().representation == 0);
     SHASTA_ASSERT(not assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdA));
     SHASTA_ASSERT(not assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdB));
+
+    const MarkerGraph& markerGraph = assembler.markerGraph;
+    const auto& markers = assembler.markers;
+
+    // edgeIdA and edgeIdB cannot have duplicate oriented reads.
+    if(markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdA)) {
+        throw runtime_error("Duplicated oriented read on edgeIdA.");
+    }
+    if(markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdB)) {
+        throw runtime_error("Duplicated oriented read on edgeIdB.");
+    }
+
+    // Neither can their source and target vertices.
+    const MarkerGraph::Edge& edgeA = markerGraph.edges[edgeIdA];
+    const MarkerGraph::Edge& edgeB = markerGraph.edges[edgeIdB];
+    const MarkerGraphVertexId vertexIdA0 = edgeA.source;
+    const MarkerGraphVertexId vertexIdA1 = edgeA.target;
+    const MarkerGraphVertexId vertexIdB0 = edgeB.source;
+    const MarkerGraphVertexId vertexIdB1 = edgeB.target;
+    if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdA0, markers)) {
+        throw runtime_error("Duplicated oriented read on source vertex of edgeIdA.");
+    }
+    if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdA1, markers)) {
+        throw runtime_error("Duplicated oriented read on target vertex of edgeIdA.");
+    }
+    if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdB0, markers)) {
+        throw runtime_error("Duplicated oriented read on source vertex of edgeIdB.");
+    }
+    if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdB1, markers)) {
+        throw runtime_error("Duplicated oriented read on target vertex of edgeIdB.");
+    }
 }
 
 

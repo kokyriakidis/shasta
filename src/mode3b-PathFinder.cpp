@@ -59,12 +59,19 @@ pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> PathFinder::findNextPrimaryEdge
     uint64_t minCommonCount,
     double minCorrectedJaccard) const
 {
+    const MarkerGraph& markerGraph = assembler.markerGraph;
+    const auto& markers = assembler.markers;
 
-    if(assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeId0)) {
+    // Check for duplicate oriented reads on edgeId0 or its vertices.
+    const MarkerGraph::Edge& edge0 = markerGraph.edges[edgeId0];
+    if(
+        markerGraph.edgeHasDuplicateOrientedReadIds(edgeId0) or
+        markerGraph.vertexHasDuplicateOrientedReadIds(edge0.source, markers) or
+        markerGraph.vertexHasDuplicateOrientedReadIds(edge0.target, markers)) {
         return make_pair(invalid<MarkerGraphEdgeId>, MarkerGraphEdgePairInfo());
     }
 
-    const auto markerIntervals0 = assembler.markerGraph.edgeMarkerIntervals[edgeId0];
+    const auto markerIntervals0 = markerGraph.edgeMarkerIntervals[edgeId0];
     /*
     cout << "PathFinder::findNextPrimaryEdge begins for edge " << edgeId0 <<
         " with coverage " << markerIntervals0.size() << endl;
@@ -93,8 +100,12 @@ pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> PathFinder::findNextPrimaryEdge
                 continue;
             }
 
-            // If this edge is visited by an oriented read more than once, skip it.
-            if(assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeId1)) {
+            // Check for duplicate oriented reads on edgeId1 or its vertices.
+            const MarkerGraph::Edge& edge1 = markerGraph.edges[edgeId1];
+            if(
+                markerGraph.edgeHasDuplicateOrientedReadIds(edgeId1) or
+                markerGraph.vertexHasDuplicateOrientedReadIds(edge1.source, markers) or
+                markerGraph.vertexHasDuplicateOrientedReadIds(edge1.target, markers)) {
                 continue;
             }
 

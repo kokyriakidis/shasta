@@ -741,3 +741,31 @@ bool MarkerGraph::edgeHasDuplicateOrientedReadIds(EdgeId edgeId) const
 
     return false;
 }
+
+
+
+// Find out if a vertex has more than one marker on the same oriented read.
+bool MarkerGraph::vertexHasDuplicateOrientedReadIds(
+    VertexId vertexId,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) const
+{
+    const span<const MarkerId> vertexMarkerIds = vertices()[vertexId];
+    SHASTA_ASSERT(vertexMarkerIds.size() > 0);
+
+    // The markers are sorted, so we only have to check each marker
+    // against the previous one.
+    // This could be done faster but is not performance critical.
+    for(uint64_t i=1; i<vertexMarkerIds.size(); i++) {
+        const MarkerId markerId0 = vertexMarkerIds[i-1];
+        const MarkerId markerId1 = vertexMarkerIds[i];
+        OrientedReadId orientedReadId0;
+        OrientedReadId orientedReadId1;
+        tie(orientedReadId0, ignore) = findMarkerId(markerId0, markers);
+        tie(orientedReadId1, ignore) = findMarkerId(markerId1, markers);
+        if(orientedReadId0 == orientedReadId1) {
+            return true;
+        }
+    }
+
+    return false;
+}
