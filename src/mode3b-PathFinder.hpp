@@ -52,7 +52,8 @@ private:
         uint64_t maxMarkerOffset,
         uint64_t minCommonCount,
         double minCorrectedJaccard,
-        vector<MarkerGraphEdgeId>&) const;
+        vector< pair<MarkerGraphEdgeId, int64_t> >& // With offset in bases
+        ) const;
 };
 
 #endif

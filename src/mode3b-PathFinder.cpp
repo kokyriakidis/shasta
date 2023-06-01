@@ -140,7 +140,8 @@ void PathFinder::findNextPrimaryEdges(
     uint64_t maxMarkerOffset,
     uint64_t minCommonCount,
     double minCorrectedJaccard,
-    vector<MarkerGraphEdgeId>& nextPrimaryEdges) const
+    vector< pair<MarkerGraphEdgeId, int64_t> >& nextPrimaryEdges // With offset in bases
+    ) const
 {
     nextPrimaryEdges.clear();
 
@@ -190,7 +191,7 @@ void PathFinder::findNextPrimaryEdges(
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
             const double correctedJaccard = info.correctedJaccard();
             if(info.common >= minCommonCount and correctedJaccard >= minCorrectedJaccard) {
-                nextPrimaryEdges.push_back(edgeId1);
+                nextPrimaryEdges.push_back({edgeId1, info.offsetInBases});
                 if(nextPrimaryEdges.size() >= maxEdgeCount) {
                     return;
                 }
@@ -210,18 +211,34 @@ PathFinder::PathFinder(
     assembler(assembler)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    const uint64_t minCoverage = 6;
-    const uint64_t maxCoverage = 18;
-    const uint64_t maxEdgeCount = 6;
-    const uint64_t maxMarkerOffset = 10000;
-    const uint64_t minCommonCount = 6;
-    const double minCorrectedJaccard = 0.8;
+    const uint64_t minCoverage = 8;
+    const uint64_t maxCoverage = 15;
+    const uint64_t maxEdgeCount = 8;
+    const uint64_t maxMarkerOffset = 30000;
+    const uint64_t minCommonCount = 5;
+    const double minCorrectedJaccard = 0.9;
+
+    class EdgePair {
+    public:
+        MarkerGraphEdgeId edgeId0;
+        MarkerGraphEdgeId edgeId1;
+        uint64_t offsetInBases;
+        bool operator==(const EdgePair& that) const
+        {
+            return tie(edgeId0, edgeId1) == tie(that.edgeId0, that.edgeId1);
+        }
+        bool operator<(const EdgePair& that) const
+        {
+            return tie(edgeId0, edgeId1) < tie(that.edgeId0, that.edgeId1);
+        }
+    };
+    vector<EdgePair> edgePairs;
+
 
     // Loop over all marker graph edges.
     // This is slow and should run in multithreaded code.
     uint64_t primaryEdgeCount = 0;
-    vector< pair<MarkerGraphEdgeId, MarkerGraphEdgeId> > edgePairs;
-    vector<MarkerGraphEdgeId> nextPrimaryEdges;
+    vector< pair<MarkerGraphEdgeId, int64_t> > nextPrimaryEdges; // With offset in bases
     for(MarkerGraphEdgeId edgeId0=0; edgeId0<assembler.markerGraph.edges.size(); edgeId0++) {
         if((edgeId0 % 100000) == 0) {
             cout << timestamp << edgeId0 << "/" << assembler.markerGraph.edges.size() << endl;
@@ -233,8 +250,12 @@ PathFinder::PathFinder(
             continue;
         }
 
-        // If the edge has duplicate oriented reads, skip it.
-        if(assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeId0)) {
+        // Check for duplicate oriented reads on edgeId0 or its vertices.
+        const MarkerGraph::Edge& edge0 = assembler.markerGraph.edges[edgeId0];
+        if(
+            assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeId0) or
+            assembler.markerGraph.vertexHasDuplicateOrientedReadIds(edge0.source, assembler.markers) or
+            assembler.markerGraph.vertexHasDuplicateOrientedReadIds(edge0.target, assembler.markers)) {
             continue;
         }
         ++primaryEdgeCount;
@@ -251,11 +272,13 @@ PathFinder::PathFinder(
                 minCommonCount,
                 minCorrectedJaccard,
                 nextPrimaryEdges);
-            for(const MarkerGraphEdgeId edgeId1: nextPrimaryEdges) {
+            for(const auto& p: nextPrimaryEdges) {
+                const MarkerGraphEdgeId edgeId1 = p.first;
+                const uint64_t offsetInBases = p.second;
                 if(direction == 0) {
-                    edgePairs.push_back({edgeId0, edgeId1});
+                    edgePairs.push_back({edgeId0, edgeId1, offsetInBases});
                 } else {
-                    edgePairs.push_back({edgeId1, edgeId0});
+                    edgePairs.push_back({edgeId1, edgeId0, -offsetInBases});
                 }
             }
         }
@@ -271,8 +294,8 @@ PathFinder::PathFinder(
     {
         ofstream out("PathGraph.dot");
         out << "digraph PathGraph {\n";
-        for(const auto& p: edgePairs) {
-            out << p.first << "->" << p.second << ";\n";
+        for(const EdgePair& edgePair: edgePairs) {
+            out << edgePair.edgeId0 << "->" << edgePair.edgeId1 << ";\n";
         }
         out << "}\n";
     }
