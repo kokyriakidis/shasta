@@ -4,6 +4,7 @@
 #include "MarkerGraphEdgePairInfo.hpp"
 #include "shastaTypes.hpp"
 
+#include <set>
 #include "utility.hpp"
 #include "vector.hpp"
 
@@ -42,6 +43,16 @@ private:
         uint64_t maxMarkerOffset,
         uint64_t minCommonCount,
         double minCorrectedJaccard) const;
+
+    // Same, but with a forbidden list that can be used for backtracking.
+    pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> findNextPrimaryEdge(
+        MarkerGraphEdgeId,
+        uint64_t direction,
+        uint64_t maxMarkerOffset,
+        uint64_t minCommonCount,
+        double minCorrectedJaccard,
+        const std::set<MarkerGraphEdgeId>& forbiddedEdgeIds) const;
+
 
     void findNextPrimaryEdges(
         MarkerGraphEdgeId,

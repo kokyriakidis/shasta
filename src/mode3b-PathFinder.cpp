@@ -17,6 +17,8 @@ using namespace mode3b;
 
 
 
+#if 0
+// Old version without backtracking.
 PathFinder::PathFinder(
     const Assembler& assembler,
     MarkerGraphEdgeId startEdgeId,  // The path starts here.
@@ -44,6 +46,83 @@ PathFinder::PathFinder(
         }
         edgeId = nextEdgeId;
         primaryEdges.push_back(p);
+    }
+    cout << "Found " << primaryEdges.size() + 1 << " primary edges including the starting edge." << endl;
+}
+#endif
+
+
+
+// New version with backtracking.
+PathFinder::PathFinder(
+    const Assembler& assembler,
+    MarkerGraphEdgeId startEdgeId,  // The path starts here.
+    uint64_t direction,            // 0=forward, 1=backward
+    vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >& primaryEdges
+    ) :
+    assembler(assembler)
+{
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t maxMarkerOffset = 10000;
+    const uint64_t minCommonCount = 6;
+    const double minCorrectedJaccard = 0.75;
+    const uint64_t maxBacktrackStreakLength = 6;
+
+    std::set<MarkerGraphEdgeId> forbiddenEdgeIds;
+
+    const bool debug = true;
+
+
+
+    // To create the primary edges, move in the specified direction
+    // until we find an edge with similar read composition
+    // that is suitable to become the next primary vertex.
+    // If we get stuck, backtrack.
+    uint64_t backTrackingStreakLength = 0;
+    primaryEdges.clear();
+    while(true) {
+        if(backTrackingStreakLength > maxBacktrackStreakLength) {
+            break;
+        }
+
+        // The last edge we have.
+        const MarkerGraphEdgeId edgeId =
+            (primaryEdges.empty() ? startEdgeId : primaryEdges.back().first);
+        if(debug) {
+            cout << "Looking for next edge after " << edgeId << endl;
+        }
+
+        // Look for the next edge.
+        const pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> p = findNextPrimaryEdge(
+            edgeId, direction, maxMarkerOffset, minCommonCount, minCorrectedJaccard,
+            forbiddenEdgeIds);
+        const MarkerGraphEdgeId nextEdgeId = p.first;
+
+        if(nextEdgeId == invalid<MarkerGraphEdgeId>) {
+
+            // We did not find a next edge. Backtrack if possible.
+            if(primaryEdges.empty()) {
+                break;
+            }
+            primaryEdges.pop_back();
+            forbiddenEdgeIds.insert(edgeId);
+            ++backTrackingStreakLength;
+            if(debug) {
+                cout << "Did not find a next edge. Backtracking. Current length is " <<
+                    primaryEdges.size() << endl;
+            }
+
+        } else {
+
+            // We found a next edge. Store it.
+            backTrackingStreakLength = 0;
+            primaryEdges.push_back(p);
+            if(debug) {
+                cout << "Added " << nextEdgeId <<
+                    ", offset " << p.second.offsetInBases <<
+                    ", current length is " << primaryEdges.size()  << endl;
+            }
+        }
     }
     cout << "Found " << primaryEdges.size() + 1 << " primary edges including the starting edge." << endl;
 }
@@ -127,6 +206,93 @@ pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> PathFinder::findNextPrimaryEdge
 
 
     return make_pair(invalid<MarkerGraphEdgeId>, MarkerGraphEdgePairInfo());
+}
+
+
+
+// Same, but with a forbidden list that can be used for backtracking.
+pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> PathFinder::findNextPrimaryEdge(
+    MarkerGraphEdgeId edgeId0,
+    uint64_t direction,
+    uint64_t maxMarkerOffset,
+    uint64_t minCommonCount,
+    double minCorrectedJaccard,
+    const std::set<MarkerGraphEdgeId>& forbiddedEdgeIds) const
+{
+    const MarkerGraph& markerGraph = assembler.markerGraph;
+    const auto& markers = assembler.markers;
+
+    // Check for duplicate oriented reads on edgeId0 or its vertices.
+    const MarkerGraph::Edge& edge0 = markerGraph.edges[edgeId0];
+    if(
+        markerGraph.edgeHasDuplicateOrientedReadIds(edgeId0) or
+        markerGraph.vertexHasDuplicateOrientedReadIds(edge0.source, markers) or
+        markerGraph.vertexHasDuplicateOrientedReadIds(edge0.target, markers)) {
+        return make_pair(invalid<MarkerGraphEdgeId>, MarkerGraphEdgePairInfo());
+    }
+
+    const auto markerIntervals0 = markerGraph.edgeMarkerIntervals[edgeId0];
+    /*
+    cout << "PathFinder::findNextPrimaryEdge begins for edge " << edgeId0 <<
+        " with coverage " << markerIntervals0.size() << endl;
+    */
+
+    // The edges we already checked.
+    std::set<MarkerGraphEdgeId> alreadyEncounteredEdgeIds;
+
+    // Try increasing marker offsets in the given direction.
+    for(uint32_t ordinalOffset=1; ordinalOffset<=maxMarkerOffset ; ++ordinalOffset) {
+
+        // Try this offset on all of our marker intervals.
+        for(const MarkerInterval& markerInterval0: markerIntervals0) {
+
+            // Find the edge that contains the offset marker interval.
+            const MarkerGraphEdgeId edgeId1 = assembler.markerGraph.locateMarkerIntervalWithOffset(
+                assembler.markers, markerInterval0, ordinalOffset, direction);
+
+            // If this goes outside the ordinal range for this oriented read, skip it.
+            if(edgeId1 == invalid<MarkerGraphEdgeId>) {
+                continue;
+            }
+
+            // If we already checked it, skip it.
+            if(alreadyEncounteredEdgeIds.contains(edgeId1)) {
+                continue;
+            }
+
+            // If it is in the forbidden list, skip it.
+            if(forbiddedEdgeIds.contains(edgeId1)) {
+                continue;
+            }
+
+            // Check for duplicate oriented reads on edgeId1 or its vertices.
+            const MarkerGraph::Edge& edge1 = markerGraph.edges[edgeId1];
+            if(
+                markerGraph.edgeHasDuplicateOrientedReadIds(edgeId1) or
+                markerGraph.vertexHasDuplicateOrientedReadIds(edge1.source, markers) or
+                markerGraph.vertexHasDuplicateOrientedReadIds(edge1.target, markers)) {
+                continue;
+            }
+
+            alreadyEncounteredEdgeIds.insert(edgeId1);
+
+            MarkerGraphEdgePairInfo info;
+            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+            const double correctedJaccard = info.correctedJaccard();
+            if(info.common >= minCommonCount and correctedJaccard >= minCorrectedJaccard) {
+                cout << edgeId0 << " " << edgeId1 << ": base offset " <<
+                    info.offsetInBases << ", common " << info.common <<
+                    ", corrected jaccard " <<
+                    " " << info.correctedJaccard() << endl;
+                return make_pair(edgeId1, info);
+            }
+        }
+
+    }
+
+
+    return make_pair(invalid<MarkerGraphEdgeId>, MarkerGraphEdgePairInfo());
+
 }
 
 
