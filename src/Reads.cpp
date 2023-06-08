@@ -242,23 +242,32 @@ uint64_t Reads::getReadRawSequenceLength(ReadId readId) const
 // representation of an oriented read.
 vector<uint32_t> Reads::getRawPositions(OrientedReadId orientedReadId) const
 {
-    const ReadId readId = orientedReadId.getReadId();
-    const ReadId strand = orientedReadId.getStrand();
-    const auto repeatCounts = readRepeatCounts[readId];
-    const uint64_t n = repeatCounts.size();
-
     vector<uint32_t> v;
 
-    uint32_t position = 0;
-    for(uint64_t i=0; i<n; i++) {
-        v.push_back(position);
-        uint8_t count;
-        if(strand == 0) {
-            count = repeatCounts[i];
-        } else {
-            count = repeatCounts[n-1-i];
+    if(representation == 1) {
+        const ReadId readId = orientedReadId.getReadId();
+        const ReadId strand = orientedReadId.getStrand();
+        const auto repeatCounts = readRepeatCounts[readId];
+        const uint64_t n = repeatCounts.size();
+
+        uint32_t position = 0;
+        for(uint64_t i=0; i<n; i++) {
+            v.push_back(position);
+            uint8_t count;
+            if(strand == 0) {
+                count = repeatCounts[i];
+            } else {
+                count = repeatCounts[n-1-i];
+            }
+            position += count;
         }
-        position += count;
+    } else {
+
+        // If not using RLE, raw positions are the same as RLE positions.
+        const ReadId readId = orientedReadId.getReadId();
+        for(uint32_t i=0; i<reads[readId].baseCount; i++) {
+            v.push_back(i);
+        }
     }
 
     return v;

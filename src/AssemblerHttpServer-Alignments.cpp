@@ -1338,7 +1338,7 @@ void Assembler::exploreAlignment(
         const auto markers0 = markers[orientedReadId0.getValue()];
         const auto markers1 = markers[orientedReadId1.getValue()];
 
-        // Compute the raw position corresponding to each RLE position.
+        // Compute the positions of each marker in the two oriented reads.
         const vector<uint32_t> rawPositions0 = reads->getRawPositions(orientedReadId0);
         const vector<uint32_t> rawPositions1 = reads->getRawPositions(orientedReadId1);
 
