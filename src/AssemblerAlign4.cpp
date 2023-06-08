@@ -25,7 +25,7 @@ void Assembler::alignOrientedReads4(
     uint64_t maxBand,
     int64_t matchScore,
     int64_t mismatchScore,
-    int64_t gapScore) const
+    int64_t gapScore)
 {
     // Fill in the options.
     Align4::Options options;
@@ -81,7 +81,7 @@ void Assembler::alignOrientedReads4(
     int64_t gapScore,
     Alignment& alignment,
     AlignmentInfo& alignmentInfo
-    ) const
+    )
 {
     // Fill in the options.
     Align4::Options options;
@@ -122,25 +122,32 @@ void Assembler::alignOrientedReads4(
     MemoryMapped::ByteAllocator& byteAllocator,
     Alignment& alignment,
     AlignmentInfo& alignmentInfo,
-    bool debug) const
+    bool debug)
 {
-    /*
-    // Access the markers for the two oriented reads.
-    array<span<const CompressedMarker>, 2> orientedReadMarkers;
-    orientedReadMarkers[0] = markers[orientedReadId0.getValue()];
-    orientedReadMarkers[1] = markers[orientedReadId1.getValue()];
-    */
 
-    // Access the marker KmerIds for the two oriented reads.
-    array<span<const KmerId>, 2> orientedReadKmerIds;
-    orientedReadKmerIds[0] = markerKmerIds[orientedReadId0.getValue()];
-    orientedReadKmerIds[1] = markerKmerIds[orientedReadId1.getValue()];
+    // Get the marker KmerIds for the two oriented reads.
+    array<span<KmerId>, 2> orientedReadKmerIds;
+    array<vector<KmerId>, 2> orientedReadKmerIdsVectors;
+    if(markerKmerIds.isOpen()) {
+        orientedReadKmerIds[0] = markerKmerIds[orientedReadId0.getValue()];
+        orientedReadKmerIds[1] = markerKmerIds[orientedReadId1.getValue()];
+    } else {
+        // This is slower and will happen if markerKmerIds is not available.
+        // Resize the vectors and make the spans point to the vectors.
+        // Then call getOrientedReadMarkerKmerIds to fill them in.
+        orientedReadKmerIdsVectors[0].resize(markers.size(orientedReadId0.getValue()));
+        orientedReadKmerIdsVectors[1].resize(markers.size(orientedReadId1.getValue()));
+        orientedReadKmerIds[0] = span<KmerId>(orientedReadKmerIdsVectors[0]);
+        orientedReadKmerIds[1] = span<KmerId>(orientedReadKmerIdsVectors[1]);
+        getOrientedReadMarkerKmerIds(orientedReadId0, orientedReadKmerIds[0]);
+        getOrientedReadMarkerKmerIds(orientedReadId1, orientedReadKmerIds[1]);
+    }
 
 
 
     // Align4 needs markers sorted by KmerId.
     // Use the ones from sortedMarkers if available, or else compute them.
-    array<span< const pair<KmerId, uint32_t> >, 2> orientedReadSortedMarkersSpans;
+    array<span< pair<KmerId, uint32_t> >, 2> orientedReadSortedMarkersSpans;
     array<vector< pair<KmerId, uint32_t> >, 2> orientedReadSortedMarkers;
     if(sortedMarkers.isOpen()) {
 

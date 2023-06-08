@@ -28,8 +28,8 @@ using namespace Align4;
 
 
 void shasta::Align4::align(
-    const array< span<const KmerId>, 2>& kmerIds,
-    const array<span< const pair<KmerId, uint32_t> >, 2> sortedMarkers,
+    const array< span<KmerId>, 2>& kmerIds,
+    const array<span< pair<KmerId, uint32_t> >, 2> sortedMarkers,
     const Options& options,
     MemoryMapped::ByteAllocator& byteAllocator,
     Alignment& alignment,
@@ -44,8 +44,8 @@ void shasta::Align4::align(
 
 
 Aligner::Aligner(
-    const array<span<const KmerId>, 2>& kmerIds,
-    const array<span< const pair<KmerId, uint32_t> >, 2> sortedMarkers,
+    const array<span<KmerId>, 2>& kmerIds,
+    const array<span< pair<KmerId, uint32_t> >, 2> sortedMarkers,
     const Options& options,
     MemoryMapped::ByteAllocator& byteAllocator,
     Alignment& alignment,
@@ -192,7 +192,7 @@ SignedCoordinates Aligner::getxy(Coordinates XY) const
 
 
 
-void Aligner::createAlignmentMatrix(const array<span< const pair<KmerId, uint32_t> >, 2> sortedMarkers)
+void Aligner::createAlignmentMatrix(const array<span< pair<KmerId, uint32_t> >, 2> sortedMarkers)
 {
     alignmentMatrix.clear();
 
@@ -873,7 +873,7 @@ void Aligner::findActiveCellsConnectedComponents()
 // active cells. Return the ones that match requirements on
 // minAlignedMarkerCount, minAlignedFraction, maxSkip, maxDrift, maxTrim.
 void Aligner::computeBandedAlignments(
-    const array<span<const KmerId>, 2>& kmerIds,
+    const array<span<KmerId>, 2>& kmerIds,
     uint64_t minAlignedMarkerCount,
     double minAlignedFraction,
     uint64_t maxSkip,
@@ -991,7 +991,7 @@ void Aligner::computeBandedAlignments(
 
 // Compute a banded alignment with a given band.
 bool Aligner::computeBandedAlignment(
-    const array<span<const KmerId>, 2>& kmerIds,
+    const array<span<KmerId>, 2>& kmerIds,
     int32_t bandMin,
     int32_t bandMax,
     Alignment& alignment,

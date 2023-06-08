@@ -752,7 +752,7 @@ public:
         uint64_t maxBand,
         int64_t matchScore,
         int64_t mismatchScore,
-        int64_t gapScore) const;
+        int64_t gapScore);
 
     // Align two reads using alignment method 4.
     // If debug is true, detailed output to html is produced.
@@ -764,7 +764,7 @@ public:
         MemoryMapped::ByteAllocator&,
         Alignment&,
         AlignmentInfo&,
-        bool debug) const;
+        bool debug);
 
     // Intermediate level version used by the http server.
     void alignOrientedReads4(
@@ -785,7 +785,7 @@ public:
         int64_t gapScore,
         Alignment&,
         AlignmentInfo&
-        ) const;
+        );
 
 private:
 

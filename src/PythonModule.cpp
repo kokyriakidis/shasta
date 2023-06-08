@@ -262,7 +262,7 @@ PYBIND11_MODULE(shasta, shastaModule)
                 (ReadId, Strand, ReadId, Strand,
                     uint64_t, uint64_t, uint64_t, uint64_t,
                     uint64_t, double, uint64_t, uint64_t, uint64_t, uint64_t,
-                    int64_t, int64_t, int64_t) const
+                    int64_t, int64_t, int64_t)
             )
             &Assembler::alignOrientedReads4,
             arg("readId0"),

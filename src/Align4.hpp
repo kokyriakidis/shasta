@@ -84,8 +84,8 @@ namespace shasta {
         // The KmerIds are the KmerIds for the two reads, in position order.
         // The sorted markers are pairs(KmerId, ordinal) sorted by KmerId.
         void align(
-            const array< span<const KmerId>, 2>& kmerIds,
-            const array<span< const pair<KmerId, uint32_t> >, 2> sortedMarkers,
+            const array< span<KmerId>, 2>& kmerIds,
+            const array<span<pair<KmerId, uint32_t> >, 2> sortedMarkers,
             const Align4::Options&,
             MemoryMapped::ByteAllocator&,
             Alignment&,
@@ -136,8 +136,8 @@ public:
     // The kmerIds are in position orders.
     // The sorted markers are pairs(KmerId, ordinal) sorted by KmerId.
     Aligner(
-        const array< span<const KmerId>, 2>& kmerIds,
-        const array<span< const pair<KmerId, uint32_t> >, 2> sortedMarkers,
+        const array< span<KmerId>, 2>& kmerIds,
+        const array<span< pair<KmerId, uint32_t> >, 2> sortedMarkers,
         const Options&,
         MemoryMapped::ByteAllocator&,
         Alignment&,
@@ -173,7 +173,7 @@ private:
     using AlignmentMatrixEntryVector = vector<AlignmentMatrixEntry, AlignmentMatrixAllocator>; // For one iY
     using AlignmentMatrix = vector<AlignmentMatrixEntryVector>; // Indexed by iY.
     AlignmentMatrix alignmentMatrix;
-    void createAlignmentMatrix(const array<span< const pair<KmerId, uint32_t> >, 2> sortedMarkers);
+    void createAlignmentMatrix(const array<span< pair<KmerId, uint32_t> >, 2> sortedMarkers);
     void writeAlignmentMatrixCsv(const string& fileName) const;
     void writeAlignmentMatrixPng(
         const string& fileName,
@@ -279,7 +279,7 @@ private:
     // active cells. Return the ones that match requirements on
     // minAlignedMarkerCount, minAlignedFraction, maxSkip, maxDrift, maxTrim.
     void computeBandedAlignments(
-        const array<span<const KmerId>, 2>& kmerIds,
+        const array<span<KmerId>, 2>& kmerIds,
         uint64_t minAlignedMarkerCount,
         double minAlignedFraction,
         uint64_t maxSkip,
@@ -291,7 +291,7 @@ private:
 
     // Compute a banded alignment with a given band.
     bool computeBandedAlignment(
-        const array<span<const KmerId>, 2>& kmerIds,
+        const array<span<KmerId>, 2>& kmerIds,
         int32_t bandMin,
         int32_t bandMax,
         Alignment&,
