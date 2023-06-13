@@ -5,6 +5,7 @@
 #include "invalid.hpp"
 #include "Marker.hpp"
 #include "MarkerGraph.hpp"
+#include "orderPairs.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3b;
@@ -53,7 +54,7 @@ PathFinder::PathFinder(
 
 
 
-// New version with backtracking.
+// Similar to the above, but with backtracking.
 PathFinder::PathFinder(
     const Assembler& assembler,
     MarkerGraphEdgeId startEdgeId,  // The path starts here.
@@ -63,9 +64,11 @@ PathFinder::PathFinder(
     assembler(assembler)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    const uint64_t maxMarkerOffset = 10000;
+    const uint64_t maxMarkerOffset = 30000;
+    const uint64_t minCoverage = 8;
+    const uint64_t maxCoverage = 35;
     const uint64_t minCommonCount = 6;
-    const double minCorrectedJaccard = 0.75;
+    const double minCorrectedJaccard = 0.8;
     const uint64_t maxBacktrackStreakLength = 6;
 
     std::set<MarkerGraphEdgeId> forbiddenEdgeIds;
@@ -94,7 +97,9 @@ PathFinder::PathFinder(
 
         // Look for the next edge.
         const pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> p = findNextPrimaryEdge(
-            edgeId, direction, maxMarkerOffset, minCommonCount, minCorrectedJaccard,
+            edgeId, direction,
+            minCoverage, maxCoverage,
+            maxMarkerOffset, minCommonCount, minCorrectedJaccard,
             forbiddenEdgeIds);
         const MarkerGraphEdgeId nextEdgeId = p.first;
 
@@ -129,8 +134,88 @@ PathFinder::PathFinder(
 
 
 
+#if 0
+// This version finds a few possible choices for the next primary edge at each step,
+// then chooses the best.
+PathFinder::PathFinder(
+    const Assembler& assembler,
+    MarkerGraphEdgeId startEdgeId,  // The path starts here.
+    uint64_t direction,            // 0=forward, 1=backward
+    vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >& primaryEdges
+    ) :
+    assembler(assembler)
+{
+
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t minCoverage = 8;
+    const uint64_t maxCoverage = 30;
+    const uint64_t maxEdgeCount = 6;
+    const uint64_t maxMarkerOffset = 30000;
+    const uint64_t minCommonCount = 6;
+    const double minCorrectedJaccard = 0.6;
+
+
+    const bool debug = true;
+
+
+
+    primaryEdges.clear();
+    vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > nextPrimaryEdges;
+    while(true) {
+
+        // The last edge we have.
+        const MarkerGraphEdgeId edgeId =
+            (primaryEdges.empty() ? startEdgeId : primaryEdges.back().first);
+        if(debug) {
+            cout << "Looking for next edge after " << edgeId << endl;
+        }
+
+        // Find possible choices for the next primary edge.
+        findNextPrimaryEdges(
+            edgeId, direction,
+            minCoverage,
+            maxCoverage,
+            maxEdgeCount,
+            maxMarkerOffset,
+            minCommonCount,
+            minCorrectedJaccard,
+            nextPrimaryEdges);
+
+        // If none found, we are done. The path ends here.
+        if(nextPrimaryEdges.empty()) {
+            break;
+        }
+
+        // Sort them by decreasing number of common oriented reads.
+        sort(nextPrimaryEdges.begin(), nextPrimaryEdges.end(),
+            OrderPairsBySecondOnlyGreater<MarkerGraphEdgeId, MarkerGraphEdgePairInfo>());
+
+        if(debug) {
+            cout << "Found " << nextPrimaryEdges.size() << " possible choices:" << endl;
+            for(const auto& p: nextPrimaryEdges) {
+                cout << p.first << " " <<
+                    p.second.common << " " <<
+                    p.second.offsetInBases << " " <<
+                    p.second.correctedJaccard() << endl;
+            }
+        }
+
+        // Add the best choice to our primary edges.
+        primaryEdges.push_back(nextPrimaryEdges.front());
+        if(debug) {
+            cout << "Added " << primaryEdges.back().first <<
+                ", offset " << primaryEdges.back().second.offsetInBases <<
+                ", current length is " << primaryEdges.size()  << endl;
+        }
+    }
+    cout << "Found " << primaryEdges.size() + 1 << " primary edges including the starting edge." << endl;
+}
+#endif
+
+
+
 // Move in the specified direction until we find an edge with similar
-// read composition which is suitable to becoe the next primary vertex.
+// read composition which is suitable to become the next primary vertex.
 pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> PathFinder::findNextPrimaryEdge(
     MarkerGraphEdgeId edgeId0,
     uint64_t direction,
@@ -214,6 +299,8 @@ pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> PathFinder::findNextPrimaryEdge
 pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> PathFinder::findNextPrimaryEdge(
     MarkerGraphEdgeId edgeId0,
     uint64_t direction,
+    uint64_t minCoverage,
+    uint64_t maxCoverage,
     uint64_t maxMarkerOffset,
     uint64_t minCommonCount,
     double minCorrectedJaccard,
@@ -252,6 +339,11 @@ pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> PathFinder::findNextPrimaryEdge
 
             // If this goes outside the ordinal range for this oriented read, skip it.
             if(edgeId1 == invalid<MarkerGraphEdgeId>) {
+                continue;
+            }
+
+            const uint64_t coverage = assembler.markerGraph.edgeCoverage(edgeId1);
+            if(coverage < minCoverage or coverage > maxCoverage) {
                 continue;
             }
 
@@ -297,6 +389,9 @@ pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> PathFinder::findNextPrimaryEdge
 
 
 
+// This returns a few possible choices for the next primary edge.
+// It starts on edgeId0 and moves in the specified direction
+// (0 = forward, 1 = backward).
 void PathFinder::findNextPrimaryEdges(
     MarkerGraphEdgeId edgeId0,
     uint64_t direction,
@@ -306,9 +401,16 @@ void PathFinder::findNextPrimaryEdges(
     uint64_t maxMarkerOffset,
     uint64_t minCommonCount,
     double minCorrectedJaccard,
-    vector< pair<MarkerGraphEdgeId, int64_t> >& nextPrimaryEdges // With offset in bases
+    vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >& nextPrimaryEdges
     ) const
 {
+    const bool debug = true;
+    if(debug) {
+        cout << "Looking for next primary edge after " << edgeId0 <<
+            ", coverage " << assembler.markerGraph.edgeCoverage(edgeId0) <<
+            ", direction " << direction << endl;
+    }
+
     nextPrimaryEdges.clear();
 
     if(assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeId0)) {
@@ -338,6 +440,9 @@ void PathFinder::findNextPrimaryEdges(
             // If coverage is not in the required range, skip it.
             const uint64_t coverage = assembler.markerGraph.edgeCoverage(edgeId1);
             if(coverage<minCoverage or coverage>maxCoverage) {
+                if(false) {
+                    cout << edgeId1 << " discarded due to coverage " << coverage << endl;
+                }
                 continue;
             }
 
@@ -346,18 +451,24 @@ void PathFinder::findNextPrimaryEdges(
                 continue;
             }
 
-            // If this edge is visited by an oriented read more than once, skip it.
-            if(assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeId1)) {
+            // If this edge or one of its vertices is visited by an oriented read more than once, skip it.
+            const MarkerGraph::Edge& edge1 = assembler.markerGraph.edges[edgeId1];
+            if(
+                assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeId1) or
+                assembler.markerGraph.vertexHasDuplicateOrientedReadIds(edge1.source, assembler.markers) or
+                assembler.markerGraph.vertexHasDuplicateOrientedReadIds(edge1.target, assembler.markers)) {
                 continue;
             }
 
             edgeIds.insert(edgeId1);
 
+            // Analyze its read composition.
             MarkerGraphEdgePairInfo info;
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
             const double correctedJaccard = info.correctedJaccard();
             if(info.common >= minCommonCount and correctedJaccard >= minCorrectedJaccard) {
-                nextPrimaryEdges.push_back({edgeId1, info.offsetInBases});
+                // Store it.
+                nextPrimaryEdges.push_back({edgeId1, info});
                 if(nextPrimaryEdges.size() >= maxEdgeCount) {
                     return;
                 }
@@ -404,7 +515,7 @@ PathFinder::PathFinder(
     // Loop over all marker graph edges.
     // This is slow and should run in multithreaded code.
     uint64_t primaryEdgeCount = 0;
-    vector< pair<MarkerGraphEdgeId, int64_t> > nextPrimaryEdges; // With offset in bases
+    vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > nextPrimaryEdges;
     for(MarkerGraphEdgeId edgeId0=0; edgeId0<assembler.markerGraph.edges.size(); edgeId0++) {
         if((edgeId0 % 100000) == 0) {
             cout << timestamp << edgeId0 << "/" << assembler.markerGraph.edges.size() << endl;
@@ -440,7 +551,7 @@ PathFinder::PathFinder(
                 nextPrimaryEdges);
             for(const auto& p: nextPrimaryEdges) {
                 const MarkerGraphEdgeId edgeId1 = p.first;
-                const uint64_t offsetInBases = p.second;
+                const uint64_t offsetInBases = p.second.offsetInBases;
                 if(direction == 0) {
                     edgePairs.push_back({edgeId0, edgeId1, offsetInBases});
                 } else {

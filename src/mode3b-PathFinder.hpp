@@ -48,6 +48,8 @@ private:
     pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> findNextPrimaryEdge(
         MarkerGraphEdgeId,
         uint64_t direction,
+        uint64_t minCoverage,
+        uint64_t maxCoverage,
         uint64_t maxMarkerOffset,
         uint64_t minCommonCount,
         double minCorrectedJaccard,
@@ -63,7 +65,7 @@ private:
         uint64_t maxMarkerOffset,
         uint64_t minCommonCount,
         double minCorrectedJaccard,
-        vector< pair<MarkerGraphEdgeId, int64_t> >& // With offset in bases
+        vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >&
         ) const;
 };
 

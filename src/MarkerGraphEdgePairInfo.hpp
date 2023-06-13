@@ -64,6 +64,16 @@ public:
         return double(intersectionCount()) / double(correctedUnionCount());
     }
 
+    // Order them by number of common oriented reads.
+    bool operator<(const MarkerGraphEdgePairInfo& that) const
+    {
+        return correctedJaccard() < that.correctedJaccard();
+    }
+    bool operator>(const MarkerGraphEdgePairInfo& that) const
+    {
+        return correctedJaccard() > that.correctedJaccard();
+    }
+
 };
 
 #endif
