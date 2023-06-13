@@ -2355,7 +2355,7 @@ public:
         MarkerGraphEdgeId startEdgeId,  // The path starts here.
         uint64_t direction              // 0=forward, 1=backward
         ) const;
-    void findCompleteMarkerGraphPaths() const;
+    void findCompleteMarkerGraphPaths(uint64_t threadCount) const;
 
     // Given two consecutive primary edges, find the secondary edges
     // in between.

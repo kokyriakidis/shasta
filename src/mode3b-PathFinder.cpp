@@ -16,6 +16,10 @@ using namespace mode3b;
 #include <set>
 #include "stdexcept.hpp"
 
+// Explicit instantiation.
+#include "MultithreadedObject.tpp"
+template class MultithreadedObject<PathFinder>;
+
 
 
 #if 0
@@ -61,6 +65,7 @@ PathFinder::PathFinder(
     uint64_t direction,            // 0=forward, 1=backward
     vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >& primaryEdges
     ) :
+    MultithreadedObject<PathFinder>(*this),
     assembler(assembler)
 {
     // EXPOSE WHEN CODE STABILIZES.
@@ -404,7 +409,7 @@ void PathFinder::findNextPrimaryEdges(
     vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >& nextPrimaryEdges
     ) const
 {
-    const bool debug = true;
+    const bool debug = false;
     if(debug) {
         cout << "Looking for next primary edge after " << edgeId0 <<
             ", coverage " << assembler.markerGraph.edgeCoverage(edgeId0) <<
@@ -484,84 +489,45 @@ void PathFinder::findNextPrimaryEdges(
 
 // This version finds edge pairs and use them to create a graph.
 PathFinder::PathFinder(
-    const Assembler& assembler) :
+    const Assembler& assembler,
+    uint64_t threadCount) :
+    MultithreadedObject<PathFinder>(*this),
     assembler(assembler)
 {
     // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t maxMarkerOffset = 10000; // 30000, reduced for speed
     const uint64_t minCoverage = 8;
-    const uint64_t maxCoverage = 15;
-    const uint64_t maxEdgeCount = 8;
-    const uint64_t maxMarkerOffset = 30000;
-    const uint64_t minCommonCount = 5;
-    const double minCorrectedJaccard = 0.9;
+    const uint64_t maxCoverage = 35;
+    const uint64_t minCommonCount = 3;      // 6, reduced for speed
+    const double minCorrectedJaccard = 0.8;
+    const uint64_t maxEdgeCount = 3;    // 6, reduced for speed
 
-    class EdgePair {
-    public:
-        MarkerGraphEdgeId edgeId0;
-        MarkerGraphEdgeId edgeId1;
-        uint64_t offsetInBases;
-        bool operator==(const EdgePair& that) const
-        {
-            return tie(edgeId0, edgeId1) == tie(that.edgeId0, that.edgeId1);
-        }
-        bool operator<(const EdgePair& that) const
-        {
-            return tie(edgeId0, edgeId1) < tie(that.edgeId0, that.edgeId1);
-        }
-    };
-    vector<EdgePair> edgePairs;
+    // Store the parameters so the threads can see them.
+    threadFunction1Data.maxMarkerOffset = maxMarkerOffset;
+    threadFunction1Data.minCoverage = minCoverage;
+    threadFunction1Data.maxCoverage = maxCoverage;
+    threadFunction1Data.minCommonCount =  minCommonCount;
+    threadFunction1Data.minCorrectedJaccard = minCorrectedJaccard;
+    threadFunction1Data.maxEdgeCount = maxEdgeCount;
 
+    // Make space for the EdgePairs found by each thread.
+    threadFunction1Data.threadEdgePairs.clear();
+    threadFunction1Data.threadEdgePairs.resize(threadCount);
 
-    // Loop over all marker graph edges.
-    // This is slow and should run in multithreaded code.
-    uint64_t primaryEdgeCount = 0;
-    vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > nextPrimaryEdges;
-    for(MarkerGraphEdgeId edgeId0=0; edgeId0<assembler.markerGraph.edges.size(); edgeId0++) {
-        if((edgeId0 % 100000) == 0) {
-            cout << timestamp << edgeId0 << "/" << assembler.markerGraph.edges.size() << endl;
-        }
+    // Find the EdgePairs.
+    const uint64_t batchSize = 100;
+    setupLoadBalancing(assembler.markerGraph.edges.size(), batchSize);
+    runThreads(&PathFinder::threadFunction1, threadCount);
 
-        // If coverage is not in the required range, skip it.
-        const uint64_t coverage = assembler.markerGraph.edgeCoverage(edgeId0);
-        if(coverage<minCoverage or coverage>maxCoverage) {
-            continue;
-        }
-
-        // Check for duplicate oriented reads on edgeId0 or its vertices.
-        const MarkerGraph::Edge& edge0 = assembler.markerGraph.edges[edgeId0];
-        if(
-            assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeId0) or
-            assembler.markerGraph.vertexHasDuplicateOrientedReadIds(edge0.source, assembler.markers) or
-            assembler.markerGraph.vertexHasDuplicateOrientedReadIds(edge0.target, assembler.markers)) {
-            continue;
-        }
-        ++primaryEdgeCount;
-
-        // Find nearby edges with similar read composition, in both directions.
-        for(uint64_t direction=0; direction<2; direction++) {
-            findNextPrimaryEdges(
-                edgeId0,
-                direction,
-                minCoverage,
-                maxCoverage,
-                maxEdgeCount,
-                maxMarkerOffset,
-                minCommonCount,
-                minCorrectedJaccard,
-                nextPrimaryEdges);
-            for(const auto& p: nextPrimaryEdges) {
-                const MarkerGraphEdgeId edgeId1 = p.first;
-                const uint64_t offsetInBases = p.second.offsetInBases;
-                if(direction == 0) {
-                    edgePairs.push_back({edgeId0, edgeId1, offsetInBases});
-                } else {
-                    edgePairs.push_back({edgeId1, edgeId0, -offsetInBases});
-                }
-            }
-        }
+    // Merge the EdgePairs found by all threads.
+    edgePairs.clear();
+    for(const vector<EdgePair>& thisThreadEdgePairs: threadFunction1Data.threadEdgePairs) {
+        copy(thisThreadEdgePairs.begin(), thisThreadEdgePairs.end(), back_inserter(edgePairs));
     }
+    threadFunction1Data.threadEdgePairs.clear();
+
     cout << "Total number of marker graph edges is " << assembler.markerGraph.edges.size() << endl;
-    cout << "Total number of primary edges is " << primaryEdgeCount << endl;
+    // cout << "Total number of primary edges is " << primaryEdgeCount << endl;
     cout << "Number of primary edge pairs before deduplication is " << edgePairs.size() << endl;
     deduplicate(edgePairs);
     cout << "Number of primary edge pairs after deduplication is " << edgePairs.size() << endl;
@@ -579,3 +545,74 @@ PathFinder::PathFinder(
 
 
 }
+
+
+
+void PathFinder::threadFunction1(uint64_t threadId)
+{
+    // Get the parameters.
+    const uint64_t maxMarkerOffset = threadFunction1Data.maxMarkerOffset;
+    const uint64_t minCoverage = threadFunction1Data.minCoverage;
+    const uint64_t maxCoverage = threadFunction1Data.maxCoverage;
+    const uint64_t minCommonCount = threadFunction1Data.minCommonCount;
+    const double minCorrectedJaccard = threadFunction1Data.minCorrectedJaccard;
+    const uint64_t maxEdgeCount = threadFunction1Data.maxEdgeCount;
+
+    // The vector where we will store the EdgePairs found by this thread.
+    vector<EdgePair>& thisThreadEdgePairs = threadFunction1Data.threadEdgePairs[threadId];
+
+    // Work vector used in the main loop but defined here to reduce memory allocation activity.
+    vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > nextPrimaryEdges;
+
+    // Look over all batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over all marker graph edges assigned to this batch.
+        for(MarkerGraphEdgeId edgeId0=begin; edgeId0<end; edgeId0++) {
+            if((edgeId0 % 100000) == 0) {
+                std::lock_guard<std::mutex> lock(mutex);
+                cout << timestamp << edgeId0 << "/" << assembler.markerGraph.edges.size() << endl;
+            }
+
+            // If coverage is not in the required range, skip it.
+            const uint64_t coverage = assembler.markerGraph.edgeCoverage(edgeId0);
+            if(coverage<minCoverage or coverage>maxCoverage) {
+                continue;
+            }
+
+            // Check for duplicate oriented reads on edgeId0 or its vertices.
+            const MarkerGraph::Edge& edge0 = assembler.markerGraph.edges[edgeId0];
+            if(
+                assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeId0) or
+                assembler.markerGraph.vertexHasDuplicateOrientedReadIds(edge0.source, assembler.markers) or
+                assembler.markerGraph.vertexHasDuplicateOrientedReadIds(edge0.target, assembler.markers)) {
+                continue;
+            }
+
+            // Find nearby edges with similar read composition, in both directions.
+            for(uint64_t direction=0; direction<2; direction++) {
+                findNextPrimaryEdges(
+                    edgeId0,
+                    direction,
+                    minCoverage,
+                    maxCoverage,
+                    maxEdgeCount,
+                    maxMarkerOffset,
+                    minCommonCount,
+                    minCorrectedJaccard,
+                    nextPrimaryEdges);
+                for(const auto& p: nextPrimaryEdges) {
+                    const MarkerGraphEdgeId edgeId1 = p.first;
+                    const uint64_t offsetInBases = p.second.offsetInBases;
+                    if(direction == 0) {
+                        thisThreadEdgePairs.push_back({edgeId0, edgeId1, offsetInBases});
+                    } else {
+                        thisThreadEdgePairs.push_back({edgeId1, edgeId0, -offsetInBases});
+                    }
+                }
+            }
+        }
+    }
+}
+

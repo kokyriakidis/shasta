@@ -42,9 +42,14 @@ void Assembler::findCompleteMarkerGraphPath(
 
 
 
-void Assembler::findCompleteMarkerGraphPaths() const
+void Assembler::findCompleteMarkerGraphPaths(uint64_t threadCount) const
 {
-    mode3b::PathFinder pathFinder(*this);
+    // Adjust the numbers of threads, if necessary.
+    if(threadCount == 0) {
+        threadCount = std::thread::hardware_concurrency();
+    }
+
+    mode3b::PathFinder pathFinder(*this, threadCount);
 }
 
 
