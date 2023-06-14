@@ -35,7 +35,7 @@ public:
     AssemblyPath(
         const Assembler&,
         MarkerGraphEdgeId,
-        uint64_t direction  // 0 = forward, 1 = backward.
+        uint64_t direction  // 0 = forward, 1 = backward, 2=bidirectional
         );
 
     void getSequence(vector<Base>&) const;
@@ -58,6 +58,15 @@ private:
         Step(const MarkerGraphEdgePairInfo& info);
     };
     vector<Step> steps;
+
+    // Create the primaryEdges and the steps.
+    void create(
+        MarkerGraphEdgeId,
+        uint64_t direction  // 0 = forward, 1 = backward, 2=bidirectional
+        );
+
+    // Assemble the sequence of each Step.
+    void assemble();
 };
 
 #endif

@@ -1,8 +1,11 @@
 #ifndef SHASTA_MARKER_GRAPH_EDGE_PAIR_INFO_HPP
 #define SHASTA_MARKER_GRAPH_EDGE_PAIR_INFO_HPP
 
+// Shasta.
 #include "invalid.hpp"
 
+// Standard library.
+#include "algorithm.hpp"
 #include "cstdint.hpp"
 
 namespace shasta {
@@ -72,6 +75,15 @@ public:
     bool operator>(const MarkerGraphEdgePairInfo& that) const
     {
         return correctedJaccard() > that.correctedJaccard();
+    }
+
+    void reverse()
+    {
+        swap(totalA, totalB);
+        swap(onlyA, onlyB);
+        swap(onlyAShort, onlyBShort);
+        offsetInMarkers = - offsetInMarkers;
+        offsetInBases = - offsetInBases;
     }
 
 };

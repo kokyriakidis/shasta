@@ -2353,7 +2353,7 @@ public:
     // Version in namespace mode3b that uses the complete marker graph.
     void findCompleteMarkerGraphPath(
         MarkerGraphEdgeId startEdgeId,  // The path starts here.
-        uint64_t direction              // 0=forward, 1=backward
+        uint64_t direction              // 0=forward, 1=backward, 2=bidirectional
         ) const;
     void findCompleteMarkerGraphPaths(uint64_t threadCount) const;
 

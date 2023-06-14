@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser(description=
 parser.add_argument('startEdgeId', type=int,
     help='The id of the marker graph edge to start from.')
 parser.add_argument('direction', type=int, choices=range(2),
-    help='The direction to move in while creating the path: 0=forward, 1=backward.')
+    help='The direction to move in while creating the path: 0=forward, 1=backward, 2=bidirectional.')
     
 arguments = parser.parse_args()   
 

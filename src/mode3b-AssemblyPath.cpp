@@ -13,22 +13,67 @@ using namespace mode3b;
 AssemblyPath::AssemblyPath(
     const Assembler& assembler,
     MarkerGraphEdgeId startEdgeId,
-    uint64_t direction  // 0 = forward, 1 = backward.
+    uint64_t direction  // 0 = forward, 1 = backward, 2=bidirectional
     ) :
     assembler(assembler)
 {
-    vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > otherPrimaryEdges;
-    PathFinder pathFinder(assembler, startEdgeId, direction, otherPrimaryEdges);
+    create(startEdgeId, direction);
+    assemble();
+}
 
-    // Create the primaryEdges and the steps.
-    primaryEdges.push_back(startEdgeId);
-    for(const auto& p: otherPrimaryEdges) {
-        primaryEdges.push_back(p.first);
-        steps.push_back(Step(p.second));
+
+
+// Create the primaryEdges and the steps.
+void AssemblyPath::create(
+    MarkerGraphEdgeId startEdgeId,
+    uint64_t direction  // 0 = forward, 1 = backward, 2=bidirectional
+    )
+{
+
+    if(direction == 0) {
+
+        vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > otherPrimaryEdges;
+        PathFinder pathFinder(assembler, startEdgeId, direction, otherPrimaryEdges);
+
+        // Create the primaryEdges and the steps.
+        primaryEdges.push_back(startEdgeId);
+        for(const auto& p: otherPrimaryEdges) {
+            primaryEdges.push_back(p.first);
+            steps.push_back(Step(p.second));
+        }
     }
-    SHASTA_ASSERT(primaryEdges.size() == steps.size() + 1);
 
-    // Fill in intervening assembled sequence for each Step.
+    else if(direction == 1) {
+
+        vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > otherPrimaryEdges;
+        PathFinder pathFinder(assembler, startEdgeId, direction, otherPrimaryEdges);
+
+        // Reverse the other primary edges.
+        reverse(otherPrimaryEdges.begin(), otherPrimaryEdges.end());
+        for(auto& p: otherPrimaryEdges) {
+            p.second.reverse();
+        }
+
+        // Create the primaryEdges and the steps.
+        for(const auto& p: otherPrimaryEdges) {
+            primaryEdges.push_back(p.first);
+            steps.push_back(Step(p.second));
+        }
+        primaryEdges.push_back(startEdgeId);
+    }
+
+    else if(direction == 2) {
+        SHASTA_ASSERT(0);
+    }
+
+    SHASTA_ASSERT(primaryEdges.size() == steps.size() + 1);
+}
+
+
+
+// Assemble the sequence of each Step.
+void AssemblyPath::assemble()
+{
     for(uint64_t i=0; i<steps.size(); i++) {
         const MarkerGraphEdgeId edgeIdA = primaryEdges[i];
         const MarkerGraphEdgeId edgeIdB = primaryEdges[i+1];

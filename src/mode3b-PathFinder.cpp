@@ -69,6 +69,8 @@ PathFinder::PathFinder(
     MultithreadedObject<PathFinder>(*this),
     assembler(assembler)
 {
+    SHASTA_ASSERT(direction < 2);
+
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t maxMarkerOffset = 30000;
     const uint64_t minCoverage = 8;
