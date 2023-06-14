@@ -30,6 +30,7 @@ void AssemblyPath::create(
     )
 {
 
+    // Forward.
     if(direction == 0) {
 
         vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > otherPrimaryEdges;
@@ -43,6 +44,9 @@ void AssemblyPath::create(
         }
     }
 
+
+
+    // Backward.
     else if(direction == 1) {
 
         vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > otherPrimaryEdges;
@@ -62,9 +66,36 @@ void AssemblyPath::create(
         primaryEdges.push_back(startEdgeId);
     }
 
+
+
+    // Bidirectional
     else if(direction == 2) {
-        SHASTA_ASSERT(0);
+
+        // Move forward.
+        vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > otherPrimaryEdgesForward;
+        PathFinder forwardPathFinder(assembler, startEdgeId, 0, otherPrimaryEdgesForward);
+
+        // Move backward.
+        vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > otherPrimaryEdgesBackward;
+        PathFinder backWardPathFinder(assembler, startEdgeId, 1, otherPrimaryEdgesBackward);
+        reverse(otherPrimaryEdgesBackward.begin(), otherPrimaryEdgesBackward.end());
+        for(auto& p: otherPrimaryEdgesBackward) {
+            p.second.reverse();
+        }
+
+        // Combine them.
+        for(const auto& p: otherPrimaryEdgesBackward) {
+            primaryEdges.push_back(p.first);
+            steps.push_back(Step(p.second));
+        }
+        primaryEdges.push_back(startEdgeId);
+        for(const auto& p: otherPrimaryEdgesForward) {
+            primaryEdges.push_back(p.first);
+            steps.push_back(Step(p.second));
+        }
     }
+
+
 
     SHASTA_ASSERT(primaryEdges.size() == steps.size() + 1);
 }
