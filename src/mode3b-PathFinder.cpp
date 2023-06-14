@@ -11,6 +11,7 @@ using namespace shasta;
 using namespace mode3b;
 
 // Standard library.
+#include <cstdlib>
 #include "fstream.hpp"
 #include "iostream.hpp"
 #include <set>
@@ -496,6 +497,8 @@ PathFinder::PathFinder(
 {
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t maxMarkerOffset = 10000; // 30000, reduced for speed
+    // const uint64_t minCoverage = 15; // Change back to 8 when done debugging.
+    // const uint64_t maxCoverage = 20; // Change back to 35 when done debugging.
     const uint64_t minCoverage = 8;
     const uint64_t maxCoverage = 35;
     const uint64_t minCommonCount = 3;      // 6, reduced for speed
@@ -527,23 +530,23 @@ PathFinder::PathFinder(
     threadFunction1Data.threadEdgePairs.clear();
 
     cout << "Total number of marker graph edges is " << assembler.markerGraph.edges.size() << endl;
-    // cout << "Total number of primary edges is " << primaryEdgeCount << endl;
     cout << "Number of primary edge pairs before deduplication is " << edgePairs.size() << endl;
     deduplicate(edgePairs);
     cout << "Number of primary edge pairs after deduplication is " << edgePairs.size() << endl;
 
 
     // Write out the pairs in Graphviz format.
+    // The len attribute is only honored by neato and fdp.
     {
         ofstream out("PathGraph.dot");
         out << "digraph PathGraph {\n";
         for(const EdgePair& edgePair: edgePairs) {
-            out << edgePair.edgeId0 << "->" << edgePair.edgeId1 << ";\n";
+            out << edgePair.edgeId0 << "->" << edgePair.edgeId1 <<
+                " [len=" << max(1UL, uint64_t(0.001 * double(edgePair.offsetInBases))) << "]"
+                ";\n";
         }
         out << "}\n";
     }
-
-
 }
 
 
