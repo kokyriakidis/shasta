@@ -38,6 +38,8 @@ void Assembler::findCompleteMarkerGraphPath(
         direction);
     ofstream fasta("AssemblyPath.fasta");
     assemblyPath.writeFasta(fasta);
+    ofstream csv("AssemblyPath.csv");
+    assemblyPath.writeCsv(csv);
 }
 
 

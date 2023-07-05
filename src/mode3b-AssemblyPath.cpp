@@ -10,6 +10,7 @@ using namespace mode3b;
 #include <iostream.hpp>
 
 
+
 AssemblyPath::AssemblyPath(
     const Assembler& assembler,
     MarkerGraphEdgeId startEdgeId,
@@ -156,4 +157,69 @@ void AssemblyPath::writeFasta(ostream& fasta) const
     fasta << ">Path " << sequence.size() << "\n";
     copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(fasta));
     fasta << "\n";
+}
+
+
+
+void AssemblyPath::writeCsv(ostream& csv) const
+{
+    csv << "Step,EdgeId,Begin,End,Length,Sequence\n";
+
+    uint64_t positionBegin = 0;
+
+    for(uint64_t i=0; /* Check later */ ; i++) {
+
+        // Write a line for this primary edge.
+        {
+            const MarkerGraphEdgeId edgeId = primaryEdges[i];
+            const auto edgeSequence = assembler.markerGraph.edgeSequence[edgeId];
+            const uint64_t length = edgeSequence.size();
+            const uint64_t positionEnd = positionBegin + length;
+
+            csv << i << ",";
+            csv << edgeId << ",";
+            csv << positionBegin << ",";
+            csv << positionEnd << ",";
+            csv << length << ",";
+            copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(csv));
+            csv << "\n";
+
+            positionBegin = positionEnd;
+        }
+
+
+
+        // If this is the last primary edge, we are done.
+        if(i == primaryEdges.size() - 1) {
+            break;
+        }
+
+        // Write a line with the sequence of the step between this primary edge and the next.
+        {
+            const Step& step = steps[i];
+            const uint64_t length = step.sequence.size();
+            const uint64_t positionEnd = positionBegin + length;
+
+            csv << i << ",";
+            csv << ",";
+            csv << positionBegin << ",";
+            csv << positionEnd << ",";
+            csv << length << ",";
+
+            // The sequence can be long, so for convenience we write it on multiple lines.
+            // To keep all lines in the same cell, we must quote the entire sequence.
+            csv << "\"";
+            const uint64_t basesPerLine = 100;
+            for(uint64_t i=0; i<step.sequence.size(); i++) {
+                if(i != 0 and ((i % basesPerLine) == 0)) {
+                    csv << "\n";
+                }
+                csv << step.sequence[i];
+            }
+            csv << "\"\n";
+
+            positionBegin = positionEnd;
+        }
+    }
+
 }

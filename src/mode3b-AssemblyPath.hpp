@@ -40,6 +40,7 @@ public:
 
     void getSequence(vector<Base>&) const;
     void writeFasta(ostream&) const;
+    void writeCsv(ostream&) const;
 private:
     const Assembler& assembler;
 
