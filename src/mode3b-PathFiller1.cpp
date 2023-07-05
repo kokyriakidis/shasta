@@ -718,29 +718,40 @@ void PathFiller1::writeGraphviz(
 
         // Tooltip.
         out << " tooltip=\"";
-        out << coverage << "\\n";
-        copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(out));
+        out << "Coverage " << coverage << "\\n";
+        out << edgeSequence.size() << " bases";
         if(it != assemblyPathMap.end()) {
             const uint64_t assembledPosition = it->second;
             out << "\\n" << assembledPosition << "-" <<
                 assembledPosition+edgeSequence.size();
+        }
+        if(edgeSequence.size() < 100) {
+            out << "\\n";
+            copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(out));
+        } else {
+            out << "\\nSequence is too long";
         }
         out << "\"";
 
         // Label.
         if(showEdgeLabels) {
             out << " label=\"";
-            out << coverage;
-            for(uint64_t i=0; i<edgeSequence.size(); i++) {
-                if((i % 10) == 0) {
-                    out << "\\n";
-                }
-                out << edgeSequence[i];
-            }
+            out << "Coverage = " << coverage << "\\n";
+            out << edgeSequence.size() << " bases";
             if(it != assemblyPathMap.end()) {
                 const uint64_t assembledPosition = it->second;
                 out << "\\n" << assembledPosition << "-" <<
                     assembledPosition+edgeSequence.size();
+            }
+            if(edgeSequence.size() < 500) {
+                for(uint64_t i=0; i<edgeSequence.size(); i++) {
+                    if((i % 20) == 0) {
+                        out << "\\n";
+                    }
+                    out << edgeSequence[i];
+                }
+            } else {
+                out << "\\nSequence is too long";
             }
             out << "\"";
         }
