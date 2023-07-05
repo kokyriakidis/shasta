@@ -111,7 +111,7 @@ void AssemblyPath::assemble()
         const MarkerGraphEdgeId edgeIdB = primaryEdges[i+1];
         Step& step = steps[i];
         ostream html(0);
-        PathFiller1 pathFiller(assembler, edgeIdA, edgeIdB, html);
+        PathFiller1 pathFiller(assembler, edgeIdA, edgeIdB, html, false, false, false, false, false);
         pathFiller.getSequence(step.sequence, false);
         cout << "Assembly primary edges " <<
             edgeIdA << " " << edgeIdB << ": coverage " << pathFiller.coverage() <<

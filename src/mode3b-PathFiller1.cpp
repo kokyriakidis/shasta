@@ -37,7 +37,8 @@ PathFiller1::PathFiller1(
     bool showGraph,
     bool showVertices,
     bool showVertexLabels,
-    bool showEdgeLabels) :
+    bool showEdgeLabels,
+    bool showDebugInformation) :
     assembler(assembler),
     edgeIdA(edgeIdA),
     edgeIdB(edgeIdB)
@@ -59,13 +60,19 @@ PathFiller1::PathFiller1(
         writeOrientedReads(html);
     }
 
-    createGraph(maxBaseSkip, minVertexCoverage);
+    createGraph(maxBaseSkip, minVertexCoverage,
+        html,
+        showGraph,
+        showVertices,
+        showVertexLabels,
+        showEdgeLabels,
+        showDebugInformation);
     linearize();
     assembleEdges();
     findAssemblyPath();
 
     if(html) {
-        html << "<p>The graph has " << num_vertices(graph) <<
+        html << "<p>The final assembly graph has " << num_vertices(graph) <<
             " vertices and " << num_edges(graph) << " edges.";
     }
 
@@ -77,6 +84,7 @@ PathFiller1::PathFiller1(
         writeAssemblyDetails(csv);
         if(showGraph) {
             approximateTopologicalSort();
+            html << "<h2>Final assembly graph</h2>";
             writeGraph(
                 html,
                 showVertices,
@@ -290,12 +298,32 @@ void PathFiller1::writeOrientedReads(ostream& html) const
 
 void PathFiller1::createGraph(
     uint64_t maxBaseSkip,
-    uint64_t minVertexCoverage)
+    uint64_t minVertexCoverage,
+    ostream& html,
+    bool showGraph,
+    bool showVertices,
+    bool showVertexLabels,
+    bool showEdgeLabels,
+    bool showDebugInformation)
 {
+    const PathFiller1& graph = *this;
+
     createVertices();
     removeLowCoverageVertices(minVertexCoverage);
     splitVertices(maxBaseSkip);
     createEdges();
+
+    if(html and showGraph and showDebugInformation) {
+        approximateTopologicalSort();
+        html << "<h2>Initial assembly graph</h2>";
+        html << "<p>The initial assembly graph has " << num_vertices(graph) <<
+            " vertices and " << num_edges(graph) << " edges.";
+        writeGraph(
+            html,
+            showVertices,
+            showVertexLabels,
+            showEdgeLabels);
+    }
 
     // Remove strongly connected components, then regerenerate
     // edges with the remaining vertices.
@@ -719,17 +747,19 @@ void PathFiller1::writeGraphviz(
         // Tooltip.
         out << " tooltip=\"";
         out << "Coverage " << coverage << "\\n";
-        out << edgeSequence.size() << " bases";
-        if(it != assemblyPathMap.end()) {
-            const uint64_t assembledPosition = it->second;
-            out << "\\n" << assembledPosition << "-" <<
-                assembledPosition+edgeSequence.size();
-        }
-        if(edgeSequence.size() < 100) {
-            out << "\\n";
-            copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(out));
-        } else {
-            out << "\\nSequence is too long";
+        if(edgesWereAssembled) {
+            out << edgeSequence.size() << " bases";
+            if(it != assemblyPathMap.end()) {
+                const uint64_t assembledPosition = it->second;
+                out << "\\n" << assembledPosition << "-" <<
+                    assembledPosition+edgeSequence.size();
+            }
+            if(edgeSequence.size() < 100) {
+                out << "\\n";
+                copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(out));
+            } else {
+                out << "\\nSequence is too long";
+            }
         }
         out << "\"";
 
@@ -737,21 +767,23 @@ void PathFiller1::writeGraphviz(
         if(showEdgeLabels) {
             out << " label=\"";
             out << "Coverage = " << coverage << "\\n";
-            out << edgeSequence.size() << " bases";
-            if(it != assemblyPathMap.end()) {
-                const uint64_t assembledPosition = it->second;
-                out << "\\n" << assembledPosition << "-" <<
-                    assembledPosition+edgeSequence.size();
-            }
-            if(edgeSequence.size() < 500) {
-                for(uint64_t i=0; i<edgeSequence.size(); i++) {
-                    if((i % 20) == 0) {
-                        out << "\\n";
-                    }
-                    out << edgeSequence[i];
+            if(edgesWereAssembled) {
+                out << edgeSequence.size() << " bases";
+                if(it != assemblyPathMap.end()) {
+                    const uint64_t assembledPosition = it->second;
+                    out << "\\n" << assembledPosition << "-" <<
+                        assembledPosition+edgeSequence.size();
                 }
-            } else {
-                out << "\\nSequence is too long";
+                if(edgeSequence.size() < 500) {
+                    for(uint64_t i=0; i<edgeSequence.size(); i++) {
+                        if((i % 20) == 0) {
+                            out << "\\n";
+                        }
+                        out << edgeSequence[i];
+                    }
+                } else {
+                    out << "\\nSequence is too long";
+                }
             }
             out << "\"";
         }
@@ -1461,6 +1493,7 @@ void PathFiller1::assembleEdges()
     BGL_FORALL_EDGES(e, graph, PathFiller1) {
         assembleEdge(e);
     }
+    edgesWereAssembled = true;
 }
 void PathFiller1::assembleEdge(edge_descriptor e)
 {

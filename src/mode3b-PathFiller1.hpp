@@ -109,10 +109,11 @@ public:
         MarkerGraphEdgeId edgeIdA,
         MarkerGraphEdgeId edgeIdB,
         ostream& html,
-        bool showGraph = false,
-        bool showVertices = false,
-        bool showVertexLabels = false,
-        bool showEdgeLabels = false);
+        bool showGraph,
+        bool showVertices,
+        bool showVertexLabels,
+        bool showEdgeLabels,
+        bool showDebugInformation);
 
     // Get the assembled sequence.
     // The sequences of edgeIdA and edgeIdB are only included if
@@ -182,7 +183,13 @@ private:
 
     void createGraph(
         uint64_t maxBaseSkip,
-        uint64_t minVertexCoverage);
+        uint64_t minVertexCoverage,
+        ostream& html,
+        bool showGraph,
+        bool showVertices,
+        bool showVertexLabels,
+        bool showEdgeLabels,
+        bool showDebugInformation);
     void createVertices();
     void removeVertex(vertex_descriptor);
     void removeLowCoverageVertices(uint64_t minVertexCoverage);
@@ -206,6 +213,7 @@ private:
 
     // Assemble edges using MSA.
     // Sequences stored in the marker graph are not used.
+    bool edgesWereAssembled = false;
     void assembleEdges();
     void assembleEdge(edge_descriptor);
 

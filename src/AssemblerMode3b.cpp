@@ -89,6 +89,9 @@ void Assembler::fillMode3bAssemblyPathStep(const vector<string>& request, ostrea
     string showEdgeLabelsString;
     const bool showEdgeLabels = getParameterValue(request, "showEdgeLabels", showEdgeLabelsString);
 
+    string showDebugInformationString;
+    const bool showDebugInformation = getParameterValue(request, "showDebugInformation", showDebugInformationString);
+
 
 
     // Write the form.
@@ -123,6 +126,11 @@ void Assembler::fillMode3bAssemblyPathStep(const vector<string>& request, ostrea
         "<th class=left>Display edge labels"
         "<td class=centered><input type=checkbox name=showEdgeLabels" <<
         (showEdgeLabels ? " checked" : "") << ">"
+
+        "<tr>"
+        "<th class=left>Display debug information"
+        "<td class=centered><input type=checkbox name=showDebugInformation" <<
+        (showDebugInformation ? " checked" : "") << ">"
 
         "</table>"
         "<br><input type=submit value='Do it'>"
@@ -165,5 +173,6 @@ void Assembler::fillMode3bAssemblyPathStep(const vector<string>& request, ostrea
         showGraph,
         showVertices,
         showVertexLabels,
-        showEdgeLabels);
+        showEdgeLabels,
+        showDebugInformation);
 }
