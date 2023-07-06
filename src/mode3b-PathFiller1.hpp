@@ -127,9 +127,6 @@ public:
 
 private:
 
-    // The path secondary edges. This excludes the primary edges edgeIdA and edgeIdB.
-    vector<MarkerGraphEdgeId> secondaryEdges;
-
     // Store constructor arguments.
     const Assembler& assembler;
     MarkerGraphEdgeId edgeIdA;
