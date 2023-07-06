@@ -428,6 +428,10 @@ void PathFiller1::splitVertices(uint64_t maxBaseSkip)
 {
     PathFiller1& graph = *this;
 
+    // The vertices of edgeIdA and edgeIdB should not be split.
+    const MarkerGraph::Edge& edgeA = assembler.markerGraph.edges[edgeIdA];
+    const MarkerGraph::Edge& edgeB = assembler.markerGraph.edges[edgeIdB];
+
     // Gather the vertices we have now so we can safely iterate over them.
     vector<vertex_descriptor> initialVertices;
     BGL_FORALL_VERTICES(v, graph, PathFiller1) {
@@ -451,6 +455,16 @@ void PathFiller1::splitVertices(uint64_t maxBaseSkip)
     for(const vertex_descriptor v: initialVertices) {
         const PathFiller1Vertex& vertex = graph[v];
         SHASTA_ASSERT(vertex.ordinals.size() == orientedReadInfos.size());
+
+        // If this is a vertex of edgeIdA or edgeIdB, don't split it.
+        const MarkerGraphVertexId vertexId = vertex.vertexId;
+        if( vertexId == edgeA.source or
+            vertexId == edgeA.target or
+            vertexId == edgeB.source or
+            vertexId == edgeB.target
+            ) {
+            continue;
+        }
 
         // Loop over all ordinals of all oriented reads in this vertex.
         ordinalInfos.clear();
