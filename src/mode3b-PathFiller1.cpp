@@ -47,6 +47,7 @@ PathFiller1::PathFiller1(
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t maxBaseSkip = 300;
     const uint64_t minVertexCoverage = 4;
+    const uint64_t maxAllowedMsaLength = 10000;
 
     checkAssumptions();
     if(html) {
@@ -74,7 +75,7 @@ PathFiller1::PathFiller1(
     // adding vertices back as necessary to
     // eliminate very long MSAs.
     PathFiller1 simplifiedGraph = *this;
-    simplifiedGraph.simplify(*this);
+    simplifiedGraph.simplify(*this, maxAllowedMsaLength);
 
     // Assemble edges on the assembly path.
     simplifiedGraph.assembleAssemblyPathEdges();
@@ -219,6 +220,8 @@ void PathFiller1::gatherOrientedReads()
         // If the edges don't appear in the expected order in this oriented read,
         // skip it.
         if(info.ordinalB0 < info.ordinalA1) {
+            ++itA;
+            ++itB;
             continue;
         }
 
@@ -1622,6 +1625,43 @@ void PathFiller1::assembleEdge(edge_descriptor e)
 
 
 
+uint64_t PathFiller1::msaLength(edge_descriptor e) const
+{
+    const PathFiller1& graph = *this;
+    const PathFiller1Edge& edge = graph[e];
+
+    const uint64_t k = assembler.assemblerInfo->k;
+    SHASTA_ASSERT((k % 2) == 0);
+    const uint64_t kHalf = k / 2;
+
+    uint64_t maxMsaLength = 0;
+
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        const OrientedReadId orientedReadId = orientedReadInfos[i].orientedReadId;
+        const vector< pair<uint32_t, uint32_t> >& orientedReadMarkerIntervals = edge.markerIntervals[i];
+        if(orientedReadMarkerIntervals.empty()) {
+            continue;
+        }
+
+        // Find the first and last ordinals of this oriented read on this edge.
+        const uint32_t ordinal0 = orientedReadMarkerIntervals.front().first;
+        const uint32_t ordinal1 = orientedReadMarkerIntervals.back().second;
+
+        // Find the corresponding MarkerIds.
+        const MarkerId markerId0 = assembler.getMarkerId(orientedReadId, ordinal0);
+        const MarkerId markerId1 = assembler.getMarkerId(orientedReadId, ordinal1);
+
+        // And the corresponding positions in the oriented reads.
+        const uint64_t position0 = assembler.markers.begin()[markerId0].position + kHalf;
+        const uint64_t position1 = assembler.markers.begin()[markerId1].position + kHalf;
+
+        maxMsaLength = max(maxMsaLength, position1 - position0);
+    }
+
+    return maxMsaLength;
+}
+
+
 
 // Linearize the graph by keeping only vertices on the dominator tree path
 // from edgeIdA to edgeIdB.
@@ -1710,9 +1750,12 @@ PathFiller1::vertex_descriptor PathFiller1::getExit() const
 // Later, vertices are added back as necessary, to eliminate very long MSAs.
 // It needs access to the old, complete graph as initially created,
 // to be able to add vertices back as necessary.
-void PathFiller1::simplify(const PathFiller1& completeGraph)
+void PathFiller1::simplify(
+    const PathFiller1& completeGraph,
+    uint64_t maxAllowedMsaLength)
 {
     PathFiller1& graph = *this;
+    const bool debug = false;
 
     // Check that each oriented read appears no more than once in each vertex.
     BGL_FORALL_VERTICES(v, graph, PathFiller1) {
@@ -1721,11 +1764,16 @@ void PathFiller1::simplify(const PathFiller1& completeGraph)
         }
     }
 
-    removeAllEdges();
+    // At first, keep only vertices with maximum coverage.
+    // ater, we will add vertices with lower coverage,
+    // if necessary to reduce MSA length.
+    const uint64_t maximumCoverage = orientedReadInfos.size();
+    uint64_t minimumVertexCoverage = maximumCoverage;
+
 
     // Remove all vertices with coverage less than the maximum.
     // Then recreate the edges from scratch.
-    const uint64_t maximumCoverage = orientedReadInfos.size();
+    removeAllEdges();
     vector<vertex_descriptor> verticesToBeRemoved;
     BGL_FORALL_VERTICES(v, graph, PathFiller1) {
         if(graph[v].coverage() < maximumCoverage) {
@@ -1743,8 +1791,111 @@ void PathFiller1::simplify(const PathFiller1& completeGraph)
     while(true) {
         findAssemblyPath();
 
-        // For now, just be happy with what we have.
-        break;
+        // Find the maximum MSA length on the assembly path edges.
+        uint64_t maxMsaLength = 0;
+        for(const edge_descriptor e: assemblyPath) {
+            const uint64_t edgeMsaLength = msaLength(e);
+            if(debug) {
+                cout << graph[source(e, graph)].stringId() << " -> " <<
+                    graph[target(e, graph)].stringId() << " has maximum MSA length " << edgeMsaLength << endl;
+            }
+            maxMsaLength = max(maxMsaLength, edgeMsaLength);
+        }
+        if(debug) {
+            cout << "Maximum MSA length is " << maxMsaLength << endl;
+        }
+
+        // If we don't have any long MSAs, we are done.
+        if(maxMsaLength <= maxAllowedMsaLength) {
+            break;
+        }
+
+
+
+        // The graph as is contains assembly path edges that would generate a long MSA.
+        // Add more vertices.
+        --minimumVertexCoverage;
+        if(debug) {
+            cout << "Reduced minimum vertex coverage to " << minimumVertexCoverage << endl;
+        }
+        if(minimumVertexCoverage == 0) {
+            cout << "Can't reduce minimum vertex coverage." << endl;
+            break;
+        }
+        vector<vertex_descriptor> cVerticesToBeAdded;
+        for(const edge_descriptor e: assemblyPath) {
+            if(msaLength(e) > maxAllowedMsaLength) {
+
+                // Add vertices that have coverage exactly equal to minimumVertexCoverage
+                // and that are in between, as seen by any of the oriented reads.
+                // We get these vertices from the completeGraph.
+                // Here, names of vertices in the complete graph are prefixed with c.
+                const vertex_descriptor v0 = source(e, graph);
+                const vertex_descriptor v1 = target(e, graph);
+                const PathFiller1Vertex& vertex0 = graph[v0];
+                const PathFiller1Vertex& vertex1 = graph[v1];
+
+                for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+                    // const OrientedReadInfo& info = orientedReadInfos[i];
+                    const OrientedReadInfo& cinfo = completeGraph.orientedReadInfos[i];
+
+                    SHASTA_ASSERT(vertex0.ordinals[i].size() <= 1);
+                    if(vertex0.ordinals[i].empty()) {
+                        continue;
+                    }
+                    const uint32_t ordinal0 = vertex0.ordinals[i].front();
+
+                    SHASTA_ASSERT(vertex1.ordinals[i].size() <= 1);
+                    if(vertex1.ordinals[i].empty()) {
+                        continue;
+                    }
+                    const uint32_t ordinal1 = vertex1.ordinals[i].front();
+
+                    // Loop over ordinals between ordinal0 and ordinal1.
+                    for(uint32_t ordinal=ordinal0+1; ordinal<ordinal1; ordinal++) {
+                        const vertex_descriptor cv = cinfo.vertices[ordinal - cinfo.ordinalA0];
+                        if(cv == null_vertex()) {
+                            continue;
+                        }
+                        if(completeGraph[cv].coverage() == minimumVertexCoverage) {
+                            cVerticesToBeAdded.push_back(cv);
+                        }
+                    }
+                }
+
+            }
+
+        }
+        deduplicate(cVerticesToBeAdded);
+        if(debug) {
+            cout << "Vertices to be added:";
+            for(const vertex_descriptor cv: cVerticesToBeAdded) {
+                cout << " " << completeGraph[cv].stringId();
+            }
+            cout << endl;
+        }
+
+        if(cVerticesToBeAdded.empty()) {
+            cout << "No vertices can be added." << endl;
+            break;
+        }
+
+        // Add these vertices, copying them from the complete graph.
+        removeAllEdges();
+        for(const vertex_descriptor cv: cVerticesToBeAdded) {
+            const PathFiller1Vertex& cVertex = completeGraph[cv];
+            const vertex_descriptor v = add_vertex(cVertex, graph);
+            PathFiller1Vertex& vertex = graph[cv];
+            for(uint64_t i=0; i<vertex.ordinals.size(); i++) {
+                 for(const uint32_t ordinal: vertex.ordinals[i]) {
+                     vertex_descriptor& vv = orientedReadInfos[i].vertices[ordinal - orientedReadInfos[i].ordinalA0];
+                     SHASTA_ASSERT(vv == null_vertex());
+                     vv = v;
+                 }
+            }
+        }
+        createEdges();
+
     }
 
 }

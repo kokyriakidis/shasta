@@ -100,7 +100,7 @@ PathFinder::PathFinder(
         const MarkerGraphEdgeId edgeId =
             (primaryEdges.empty() ? startEdgeId : primaryEdges.back().first);
         if(debug) {
-            cout << "Looking for next edge after " << edgeId << endl;
+            cout << "Looking for next edge after " << edgeId << ", direction " << direction << endl;
         }
 
         // Look for the next edge.

@@ -211,12 +211,15 @@ private:
     // This simplifies the graph by removing vertices, then recreating edges.
     // It needs access to the complete graph as initially created,
     // to be able to add vertices back when necessary.
-    void simplify(const PathFiller1& completeGraph);
+    void simplify(
+        const PathFiller1& completeGraph,
+        uint64_t maxAllowedMsaLength);
 
     // Assemble edges using MSA.
     // Sequences stored in the marker graph are not used.
     void assembleAssemblyPathEdges();
     void assembleEdge(edge_descriptor);
+    uint64_t msaLength(edge_descriptor) const;
 
     // Get the edge sequence from the marker graph, for a regular edge,
     // or from the edge itself, for a virtual edge.

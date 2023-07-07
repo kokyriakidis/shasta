@@ -109,13 +109,13 @@ void AssemblyPath::assemble()
     for(uint64_t i=0; i<steps.size(); i++) {
         const MarkerGraphEdgeId edgeIdA = primaryEdges[i];
         const MarkerGraphEdgeId edgeIdB = primaryEdges[i+1];
+        cout << "Assembling between primary edges " <<
+            edgeIdA << " " << edgeIdB << endl;
         Step& step = steps[i];
         ostream html(0);
         PathFiller1 pathFiller(assembler, edgeIdA, edgeIdB, html, false, false, false, false, false);
         pathFiller.getSecondarySequence(step.sequence);
-        cout << "Assembly primary edges " <<
-            edgeIdA << " " << edgeIdB << ": coverage " << pathFiller.coverage() <<
-            ", assembled length " << step.sequence.size() << endl;
+        cout << "Coverage " << pathFiller.coverage() << " , assembled length " << step.sequence.size() << endl;
     }
 }
 
