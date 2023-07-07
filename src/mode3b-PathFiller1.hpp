@@ -125,6 +125,8 @@ public:
         return orientedReadInfos.size();
     }
 
+    PathFiller1(const PathFiller1&);
+
 private:
 
     // Store constructor arguments.

@@ -67,6 +67,8 @@ PathFiller1::PathFiller1(
         showVertexLabels,
         showEdgeLabels,
         showDebugInformation);
+
+    // Simplify and assemble.
     linearize();
     assembleEdges();
     findAssemblyPath();
@@ -122,6 +124,40 @@ PathFiller1::PathFiller1(
     }
 #endif
 }
+
+
+
+PathFiller1::PathFiller1(const PathFiller1& that) :
+    PathFiller1BaseClass(that),
+    assembler(that.assembler),
+    edgeIdA(that.edgeIdA),
+    edgeIdB(that.edgeIdB),
+    orientedReadInfos(that.orientedReadInfos),
+    ordinalOffset(that.ordinalOffset),
+    baseOffset(that.baseOffset),
+    edgesWereAssembled(false)
+    // The copy has no assemblyPath
+{
+    PathFiller1& graph = *this;
+
+    // In the orientedReadInfos, we have to replace the old
+    // vertex descriptors with the new ones.
+    BGL_FORALL_VERTICES(v, graph, PathFiller1) {
+        const PathFiller1Vertex& vertex = graph[v];
+
+        // Loop over oriented reads of this vertex.
+        for(uint64_t i=0; i<vertex.ordinals.size(); i++) {
+
+            // Loop over ordinals of this oriented read in this vertex.
+            // There can be more than one if cycles are present.
+            const vector<uint32_t>& ordinalsForThisOrientedRead = vertex.ordinals[i];
+            for(const uint32_t ordinal: ordinalsForThisOrientedRead) {
+                orientedReadInfos[i].vertices[ordinal - orientedReadInfos[i].ordinalA0] = v;
+            }
+        }
+    }
+}
+
 
 
 
@@ -330,6 +366,18 @@ void PathFiller1::createGraph(
     removeStrongComponents();
     removeAllEdges();
     createEdges();
+
+    if(html and showGraph and showDebugInformation) {
+        approximateTopologicalSort();
+        html << "<h2>Assembly graph after removal of strongly connected components</h2>";
+        html << "<p>The initial assembly graph has " << num_vertices(graph) <<
+            " vertices and " << num_edges(graph) << " edges.";
+        writeGraph(
+            html,
+            showVertices,
+            showVertexLabels,
+            showEdgeLabels);
+    }
 }
 
 
