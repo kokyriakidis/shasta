@@ -116,18 +116,16 @@ public:
         bool showDebugInformation);
 
     // Get the assembled sequence.
-    // The sequences of edgeIdA and edgeIdB are only included if
-    // includePrimary is true.
-    void getSequence(vector<Base>&, bool includePrimary) const;
+    void getSecondarySequence(vector<Base>&) const;
 
     uint64_t coverage() const
     {
         return orientedReadInfos.size();
     }
 
+private:
     PathFiller1(const PathFiller1&);
 
-private:
 
     // Store constructor arguments.
     const Assembler& assembler;
@@ -210,10 +208,14 @@ private:
     // from edgeIdA to edgeIdB.
     void linearize();
 
+    // This simplifies the graph by removing vertices, then recreating edges.
+    // It needs access to the complete graph as initially created,
+    // to be able to add vertices back when necessary.
+    void simplify(const PathFiller1& completeGraph);
+
     // Assemble edges using MSA.
     // Sequences stored in the marker graph are not used.
-    bool edgesWereAssembled = false;
-    void assembleEdges();
+    void assembleAssemblyPathEdges();
     void assembleEdge(edge_descriptor);
 
     // Get the edge sequence from the marker graph, for a regular edge,
@@ -224,6 +226,15 @@ private:
     // and edgeIdB at the end.
     vector<edge_descriptor> assemblyPath;
     void findAssemblyPath();
+
+    // Assembled sequence, without including the sequence of
+    // the primary edges edgeIdA and edgeIdB.
+    vector<Base> secondarySequence;
+    void storeSecondarySequence();
+
+    // Get the complete sequence, consisting of the sequence of edgeIdA,
+    // the secondary sequence, and the sequence of edgeIdB.
+    void getCompleteSequence(vector<Base>&) const;
 
     // Output.
     void writeGraph(
@@ -238,8 +249,8 @@ private:
         bool showVertexLabels,
         bool showEdgeLabels) const;
 
-    void writeSequence(ostream& html) const;
-    void writeSequenceFasta(ostream& html) const;
+    void writeCompleteSequenceHtml(ostream& html) const;
+    void writeCompleteSequenceFasta(ostream& html) const;
     void writeAssemblyDetails(ostream& csv) const;
 };
 

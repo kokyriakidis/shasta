@@ -43,7 +43,6 @@ PathFiller1::PathFiller1(
     edgeIdA(edgeIdA),
     edgeIdB(edgeIdB)
 {
-    const PathFiller1& graph = *this;
 
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t maxBaseSkip = 300;
@@ -68,61 +67,42 @@ PathFiller1::PathFiller1(
         showEdgeLabels,
         showDebugInformation);
 
-    // Simplify and assemble.
-    linearize();
-    assembleEdges();
-    findAssemblyPath();
+
+
+    // Create a simplified version of the graph
+    // that initially only uses vertices of maximum coverage,
+    // adding vertices back as necessary to
+    // eliminate very long MSAs.
+    PathFiller1 simplifiedGraph = *this;
+    simplifiedGraph.simplify(*this);
+
+    // Assemble edges on the assembly path.
+    simplifiedGraph.assembleAssemblyPathEdges();
+
+    // Store the secondary sequence in both graph and simplifiedGraph.
+    simplifiedGraph.storeSecondarySequence();
+    secondarySequence = simplifiedGraph.secondarySequence;
 
     if(html) {
-        html << "<p>The final assembly graph has " << num_vertices(graph) <<
-            " vertices and " << num_edges(graph) << " edges.";
-    }
+        html << "<p>The final assembly graph has " << num_vertices(simplifiedGraph) <<
+            " vertices and " << num_edges(simplifiedGraph) << " edges.";
 
-    if(html) {
-        writeSequence(html);
-        ofstream fasta("AssemblyPath.fasta");
-        writeSequenceFasta(fasta);
-        ofstream csv("AssemblyPath.csv");
-        writeAssemblyDetails(csv);
         if(showGraph) {
-            approximateTopologicalSort();
+            simplifiedGraph.approximateTopologicalSort();
             html << "<h2>Final assembly graph</h2>";
-            writeGraph(
+            simplifiedGraph.writeGraph(
                 html,
                 showVertices,
                 showVertexLabels,
                 showEdgeLabels);
         }
-    }
 
-#if 0
-    computeStrongComponents();
-    createVirtualEdges();
-    writeVerticesCsv();
-    approximateTopologicalSort();
-    if(html) {
-        html << "<p>The local marker graph for this step assembly has " <<
-            num_vertices(graph) << " vertices and " <<
-            num_edges(graph) << " edges." << endl;
-    }
-
-    // Assemble the path between edgeIdA and edgeIdB.
-    findAssemblyPath();
-    if(html) {
-        writeSequence(html);
+        simplifiedGraph.writeCompleteSequenceHtml(html);
         ofstream fasta("AssemblyPath.fasta");
-        writeSequenceFasta(fasta);
+        simplifiedGraph.writeCompleteSequenceFasta(fasta);
         ofstream csv("AssemblyPath.csv");
-        writeAssemblyDetails(csv);
-        if(showGraph) {
-            writeGraph(
-                html,
-                showVertices,
-                showVertexLabels,
-                showEdgeLabels);
-        }
+        simplifiedGraph.writeAssemblyDetails(csv);
     }
-#endif
 }
 
 
@@ -134,8 +114,7 @@ PathFiller1::PathFiller1(const PathFiller1& that) :
     edgeIdB(that.edgeIdB),
     orientedReadInfos(that.orientedReadInfos),
     ordinalOffset(that.ordinalOffset),
-    baseOffset(that.baseOffset),
-    edgesWereAssembled(false)
+    baseOffset(that.baseOffset)
     // The copy has no assemblyPath
 {
     PathFiller1& graph = *this;
@@ -809,7 +788,7 @@ void PathFiller1::writeGraphviz(
         // Tooltip.
         out << " tooltip=\"";
         out << "Coverage " << coverage << "\\n";
-        if(edgesWereAssembled) {
+        if(not edgeSequence.empty()) {
             out << edgeSequence.size() << " bases";
             if(it != assemblyPathMap.end()) {
                 const uint64_t assembledPosition = it->second;
@@ -829,7 +808,7 @@ void PathFiller1::writeGraphviz(
         if(showEdgeLabels) {
             out << " label=\"";
             out << "Coverage = " << coverage << "\\n";
-            if(edgesWereAssembled) {
+            if(not edgeSequence.empty()) {
                 out << edgeSequence.size() << " bases";
                 if(it != assemblyPathMap.end()) {
                     const uint64_t assembledPosition = it->second;
@@ -1010,47 +989,40 @@ void PathFiller1::findAssemblyPath()
 
 
 
-// Get the sequence.
-// The sequences of edgeIdA and edgeIdB are only included if
-// includePrimary is true.
-void PathFiller1::getSequence(
-    vector<Base>& sequence,
-    bool includePrimary) const
+// Get the complete sequence, including the sequences of edgeIdA and edgeIdB.
+void PathFiller1::getCompleteSequence(
+    vector<Base>& sequence) const
 {
     sequence.clear();
 
-#if 0
-    if(includePrimary) {
-        const auto sequenceA = assembler.markerGraph.edgeSequence[edgeIdA];
-        copy(sequenceA.begin(), sequenceA.end(), back_inserter(sequence));
-    }
+    const auto sequenceA = getEdgeSequence(assemblyPath.front());
+    const auto sequenceB = getEdgeSequence(assemblyPath.back());
 
-    for(const MarkerGraphEdgeId edgeId: secondaryEdges) {
-        const auto thisEdgeSequence = assembler.markerGraph.edgeSequence[edgeId];
-        copy(thisEdgeSequence.begin(), thisEdgeSequence.end(), back_inserter(sequence));
-    }
-
-    if(includePrimary) {
-        const auto sequenceB = assembler.markerGraph.edgeSequence[edgeIdB];
-        copy(sequenceB.begin(), sequenceB.end(), back_inserter(sequence));
-    }
-#endif
+    copy(sequenceA.begin(), sequenceA.end(), back_inserter(sequence));
+    copy(secondarySequence.begin(), secondarySequence.end(), back_inserter(sequence));
+    copy(sequenceB.begin(), sequenceB.end(), back_inserter(sequence));
+}
 
 
-    // Use the assemblyPath to assemble sequence.
-    for(uint64_t i=0; i<assemblyPath.size(); i++) {
 
-        // Skip edgeIdA and edgeIdB if so requested.
-        if(not includePrimary) {
-            if(i == 0 or i==assemblyPath.size() - 1) {
-                continue;
-            }
-        }
+void PathFiller1::storeSecondarySequence()
+{
+    secondarySequence.clear();
 
+    // Do not include edgeIdA (i=0) and edgeIdB (i=assemblypath.size()-1).
+    for(uint64_t i=1; i<assemblyPath.size()-1; i++) {
         // Append the sequence contributed by this edge, virtual or not.
         const auto edgeSequence = getEdgeSequence(assemblyPath[i]);
-        copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
+        copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(secondarySequence));
     }
+
+}
+
+
+
+void PathFiller1::getSecondarySequence(vector<Base>& sequence) const
+{
+    sequence = secondarySequence;
 }
 
 
@@ -1066,31 +1038,29 @@ span<const Base> PathFiller1::getEdgeSequence(edge_descriptor e) const
 
 
 
-void PathFiller1::writeSequence(ostream& html) const
+void PathFiller1::writeCompleteSequenceHtml(ostream& html) const
 {
     if(not html) {
         return;
     }
 
-    const auto sequenceA = assembler.markerGraph.edgeSequence[edgeIdA];
-    const auto sequenceB = assembler.markerGraph.edgeSequence[edgeIdB];
-    vector<Base> sequence;
-    getSequence(sequence, false);
+    const auto sequenceA = getEdgeSequence(assemblyPath.front());
+    const auto sequenceB = getEdgeSequence(assemblyPath.back());
 
     html << "<pre style='font-family:monospace'>\n";
 
     html << ">" << edgeIdA << " length " << sequenceA.size() << "\n";
     copy(sequenceA.begin(), sequenceA.end(), ostream_iterator<shasta::Base>(html));
 
-    html << "\n>Intervening length " << sequence.size() << "\n";
-    copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
+    html << "\n>Intervening length " << secondarySequence.size() << "\n";
+    copy(secondarySequence.begin(), secondarySequence.end(), ostream_iterator<shasta::Base>(html));
 
     html << "\n>" << edgeIdB << " length " << sequenceB.size() << "\n";
     copy(sequenceB.begin(), sequenceB.end(), ostream_iterator<shasta::Base>(html));
 
-    html << "\n>Combined length " << sequenceA.size() + sequence.size() + sequenceB.size() << "\n";
+    html << "\n>Combined length " << sequenceA.size() + secondarySequence.size() + sequenceB.size() << "\n";
     copy(sequenceA.begin(), sequenceA.end(), ostream_iterator<shasta::Base>(html));
-    copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(html));
+    copy(secondarySequence.begin(), secondarySequence.end(), ostream_iterator<shasta::Base>(html));
     copy(sequenceB.begin(), sequenceB.end(), ostream_iterator<shasta::Base>(html));
 
     html << "\n</pre>";
@@ -1098,10 +1068,10 @@ void PathFiller1::writeSequence(ostream& html) const
 
 
 
-void PathFiller1::writeSequenceFasta(ostream& fasta) const
+void PathFiller1::writeCompleteSequenceFasta(ostream& fasta) const
 {
     vector<Base> sequence;
-    getSequence(sequence, true);
+    getCompleteSequence(sequence);
 
     fasta << ">Path " << sequence.size() << "\n";
     copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(fasta));
@@ -1549,14 +1519,15 @@ void PathFiller1::createVirtualEdges()
 
 // Assemble edges using MSA.
 // Sequences stored in the marker graph are not used.
-void PathFiller1::assembleEdges()
+void PathFiller1::assembleAssemblyPathEdges()
 {
-    PathFiller1& graph = *this;
-    BGL_FORALL_EDGES(e, graph, PathFiller1) {
+    for(const edge_descriptor e: assemblyPath) {
         assembleEdge(e);
     }
-    edgesWereAssembled = true;
 }
+
+
+
 void PathFiller1::assembleEdge(edge_descriptor e)
 {
 
@@ -1731,3 +1702,49 @@ PathFiller1::vertex_descriptor PathFiller1::getExit() const
     return info.vertices.back();
 }
 
+
+
+
+// This simplifies the graph by removing vertices, then recreating edges.
+// It initially only keeps vertices with maximum coverage.
+// Later, vertices are added back as necessary, to eliminate very long MSAs.
+// It needs access to the old, complete graph as initially created,
+// to be able to add vertices back as necessary.
+void PathFiller1::simplify(const PathFiller1& completeGraph)
+{
+    PathFiller1& graph = *this;
+
+    // Check that each oriented read appears no more than once in each vertex.
+    BGL_FORALL_VERTICES(v, graph, PathFiller1) {
+        for(const auto& v: graph[v].ordinals) {
+            SHASTA_ASSERT(v.size() <= 1);
+        }
+    }
+
+    removeAllEdges();
+
+    // Remove all vertices with coverage less than the maximum.
+    // Then recreate the edges from scratch.
+    const uint64_t maximumCoverage = orientedReadInfos.size();
+    vector<vertex_descriptor> verticesToBeRemoved;
+    BGL_FORALL_VERTICES(v, graph, PathFiller1) {
+        if(graph[v].coverage() < maximumCoverage) {
+            verticesToBeRemoved.push_back(v);
+        }
+    }
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        removeVertex(v);
+    }
+    createEdges();
+
+
+
+    // Add vertices back as necessary, until the assembly path has no long MSAs.
+    while(true) {
+        findAssemblyPath();
+
+        // For now, just be happy with what we have.
+        break;
+    }
+
+}

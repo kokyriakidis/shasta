@@ -112,7 +112,7 @@ void AssemblyPath::assemble()
         Step& step = steps[i];
         ostream html(0);
         PathFiller1 pathFiller(assembler, edgeIdA, edgeIdB, html, false, false, false, false, false);
-        pathFiller.getSequence(step.sequence, false);
+        pathFiller.getSecondarySequence(step.sequence);
         cout << "Assembly primary edges " <<
             edgeIdA << " " << edgeIdB << ": coverage " << pathFiller.coverage() <<
             ", assembled length " << step.sequence.size() << endl;
