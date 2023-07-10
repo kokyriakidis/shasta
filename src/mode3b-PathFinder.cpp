@@ -498,14 +498,12 @@ PathFinder::PathFinder(
     assembler(assembler)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    const uint64_t maxMarkerOffset = 10000; // 30000, reduced for speed
-    // const uint64_t minCoverage = 15; // Change back to 8 when done debugging.
-    // const uint64_t maxCoverage = 20; // Change back to 35 when done debugging.
-    const uint64_t minCoverage = 8;
+    const uint64_t maxMarkerOffset = 10000;
+    const uint64_t minCoverage = 15;
     const uint64_t maxCoverage = 35;
-    const uint64_t minCommonCount = 3;      // 6, reduced for speed
+    const uint64_t minCommonCount = 6;
     const double minCorrectedJaccard = 0.8;
-    const uint64_t maxEdgeCount = 3;    // 6, reduced for speed
+    const uint64_t maxEdgeCount = 4;
 
     // Store the parameters so the threads can see them.
     threadFunction1Data.maxMarkerOffset = maxMarkerOffset;
