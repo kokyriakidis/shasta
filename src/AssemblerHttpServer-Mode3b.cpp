@@ -323,13 +323,7 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
     // Write edges first, to avoid obscuring the vertices.
     const double edgeThickness = initialEdgeThicknessPixels * max(xMax-xMin, yMax-yMin) / sizePixels;
     BGL_FORALL_EDGES(e, pathGraph, PathGraph) {
-        //const PathGraphEdge& edge = pathGraph[e];
-
-        /*
-        const double correctedJaccard = edge.info.correctedJaccard();
-        const uint64_t hue = uint64_t(std::round(120. *
-            (correctedJaccard - minCorrectedJaccard) / (1. - minCorrectedJaccard)));
-        */
+        const PathGraphEdge& edge = pathGraph[e];
 
         const vertex_descriptor v1 = source(e, pathGraph);
         const vertex_descriptor v2 = target(e, pathGraph);
@@ -352,16 +346,18 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
         const double ym = 0.5 * (y1 + y2);
 
         html <<
-            "\n<line x1=" << x1 << " y1=" << y1 <<
+            "\n<g><title>" << pathGraph[v1].edgeId << "->" << pathGraph[v2].edgeId << ", offset " <<
+            edge.info.offsetInBases << " bases</title>"
+            "<line x1=" << x1 << " y1=" << y1 <<
             " x2=" << xm << " y2=" << ym <<
             " stroke=Black"
             " stroke-width=" << edgeThickness <<
             " />"
-            "\n<line x1=" << xm << " y1=" << ym <<
+            "<line x1=" << xm << " y1=" << ym <<
             " x2=" << x2 << " y2=" << y2 <<
             " stroke=Green"
             " stroke-width=" << edgeThickness <<
-            " />";
+            " /></g>";
     }
 
 
