@@ -325,10 +325,20 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
         const double x2 = p2[0];
         const double y2 = p2[1];
 
-        html << "\n<line x1=" << x1 << " y1=" << y1 <<
-            " x2=" << x2 << " y2=" << y2 <<
-            // " stroke='hsl(" << hue << ",100%,50%)'"  // The color does not add much.
+        // To show the direction, the two halves of the edge are
+        // displayed in different colors.
+        const double xm = 0.5 * (x1 + x2);
+        const double ym = 0.5 * (y1 + y2);
+
+        html <<
+            "\n<line x1=" << x1 << " y1=" << y1 <<
+            " x2=" << xm << " y2=" << ym <<
             " stroke=Black"
+            " stroke-width=" << edgeThickness <<
+            " />"
+            "\n<line x1=" << xm << " y1=" << ym <<
+            " x2=" << x2 << " y2=" << y2 <<
+            " stroke=Green"
             " stroke-width=" << edgeThickness <<
             " />";
     }
