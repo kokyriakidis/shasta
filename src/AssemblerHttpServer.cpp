@@ -259,6 +259,7 @@ void Assembler::fillServerFunctionTable()
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3aAssemblyPath);
 
     SHASTA_ADD_TO_FUNCTION_TABLE(fillMode3bAssemblyPathStep);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3bPathGraph);
 }
 #undef SHASTA_ADD_TO_FUNCTION_TABLE
 
@@ -467,6 +468,7 @@ void Assembler::writeNavigation(ostream& html) const
             {"Follow a read in the marker graph", "followReadInMarkerGraph"},
             {"Marker connectivity", "exploreMarkerConnectivity"},
             {"Assembly path step", "fillMode3bAssemblyPathStep"},
+            {"Path graph", "exploreMode3bPathGraph"},
             });
     } else {
         writeNavigation(html, "Marker graph", {

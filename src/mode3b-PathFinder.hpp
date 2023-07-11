@@ -31,6 +31,7 @@ public:
         );
 
     PathFinder(const Assembler&, uint64_t threadCount);
+    PathFinder(const Assembler&);
 private:
 
     // Things we get from the constructor.
@@ -57,7 +58,7 @@ private:
         double minCorrectedJaccard,
         const std::set<MarkerGraphEdgeId>& forbiddedEdgeIds) const;
 
-
+public:
     void findNextPrimaryEdges(
         MarkerGraphEdgeId,
         uint64_t direction,
@@ -69,7 +70,7 @@ private:
         double minCorrectedJaccard,
         vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >&
         ) const;
-
+private:
 
 
     // Multithreaded code used to create a global graph.

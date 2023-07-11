@@ -619,3 +619,11 @@ void PathFinder::threadFunction1(uint64_t threadId)
     }
 }
 
+
+
+PathFinder::PathFinder(
+    const Assembler& assembler) :
+    MultithreadedObject<PathFinder>(*this),
+    assembler(assembler)
+{
+}
