@@ -62,6 +62,10 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
     uint64_t maxDistance = 4;
     getParameterValue(request, "maxDistance", maxDistance);
 
+    // The path direction can be forward, backward, or bidirectional.
+    string graphDirection = "bidirectional";
+    HttpServer::getParameterValue(request, "graphDirection", graphDirection);
+
     // Other quantities to add to the request.
     const double sizePixels = 900.;
     const double initialVertexRadiusPixels = 2.;
@@ -123,6 +127,16 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
         "<td class=centered>"
         "<input type=text required name=maxDistance size=8 style='text-align:center'" <<
         "value='" << maxDistance << "'>"
+
+        "<tr>"
+        "<td>Direction"
+        "<td>"
+        "<input type=radio name=graphDirection value=forward" <<
+        (graphDirection=="forward" ? " checked=checked" : "") << "> Forward"
+        "<br><input type=radio name=graphDirection value=backward" <<
+        (graphDirection=="backward" ? " checked=checked" : "") << "> Backward"
+        "<br><input type=radio name=graphDirection value=bidirectional" <<
+        (graphDirection=="bidirectional" ? " checked=checked" : "") << "> Both" <<
 
         "</table>"
         "<br><input type=submit value='Do it'>"
@@ -199,6 +213,13 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
 
         // Loop over both directions.
         for(uint64_t direction=0; direction<2; direction++) {
+            if(direction == 0 and graphDirection == "backward") {
+                continue;
+            }
+            if(direction == 1 and graphDirection == "forward") {
+                continue;
+            }
+
             pathFinder.findNextPrimaryEdges(
                 edgeId0,
                 direction,
