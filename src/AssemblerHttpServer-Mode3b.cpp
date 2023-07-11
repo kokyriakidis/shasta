@@ -330,6 +330,7 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
 
     // Write edges first, to avoid obscuring the vertices.
     const double edgeThickness = initialEdgeThicknessPixels * max(xMax-xMin, yMax-yMin) / double(sizePixels);
+    html << "<g id=edges stroke-width=" << edgeThickness << ">";
     BGL_FORALL_EDGES(e, pathGraph, PathGraph) {
         const PathGraphEdge& edge = pathGraph[e];
 
@@ -359,15 +360,15 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
             "<line x1=" << x1 << " y1=" << y1 <<
             " x2=" << xm << " y2=" << ym <<
             " stroke=Black"
-            " stroke-width=" << edgeThickness <<
+            // " stroke-width=" << edgeThickness <<
             " />"
             "<line x1=" << xm << " y1=" << ym <<
             " x2=" << x2 << " y2=" << y2 <<
             " stroke=Green"
-            " stroke-width=" << edgeThickness <<
+            // " stroke-width=" << edgeThickness <<
             " /></g>";
     }
-
+    html << "</g>";
 
     // Write the vertices in order of decreasing distance
     // to avoid obscuring the ones at low distance.
@@ -380,6 +381,7 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
 
 
     // Write the vertices (each corresponding to a marker graph edge).
+    html << "<g id=vertices>";
     const double vertexRadius = initialVertexRadiusPixels * max(xMax-xMin, yMax-yMin) / double(sizePixels);
     for(const auto& q: sortedVertices) {
         const vertex_descriptor v = q.first;
@@ -405,10 +407,60 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
             "</g>";
 
     }
+    // Finish the vertices group.
+    html << "</g>";
 
 
     // Finish the svg.
     html << "\n</svg></div>";
+
+    // Side panel.
+    html << "<div style='display: inline-block'>";
+
+    // Change vertex radius
+    html << R"stringDelimiter(
+    <p><table>
+    <tr><th class=left>Vertex radius<td>
+    <button type='button' onClick='changeVertexRadius(0.1)' style='width:3em'>---</button>
+    <button type='button' onClick='changeVertexRadius(0.5)' style='width:3em'>--</button>
+    <button type='button' onClick='changeVertexRadius(0.8)' style='width:3em'>-</button>
+    <button type='button' onClick='changeVertexRadius(1.25)' style='width:3em'>+</button>
+    <button type='button' onClick='changeVertexRadius(2.)' style='width:3em'>++</button>
+    <button type='button' onClick='changeVertexRadius(10.)' style='width:3em'>+++</button>
+    <tr><th class=left>EdgeThickness<td>
+    <button type='button' onClick='changeEdgeThickness(0.1)' style='width:3em'>---</button>
+    <button type='button' onClick='changeEdgeThickness(0.5)' style='width:3em'>--</button>
+    <button type='button' onClick='changeEdgeThickness(0.8)' style='width:3em'>-</button>
+    <button type='button' onClick='changeEdgeThickness(1.25)' style='width:3em'>+</button>
+    <button type='button' onClick='changeEdgeThickness(2.)' style='width:3em'>++</button>
+    <button type='button' onClick='changeEdgeThickness(10.)' style='width:3em'>+++</button>
+    </table>
+    <script>
+    function changeVertexRadius(factor)
+    {
+        var vertexGroup = document.getElementById('vertices');
+        var vertexCircles = vertexGroup.getElementsByTagName('circle');
+        for(i=0; i<vertexCircles.length; i++) {
+            var vertexCircle = vertexCircles[i];
+            var oldRadius = vertexCircle.getAttribute('r');
+            vertexCircle.setAttribute('r', oldRadius * factor);
+        }
+    }
+    function changeEdgeThickness(factor)
+    {
+        // window.alert(0);
+        var edgeGroup = document.getElementById('edges');
+        // window.alert(1);
+        var oldThickness = edgeGroup.getAttribute('stroke-width');
+        // window.alert(2);
+        edgeGroup.setAttribute('stroke-width', oldThickness * factor);
+        // window.alert(3);
+    }
+    </script>
+    )stringDelimiter";
+
+    // End of side panel.
+    html << "</div>";
 
     // Add drag and zoom.
     addSvgDragAndZoom(html);
