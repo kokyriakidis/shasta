@@ -66,8 +66,10 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
     string graphDirection = "bidirectional";
     HttpServer::getParameterValue(request, "graphDirection", graphDirection);
 
+    uint64_t sizePixels = 600;
+    getParameterValue(request, "sizePixels", sizePixels);
+
     // Other quantities to add to the request.
-    const double sizePixels = 900.;
     const double initialVertexRadiusPixels = 2.;
     const double initialEdgeThicknessPixels = 0.5;
     const double timeout = 600.;
@@ -137,6 +139,12 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
         (graphDirection=="backward" ? " checked=checked" : "") << "> Backward"
         "<br><input type=radio name=graphDirection value=bidirectional" <<
         (graphDirection=="bidirectional" ? " checked=checked" : "") << "> Both" <<
+
+        "<tr>"
+        "<td>sizePixels"
+        "<td class=centered>"
+        "<input type=text required name=sizePixels size=8 style='text-align:center'" <<
+        "value='" << sizePixels << "'>"
 
         "</table>"
         "<br><input type=submit value='Do it'>"
@@ -321,7 +329,7 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
 
 
     // Write edges first, to avoid obscuring the vertices.
-    const double edgeThickness = initialEdgeThicknessPixels * max(xMax-xMin, yMax-yMin) / sizePixels;
+    const double edgeThickness = initialEdgeThicknessPixels * max(xMax-xMin, yMax-yMin) / double(sizePixels);
     BGL_FORALL_EDGES(e, pathGraph, PathGraph) {
         const PathGraphEdge& edge = pathGraph[e];
 
@@ -372,7 +380,7 @@ void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& h
 
 
     // Write the vertices (each corresponding to a marker graph edge).
-    const double vertexRadius = initialVertexRadiusPixels * max(xMax-xMin, yMax-yMin) / sizePixels;
+    const double vertexRadius = initialVertexRadiusPixels * max(xMax-xMin, yMax-yMin) / double(sizePixels);
     for(const auto& q: sortedVertices) {
         const vertex_descriptor v = q.first;
         const PathGraphVertex& vertex = pathGraph[v];
