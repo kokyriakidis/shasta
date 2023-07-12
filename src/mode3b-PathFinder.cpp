@@ -286,7 +286,10 @@ pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> PathFinder::findNextPrimaryEdge
             MarkerGraphEdgePairInfo info;
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
             const double correctedJaccard = info.correctedJaccard();
-            if(info.common >= minCommonCount and correctedJaccard >= minCorrectedJaccard) {
+            const bool hasConsistentOffset =
+                (direction==0 and info.offsetInBases >= 0) or
+                (direction==1 and info.offsetInBases <= 0);
+            if(hasConsistentOffset and info.common >= minCommonCount and correctedJaccard >= minCorrectedJaccard) {
                 cout << edgeId0 << " " << edgeId1 << ": base offset " <<
                     info.offsetInBases << ", common " << info.common <<
                     ", corrected jaccard " <<
@@ -379,7 +382,10 @@ pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> PathFinder::findNextPrimaryEdge
             MarkerGraphEdgePairInfo info;
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
             const double correctedJaccard = info.correctedJaccard();
-            if(info.common >= minCommonCount and correctedJaccard >= minCorrectedJaccard) {
+            const bool hasConsistentOffset =
+                (direction==0 and info.offsetInBases >= 0) or
+                (direction==1 and info.offsetInBases <= 0);
+            if(hasConsistentOffset and info.common >= minCommonCount and correctedJaccard >= minCorrectedJaccard) {
                 cout << edgeId0 << " " << edgeId1 << ": base offset " <<
                     info.offsetInBases << ", common " << info.common <<
                     ", corrected jaccard " <<
@@ -474,8 +480,15 @@ void PathFinder::findNextPrimaryEdges(
             MarkerGraphEdgePairInfo info;
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
             const double correctedJaccard = info.correctedJaccard();
-            if(info.common >= minCommonCount and correctedJaccard >= minCorrectedJaccard) {
-                // Store it.
+
+            // If it satisfies our criteria, store it.
+            const bool hasConsistentOffset =
+                (direction==0 and info.offsetInBases >= 0) or
+                (direction==1 and info.offsetInBases <= 0);
+            if(
+                hasConsistentOffset and
+                info.common >= minCommonCount and
+                correctedJaccard >= minCorrectedJaccard) {
                 nextPrimaryEdges.push_back({edgeId1, info});
                 if(nextPrimaryEdges.size() >= maxEdgeCount) {
                     return;
