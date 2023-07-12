@@ -486,6 +486,8 @@ void Assembler::writeHtmlMarkerGraphEdgePairInfo(
         "<th class=centered colspan=2>Length"
         "<th colspan=4>Edge A"
         "<th colspan=4>Edge B"
+        "<th rowspan=2>Ordinal offset"
+        "<th rowspan=2>Base offset"
         "<th rowspan=2>Classification"
         "<tr>"
         "<th>Markers"
@@ -544,7 +546,7 @@ void Assembler::writeHtmlMarkerGraphEdgePairInfo(
                 "<td class=centered>" << positionA1 <<
                 "<td><td>"
                 "<td class=centered style='color:Red'>" << positionB0 <<
-                "<td class=centered style='color:Red'>" << positionB1 <<
+                "<td class=centered style='color:Red'>" << positionB1 << "<td><td>"
                 "<td class=centered>OnlyA, " << (isShort ? "short" : "missing");
 
             ++itA;
@@ -580,7 +582,7 @@ void Assembler::writeHtmlMarkerGraphEdgePairInfo(
                 "<td class=centered>" << ordinalB0 <<
                 "<td class=centered>" << ordinalB1 <<
                 "<td class=centered>" << positionB0 <<
-                "<td class=centered>" << positionB1 <<
+                "<td class=centered>" << positionB1 << "<td><td>"
                 "<td class=centered>OnlyB, " << (isShort ? "short" : "missing");
 
             ++itB;
@@ -605,6 +607,10 @@ void Assembler::writeHtmlMarkerGraphEdgePairInfo(
             const int64_t positionB0 = int64_t(orientedReadMarkers[ordinalB0].position);
             const int64_t positionB1 = int64_t(orientedReadMarkers[ordinalB1].position);
 
+            // Compute estimated offsets.
+            const int64_t ordinalOffset = uint64_t(ordinalB1) - uint64_t(ordinalA0);
+            const int64_t baseOffset = positionB1 - positionA0;
+
             html <<
                 "<tr><td class=centered>"
                 "<a href='exploreRead?readId=" << orientedReadId.getReadId() <<
@@ -619,6 +625,8 @@ void Assembler::writeHtmlMarkerGraphEdgePairInfo(
                 "<td class=centered>" << ordinalB1 <<
                 "<td class=centered>" << positionB0 <<
                 "<td class=centered>" << positionB1 <<
+                "<td class=centered>" << ordinalOffset <<
+                "<td class=centered>" << baseOffset <<
                 "<td class=centered>Common";
 
             ++itA;
