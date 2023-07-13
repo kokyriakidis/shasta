@@ -1,7 +1,9 @@
 #ifndef SHASTA_MODE3B_PATH_FINDER_HPP
 #define SHASTA_MODE3B_PATH_FINDER_HPP
 
+#include "MappedMemoryOwner.hpp"
 #include "MarkerGraphEdgePairInfo.hpp"
+#include "MemoryMappedVectorOfVectors.hpp"
 #include "MultithreadedObject.hpp"
 #include "shastaTypes.hpp"
 
@@ -20,7 +22,9 @@ namespace shasta {
 
 
 // Find and assemble a path in the complete marker graph.
-class shasta::mode3b::PathFinder : public MultithreadedObject<PathFinder> {
+class shasta::mode3b::PathFinder :
+    public MappedMemoryOwner,
+    public MultithreadedObject<PathFinder> {
 public:
 
     PathFinder(
@@ -70,6 +74,17 @@ public:
         double minCorrectedJaccard,
         vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >&
         ) const;
+    void findNextPrimaryEdgesFast(
+        MarkerGraphEdgeId,
+        uint64_t direction,
+        uint64_t minCoverage,
+        uint64_t maxCoverage,
+        uint64_t maxEdgeCount,
+        uint64_t maxMarkerOffset,
+        uint64_t minCommonCount,
+        double minCorrectedJaccard,
+        vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >&
+        ) const;
 private:
 
 
@@ -103,6 +118,32 @@ private:
     ThreadFunction1Data threadFunction1Data;
     // All the EdgePairs found by all threads.
     vector<EdgePair> edgePairs;
+
+
+
+    // A table that gives the MarkerGraphEdgeId of the edge
+    // whose source vertex contains the marker at a specified
+    // oriented read and ordinal:
+    // const MarkerGraphEdgeId edgeId = markerGraphEdgeTable[orientedReadId.getValue()][ordinal0];
+    // If such a marker graph edge does not exist or is outside the coverage range
+    // specified when calling createMarkerGraphEdgeTable,
+    // the table stores invalid<MarkerGraphEdgeId>.
+    // The table also stores invalid<MarkerGraphEdgeId>
+    // If the edge or one of its vertices has duplicate oriented read ids.
+    // This is used to speed up findNextPrimaryEdges.
+    MemoryMapped::VectorOfVectors<MarkerGraphEdgeId, uint64_t> markerGraphEdgeTable;
+    void createMarkerGraphEdgeTable(
+        uint64_t threadCount,
+        uint64_t minCoverage,
+        uint64_t maxCoverage
+        );
+    void createMarkerGraphEdgeTableThreadFunction(uint64_t threadId);
+    class CreateMarkerGraphEdgeTableData {
+public:
+        uint64_t minCoverage;
+        uint64_t maxCoverage;
+    };
+    CreateMarkerGraphEdgeTableData createMarkerGraphEdgeTableData;
 
 };
 

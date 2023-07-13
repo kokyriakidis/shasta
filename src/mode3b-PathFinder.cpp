@@ -66,6 +66,7 @@ PathFinder::PathFinder(
     uint64_t direction,            // 0=forward, 1=backward
     vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >& primaryEdges
     ) :
+    MappedMemoryOwner(assembler),
     MultithreadedObject<PathFinder>(*this),
     assembler(assembler)
 {
@@ -503,10 +504,106 @@ void PathFinder::findNextPrimaryEdges(
 
 
 
+// This returns a few possible choices for the next primary edge.
+// It starts on edgeId0 and moves in the specified direction
+// (0 = forward, 1 = backward).
+// Fast version that used the edge table.
+void PathFinder::findNextPrimaryEdgesFast(
+    MarkerGraphEdgeId edgeId0,
+    uint64_t direction,
+    uint64_t minCoverage,
+    uint64_t maxCoverage,
+    uint64_t maxEdgeCount,
+    uint64_t maxMarkerOffset,
+    uint64_t minCommonCount,
+    double minCorrectedJaccard,
+    vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> >& nextPrimaryEdges
+    ) const
+{
+    const bool debug = false;
+    if(debug) {
+        cout << "Looking for next primary edge after " << edgeId0 <<
+            ", coverage " << assembler.markerGraph.edgeCoverage(edgeId0) <<
+            ", direction " << direction << endl;
+    }
+
+    nextPrimaryEdges.clear();
+
+    if(assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeId0)) {
+        return;
+    }
+
+    const auto markerIntervals0 = assembler.markerGraph.edgeMarkerIntervals[edgeId0];
+
+    // The edges we already checked.
+    std::set<MarkerGraphEdgeId> edgeIds;
+
+    // Try increasing marker offsets in the given direction.
+    for(uint32_t ordinalOffset=1; ordinalOffset<=maxMarkerOffset ; ++ordinalOffset) {
+
+        // Try this offset on all of our marker intervals.
+        for(const MarkerInterval& markerInterval0: markerIntervals0) {
+            const OrientedReadId orientedReadId = markerInterval0.orientedReadId;
+
+            // Compute the offset ordinal.
+            // If we end up outside the read, do nothing.
+            uint32_t ordinal0WithOffset;
+            if(direction == 0) {
+                ordinal0WithOffset = markerInterval0.ordinals[0] + ordinalOffset;
+                if(ordinal0WithOffset >= assembler.markers.size(orientedReadId.getValue())) {
+                    continue;
+                }
+            } else {
+                if(ordinalOffset > markerInterval0.ordinals[0]) {
+                    continue;
+                }
+                ordinal0WithOffset = markerInterval0.ordinals[0] - ordinalOffset;
+            }
+
+            // Find the edgeId that begins at this ordinal.
+            const MarkerGraphEdgeId edgeId1 = markerGraphEdgeTable[orientedReadId.getValue()][ordinal0WithOffset];
+            if(edgeId1 == invalid<MarkerGraphEdgeId>) {
+                continue;
+            }
+
+            // If we already checked it, skip it.
+            if(edgeIds.contains(edgeId1)) {
+                continue;
+            }
+
+            edgeIds.insert(edgeId1);
+
+            // Analyze its read composition.
+            MarkerGraphEdgePairInfo info;
+            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+            const double correctedJaccard = info.correctedJaccard();
+
+            // If it satisfies our criteria, store it.
+            const bool hasConsistentOffset =
+                (direction==0 and info.offsetInBases >= 0) or
+                (direction==1 and info.offsetInBases <= 0);
+            if(
+                hasConsistentOffset and
+                info.common >= minCommonCount and
+                correctedJaccard >= minCorrectedJaccard) {
+                nextPrimaryEdges.push_back({edgeId1, info});
+                if(nextPrimaryEdges.size() >= maxEdgeCount) {
+                    return;
+                }
+            }
+        }
+
+    }
+
+
+}
+
+
 // This version finds edge pairs and use them to create a graph.
 PathFinder::PathFinder(
     const Assembler& assembler,
     uint64_t threadCount) :
+    MappedMemoryOwner(assembler),
     MultithreadedObject<PathFinder>(*this),
     assembler(assembler)
 {
@@ -533,7 +630,10 @@ PathFinder::PathFinder(
     // Find the EdgePairs.
     const uint64_t batchSize = 100;
     setupLoadBalancing(assembler.markerGraph.edges.size(), batchSize);
+    createMarkerGraphEdgeTable(threadCount, minCoverage, maxCoverage);
+    setupLoadBalancing(assembler.markerGraph.edges.size(), batchSize);
     runThreads(&PathFinder::threadFunction1, threadCount);
+    markerGraphEdgeTable.remove();
 
     // Merge the EdgePairs found by all threads.
     edgePairs.clear();
@@ -586,7 +686,7 @@ void PathFinder::threadFunction1(uint64_t threadId)
 
         // Loop over all marker graph edges assigned to this batch.
         for(MarkerGraphEdgeId edgeId0=begin; edgeId0<end; edgeId0++) {
-            if((edgeId0 % 100000) == 0) {
+            if((edgeId0 % 1000000) == 0) {
                 std::lock_guard<std::mutex> lock(mutex);
                 cout << timestamp << edgeId0 << "/" << assembler.markerGraph.edges.size() << endl;
             }
@@ -608,7 +708,7 @@ void PathFinder::threadFunction1(uint64_t threadId)
 
             // Find nearby edges with similar read composition, in both directions.
             for(uint64_t direction=0; direction<2; direction++) {
-                findNextPrimaryEdges(
+                findNextPrimaryEdgesFast(
                     edgeId0,
                     direction,
                     minCoverage,
@@ -636,7 +736,66 @@ void PathFinder::threadFunction1(uint64_t threadId)
 
 PathFinder::PathFinder(
     const Assembler& assembler) :
+    MappedMemoryOwner(assembler),
     MultithreadedObject<PathFinder>(*this),
     assembler(assembler)
 {
 }
+
+
+
+void PathFinder::createMarkerGraphEdgeTable(
+    uint64_t threadCount,
+    uint64_t minCoverage,
+    uint64_t maxCoverage
+    )
+{
+    cout << timestamp << "createMarkerGraphEdgeTable begins." << endl;
+    createNew(markerGraphEdgeTable, "MarkerGraphEdgeTable");
+    for(uint64_t i=0; i<assembler.markers.size(); i++) {
+        markerGraphEdgeTable.appendVector(assembler.markers.size(i));
+    }
+    fill(markerGraphEdgeTable.begin(), markerGraphEdgeTable.end(), invalid<MarkerGraphEdgeId>);
+
+    createMarkerGraphEdgeTableData.minCoverage = minCoverage;
+    createMarkerGraphEdgeTableData.maxCoverage = maxCoverage;
+    setupLoadBalancing(assembler.markerGraph.edges.size(), 1000);
+    runThreads(&PathFinder::createMarkerGraphEdgeTableThreadFunction, threadCount);
+    cout << timestamp << "createMarkerGraphEdgeTable ends." << endl;
+}
+
+
+void PathFinder::createMarkerGraphEdgeTableThreadFunction(uint64_t threadId)
+{
+    const uint64_t minCoverage = createMarkerGraphEdgeTableData.minCoverage;
+    const uint64_t maxCoverage = createMarkerGraphEdgeTableData.maxCoverage;
+
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+        for(MarkerGraphEdgeId edgeId=begin; edgeId!=end; ++edgeId) {
+
+            // Check coverage.
+            const uint64_t coverage = assembler.markerGraph.edgeCoverage(edgeId);
+            if(coverage<minCoverage or coverage>maxCoverage) {
+                continue;
+            }
+
+            // Check for duplicate oriented reads.
+            const MarkerGraph::Edge& edge = assembler.markerGraph.edges[edgeId];
+            if(
+                assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeId) or
+                assembler.markerGraph.vertexHasDuplicateOrientedReadIds(edge.source, assembler.markers) or
+                assembler.markerGraph.vertexHasDuplicateOrientedReadIds(edge.target, assembler.markers)) {
+                continue;
+            }
+
+            const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
+            for(const MarkerInterval& markerInterval: markerIntervals) {
+                const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+                const uint32_t ordinal0 = markerInterval.ordinals[0];
+                markerGraphEdgeTable[orientedReadId.getValue()][ordinal0] = edgeId;
+            }
+        }
+    }
+}
+
