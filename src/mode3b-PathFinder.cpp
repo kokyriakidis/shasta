@@ -10,6 +10,9 @@
 using namespace shasta;
 using namespace mode3b;
 
+// Boost libraries.
+#include <boost/pending/disjoint_sets.hpp>
+
 // Standard library.
 #include <cstdlib>
 #include "fstream.hpp"
@@ -615,6 +618,49 @@ PathFinder::PathFinder(
     const double minCorrectedJaccard = 0.8;
     const uint64_t maxEdgeCount = 2;
 
+    // Find edge pairs with similar read compositions.
+    findEdgePairs(
+        threadCount,
+        maxMarkerOffset,
+        minCoverage,
+        maxCoverage,
+        minCommonCount,
+        minCorrectedJaccard,
+        maxEdgeCount);
+    writeEdgePairsGraphviz();
+
+    // Find connected components of marker graph edges.
+    findComponents();
+}
+
+
+
+// Write out the edge pairs in Graphviz format.
+// The len attribute is only honored by neato and fdp.
+void PathFinder::writeEdgePairsGraphviz() const
+{
+
+    ofstream out("PathGraph.dot");
+    out << "digraph PathGraph {\n";
+    for(const EdgePair& edgePair: edgePairs) {
+        out << edgePair.edgeId0 << "->" << edgePair.edgeId1 <<
+            " [len=" << max(1UL, uint64_t(0.001 * double(edgePair.offsetInBases))) << "]"
+            ";\n";
+    }
+    out << "}\n";
+}
+
+
+
+void PathFinder::findEdgePairs(
+    uint64_t threadCount,
+    uint64_t maxMarkerOffset,
+    uint64_t minCoverage,
+    uint64_t maxCoverage,
+    uint64_t minCommonCount,
+    double minCorrectedJaccard,
+    uint64_t maxEdgeCount)
+{
     // Store the parameters so the threads can see them.
     threadFunction1Data.maxMarkerOffset = maxMarkerOffset;
     threadFunction1Data.minCoverage = minCoverage;
@@ -647,19 +693,6 @@ PathFinder::PathFinder(
     deduplicate(edgePairs);
     cout << "Number of primary edge pairs after deduplication is " << edgePairs.size() << endl;
 
-
-    // Write out the pairs in Graphviz format.
-    // The len attribute is only honored by neato and fdp.
-    {
-        ofstream out("PathGraph.dot");
-        out << "digraph PathGraph {\n";
-        for(const EdgePair& edgePair: edgePairs) {
-            out << edgePair.edgeId0 << "->" << edgePair.edgeId1 <<
-                " [len=" << max(1UL, uint64_t(0.001 * double(edgePair.offsetInBases))) << "]"
-                ";\n";
-        }
-        out << "}\n";
-    }
 }
 
 
@@ -750,7 +783,6 @@ void PathFinder::createMarkerGraphEdgeTable(
     uint64_t maxCoverage
     )
 {
-    cout << timestamp << "createMarkerGraphEdgeTable begins." << endl;
     createNew(markerGraphEdgeTable, "MarkerGraphEdgeTable");
     for(uint64_t i=0; i<assembler.markers.size(); i++) {
         markerGraphEdgeTable.appendVector(assembler.markers.size(i));
@@ -761,7 +793,6 @@ void PathFinder::createMarkerGraphEdgeTable(
     createMarkerGraphEdgeTableData.maxCoverage = maxCoverage;
     setupLoadBalancing(assembler.markerGraph.edges.size(), 1000);
     runThreads(&PathFinder::createMarkerGraphEdgeTableThreadFunction, threadCount);
-    cout << timestamp << "createMarkerGraphEdgeTable ends." << endl;
 }
 
 
@@ -799,3 +830,92 @@ void PathFinder::createMarkerGraphEdgeTableThreadFunction(uint64_t threadId)
     }
 }
 
+
+
+void PathFinder::findComponents()
+{
+
+    // Gather all the MarkerGraphEdgeIds that appear in edge pairs.
+    vector<MarkerGraphEdgeId> primaryEdges;
+    for(const EdgePair& edgePair: edgePairs) {
+        primaryEdges.push_back(edgePair.edgeId0);
+        primaryEdges.push_back(edgePair.edgeId1);
+    }
+    deduplicate(primaryEdges);
+    cout << "Found " << primaryEdges.size() <<
+        " primary edges that appear in at least one edge pair." << endl;
+
+    // Compute connected components.
+    const uint64_t n = primaryEdges.size();
+    vector<uint64_t> rank(n);
+    vector<uint64_t> parent(n);
+    boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
+    for(uint64_t i=0; i<n; i++) {
+        disjointSets.make_set(i);
+    }
+    for(const EdgePair& edgePair: edgePairs) {
+        const auto it0 = lower_bound(primaryEdges.begin(), primaryEdges.end(), edgePair.edgeId0);
+        const auto it1 = lower_bound(primaryEdges.begin(), primaryEdges.end(), edgePair.edgeId1);
+        SHASTA_ASSERT(it0 != primaryEdges.end());
+        SHASTA_ASSERT(it1 != primaryEdges.end());
+        const uint64_t i0 = it0 - primaryEdges.begin();
+        const uint64_t i1 = it1 - primaryEdges.begin();
+        disjointSets.union_set(i0, i1);
+    }
+
+    // Generate vertices of each connected component.
+    components.clear();
+    components.resize(n);
+    for(uint64_t i=0; i<n; i++) {
+        const uint64_t componentId = disjointSets.find_set(i);
+        components[componentId].addVertex(primaryEdges[i]);
+    }
+
+    // Compute a histogram of component sizes.
+    vector<uint64_t> histogram;
+    for(const Graph& component: components) {
+        const uint64_t componentSize = num_vertices(component);
+        if(componentSize >= histogram.size()) {
+            histogram.resize(componentSize + 1, 0);
+        }
+        ++histogram[componentSize];
+    }
+    {
+        ofstream csv("ComponentSizeHistogram.csv");
+        csv << "Size,Frequency,TotalSize\n";
+        for(uint64_t componentSize=1; componentSize<histogram.size(); componentSize++) {
+            const uint64_t frequency = histogram[componentSize];
+            if(frequency) {
+                csv << componentSize << ",";
+                csv << frequency << ",";
+                csv << frequency * componentSize << "\n";
+            }
+        }
+    }
+
+    // Generate edges.
+    for(const EdgePair& edgePair: edgePairs) {
+        const auto it0 = lower_bound(primaryEdges.begin(), primaryEdges.end(), edgePair.edgeId0);
+        const auto it1 = lower_bound(primaryEdges.begin(), primaryEdges.end(), edgePair.edgeId1);
+        SHASTA_ASSERT(it0 != primaryEdges.end());
+        SHASTA_ASSERT(it1 != primaryEdges.end());
+        const uint64_t i0 = it0 - primaryEdges.begin();
+        const uint64_t i1 = it1 - primaryEdges.begin();
+        const uint64_t componentId = disjointSets.find_set(i0);
+        SHASTA_ASSERT(componentId == disjointSets.find_set(i1));
+        components[componentId].addEdge(edgePair.edgeId0, edgePair.edgeId1);
+    }
+
+
+    // Create the componentIndex.
+    componentIndex.clear();
+    for(uint64_t componentId=0; componentId<n; componentId++) {
+        const auto& component = components[componentId];
+        const uint64_t componentSize = num_vertices(component);
+        if(componentSize > 0) {
+            componentIndex.push_back({componentId, componentSize});
+        }
+    }
+    sort(componentIndex.begin(), componentIndex.end(),
+        OrderPairsBySecondOnlyGreater<uint64_t, uint64_t>());
+}

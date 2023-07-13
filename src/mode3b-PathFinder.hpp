@@ -7,6 +7,8 @@
 #include "MultithreadedObject.hpp"
 #include "shastaTypes.hpp"
 
+#include <boost/graph/adjacency_list.hpp>
+
 #include <set>
 #include "tuple.hpp"
 #include "utility.hpp"
@@ -118,6 +120,58 @@ private:
     ThreadFunction1Data threadFunction1Data;
     // All the EdgePairs found by all threads.
     vector<EdgePair> edgePairs;
+    void findEdgePairs(
+        uint64_t threadCount,
+        uint64_t maxMarkerOffset,
+        uint64_t minCoverage,
+        uint64_t maxCoverage,
+        uint64_t minCommonCount,
+        double minCorrectedJaccard,
+        uint64_t maxEdgeCount);
+    void writeEdgePairsGraphviz() const;
+
+
+
+    // Connected components defined by the edge pairs.
+    class Vertex {
+    public:
+        MarkerGraphEdgeId edgeId;
+    };
+    class Edge {
+    public:
+        uint64_t offsetInBases;
+    };
+    class Graph : public boost::adjacency_list<
+        boost::listS,
+        boost::listS,
+        boost::bidirectionalS,
+        Vertex,
+        Edge> {
+    public:
+        std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
+        void addVertex(MarkerGraphEdgeId edgeId)
+        {
+            SHASTA_ASSERT(not vertexMap.contains(edgeId));
+            vertexMap.insert({edgeId, add_vertex(Vertex({edgeId}), *this)});
+        }
+        void addEdge(
+            MarkerGraphEdgeId edgeId0,
+            MarkerGraphEdgeId edgeId1)
+        {
+            auto it0 = vertexMap.find(edgeId0);
+            auto it1 = vertexMap.find(edgeId1);
+            SHASTA_ASSERT(it0 != vertexMap.end());
+            SHASTA_ASSERT(it1 != vertexMap.end());
+            add_edge(it0->second, it1->second, *this);
+        }
+    };
+    vector<Graph> components;
+    void findComponents();
+
+    // An index of the non-empty components, sorted by decreasing size.
+    // Each entry contains (componentId, size),
+    // where componentId is the index into the components vector.
+    vector< pair<uint64_t, uint64_t> > componentIndex;
 
 
 
