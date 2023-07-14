@@ -5,6 +5,7 @@
 #include "invalid.hpp"
 #include "Marker.hpp"
 #include "MarkerGraph.hpp"
+#include "mode3b-AssemblyPath.hpp"
 #include "orderPairs.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
@@ -632,17 +633,39 @@ PathFinder::PathFinder(
     // Find connected components of marker graph edges.
     findComponents();
 
-    // Compute the longest path of the largest component.
-    SHASTA_ASSERT(not componentIndex.empty());
-    const Graph& largestComponent = components[componentIndex.front().first];
-    vector<MarkerGraphEdgeId> longestPath;
-    largestComponent.getLongestPath(longestPath);
-    cout << "The largest component has " << num_vertices(largestComponent) <<
-        " vertices (primary marker graph edges)." << endl;
-    cout << "Its longest path has " << longestPath.size() <<
-        " vertices (primary marker graph edges)." << endl;
-    cout << "Linearity ratio is " <<
-        double(longestPath.size()) / double(num_vertices(largestComponent)) << endl;
+
+    // Create an AssemblyPath for the largest few components.
+    const uint64_t componentCount = 10;
+    for(uint64_t componentRank=0;
+        componentRank < min(componentCount, componentIndex.size());
+        componentRank++) {
+
+        // Access this component.
+        const uint64_t componentId = componentIndex[componentRank].first;
+        const Graph& component = components[componentId];
+
+        // Compute a longest path.
+        vector<MarkerGraphEdgeId> primaryEdges;
+        vector<MarkerGraphEdgePairInfo> infos;
+        component.getLongestPath(primaryEdges, infos);
+
+        // Create an assembly path.
+        AssemblyPath assemblyPath(assembler, primaryEdges, infos);
+        vector<Base> sequence;
+        assemblyPath.getSequence(sequence);
+
+        ofstream fasta("AssemblyPath-" + to_string(componentRank) + ".fasta");
+        assemblyPath.writeFasta(fasta);
+        ofstream csv("AssemblyPath.csv");
+        assemblyPath.writeCsv(csv);
+        cout << "Component " << componentRank << " has " << num_vertices(component) <<
+            " vertices (primary marker graph edges)." << endl;
+        cout << "\tIts longest path has " << primaryEdges.size() <<
+            " vertices (primary marker graph edges)." << endl;
+        cout << "\tLinearity ratio is " <<
+            double(primaryEdges.size()) / double(num_vertices(component)) << endl;
+        cout << "\tAssembled sequence length " << sequence.size() << endl;
+    }
 
 }
 

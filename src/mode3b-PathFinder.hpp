@@ -166,14 +166,33 @@ private:
             SHASTA_ASSERT(it1 != vertexMap.end());
             add_edge(it0->second, it1->second, Edge({info}), *this);
         }
-        void getLongestPath(vector<MarkerGraphEdgeId>& path) const
+        void getLongestPath(
+            vector<MarkerGraphEdgeId>& primaryEdges,
+            vector<MarkerGraphEdgePairInfo>& infos) const
         {
             const Graph& graph = *this;
+            SHASTA_ASSERT(num_vertices(graph));
+
+            // Compute the longest path.
             vector<vertex_descriptor> pathVertices;
             longestPath(graph, pathVertices);
-            path.clear();
+
+            // Fill in the primary edges.
+            primaryEdges.clear();
             for(const vertex_descriptor v: pathVertices) {
-                path.push_back(graph[v].edgeId);
+                primaryEdges.push_back(graph[v].edgeId);
+            }
+
+            // Fill in the infos.
+            infos.clear();
+            for(uint64_t i=1; i<pathVertices.size(); i++) {
+                const vertex_descriptor v0 = pathVertices[i-1];
+                const vertex_descriptor v1 = pathVertices[i];
+                edge_descriptor e;
+                bool edgeExists = false;
+                tie(e, edgeExists) = edge(v0, v1, graph);
+                SHASTA_ASSERT(edgeExists);
+                infos.push_back(graph[e].info);
             }
         }
     };

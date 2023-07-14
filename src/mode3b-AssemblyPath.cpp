@@ -11,6 +11,7 @@ using namespace mode3b;
 
 
 
+// Create the assembly path starting from a given primary edge.
 AssemblyPath::AssemblyPath(
     const Assembler& assembler,
     MarkerGraphEdgeId startEdgeId,
@@ -103,19 +104,41 @@ void AssemblyPath::create(
 
 
 
+// Create the assembly path given n primary edges and
+// the n-1 MarkerGraphEdgePairInfo between consecutive primary edges.
+AssemblyPath::AssemblyPath(
+    const Assembler& assembler,
+    const vector<MarkerGraphEdgeId>& primaryEdges,
+    const vector<MarkerGraphEdgePairInfo> infos) :
+    assembler(assembler),
+    primaryEdges(primaryEdges)
+{
+    // Sanity check.
+    SHASTA_ASSERT(not infos.empty());
+    SHASTA_ASSERT(infos.size() == primaryEdges.size() - 1);
+
+    // Fill in the steps. The primaryEdges were already filled in above.
+    for(const MarkerGraphEdgePairInfo& info: infos) {
+        steps.push_back(Step(info));
+    }
+
+    assemble();
+}
+
+
+
 // Assemble the sequence of each Step.
 void AssemblyPath::assemble()
 {
     for(uint64_t i=0; i<steps.size(); i++) {
         const MarkerGraphEdgeId edgeIdA = primaryEdges[i];
         const MarkerGraphEdgeId edgeIdB = primaryEdges[i+1];
-        cout << "Assembling between primary edges " <<
-            edgeIdA << " " << edgeIdB << endl;
+        // cout << "Assembling between primary edges " << edgeIdA << " " << edgeIdB << endl;
         Step& step = steps[i];
         ostream html(0);
         PathFiller1 pathFiller(assembler, edgeIdA, edgeIdB, html, false, false, false, false, false);
         pathFiller.getSecondarySequence(step.sequence);
-        cout << "Coverage " << pathFiller.coverage() << " , assembled length " << step.sequence.size() << endl;
+        // cout << "Coverage " << pathFiller.coverage() << " , assembled length " << step.sequence.size() << endl;
     }
 }
 

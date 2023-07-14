@@ -12,5 +12,6 @@ a = shasta.Assembler()
 a.accessMarkers()
 a.accessMarkerGraphVertices()
 a.accessMarkerGraphEdges()
+a.accessMarkerGraphConsensus()
 a.findCompleteMarkerGraphPaths()
  

@@ -32,11 +32,20 @@ namespace shasta {
 // can be used to assemble sequence.
 class shasta::mode3b::AssemblyPath {
 public:
+
+    // Create the assembly path starting from a given primary edge.
     AssemblyPath(
         const Assembler&,
         MarkerGraphEdgeId,
         uint64_t direction  // 0 = forward, 1 = backward, 2=bidirectional
         );
+
+    // Create the assembly path given n primary edges and
+    // the n-1 MarkerGraphEdgePairInfo between consecutive primary edges.
+    AssemblyPath(
+        const Assembler&,
+        const vector<MarkerGraphEdgeId>&,
+        const vector<MarkerGraphEdgePairInfo>);
 
     void getSequence(vector<Base>&) const;
     void writeFasta(ostream&) const;
