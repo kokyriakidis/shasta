@@ -1,6 +1,7 @@
 #ifndef SHASTA_MODE3B_PATH_FINDER_HPP
 #define SHASTA_MODE3B_PATH_FINDER_HPP
 
+#include "longestPath.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "MarkerGraphEdgePairInfo.hpp"
 #include "MemoryMappedVectorOfVectors.hpp"
@@ -143,7 +144,7 @@ private:
     };
     class Graph : public boost::adjacency_list<
         boost::listS,
-        boost::listS,
+        boost::vecS,
         boost::bidirectionalS,
         Vertex,
         Edge> {
@@ -163,6 +164,16 @@ private:
             SHASTA_ASSERT(it0 != vertexMap.end());
             SHASTA_ASSERT(it1 != vertexMap.end());
             add_edge(it0->second, it1->second, *this);
+        }
+        void getLongestPath(vector<MarkerGraphEdgeId>& path) const
+        {
+            const Graph& graph = *this;
+            vector<vertex_descriptor> pathVertices;
+            longestPath(graph, pathVertices);
+            path.clear();
+            for(const vertex_descriptor v: pathVertices) {
+                path.push_back(graph[v].edgeId);
+            }
         }
     };
     vector<Graph> components;

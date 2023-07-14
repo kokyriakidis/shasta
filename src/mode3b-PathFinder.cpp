@@ -631,6 +631,19 @@ PathFinder::PathFinder(
 
     // Find connected components of marker graph edges.
     findComponents();
+
+    // Compute the longest path of the largest component.
+    SHASTA_ASSERT(not componentIndex.empty());
+    const Graph& largestComponent = components[componentIndex.front().first];
+    vector<MarkerGraphEdgeId> longestPath;
+    largestComponent.getLongestPath(longestPath);
+    cout << "The largest component has " << num_vertices(largestComponent) <<
+        " vertices (primary marker graph edges)." << endl;
+    cout << "Its longest path has " << longestPath.size() <<
+        " vertices (primary marker graph edges)." << endl;
+    cout << "Linearity ratio is " <<
+        double(longestPath.size()) / double(num_vertices(largestComponent)) << endl;
+
 }
 
 
