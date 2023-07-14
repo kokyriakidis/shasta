@@ -657,7 +657,7 @@ void PathFinder::writeEdgePairsGraphviz() const
     out << "digraph PathGraph {\n";
     for(const EdgePair& edgePair: edgePairs) {
         out << edgePair.edgeId0 << "->" << edgePair.edgeId1 <<
-            " [len=" << max(1UL, uint64_t(0.001 * double(edgePair.offsetInBases))) << "]"
+            " [len=" << max(1UL, uint64_t(0.001 * double(edgePair.info.offsetInBases))) << "]"
             ";\n";
     }
     out << "}\n";
@@ -764,13 +764,14 @@ void PathFinder::threadFunction1(uint64_t threadId)
                     minCommonCount,
                     minCorrectedJaccard,
                     nextPrimaryEdges);
-                for(const auto& p: nextPrimaryEdges) {
+                for(auto& p: nextPrimaryEdges) {
                     const MarkerGraphEdgeId edgeId1 = p.first;
-                    const uint64_t offsetInBases = p.second.offsetInBases;
+                    MarkerGraphEdgePairInfo& info = p.second;
                     if(direction == 0) {
-                        thisThreadEdgePairs.push_back({edgeId0, edgeId1, offsetInBases});
+                        thisThreadEdgePairs.push_back({edgeId0, edgeId1, info});
                     } else {
-                        thisThreadEdgePairs.push_back({edgeId1, edgeId0, -offsetInBases});
+                        info.reverse();
+                        thisThreadEdgePairs.push_back({edgeId1, edgeId0, info});
                     }
                 }
             }

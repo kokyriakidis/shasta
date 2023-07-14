@@ -96,7 +96,7 @@ private:
     public:
         MarkerGraphEdgeId edgeId0;
         MarkerGraphEdgeId edgeId1;
-        uint64_t offsetInBases;
+        MarkerGraphEdgePairInfo info;
         bool operator==(const EdgePair& that) const
         {
             return tie(edgeId0, edgeId1) == tie(that.edgeId0, that.edgeId1);
