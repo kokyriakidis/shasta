@@ -917,7 +917,7 @@ void PathFinder::findComponents()
         const uint64_t i1 = it1 - primaryEdges.begin();
         const uint64_t componentId = disjointSets.find_set(i0);
         SHASTA_ASSERT(componentId == disjointSets.find_set(i1));
-        components[componentId].addEdge(edgePair.edgeId0, edgePair.edgeId1);
+        components[componentId].addEdge(edgePair.edgeId0, edgePair.edgeId1, edgePair.info);
     }
 
 

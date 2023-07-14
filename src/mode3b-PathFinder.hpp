@@ -140,7 +140,7 @@ private:
     };
     class Edge {
     public:
-        uint64_t offsetInBases;
+        MarkerGraphEdgePairInfo info;
     };
     class Graph : public boost::adjacency_list<
         boost::listS,
@@ -157,13 +157,14 @@ private:
         }
         void addEdge(
             MarkerGraphEdgeId edgeId0,
-            MarkerGraphEdgeId edgeId1)
+            MarkerGraphEdgeId edgeId1,
+            const MarkerGraphEdgePairInfo& info)
         {
             auto it0 = vertexMap.find(edgeId0);
             auto it1 = vertexMap.find(edgeId1);
             SHASTA_ASSERT(it0 != vertexMap.end());
             SHASTA_ASSERT(it1 != vertexMap.end());
-            add_edge(it0->second, it1->second, *this);
+            add_edge(it0->second, it1->second, Edge({info}), *this);
         }
         void getLongestPath(vector<MarkerGraphEdgeId>& path) const
         {
