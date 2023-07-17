@@ -1,7 +1,6 @@
 #ifndef SHASTA_MODE3B_PATH_FINDER_HPP
 #define SHASTA_MODE3B_PATH_FINDER_HPP
 
-#include "longestPath.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "MarkerGraphEdgePairInfo.hpp"
 #include "MemoryMappedVectorOfVectors.hpp"
@@ -150,51 +149,19 @@ private:
         Edge> {
     public:
         std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
-        void addVertex(MarkerGraphEdgeId edgeId)
-        {
-            SHASTA_ASSERT(not vertexMap.contains(edgeId));
-            vertexMap.insert({edgeId, add_vertex(Vertex({edgeId}), *this)});
-        }
+        void addVertex(MarkerGraphEdgeId);
         void addEdge(
-            MarkerGraphEdgeId edgeId0,
-            MarkerGraphEdgeId edgeId1,
-            const MarkerGraphEdgePairInfo& info)
-        {
-            auto it0 = vertexMap.find(edgeId0);
-            auto it1 = vertexMap.find(edgeId1);
-            SHASTA_ASSERT(it0 != vertexMap.end());
-            SHASTA_ASSERT(it1 != vertexMap.end());
-            add_edge(it0->second, it1->second, Edge({info}), *this);
-        }
+            MarkerGraphEdgeId,
+            MarkerGraphEdgeId,
+            const MarkerGraphEdgePairInfo&);
+
+        // Get the longest path.
+        // On return, primaryEdges contains the vertices (marker graph edges)
+        // on the longest path. infos is filled in with the MarkerGraphEdgePairInfos
+        // of the edges along the path, so it has size one less that primaryEdges.
         void getLongestPath(
             vector<MarkerGraphEdgeId>& primaryEdges,
-            vector<MarkerGraphEdgePairInfo>& infos) const
-        {
-            const Graph& graph = *this;
-            SHASTA_ASSERT(num_vertices(graph));
-
-            // Compute the longest path.
-            vector<vertex_descriptor> pathVertices;
-            longestPath(graph, pathVertices);
-
-            // Fill in the primary edges.
-            primaryEdges.clear();
-            for(const vertex_descriptor v: pathVertices) {
-                primaryEdges.push_back(graph[v].edgeId);
-            }
-
-            // Fill in the infos.
-            infos.clear();
-            for(uint64_t i=1; i<pathVertices.size(); i++) {
-                const vertex_descriptor v0 = pathVertices[i-1];
-                const vertex_descriptor v1 = pathVertices[i];
-                edge_descriptor e;
-                bool edgeExists = false;
-                tie(e, edgeExists) = edge(v0, v1, graph);
-                SHASTA_ASSERT(edgeExists);
-                infos.push_back(graph[e].info);
-            }
-        }
+            vector<MarkerGraphEdgePairInfo>& infos) const;
     };
     vector<Graph> components;
     void findComponents();

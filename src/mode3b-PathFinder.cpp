@@ -3,6 +3,7 @@
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
 #include "invalid.hpp"
+#include "longestPath.hpp"
 #include "Marker.hpp"
 #include "MarkerGraph.hpp"
 #include "mode3b-AssemblyPath.hpp"
@@ -956,3 +957,58 @@ void PathFinder::findComponents()
     sort(componentIndex.begin(), componentIndex.end(),
         OrderPairsBySecondOnlyGreater<uint64_t, uint64_t>());
 }
+
+
+
+void PathFinder::Graph::addVertex(MarkerGraphEdgeId edgeId)
+{
+    SHASTA_ASSERT(not vertexMap.contains(edgeId));
+    vertexMap.insert({edgeId, add_vertex(Vertex({edgeId}), *this)});
+}
+
+
+
+void PathFinder::Graph::addEdge(
+    MarkerGraphEdgeId edgeId0,
+    MarkerGraphEdgeId edgeId1,
+    const MarkerGraphEdgePairInfo& info)
+{
+    auto it0 = vertexMap.find(edgeId0);
+    auto it1 = vertexMap.find(edgeId1);
+    SHASTA_ASSERT(it0 != vertexMap.end());
+    SHASTA_ASSERT(it1 != vertexMap.end());
+    add_edge(it0->second, it1->second, Edge({info}), *this);
+}
+
+
+
+void PathFinder::Graph::getLongestPath(
+    vector<MarkerGraphEdgeId>& primaryEdges,
+    vector<MarkerGraphEdgePairInfo>& infos) const
+{
+    const Graph& graph = *this;
+    SHASTA_ASSERT(num_vertices(graph));
+
+    // Compute the longest path.
+    vector<vertex_descriptor> pathVertices;
+    longestPath(graph, pathVertices);
+
+    // Fill in the primary edges.
+    primaryEdges.clear();
+    for(const vertex_descriptor v: pathVertices) {
+        primaryEdges.push_back(graph[v].edgeId);
+    }
+
+    // Fill in the infos.
+    infos.clear();
+    for(uint64_t i=1; i<pathVertices.size(); i++) {
+        const vertex_descriptor v0 = pathVertices[i-1];
+        const vertex_descriptor v1 = pathVertices[i];
+        edge_descriptor e;
+        bool edgeExists = false;
+        tie(e, edgeExists) = edge(v0, v1, graph);
+        SHASTA_ASSERT(edgeExists);
+        infos.push_back(graph[e].info);
+    }
+}
+
