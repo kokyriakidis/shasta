@@ -172,12 +172,12 @@ void AssemblyPath::getSequence(vector<Base>& sequence) const
 }
 
 
-void AssemblyPath::writeFasta(ostream& fasta) const
+void AssemblyPath::writeFasta(ostream& fasta, const string& name) const
 {
     vector<Base> sequence;
     getSequence(sequence);
 
-    fasta << ">Path " << sequence.size() << "\n";
+    fasta << ">" << name << " " << sequence.size() << "\n";
     copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(fasta));
     fasta << "\n";
 }

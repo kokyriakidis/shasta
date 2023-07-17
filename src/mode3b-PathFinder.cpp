@@ -620,6 +620,8 @@ PathFinder::PathFinder(
     const uint64_t minCommonCount = 6;
     const double minCorrectedJaccard = 0.8;
     const uint64_t maxEdgeCount = 2;
+    const double minLinearityRatio = 0.5;
+    const uint64_t minAssembledSequenceLength = 10000;
 
     // Find edge pairs with similar read compositions.
     findEdgePairs(
@@ -640,6 +642,7 @@ PathFinder::PathFinder(
     const uint64_t componentCount = 100;
     ofstream summaryCsv("PathFinder-ComponentSummary.csv");
     summaryCsv << "Rank,Size,Longest path,Linearity ratio,Sequence length\n";
+    ofstream assemblyFasta("AssemblyPaths.fasta");
     for(uint64_t componentRank=0;
         componentRank < min(componentCount, componentIndex.size());
         componentRank++) {
@@ -654,13 +657,17 @@ PathFinder::PathFinder(
         component.getLongestPath(primaryEdges, infos);
         component.writeGraphviz("PathFinder_Component_" + to_string(componentRank), primaryEdges, infos);
 
+        // The linearity ratio is the fraction of vertices that are in the longest path.
+        const double linearityRatio = double(primaryEdges.size()) / double(num_vertices(component));
+
         // Create an assembly path.
         AssemblyPath assemblyPath(assembler, primaryEdges, infos);
         vector<Base> sequence;
         assemblyPath.getSequence(sequence);
 
+
         ofstream fasta("AssemblyPath-" + to_string(componentRank) + ".fasta");
-        assemblyPath.writeFasta(fasta);
+        assemblyPath.writeFasta(fasta, "Path-" + to_string(componentRank));
         {
             ofstream csv("AssemblyPath.csv");
             assemblyPath.writeCsv(csv);
@@ -669,16 +676,21 @@ PathFinder::PathFinder(
             " vertices (primary marker graph edges)." << endl;
         cout << "\tIts longest path has " << primaryEdges.size() <<
             " vertices (primary marker graph edges)." << endl;
-        cout << "\tLinearity ratio is " <<
-            double(primaryEdges.size()) / double(num_vertices(component)) << endl;
+        cout << "\tLinearity ratio is " << linearityRatio << endl;
         cout << "\tAssembled sequence length " << sequence.size() << endl;
 
         summaryCsv << componentRank << ",";
         summaryCsv << num_vertices(component) << ",";
         summaryCsv << primaryEdges.size() << ",";
-        summaryCsv << double(primaryEdges.size()) / double(num_vertices(component)) << ",";
+        summaryCsv << linearityRatio << ",";
         summaryCsv << sequence.size() << ",";
         summaryCsv << endl;
+
+        if(
+            (linearityRatio > minLinearityRatio) and
+            (sequence.size()>= minAssembledSequenceLength)) {
+            assemblyPath.writeFasta(assemblyFasta, "Path-" + to_string(componentRank));
+        }
     }
 
 }

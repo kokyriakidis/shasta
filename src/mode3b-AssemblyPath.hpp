@@ -5,6 +5,7 @@
 #include "shastaTypes.hpp"
 
 #include "iosfwd.hpp"
+#include "string.hpp"
 #include "vector.hpp"
 
 namespace shasta {
@@ -48,7 +49,7 @@ public:
         const vector<MarkerGraphEdgePairInfo>);
 
     void getSequence(vector<Base>&) const;
-    void writeFasta(ostream&) const;
+    void writeFasta(ostream&, const string& name) const;
     void writeCsv(ostream&) const;
 private:
     const Assembler& assembler;
