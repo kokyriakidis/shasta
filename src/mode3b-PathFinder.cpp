@@ -639,12 +639,11 @@ PathFinder::PathFinder(
 
 
     // Create an AssemblyPath for the largest few components.
-    const uint64_t componentCount = 100;
     ofstream summaryCsv("PathFinder-ComponentSummary.csv");
     summaryCsv << "Rank,Size,Longest path,Linearity ratio,Sequence length\n";
     ofstream assemblyFasta("AssemblyPaths.fasta");
     for(uint64_t componentRank=0;
-        componentRank < min(componentCount, componentIndex.size());
+        componentRank < componentIndex.size();
         componentRank++) {
 
         // Access this component.
@@ -658,13 +657,21 @@ PathFinder::PathFinder(
         component.writeGraphviz("PathFinder_Component_" + to_string(componentRank), primaryEdges, infos);
 
         // The linearity ratio is the fraction of vertices that are in the longest path.
+        // If it is too small, skip this component.
         const double linearityRatio = double(primaryEdges.size()) / double(num_vertices(component));
+        if(linearityRatio < minLinearityRatio) {
+            continue;
+        }
 
         // Create an assembly path.
         AssemblyPath assemblyPath(assembler, primaryEdges, infos);
         vector<Base> sequence;
         assemblyPath.getSequence(sequence);
 
+        // If assembled sequence is too short, skip this component.
+        if(sequence.size() < minAssembledSequenceLength) {
+            continue;
+        }
 
         ofstream fasta("AssemblyPath-" + to_string(componentRank) + ".fasta");
         assemblyPath.writeFasta(fasta, "Path-" + to_string(componentRank));
