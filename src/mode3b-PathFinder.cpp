@@ -13,6 +13,7 @@ using namespace shasta;
 using namespace mode3b;
 
 // Boost libraries.
+#include "boost/graph/iteration_macros.hpp"
 #include <boost/pending/disjoint_sets.hpp>
 
 // Standard library.
@@ -636,7 +637,9 @@ PathFinder::PathFinder(
 
 
     // Create an AssemblyPath for the largest few components.
-    const uint64_t componentCount = 10;
+    const uint64_t componentCount = 100;
+    ofstream summaryCsv("PathFinder-ComponentSummary.csv");
+    summaryCsv << "Rank,Size,Longest path,Linearity ratio,Sequence length\n";
     for(uint64_t componentRank=0;
         componentRank < min(componentCount, componentIndex.size());
         componentRank++) {
@@ -649,6 +652,7 @@ PathFinder::PathFinder(
         vector<MarkerGraphEdgeId> primaryEdges;
         vector<MarkerGraphEdgePairInfo> infos;
         component.getLongestPath(primaryEdges, infos);
+        component.writeGraphviz("PathFinder_Component_" + to_string(componentRank), primaryEdges, infos);
 
         // Create an assembly path.
         AssemblyPath assemblyPath(assembler, primaryEdges, infos);
@@ -657,8 +661,10 @@ PathFinder::PathFinder(
 
         ofstream fasta("AssemblyPath-" + to_string(componentRank) + ".fasta");
         assemblyPath.writeFasta(fasta);
-        ofstream csv("AssemblyPath.csv");
-        assemblyPath.writeCsv(csv);
+        {
+            ofstream csv("AssemblyPath.csv");
+            assemblyPath.writeCsv(csv);
+        }
         cout << "Component " << componentRank << " has " << num_vertices(component) <<
             " vertices (primary marker graph edges)." << endl;
         cout << "\tIts longest path has " << primaryEdges.size() <<
@@ -666,6 +672,13 @@ PathFinder::PathFinder(
         cout << "\tLinearity ratio is " <<
             double(primaryEdges.size()) / double(num_vertices(component)) << endl;
         cout << "\tAssembled sequence length " << sequence.size() << endl;
+
+        summaryCsv << componentRank << ",";
+        summaryCsv << num_vertices(component) << ",";
+        summaryCsv << primaryEdges.size() << ",";
+        summaryCsv << double(primaryEdges.size()) / double(num_vertices(component)) << ",";
+        summaryCsv << sequence.size() << ",";
+        summaryCsv << endl;
     }
 
 }
@@ -1012,3 +1025,57 @@ void PathFinder::Graph::getLongestPath(
     }
 }
 
+
+
+// Graphviz output including longest path information.
+// The len attribute is only honored by neato and fdp.
+void PathFinder::Graph::writeGraphviz(
+    const string& name,
+    const vector<MarkerGraphEdgeId>& primaryEdges,
+    const vector<MarkerGraphEdgePairInfo>& infos) const
+{
+    const Graph& graph = *this;
+
+    std::set<MarkerGraphEdgeId> primaryEdgesSet;
+    copy(primaryEdges.begin(), primaryEdges.end(),
+        inserter(primaryEdgesSet, primaryEdgesSet.begin()));
+
+    ofstream out(name + ".dot");
+    out << "digraph " << name << "{\n";
+
+
+
+    // Write the vertices.
+    BGL_FORALL_VERTICES(v, graph, Graph) {
+        const MarkerGraphEdgeId edgeId = graph[v].edgeId;
+        out << edgeId << "[tooltip=\"" << edgeId << "\"";
+        if(primaryEdgesSet.contains(edgeId)) {
+            out << " color=red";
+        }
+        out << "];\n";
+    }
+
+
+
+    // Write the edges.
+    BGL_FORALL_EDGES(e, graph, Graph) {
+        const MarkerGraphEdgePairInfo& info = graph[e].info;
+        const vertex_descriptor v0 = source(e, graph);
+        const vertex_descriptor v1 = target(e, graph);
+        const MarkerGraphEdgeId edgeId0 = graph[v0].edgeId;
+        const MarkerGraphEdgeId edgeId1 = graph[v1].edgeId;
+        const bool isOnLongestPath =
+            primaryEdgesSet.contains(edgeId0) and primaryEdgesSet.contains(edgeId1);
+        out << edgeId0 << "->" << edgeId1 <<
+            "[tooltip=\"" << edgeId0 << "->" << edgeId1 << " " << info.offsetInBases <<
+            "\"";
+        if(isOnLongestPath) {
+            out << " color=red";
+        }
+        out << "];\n";
+    }
+
+
+
+    out << "}\n";
+}

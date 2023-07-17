@@ -162,6 +162,12 @@ private:
         void getLongestPath(
             vector<MarkerGraphEdgeId>& primaryEdges,
             vector<MarkerGraphEdgePairInfo>& infos) const;
+
+        // Graphviz output including longest path information.
+        void writeGraphviz(
+            const string& name,
+            const vector<MarkerGraphEdgeId>& primaryEdges,
+            const vector<MarkerGraphEdgePairInfo>& infos) const;
     };
     vector<Graph> components;
     void findComponents();
@@ -196,7 +202,6 @@ public:
         uint64_t maxCoverage;
     };
     CreateMarkerGraphEdgeTableData createMarkerGraphEdgeTableData;
-
 };
 
 #endif
