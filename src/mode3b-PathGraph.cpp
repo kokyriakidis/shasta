@@ -12,9 +12,9 @@ PathGraph::PathGraph(const Assembler& assembler) :
     assembler(assembler)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    minPrimaryCoverage = 15;
-    maxPrimaryCoverage = 35;
-    minCoverage = 6;
+    minPrimaryCoverage = 10;
+    maxPrimaryCoverage = 25;
+    minCoverage = 4;
 
     findVertices();
     cout << "The path graph has " << vertices.size() << " vertices. "
@@ -24,6 +24,8 @@ PathGraph::PathGraph(const Assembler& assembler) :
 
     findEdges();
     cout << "The path graph has " << edges.size() << " edges." << endl;
+
+    writeGraphviz();
 
 }
 
@@ -135,3 +137,26 @@ void PathGraph::findEdges()
     }
 
 }
+
+
+
+// Write the entire PathGraph in graphviz format.
+void PathGraph::writeGraphviz() const
+{
+    ofstream out("PathGraph.dot");
+    out << "digraph PathGraph {\n";
+
+    for(uint64_t i=0; i<edges.size(); i++) {
+        const pair<uint64_t, uint64_t>& edge = edges[i];
+        const uint64_t vertexId0 = edge.first;
+        const uint64_t vertexId1 = edge.second;
+        const MarkerGraphEdgeId edgeId0 = vertices[vertexId0];
+        const MarkerGraphEdgeId edgeId1 = vertices[vertexId1];
+        out << edgeId0 << "->";
+        out << edgeId1;
+        out << "[tooltip=\"" << edgeId0 << "->" << edgeId1 << " " << edgeCoverage[i] << "\"];\n";
+    }
+
+    out << "}\n";
+}
+

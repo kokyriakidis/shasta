@@ -63,6 +63,9 @@ private:
     vector<uint64_t> edgeCoverage;
     uint64_t minCoverage;
     void findEdges();
+
+    // Write the entire PathGraph in graphviz format.
+    void writeGraphviz() const;
 };
 
 #endif
