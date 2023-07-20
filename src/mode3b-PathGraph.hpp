@@ -19,6 +19,9 @@ primary marker graph edges in between.
 // Shasta.
 #include "shastaTypes.hpp"
 
+// Boost libraries.
+#include <boost/graph/adjacency_list.hpp>
+
 // Standard library.
 #include "utility.hpp"
 #include "vector.hpp"
@@ -66,6 +69,35 @@ private:
 
     // Write the entire PathGraph in graphviz format.
     void writeGraphviz() const;
+
+
+    // Represent each connected component as a Graph.
+    class Vertex {
+    public:
+        MarkerGraphEdgeId edgeId;
+    };
+    class Edge {
+    public:
+    };
+    class Graph : public boost::adjacency_list<
+        boost::listS,
+        boost::vecS,
+        boost::bidirectionalS,
+        Vertex,
+        Edge> {
+    public:
+        std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
+        void addVertex(MarkerGraphEdgeId);
+        void addEdge(MarkerGraphEdgeId, MarkerGraphEdgeId);
+    };
+    vector<Graph> components;
+    void createComponents();
+
+    // Index the large components.
+    // Sorted by decreasing size.
+    uint64_t minComponentSize;
+    vector< pair<uint64_t, uint64_t> > componentIndex; // (componentId, size)
+
 };
 
 #endif

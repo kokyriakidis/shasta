@@ -1,3 +1,4 @@
+// Shasta.
 #include "mode3b-PathGraph.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
@@ -5,6 +6,11 @@
 using namespace shasta;
 using namespace mode3b;
 
+// Boost libraries.
+#include "boost/graph/iteration_macros.hpp"
+#include <boost/pending/disjoint_sets.hpp>
+
+// Standard library.
 #include "fstream.hpp"
 
 
@@ -14,7 +20,8 @@ PathGraph::PathGraph(const Assembler& assembler) :
     // EXPOSE WHEN CODE STABILIZES.
     minPrimaryCoverage = 10;
     maxPrimaryCoverage = 25;
-    minCoverage = 4;
+    minCoverage = 6;
+    minComponentSize = 100;
 
     findVertices();
     cout << "The path graph has " << vertices.size() << " vertices. "
@@ -26,6 +33,7 @@ PathGraph::PathGraph(const Assembler& assembler) :
     cout << "The path graph has " << edges.size() << " edges." << endl;
 
     writeGraphviz();
+    createComponents();
 
 }
 
@@ -160,3 +168,75 @@ void PathGraph::writeGraphviz() const
     out << "}\n";
 }
 
+
+
+void PathGraph::createComponents()
+{
+    // Compute connected components.
+    const uint64_t n = edges.size();
+    vector<uint64_t> rank(n);
+    vector<uint64_t> parent(n);
+    boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
+    for(uint64_t i=0; i<n; i++) {
+        disjointSets.make_set(i);
+    }
+    for(const auto& p: edges) {
+        disjointSets.union_set(p.first, p.second);
+    }
+
+    // Generate vertices of each connected component.
+    components.clear();
+    components.resize(n);
+    for(uint64_t i=0; i<n; i++) {
+        const uint64_t componentId = disjointSets.find_set(i);
+        components[componentId].addVertex(vertices[i]);
+    }
+
+    // Create edges of each connected component.
+    for(const auto& p: edges) {
+        const uint64_t vertexId0 = p.first;
+        const uint64_t vertexId1 = p.second;
+        const uint64_t componentId = disjointSets.find_set(vertexId0);
+        SHASTA_ASSERT(componentId == disjointSets.find_set(vertexId1));
+        const MarkerGraphEdgeId edgeId0 = vertices[vertexId0];
+        const MarkerGraphEdgeId edgeId1 = vertices[vertexId1];
+        components[componentId].addEdge(edgeId0, edgeId1);
+    }
+
+    // Create the componentIndex.
+    componentIndex.clear();
+    for(uint64_t componentId=0; componentId<n; componentId++) {
+        const uint64_t componentSize = num_vertices(components[componentId]);
+        if(componentSize >= minComponentSize) {
+            componentIndex.push_back({componentId, componentSize});
+        }
+    }
+    sort(componentIndex.begin(), componentIndex.end(),
+        OrderPairsBySecondOnlyGreater<uint64_t, uint64_t>());
+    cout << "Found " << componentIndex.size() << " connected components of the path graph "
+        "with at least " << minComponentSize << " vertices." << endl;
+}
+
+
+
+void PathGraph::Graph::addVertex(MarkerGraphEdgeId edgeId)
+{
+    SHASTA_ASSERT(not vertexMap.contains(edgeId));
+    vertexMap.insert({edgeId, add_vertex(*this)});
+}
+
+
+
+void PathGraph::Graph::addEdge(
+    MarkerGraphEdgeId edgeId0,
+    MarkerGraphEdgeId edgeId1)
+{
+    auto it0 = vertexMap.find(edgeId0);
+    auto it1 = vertexMap.find(edgeId1);
+    SHASTA_ASSERT(it0 != vertexMap.end());
+    SHASTA_ASSERT(it1 != vertexMap.end());
+    const vertex_descriptor v0 = it0->second;
+    const vertex_descriptor v1 = it1->second;
+
+    add_edge(v0, v1, *this);
+}
