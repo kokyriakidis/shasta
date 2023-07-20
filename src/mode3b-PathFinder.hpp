@@ -166,8 +166,8 @@ private:
         // Graphviz output including longest path information.
         void writeGraphviz(
             const string& name,
-            const vector<MarkerGraphEdgeId>& primaryEdges,
-            const vector<MarkerGraphEdgePairInfo>& infos) const;
+            const vector<MarkerGraphEdgeId>& longestPathPrimaryEdges/*,
+            const vector<MarkerGraphEdgePairInfo>& infos*/) const;
     };
     vector<Graph> components;
     void findComponents();
@@ -177,6 +177,8 @@ private:
     // where componentId is the index into the components vector.
     vector< pair<uint64_t, uint64_t> > componentIndex;
 
+    // Transitive reduction of each connected component.
+    void transitiveReduction();
 
 
     // A table that gives the MarkerGraphEdgeId of the edge

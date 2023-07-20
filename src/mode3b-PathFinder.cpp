@@ -9,6 +9,7 @@
 #include "mode3b-AssemblyPath.hpp"
 #include "orderPairs.hpp"
 #include "timestamp.hpp"
+#include "transitiveReduction.hpp"
 using namespace shasta;
 using namespace mode3b;
 
@@ -614,14 +615,15 @@ PathFinder::PathFinder(
     assembler(assembler)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    const uint64_t maxMarkerOffset = 1000;
+    const uint64_t maxMarkerOffset = 30000;
     const uint64_t minCoverage = 15;
     const uint64_t maxCoverage = 35;
-    const uint64_t minCommonCount = 6;
+    const uint64_t minCommonCount = 15;
     const double minCorrectedJaccard = 0.8;
-    const uint64_t maxEdgeCount = 2;
-    const double minLinearityRatio = 0.5;
-    const uint64_t minAssembledSequenceLength = 10000;
+    const uint64_t maxEdgeCount = 1;
+    const double minLinearityRatio = 0.0;
+    const uint64_t minAssembledSequenceLength = 50000;
+    const uint64_t minComponentSize = 100;
 
     // Find edge pairs with similar read compositions.
     findEdgePairs(
@@ -637,6 +639,42 @@ PathFinder::PathFinder(
     // Find connected components of marker graph edges.
     findComponents();
 
+    // Transitive reduction of each connected component.
+    transitiveReduction();
+
+#if 0
+    for(uint64_t componentRank=0;
+        componentRank < componentIndex.size();
+        componentRank++) {
+
+        // Access this component.
+        const uint64_t componentId = componentIndex[componentRank].first;
+        const Graph& component = components[componentId];
+        cout << componentRank << "/" << componentIndex.size() << " " << num_vertices(component) << endl;
+
+        // If too small, skip.
+        if(num_vertices(component) < minComponentSize) {
+            continue;
+        }
+
+        // Compute a longest path.
+        vector<MarkerGraphEdgeId> longestPathPrimaryEdges;
+        vector<MarkerGraphEdgePairInfo> longestPathInfos;
+        component.getLongestPath(longestPathPrimaryEdges, longestPathInfos);
+        const double linearityRatio = double(longestPathPrimaryEdges.size()) / double(num_vertices(component));
+
+        cout << "Component " << componentRank << " has " << num_vertices(component) <<
+            " vertices (primary marker graph edges)." << endl;
+        cout << "\tIts longest path has " << longestPathPrimaryEdges.size() <<
+            " vertices (primary marker graph edges)." << endl;
+        cout << "\tLinearity ratio is " << linearityRatio << endl;
+
+        // Write in graphviz format.
+        component.writeGraphviz("PathFinder_Component_" + to_string(componentRank),
+            longestPathPrimaryEdges);
+    }
+#endif
+
 
     // Create an AssemblyPath for the largest few components.
     ofstream summaryCsv("PathFinder-ComponentSummary.csv");
@@ -650,16 +688,24 @@ PathFinder::PathFinder(
         const uint64_t componentId = componentIndex[componentRank].first;
         const Graph& component = components[componentId];
 
+        // If too small, discard.
+        if(num_vertices(component) < minComponentSize) {
+            // cout << "Component is too small " << minComponentSize << endl;
+            continue;
+        }
+        cout << componentRank << "/" << componentIndex.size() << " " << num_vertices(component) << endl;
+
         // Compute a longest path.
         vector<MarkerGraphEdgeId> primaryEdges;
         vector<MarkerGraphEdgePairInfo> infos;
         component.getLongestPath(primaryEdges, infos);
-        component.writeGraphviz("PathFinder_Component_" + to_string(componentRank), primaryEdges, infos);
+        component.writeGraphviz("PathFinder_Component_" + to_string(componentRank), primaryEdges);
 
         // The linearity ratio is the fraction of vertices that are in the longest path.
         // If it is too small, skip this component.
         const double linearityRatio = double(primaryEdges.size()) / double(num_vertices(component));
         if(linearityRatio < minLinearityRatio) {
+            cout << "Linearity ratio is too low " << linearityRatio << endl;
             continue;
         }
 
@@ -670,6 +716,7 @@ PathFinder::PathFinder(
 
         // If assembled sequence is too short, skip this component.
         if(sequence.size() < minAssembledSequenceLength) {
+            cout << "Sequence is too short." << endl;
             continue;
         }
 
@@ -699,7 +746,6 @@ PathFinder::PathFinder(
             assemblyPath.writeFasta(assemblyFasta, "Path-" + to_string(componentRank));
         }
     }
-
 }
 
 
@@ -992,6 +1038,16 @@ void PathFinder::findComponents()
 
 
 
+// Transitive reduction of each connected component.
+void PathFinder::transitiveReduction()
+{
+    for(Graph& component: components) {
+        shasta::transitiveReduction(component);
+    }
+}
+
+
+
 void PathFinder::Graph::addVertex(MarkerGraphEdgeId edgeId)
 {
     SHASTA_ASSERT(not vertexMap.contains(edgeId));
@@ -1050,13 +1106,13 @@ void PathFinder::Graph::getLongestPath(
 // The len attribute is only honored by neato and fdp.
 void PathFinder::Graph::writeGraphviz(
     const string& name,
-    const vector<MarkerGraphEdgeId>& primaryEdges,
-    const vector<MarkerGraphEdgePairInfo>& infos) const
+    const vector<MarkerGraphEdgeId>& longestPathPrimaryEdges/*,
+    const vector<MarkerGraphEdgePairInfo>& infos*/) const
 {
     const Graph& graph = *this;
 
     std::set<MarkerGraphEdgeId> primaryEdgesSet;
-    copy(primaryEdges.begin(), primaryEdges.end(),
+    copy(longestPathPrimaryEdges.begin(), longestPathPrimaryEdges.end(),
         inserter(primaryEdgesSet, primaryEdgesSet.begin()));
 
     ofstream out(name + ".dot");
