@@ -623,6 +623,8 @@ PYBIND11_MODULE(shasta, shastaModule)
         .def("findCompleteMarkerGraphPaths",
             &Assembler::findCompleteMarkerGraphPaths,
             arg("threadCount") = 0)
+        .def("findMode3bPaths",
+            &Assembler::findMode3bPaths)
 
 
 

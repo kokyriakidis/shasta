@@ -2362,6 +2362,7 @@ public:
     void fillMode3bAssemblyPathStep(const vector<string>&, ostream&);
 
     void exploreMode3bPathGraph(const vector<string>& request, ostream& html);
+    void findMode3bPaths() const;
 
 public:
     void test();

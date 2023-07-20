@@ -3,6 +3,7 @@
 #include "LocalMarkerGraph1.hpp"
 #include "mode3b-PathFiller1.hpp"
 #include "mode3b-PathFinder.hpp"
+#include "mode3b-PathGraph.hpp"
 #include "mode3b-AssemblyPath.hpp"
 #include "Reads.hpp"
 using namespace shasta;
@@ -52,6 +53,13 @@ void Assembler::findCompleteMarkerGraphPaths(uint64_t threadCount) const
     }
 
     mode3b::PathFinder pathFinder(*this, threadCount);
+}
+
+
+
+void Assembler::findMode3bPaths() const
+{
+    mode3b::PathGraph pathGraph(*this);
 }
 
 
