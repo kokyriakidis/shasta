@@ -23,6 +23,7 @@ primary marker graph edges in between.
 #include <boost/graph/adjacency_list.hpp>
 
 // Standard library.
+#include "iosfwd.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
 
@@ -50,7 +51,9 @@ private:
     // Each entry in this table is a vertex of the PathGraph.
     // The index in this table is the vertexId.
     // The table is sorted.
-    vector<MarkerGraphEdgeId> vertices;
+    // This cannot be names "vertices" due to naming conflicts caused by
+    // boost graph macros.
+    vector<MarkerGraphEdgeId> verticesVector;
 
     // Map MarkerGraphEdgeId to vertexIds.
     // This is indexed by the MarkerGraphEdgeId and contains invalid<uint64_t>
@@ -62,7 +65,9 @@ private:
 
     // Follow the reads to find edges of the PathGraph.
     // Each edge is stored as a pair of primaryIds (indexes into primaryEdges vector).
-    vector< pair<uint64_t, uint64_t> > edges;
+    // This cannot be names "edges" due to naming conflicts caused by
+    // boost graph macros.
+    vector< pair<uint64_t, uint64_t> > edgesVector;
     vector<uint64_t> edgeCoverage;
     uint64_t minCoverage;
     void findEdges();
@@ -89,6 +94,7 @@ private:
         std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
         void addVertex(MarkerGraphEdgeId);
         void addEdge(MarkerGraphEdgeId, MarkerGraphEdgeId);
+        void writeGraphviz(uint64_t componentId, ostream&) const;
     };
     vector<Graph> components;
     void createComponents();
