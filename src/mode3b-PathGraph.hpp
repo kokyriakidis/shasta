@@ -8,6 +8,7 @@ of the marker graph, which is believed to correspond to a single copy
 of sequence. It is characterized as follows:
 - minPrimaryCoverage <= coverage <= maxPrimaryCoverage
 - No duplicate oriented reads on the marker graph edge or its vertices.
+- Is a branch edge (see isBranchEdge for details).
 
 A directed edge v0->v1 is generated if a sufficient number of oriented reads
 visit the marker graph edge corresponding to v1 after
@@ -104,6 +105,12 @@ private:
     uint64_t minComponentSize;
     vector< pair<uint64_t, uint64_t> > componentIndex; // (componentId, size)
 
+    // Find out if a marker graph edge is a branch edge.
+    // A marker graph edge is a branch edge if:
+    // - Its source vertex has more than one outgoing edge with coverage at least minPrimaryCoverage.
+    // OR
+    // - Its target vertex has more than one incoming edge with coverage at least minPrimaryCoverage.
+    bool isBranchEdge(MarkerGraphEdgeId) const;
 };
 
 #endif

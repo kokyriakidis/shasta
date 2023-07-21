@@ -21,7 +21,7 @@ PathGraph::PathGraph(const Assembler& assembler) :
     // EXPOSE WHEN CODE STABILIZES.
     minPrimaryCoverage = 10;
     maxPrimaryCoverage = 25;
-    minCoverage = 4;
+    minCoverage = 3;
     minComponentSize = 100;
 
     findVertices();
@@ -71,6 +71,11 @@ bool PathGraph::isPrimary(MarkerGraphEdgeId edgeId) const
         const auto& markers = assembler.markers;
         markerGraph.vertexHasDuplicateOrientedReadIds(edge.source, markers) or
         markerGraph.vertexHasDuplicateOrientedReadIds(edge.target, markers)) {
+        return false;
+    }
+
+    // Check that is also is a branch edge.
+    if(not isBranchEdge(edgeId)) {
         return false;
     }
 
@@ -283,3 +288,45 @@ void PathGraph::Graph::addEdge(
 
     add_edge(v0, v1, *this);
 }
+
+
+
+// Find out if a marker graph edge is a branch edge.
+// A marker graph edge is a branch edge if:
+// - Its source vertex has more than one outgoing edge with coverage at least minPrimaryCoverage.
+// OR
+// - Its target vertex has more than one incoming edge with coverage at least minPrimaryCoverage.
+bool PathGraph::isBranchEdge(MarkerGraphEdgeId edgeId) const
+{
+    // Access this marker graph edge and its vertices.
+    const MarkerGraph::Edge& edge = assembler.markerGraph.edges[edgeId];
+    const MarkerGraphVertexId vertexId0 = edge.source;
+    const MarkerGraphVertexId vertexId1 = edge.target;
+
+    // Check outgoing edges of vertexId0.
+    const auto outgoingEdges0 = assembler.markerGraph.edgesBySource[vertexId0];
+    uint64_t count0 = 0;
+    for(const MarkerGraphEdgeId edgeId0: outgoingEdges0) {
+        if(assembler.markerGraph.edgeCoverage(edgeId0) >= minPrimaryCoverage) {
+            ++count0;
+        }
+    }
+    if(count0 > 1) {
+        return true;
+    }
+
+    // Check incoming edges of vertexId1.
+    const auto incomingEdges1 = assembler.markerGraph.edgesByTarget[vertexId1];
+    uint64_t count1 = 0;
+    for(const MarkerGraphEdgeId edgeId1: incomingEdges1) {
+        if(assembler.markerGraph.edgeCoverage(edgeId1) >= minPrimaryCoverage) {
+            ++count1;
+        }
+    }
+    if(count1 > 1) {
+        return true;
+    }
+
+    return false;
+}
+
