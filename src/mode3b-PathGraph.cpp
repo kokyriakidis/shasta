@@ -22,7 +22,8 @@ PathGraph::PathGraph(const Assembler& assembler) :
     minPrimaryCoverage = 8;
     maxPrimaryCoverage = 25;
     minCoverage = 6;
-    minComponentSize = 100;
+    minComponentSize = 6;
+    const uint64_t minChainLength = 3;
 
     findVertices();
     cout << "The path graph has " << verticesVector.size() << " vertices. "
@@ -35,6 +36,8 @@ PathGraph::PathGraph(const Assembler& assembler) :
     cout << "The path graph has " << edgesVector.size() << " edges." << endl;
 
     createComponents();
+    findChains(minChainLength);
+
 
     // Graphviz output.
     // writeGraphviz();    // Entire graph.
@@ -221,6 +224,124 @@ void PathGraph::Graph::writeGraphviz(uint64_t componentId, ostream& out) const
 
 
 
+// Find linear chains of vertices with in-degree<=1, out-degree<=1.
+void PathGraph::Graph::findLinearChains(
+    uint64_t minChainLength,
+    vector< vector<MarkerGraphEdgeId> >& chains)
+{
+    Graph& graph =*this;
+    chains.clear();
+
+    // Mark all vertices as unprocessed.
+    BGL_FORALL_VERTICES(v, graph, Graph) {
+        graph[v].wasProcessed = false;
+    }
+
+
+
+    // Main loop to find chains.
+    vector<vertex_descriptor> forwardChain;
+    vector<vertex_descriptor> backwardChain;
+    BGL_FORALL_VERTICES(vStart, graph, Graph) {
+
+        // See if we can start from here.
+        if(graph[vStart].wasProcessed) {
+            continue;
+        }
+        graph[vStart].wasProcessed = true;
+
+        const uint64_t inDegree = in_degree(vStart, graph);
+        if(inDegree > 1) {
+            continue;
+        }
+
+        const uint64_t outDegree = out_degree(vStart, graph);
+        if(outDegree > 1) {
+            continue;
+        }
+
+
+
+        // Move forward.
+        // This creates a forwardChain that includes vStart.
+        forwardChain.clear();
+        vertex_descriptor v = vStart;
+        while(true) {
+            if(in_degree(v, graph) > 1) {
+                break;
+            }
+            const uint64_t outDegree = out_degree(v, graph);
+            if(outDegree > 1) {
+                break;
+            }
+
+            // Add it to the forward chain.
+            forwardChain.push_back(v);
+
+            if(outDegree == 0) {
+                break;
+            }
+
+            // Move forward.
+            out_edge_iterator it;
+            tie(it, ignore) = out_edges(v, graph);
+            const edge_descriptor e = *it;
+            v = target(e, graph);
+            graph[v].wasProcessed = true;
+        }
+
+
+        // Move backward.
+        // This creates a backwardChain that includes vStart.
+        backwardChain.clear();
+        v = vStart;
+        while(true) {
+            if(out_degree(v, graph) > 1) {
+                break;
+            }
+            const uint64_t inDegree = in_degree(v, graph);
+            if(inDegree > 1) {
+                break;
+            }
+
+            // Add it to the backward chain.
+            backwardChain.push_back(v);
+
+            if(inDegree == 0) {
+                break;
+            }
+
+            // Move backward.
+            in_edge_iterator it;
+            tie(it, ignore) = in_edges(v, graph);
+            const edge_descriptor e = *it;
+            v = source(e, graph);
+            graph[v].wasProcessed = true;
+        }
+
+        // Reverse the backward chain, then remove vStart.
+        reverse(backwardChain.begin(), backwardChain.end());
+        backwardChain.resize(backwardChain.size() - 1);
+
+        // Check the length.
+        if(forwardChain.size() + backwardChain.size() < minChainLength) {
+            continue;
+        }
+
+        // Store this chain.
+        chains.resize(chains.size() + 1);
+        vector<MarkerGraphEdgeId>& chain = chains.back();
+        for(const vertex_descriptor v: backwardChain) {
+            chain.push_back(graph[v].edgeId);
+        }
+        for(const vertex_descriptor v: forwardChain) {
+            chain.push_back(graph[v].edgeId);
+        }
+    }
+}
+
+
+
 void PathGraph::createComponents()
 {
     // Compute connected components.
@@ -346,3 +467,38 @@ bool PathGraph::isBranchEdge(MarkerGraphEdgeId edgeId) const
     return false;
 }
 
+
+
+void PathGraph::findChains(uint64_t minChainLength)
+{
+    chains.clear();
+    vector< vector<MarkerGraphEdgeId> > componenthChains;
+
+    for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
+        const uint64_t componentId = componentIndex[componentRank].first;
+        Graph& component = components[componentId];
+        component.findLinearChains(minChainLength, componenthChains);
+
+        copy(componenthChains.begin(), componenthChains.end(), back_inserter(chains));
+    }
+
+    // Count the vertices in all chains.
+    uint64_t chainVertexCount = 0;
+    for(const auto& chain: chains) {
+        chainVertexCount += chain.size();
+    }
+
+    cout << "Found " << chains.size() << " linear chains containing a total " <<
+        chainVertexCount << " vertices." << endl;
+
+    // Write the chains.
+    ofstream csv("Chains.csv");
+    for(uint64_t chainId=0; chainId<chains.size(); chainId++) {
+        const auto& chain = chains[chainId];
+        for(uint64_t position=0; position<chain.size(); position++) {
+            csv << chainId << ",";
+            csv << position << ",";
+            csv << chain[position] << "\n";
+        }
+    }
+}

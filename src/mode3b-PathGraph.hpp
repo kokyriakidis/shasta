@@ -90,6 +90,7 @@ private:
     class Vertex {
     public:
         MarkerGraphEdgeId edgeId;
+        bool wasProcessed = false;
     };
     class Edge {
     public:
@@ -105,6 +106,9 @@ private:
         void addVertex(MarkerGraphEdgeId);
         void addEdge(MarkerGraphEdgeId, MarkerGraphEdgeId);
         void writeGraphviz(uint64_t componentId, ostream&) const;
+        void findLinearChains(
+            uint64_t minChainLength,
+            vector< vector<MarkerGraphEdgeId> >&);
     };
     vector<Graph> components;
     void createComponents();
@@ -113,6 +117,10 @@ private:
     // Sorted by decreasing size.
     uint64_t minComponentSize;
     vector< pair<uint64_t, uint64_t> > componentIndex; // (componentId, size)
+
+    // The linear chains found in all connected components stored in the componentIndex.
+    vector< vector<MarkerGraphEdgeId> > chains;
+    void findChains(uint64_t minChainLength);
 
     // Find out if a marker graph edge is a branch edge.
     // A marker graph edge is a branch edge if:
