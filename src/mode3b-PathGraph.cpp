@@ -94,12 +94,9 @@ void PathGraph::findVertices()
     const MarkerGraph& markerGraph = assembler.markerGraph;
 
     verticesVector.clear();
-    vertexTable.resize(markerGraph.edges.size());
-    fill(vertexTable.begin(), vertexTable.end(), invalid<MarkerGraphEdgeId>);
 
     for(MarkerGraphEdgeId edgeId=0; edgeId<markerGraph.edges.size(); edgeId++) {
         if(isPrimary(edgeId)) {
-            vertexTable[edgeId] = verticesVector.size();
             verticesVector.push_back(edgeId);
         }
     }

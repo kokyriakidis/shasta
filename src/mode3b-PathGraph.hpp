@@ -56,11 +56,6 @@ private:
     // boost graph macros.
     vector<MarkerGraphEdgeId> verticesVector;
 
-    // Map MarkerGraphEdgeId to vertexIds.
-    // This is indexed by the MarkerGraphEdgeId and contains invalid<uint64_t>
-    // if that marker graph edge is not a primary marker graph edge.
-    vector<uint64_t> vertexTable;
-
     // This fills in primaryEdges and the primaryEdgesTable.
     void findVertices();
 
