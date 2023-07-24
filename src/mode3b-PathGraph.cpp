@@ -19,9 +19,9 @@ PathGraph::PathGraph(const Assembler& assembler) :
     assembler(assembler)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    minPrimaryCoverage = 10;
+    minPrimaryCoverage = 8;
     maxPrimaryCoverage = 25;
-    minCoverage = 3;
+    minCoverage = 6;
     minComponentSize = 100;
 
     findVertices();
@@ -30,6 +30,7 @@ PathGraph::PathGraph(const Assembler& assembler) :
         "The marker graph has a total " <<
         assembler.markerGraph.edges.size() << " edges." << endl;
 
+    computeOrientedReadJourneys();
     findEdges();
     cout << "The path graph has " << edgesVector.size() << " edges." << endl;
 
@@ -102,11 +103,17 @@ void PathGraph::findVertices()
 }
 
 
-void PathGraph::findEdges()
+
+// The "journey" of each oriented read is the sequence of vertices it encounters.
+// It stores pairs (ordinal0, vertexId) for each oriented read, sorted by ordinal0.
+// The vertexId is the index in verticesVector.
+// Indexed by OrientedReadId::getValue.
+// Journeys are used to generate edges by "following the reads".
+void PathGraph::computeOrientedReadJourneys()
 {
-    // Store pairs (ordinal0, vertexId) for each oriented read.
-    // This is indexed by OrientedReadId::getValue.
-    vector < vector< pair<uint32_t, uint64_t> > > orientedReadPaths(assembler.markers.size());
+    orientedReadJourneys.clear();
+    orientedReadJourneys.resize(assembler.markers.size());
+
     for(uint64_t vertexId=0; vertexId<verticesVector.size(); vertexId++) {
         const MarkerGraphEdgeId edgeId = verticesVector[vertexId];
 
@@ -115,19 +122,28 @@ void PathGraph::findEdges()
         for(const MarkerInterval& markerInterval: markerIntervals) {
             const OrientedReadId orientedReadId = markerInterval.orientedReadId;
             const uint32_t ordinal0 = markerInterval.ordinals[0];
-            orientedReadPaths[orientedReadId.getValue()].push_back(make_pair(ordinal0, vertexId));
+            orientedReadJourneys[orientedReadId.getValue()].push_back(make_pair(ordinal0, vertexId));
         }
     }
 
-    // Now follow the path of each oriented read.
-    edgesVector.clear();
-    for(uint64_t i=0; i<orientedReadPaths.size(); i++) {
-        auto& orientedReadPath = orientedReadPaths[i];
-        sort(orientedReadPath.begin(), orientedReadPath.end(),
+    // Now sort them, for each oriented read.
+    for(auto& orientedReadJourney: orientedReadJourneys) {
+        sort(orientedReadJourney.begin(), orientedReadJourney.end(),
             OrderPairsByFirstOnly<uint32_t, uint64_t>());
+    }
+}
 
-        for(uint64_t j=1; j<orientedReadPath.size(); j++) {
-            edgesVector.push_back({orientedReadPath[j-1].second, orientedReadPath[j].second});
+
+
+void PathGraph::findEdges()
+{
+
+    edgesVector.clear();
+    for(uint64_t i=0; i<orientedReadJourneys.size(); i++) {
+        const auto& orientedReadJourney = orientedReadJourneys[i];
+
+        for(uint64_t j=1; j<orientedReadJourney.size(); j++) {
+            edgesVector.push_back({orientedReadJourney[j-1].second, orientedReadJourney[j].second});
         }
     }
 

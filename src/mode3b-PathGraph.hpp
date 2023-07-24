@@ -64,6 +64,15 @@ private:
     // This fills in primaryEdges and the primaryEdgesTable.
     void findVertices();
 
+    // The "journey" of each oriented read is the sequence of vertices it encounters.
+    // It stores pairs (ordinal0, vertexId) for each oriented read, sorted by ordinal0.
+    // The vertexId is the index in verticesVector.
+    // Indexed by OrientedReadId::getValue.
+    // Journeys are used to generate edges by "following the reads".
+    vector < vector< pair<uint32_t, uint64_t> > > orientedReadJourneys;
+    void computeOrientedReadJourneys();
+
+
     // Follow the reads to find edges of the PathGraph.
     // Each edge is stored as a pair of primaryIds (indexes into primaryEdges vector).
     // This cannot be names "edges" due to naming conflicts caused by
