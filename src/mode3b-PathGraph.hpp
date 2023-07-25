@@ -94,6 +94,9 @@ private:
     public:
         uint64_t coverage;
         MarkerGraphEdgePairInfo info;
+        // Flat that is set if the marker graph edges corresponding to the two
+        // vertice of this edge are adjacent in the mARKER GRAPH.
+        bool adjacent;
     };
     class Graph : public boost::adjacency_list<
         boost::listS,
@@ -108,7 +111,8 @@ private:
             MarkerGraphEdgeId,
             MarkerGraphEdgeId,
             uint64_t coverage,
-            const MarkerGraphEdgePairInfo&);
+            const MarkerGraphEdgePairInfo&,
+            bool adjacent);
         void writeGraphviz(uint64_t componentId, ostream&, uint64_t minCoverageA) const;
         void findLinearChains(
             uint64_t minChainLength,

@@ -238,15 +238,19 @@ void PathGraph::Graph::writeGraphviz(
         const double correctedJaccard = edge.info.correctedJaccard();
         const double hue = correctedJaccard / 3.;   // 0=red, 0.5=yellow, 1=green
 
-
-        out << graph[v0].edgeId << "->";
-        out << graph[v1].edgeId;
-        out << " [tooltip=\"" << edge.coverage << " " <<
-            std::fixed << std::setprecision(2)<< edge.info.correctedJaccard() <<
-            " " << edge.info.offsetInBases << "\"";
-        out << " color=\"" << hue << ",1,1\"";
-
-        out << "];\n";
+        out <<
+            graph[v0].edgeId << "->" <<
+            graph[v1].edgeId <<
+            " [tooltip=\"" <<
+            graph[v0].edgeId << "->" <<
+            graph[v1].edgeId << " " <<
+            edge.coverage << " " <<
+            std::fixed << std::setprecision(2)<< edge.info.correctedJaccard() << " " <<
+            edge.info.offsetInBases;
+        if(edge.adjacent) {
+            out << " adjacent";
+        }
+        out << "\" color=\"" << hue << ",1,1\"];\n";
     }
 
     out << "}\n";
@@ -405,7 +409,10 @@ void PathGraph::createComponents()
         const MarkerGraphEdgeId edgeId1 = verticesVector[vertexId1];
         MarkerGraphEdgePairInfo info;
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
-        components[componentId].addEdge(edgeId0, edgeId1, edgeCoverage[i], info);
+        const bool adjacent =
+            assembler.markerGraph.edges[edgeId0].target ==
+            assembler.markerGraph.edges[edgeId1].source;
+        components[componentId].addEdge(edgeId0, edgeId1, edgeCoverage[i], info, adjacent);
     }
 
     // Transitive reduction of each connected component.
@@ -449,7 +456,8 @@ void PathGraph::Graph::addEdge(
     MarkerGraphEdgeId edgeId0,
     MarkerGraphEdgeId edgeId1,
     uint64_t coverage,
-    const MarkerGraphEdgePairInfo& info)
+    const MarkerGraphEdgePairInfo& info,
+    bool adjacent)
 {
     auto it0 = vertexMap.find(edgeId0);
     auto it1 = vertexMap.find(edgeId1);
@@ -458,7 +466,7 @@ void PathGraph::Graph::addEdge(
     const vertex_descriptor v0 = it0->second;
     const vertex_descriptor v1 = it1->second;
 
-    add_edge(v0, v1, {coverage, info}, *this);
+    add_edge(v0, v1, {coverage, info, adjacent}, *this);
 }
 
 
