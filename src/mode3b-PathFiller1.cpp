@@ -56,6 +56,9 @@ PathFiller1::PathFiller1(
     }
 
     gatherOrientedReads();
+    if(orientedReadInfos.empty()) {
+        throw runtime_error("There are no common oriented reads.");
+    }
     if(html) {
         writeOrientedReads(html);
     }
