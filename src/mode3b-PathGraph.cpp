@@ -22,7 +22,7 @@ PathGraph::PathGraph(const Assembler& assembler) :
     // EXPOSE WHEN CODE STABILIZES.
     minPrimaryCoverage = 8;
     maxPrimaryCoverage = 25;
-    minCoverageA = 3;
+    minCoverageA = 2;
     // minCoverageB = 6;   // This gets reduced later.
     minComponentSize = 6;
     // const uint64_t minChainLength = 3;
@@ -242,7 +242,8 @@ void PathGraph::Graph::writeGraphviz(
         out << graph[v0].edgeId << "->";
         out << graph[v1].edgeId;
         out << " [tooltip=\"" << edge.coverage << " " <<
-            std::fixed << std::setprecision(2)<< edge.info.correctedJaccard() << "\"";
+            std::fixed << std::setprecision(2)<< edge.info.correctedJaccard() <<
+            " " << edge.info.offsetInBases << "\"";
         out << " color=\"" << hue << ",1,1\"";
 
         out << "];\n";
