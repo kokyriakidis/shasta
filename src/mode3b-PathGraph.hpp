@@ -18,6 +18,7 @@ primary marker graph edges in between.
 *******************************************************************************/
 
 // Shasta.
+#include "MarkerGraphEdgePairInfo.hpp"
 #include "shastaTypes.hpp"
 
 // Boost libraries.
@@ -48,6 +49,9 @@ private:
     uint64_t maxPrimaryCoverage;
     bool isPrimary(MarkerGraphEdgeId) const;
 
+    uint64_t minCoverageA;  // Used by createEdges
+    uint64_t minCoverageB;  // Used by recreate
+
     // A table of all the primary marker graph edges.
     // Each entry in this table is a vertex of the PathGraph.
     // The index in this table is the vertexId.
@@ -56,8 +60,8 @@ private:
     // boost graph macros.
     vector<MarkerGraphEdgeId> verticesVector;
 
-    // This fills in primaryEdges and the primaryEdgesTable.
-    void findVertices();
+    // This fills in the verticesVector.
+    void createVertices();
 
     // The "journey" of each oriented read is the sequence of vertices it encounters.
     // It stores pairs (ordinal0, vertexId) for each oriented read, sorted by ordinal0.
@@ -74,8 +78,7 @@ private:
     // boost graph macros.
     vector< pair<uint64_t, uint64_t> > edgesVector;
     vector<uint64_t> edgeCoverage;
-    uint64_t minCoverage;
-    void findEdges();
+    void createEdges();
 
     // Write the entire PathGraph in graphviz format.
     void writeGraphviz() const;
@@ -89,6 +92,8 @@ private:
     };
     class Edge {
     public:
+        uint64_t coverage;
+        MarkerGraphEdgePairInfo info;
     };
     class Graph : public boost::adjacency_list<
         boost::listS,
@@ -99,8 +104,12 @@ private:
     public:
         std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
         void addVertex(MarkerGraphEdgeId);
-        void addEdge(MarkerGraphEdgeId, MarkerGraphEdgeId);
-        void writeGraphviz(uint64_t componentId, ostream&) const;
+        void addEdge(
+            MarkerGraphEdgeId,
+            MarkerGraphEdgeId,
+            uint64_t coverage,
+            const MarkerGraphEdgePairInfo&);
+        void writeGraphviz(uint64_t componentId, ostream&, uint64_t minCoverageA) const;
         void findLinearChains(
             uint64_t minChainLength,
             vector< vector<MarkerGraphEdgeId> >&);
@@ -123,6 +132,16 @@ private:
     // OR
     // - Its target vertex has more than one incoming edge with coverage at least minPrimaryCoverage.
     bool isBranchEdge(MarkerGraphEdgeId) const;
+
+    // Create an updated version of the PathGraph from the chains, as follows:
+    // - Only vertices that appear in chains are used.
+    // - The oriented read journeys are recomputed.
+    // - Edges are recreated as follows:
+    //   1. Edges between successive vertices of each chain are created.
+    //      These edges are guaranteed to have edge at least equal to minCoverageA.
+    //   2. Edges bridging between two distinct chains are created if they have coverage
+    //      at least equal to minCoverageB and join the end/begin of the two chains.
+    void recreate();
 };
 
 #endif

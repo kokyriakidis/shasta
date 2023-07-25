@@ -377,6 +377,16 @@ void Assembler::exploreMarkerGraphEdgePair(
         return;
     }
 
+    // Sanity checks on the edge ids.
+    if(edgeIdA >= markerGraph.edges.size()) {
+        throw runtime_error("Marker graph edge " + to_string(edgeIdA) +
+            " is not valid. Maximum valid edge id is " + to_string(markerGraph.edges.size()));
+    }
+    if(edgeIdB >= markerGraph.edges.size()) {
+        throw runtime_error("Marker graph edge " + to_string(edgeIdB) +
+            " is not valid. Maximum valid edge id is " + to_string(markerGraph.edges.size()));
+    }
+
     // Sanity check that the two edges are distinct.
     if(edgeIdA == edgeIdB) {
         html << "Specify two distinct edges.";
