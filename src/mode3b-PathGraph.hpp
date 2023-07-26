@@ -88,7 +88,7 @@ private:
     // Each connected component is processed separately and represented
     // using classes Graph, Vertex, Edge.
 
-    class Vertex {
+    class PathGraphVertex {
     public:
         // The marker graph edge corresponding to this PathGraph vertex.
         MarkerGraphEdgeId edgeId;
@@ -96,7 +96,7 @@ private:
 
 
 
-    class Edge {
+    class PathGraphEdge {
     public:
         uint64_t coverage;
         MarkerGraphEdgePairInfo info;
@@ -113,12 +113,12 @@ private:
 
 
 
-    class Graph : public boost::adjacency_list<
+    class PathGraph : public boost::adjacency_list<
         boost::listS,
         boost::vecS,
         boost::bidirectionalS,
-        Vertex,
-        Edge> {
+        PathGraphVertex,
+        PathGraphEdge> {
     public:
 
         std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
@@ -141,8 +141,8 @@ private:
 
 
 
-    // The connected components of the PathGraph.
-    vector<Graph> components;
+    // The connected components of the GlobalPathGraph.
+    vector<PathGraph> components;
     void createComponents();
 
     // Index the large connected components.

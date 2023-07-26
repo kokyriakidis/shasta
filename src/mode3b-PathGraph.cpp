@@ -44,14 +44,14 @@ GlobalPathGraph::GlobalPathGraph(const Assembler& assembler) :
     // Find chains.
     for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
         const uint64_t componentId = componentIndex[componentRank].first;
-        Graph& component = components[componentId];
+        PathGraph& component = components[componentId];
         component.findChains(minCorrectedJaccardForChain, minTotalBaseOffsetForChain);
     }
 
     // Graphviz output.
     for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
         const uint64_t componentId = componentIndex[componentRank].first;
-        const Graph& component = components[componentId];
+        const PathGraph& component = components[componentId];
         ofstream out("PathGraphComponent" + to_string(componentRank) + ".dot");
         component.writeGraphviz(componentRank, out, minCoverage);
     }
@@ -208,22 +208,22 @@ void GlobalPathGraph::writeGraphviz() const
 
 
 // Write a component of the GlobalPathGraph in graphviz format.
-void GlobalPathGraph::Graph::writeGraphviz(
+void GlobalPathGraph::PathGraph::writeGraphviz(
     uint64_t componentId,
     ostream& out,
     uint64_t minCoverage) const
 {
-    const Graph& graph = *this;
+    const PathGraph& graph = *this;
     out << "digraph PathGraphComponent" << componentId << " {\n";
 
-    BGL_FORALL_VERTICES(v, graph, Graph) {
+    BGL_FORALL_VERTICES(v, graph, PathGraph) {
         out << graph[v].edgeId << ";\n";
     }
 
 
 
-    BGL_FORALL_EDGES(e, graph, Graph) {
-        const Edge& edge = graph[e];
+    BGL_FORALL_EDGES(e, graph, PathGraph) {
+        const PathGraphEdge& edge = graph[e];
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
 
@@ -295,7 +295,7 @@ void GlobalPathGraph::createComponents()
 
     // Transitive reduction of each connected component.
     for(uint64_t componentId=0; componentId<n; componentId++) {
-        Graph& component = components[componentId];
+        PathGraph& component = components[componentId];
         if(num_vertices(component) > 2) {
             try {
                 transitiveReduction(component);
@@ -322,15 +322,15 @@ void GlobalPathGraph::createComponents()
 
 
 
-void GlobalPathGraph::Graph::addVertex(MarkerGraphEdgeId edgeId)
+void GlobalPathGraph::PathGraph::addVertex(MarkerGraphEdgeId edgeId)
 {
     SHASTA_ASSERT(not vertexMap.contains(edgeId));
-    vertexMap.insert({edgeId, add_vertex(Vertex{edgeId}, *this)});
+    vertexMap.insert({edgeId, add_vertex({edgeId}, *this)});
 }
 
 
 
-void GlobalPathGraph::Graph::addEdge(
+void GlobalPathGraph::PathGraph::addEdge(
     MarkerGraphEdgeId edgeId0,
     MarkerGraphEdgeId edgeId1,
     uint64_t coverage,
@@ -391,18 +391,18 @@ bool GlobalPathGraph::isBranchEdge(MarkerGraphEdgeId edgeId) const
 
 
 
-void GlobalPathGraph::Graph::findChains(
+void GlobalPathGraph::PathGraph::findChains(
     double minCorrectedJaccard,
     uint64_t minTotalBaseOffset)
 {
-    Graph& graph = *this;
+    PathGraph& graph = *this;
 
     // A predicate to select edges with correctedJaccard at least equal to
     // minCorrectedJaccard. This is used to create the filtered graph below.
     class EdgePredicate {
     public:
         EdgePredicate(
-            const Graph& graph,
+            const PathGraph& graph,
             double minCorrectedJaccard) :
             graph(&graph),
             minCorrectedJaccard(minCorrectedJaccard) {}
@@ -412,7 +412,7 @@ void GlobalPathGraph::Graph::findChains(
         EdgePredicate() :
             graph(0),
             minCorrectedJaccard(0) {}
-        const Graph* graph;
+        const PathGraph* graph;
         double minCorrectedJaccard;
         bool operator()(const edge_descriptor e) const
         {
@@ -422,7 +422,7 @@ void GlobalPathGraph::Graph::findChains(
     const EdgePredicate edgePredicate(graph, minCorrectedJaccard);
 
     // Create a filtered graph that uses the above predicate to select edges.
-    using FilteredGraph = boost::filtered_graph<Graph, EdgePredicate>;
+    using FilteredGraph = boost::filtered_graph<PathGraph, EdgePredicate>;
     const FilteredGraph filteredGraph(graph, edgePredicate);
 
     // Find linear chains of edges in the filtered graph.
@@ -449,7 +449,7 @@ void GlobalPathGraph::Graph::findChains(
         const vector<edge_descriptor>& chain = chains[chainId];
         for(uint64_t position=0; position<chain.size(); position++) {
             const edge_descriptor e = chain[position];
-            Edge& edge = graph[e];
+            PathGraphEdge& edge = graph[e];
             edge.chainId = chainId;
             edge.positionInChain = position;
         }
