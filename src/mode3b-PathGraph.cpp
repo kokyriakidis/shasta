@@ -22,8 +22,7 @@ PathGraph::PathGraph(const Assembler& assembler) :
     // EXPOSE WHEN CODE STABILIZES.
     minPrimaryCoverage = 8;
     maxPrimaryCoverage = 25;
-    minCoverageA = 2;
-    // minCoverageB = 6;   // This gets reduced later.
+    minCoverage = 2;
     minComponentSize = 6;
     // const uint64_t minChainLength = 3;
 
@@ -39,28 +38,12 @@ PathGraph::PathGraph(const Assembler& assembler) :
 
     createComponents();
 
-#if 0
-    // Create an updated version of the PathGraph from the chains.
-    findChains(minChainLength);
-    recreate();
-    createComponents();
-
-    // Do it again, with a lower coverage threshold.
-    minCoverageB = 3;
-    findChains(minChainLength);
-    recreate();
-    createComponents();
-
-    // Get the chains from the final graph.
-    findChains(minChainLength);
-#endif
-
     // Graphviz output.
     for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
         const uint64_t componentId = componentIndex[componentRank].first;
         const Graph& component = components[componentId];
         ofstream out("PathGraphComponent" + to_string(componentRank) + ".dot");
-        component.writeGraphviz(componentRank, out, minCoverageA);
+        component.writeGraphviz(componentRank, out, minCoverage);
     }
 }
 
@@ -164,7 +147,7 @@ void PathGraph::createEdges()
 
     // Find coverage for each edge and remove the ones with low coverage;
     edgeCoverage.clear();
-    deduplicateAndCountWithThreshold(edgesVector, edgeCoverage, minCoverageA);
+    deduplicateAndCountWithThreshold(edgesVector, edgeCoverage, minCoverage);
     edgesVector.shrink_to_fit();
 
     // Write a coverage histogram.
@@ -254,124 +237,6 @@ void PathGraph::Graph::writeGraphviz(
     }
 
     out << "}\n";
-}
-
-
-
-// Find linear chains of vertices with in-degree<=1, out-degree<=1.
-void PathGraph::Graph::findLinearChains(
-    uint64_t minChainLength,
-    vector< vector<MarkerGraphEdgeId> >& chains)
-{
-    Graph& graph =*this;
-    chains.clear();
-
-    // Mark all vertices as unprocessed.
-    BGL_FORALL_VERTICES(v, graph, Graph) {
-        graph[v].wasProcessed = false;
-    }
-
-
-
-    // Main loop to find chains.
-    vector<vertex_descriptor> forwardChain;
-    vector<vertex_descriptor> backwardChain;
-    BGL_FORALL_VERTICES(vStart, graph, Graph) {
-
-        // See if we can start from here.
-        if(graph[vStart].wasProcessed) {
-            continue;
-        }
-        graph[vStart].wasProcessed = true;
-
-        const uint64_t inDegree = in_degree(vStart, graph);
-        if(inDegree > 1) {
-            continue;
-        }
-
-        const uint64_t outDegree = out_degree(vStart, graph);
-        if(outDegree > 1) {
-            continue;
-        }
-
-
-
-        // Move forward.
-        // This creates a forwardChain that includes vStart.
-        forwardChain.clear();
-        vertex_descriptor v = vStart;
-        while(true) {
-            if(in_degree(v, graph) > 1) {
-                break;
-            }
-            const uint64_t outDegree = out_degree(v, graph);
-            if(outDegree > 1) {
-                break;
-            }
-
-            // Add it to the forward chain.
-            forwardChain.push_back(v);
-
-            if(outDegree == 0) {
-                break;
-            }
-
-            // Move forward.
-            out_edge_iterator it;
-            tie(it, ignore) = out_edges(v, graph);
-            const edge_descriptor e = *it;
-            v = target(e, graph);
-            graph[v].wasProcessed = true;
-        }
-
-
-        // Move backward.
-        // This creates a backwardChain that includes vStart.
-        backwardChain.clear();
-        v = vStart;
-        while(true) {
-            if(out_degree(v, graph) > 1) {
-                break;
-            }
-            const uint64_t inDegree = in_degree(v, graph);
-            if(inDegree > 1) {
-                break;
-            }
-
-            // Add it to the backward chain.
-            backwardChain.push_back(v);
-
-            if(inDegree == 0) {
-                break;
-            }
-
-            // Move backward.
-            in_edge_iterator it;
-            tie(it, ignore) = in_edges(v, graph);
-            const edge_descriptor e = *it;
-            v = source(e, graph);
-            graph[v].wasProcessed = true;
-        }
-
-        // Reverse the backward chain, then remove vStart.
-        reverse(backwardChain.begin(), backwardChain.end());
-        backwardChain.resize(backwardChain.size() - 1);
-
-        // Check the length.
-        if(forwardChain.size() + backwardChain.size() < minChainLength) {
-            continue;
-        }
-
-        // Store this chain.
-        chains.resize(chains.size() + 1);
-        vector<MarkerGraphEdgeId>& chain = chains.back();
-        for(const vertex_descriptor v: backwardChain) {
-            chain.push_back(graph[v].edgeId);
-        }
-        for(const vertex_descriptor v: forwardChain) {
-            chain.push_back(graph[v].edgeId);
-        }
-    }
 }
 
 
@@ -508,131 +373,4 @@ bool PathGraph::isBranchEdge(MarkerGraphEdgeId edgeId) const
     }
 
     return false;
-}
-
-
-
-void PathGraph::findChains(uint64_t minChainLength)
-{
-    chains.clear();
-    vector< vector<MarkerGraphEdgeId> > componenthChains;
-
-    for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
-        const uint64_t componentId = componentIndex[componentRank].first;
-        Graph& component = components[componentId];
-        component.findLinearChains(minChainLength, componenthChains);
-
-        copy(componenthChains.begin(), componenthChains.end(), back_inserter(chains));
-    }
-
-    // Count the vertices in all chains.
-    uint64_t chainVertexCount = 0;
-    for(const auto& chain: chains) {
-        chainVertexCount += chain.size();
-    }
-
-    cout << "Found " << chains.size() << " linear chains containing a total " <<
-        chainVertexCount << " vertices." << endl;
-
-    // Write the chains.
-    ofstream csv("Chains.csv");
-    for(uint64_t chainId=0; chainId<chains.size(); chainId++) {
-        const auto& chain = chains[chainId];
-        for(uint64_t position=0; position<chain.size(); position++) {
-            csv << chainId << ",";
-            csv << position << ",";
-            csv << chain[position] << "\n";
-        }
-    }
-}
-
-
-
-// Create an update version of the PathGraph from the chains, as follows:
-// - Only vertices that appear in chains are used.
-// - The oriented read journeys are recomputed.
-// - Edges are recreated as follows:
-//   1. Edges between successive vertices of each chain are created.
-//   2. Edges bridging between two distinct chains are created if they have coverage
-//      at least equal to minCoverageB and join the end/begin of the two chains.
-void PathGraph::recreate()
-{
-    // Recreate the vertices, using only the ones that appear in chains.
-    // Also store (chainId, positionInChain) for each vertex.
-    class VertexInfo {
-    public:
-        MarkerGraphEdgeId edgeId;
-        uint64_t chainId;
-        uint64_t positionInChain;
-        bool operator<(const VertexInfo& that) const
-        {
-            return edgeId < that.edgeId;
-        }
-    };
-    vector<VertexInfo> infos;
-    for(uint64_t chainId=0; chainId<chains.size(); chainId++) {
-        const auto& chain = chains[chainId];
-        for(uint64_t position=0; position<chain.size(); position++) {
-            infos.push_back({chain[position], chainId, position});
-        }
-    }
-    sort(infos.begin(), infos.end());
-    verticesVector.clear();
-    for(const VertexInfo& info: infos) {
-        verticesVector.push_back(info.edgeId);
-    }
-
-    // Recompute oriented read journeys using these new vertices.
-    computeOrientedReadJourneys();
-
-    // Use the oriented read journeys to "follow the reads" and find candidate edges.
-    vector< pair<uint64_t, uint64_t> > candidateEdges;
-    for(uint64_t i=0; i<orientedReadJourneys.size(); i++) {
-        const auto& orientedReadJourney = orientedReadJourneys[i];
-        for(uint64_t j=1; j<orientedReadJourney.size(); j++) {
-            candidateEdges.push_back({orientedReadJourney[j-1].second, orientedReadJourney[j].second});
-        }
-    }
-    vector<uint64_t> candidateEdgesCoverage;
-    deduplicateAndCount(candidateEdges, candidateEdgesCoverage);
-
-
-
-    // Now we can regenerate the edges.
-    edgesVector.clear();
-    edgeCoverage.clear();
-    for(uint64_t i=0; i<candidateEdges.size(); i++) {
-        const pair<uint64_t, uint64_t>& candidateEdge = candidateEdges[i];
-        const uint64_t candidateEdgeCoverage = candidateEdgesCoverage[i];
-
-        const uint64_t vertexId0 = candidateEdge.first;
-        const uint64_t vertexId1 = candidateEdge.second;
-        const VertexInfo& info0 = infos[vertexId0];
-        const VertexInfo& info1 = infos[vertexId1];
-
-        // Decide if we should create this vertex.
-        bool createEdge = false;
-        if(info0.chainId == info1.chainId) {
-
-            // Generate edges between successive vertices of each chain.
-            if(info0.positionInChain + 1 == info1.positionInChain) {
-                createEdge = true;
-            }
-        } else {
-
-            // For edges that bridge across chains require a lower minCoverageB.
-            // Only allow them between the end of the previous chain
-            // and the beginning of the next chain.
-            if( (candidateEdgeCoverage >= minCoverageB) and
-                (info0.positionInChain == chains[info0.chainId].size() - 1) and
-                (info1.positionInChain == 0)) {
-                createEdge = true;
-            }
-        }
-
-        if(createEdge) {
-            edgesVector.push_back({vertexId0, vertexId1});
-            edgeCoverage.push_back(candidateEdgeCoverage);
-        }
-    }
 }

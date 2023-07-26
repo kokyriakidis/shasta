@@ -49,8 +49,8 @@ private:
     uint64_t maxPrimaryCoverage;
     bool isPrimary(MarkerGraphEdgeId) const;
 
-    uint64_t minCoverageA;  // Used by createEdges
-    uint64_t minCoverageB;  // Used by recreate
+    // The minimum coverage required to generate an edge when "following the reads".
+    uint64_t minCoverage;
 
     // A table of all the primary marker graph edges.
     // Each entry in this table is a vertex of the PathGraph.
@@ -88,14 +88,13 @@ private:
     class Vertex {
     public:
         MarkerGraphEdgeId edgeId;
-        bool wasProcessed = false;
     };
     class Edge {
     public:
         uint64_t coverage;
         MarkerGraphEdgePairInfo info;
-        // Flat that is set if the marker graph edges corresponding to the two
-        // vertice of this edge are adjacent in the mARKER GRAPH.
+        // Flag that is set if the two marker graph edges correspoding to
+        // the vertices of this PathGraph edge are adjacent.
         bool adjacent;
     };
     class Graph : public boost::adjacency_list<
@@ -114,9 +113,6 @@ private:
             const MarkerGraphEdgePairInfo&,
             bool adjacent);
         void writeGraphviz(uint64_t componentId, ostream&, uint64_t minCoverageA) const;
-        void findLinearChains(
-            uint64_t minChainLength,
-            vector< vector<MarkerGraphEdgeId> >&);
     };
     vector<Graph> components;
     void createComponents();
@@ -126,26 +122,12 @@ private:
     uint64_t minComponentSize;
     vector< pair<uint64_t, uint64_t> > componentIndex; // (componentId, size)
 
-    // The linear chains found in all connected components stored in the componentIndex.
-    vector< vector<MarkerGraphEdgeId> > chains;
-    void findChains(uint64_t minChainLength);
-
     // Find out if a marker graph edge is a branch edge.
     // A marker graph edge is a branch edge if:
     // - Its source vertex has more than one outgoing edge with coverage at least minPrimaryCoverage.
     // OR
     // - Its target vertex has more than one incoming edge with coverage at least minPrimaryCoverage.
     bool isBranchEdge(MarkerGraphEdgeId) const;
-
-    // Create an updated version of the PathGraph from the chains, as follows:
-    // - Only vertices that appear in chains are used.
-    // - The oriented read journeys are recomputed.
-    // - Edges are recreated as follows:
-    //   1. Edges between successive vertices of each chain are created.
-    //      These edges are guaranteed to have edge at least equal to minCoverageA.
-    //   2. Edges bridging between two distinct chains are created if they have coverage
-    //      at least equal to minCoverageB and join the end/begin of the two chains.
-    void recreate();
 };
 
 #endif
