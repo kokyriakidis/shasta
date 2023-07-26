@@ -2,12 +2,14 @@
 #include "mode3b-PathGraph.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
+#include "findLinearChains.hpp"
 #include "orderPairs.hpp"
 #include "transitiveReduction.hpp"
 using namespace shasta;
 using namespace mode3b;
 
 // Boost libraries.
+#include "boost/graph/filtered_graph.hpp"
 #include "boost/graph/iteration_macros.hpp"
 #include <boost/pending/disjoint_sets.hpp>
 
@@ -24,7 +26,8 @@ PathGraph::PathGraph(const Assembler& assembler) :
     maxPrimaryCoverage = 25;
     minCoverage = 2;
     minComponentSize = 6;
-    // const uint64_t minChainLength = 3;
+    const double minCorrectedJaccardForChain = 0.5;
+    const uint64_t minTotalBaseOffsetForChain = 200;
 
     createVertices();
     cout << "The path graph has " << verticesVector.size() << " vertices. "
@@ -37,6 +40,13 @@ PathGraph::PathGraph(const Assembler& assembler) :
     cout << "The path graph has " << edgesVector.size() << " edges." << endl;
 
     createComponents();
+
+    // Find chains.
+    for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
+        const uint64_t componentId = componentIndex[componentRank].first;
+        Graph& component = components[componentId];
+        component.findChains(minCorrectedJaccardForChain, minTotalBaseOffsetForChain);
+    }
 
     // Graphviz output.
     for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
@@ -227,11 +237,14 @@ void PathGraph::Graph::writeGraphviz(
             " [tooltip=\"" <<
             graph[v0].edgeId << "->" <<
             graph[v1].edgeId << " " <<
-            edge.coverage << " " <<
-            std::fixed << std::setprecision(2)<< edge.info.correctedJaccard() << " " <<
+            " coverage " << edge.coverage << " J' " <<
+            std::fixed << std::setprecision(2)<< edge.info.correctedJaccard() << " offset " <<
             edge.info.offsetInBases;
         if(edge.adjacent) {
             out << " adjacent";
+        }
+        if(edge.chainId != invalid<uint64_t>) {
+            out << " chain " << edge.chainId << " position " << edge.positionInChain;
         }
         out << "\" color=\"" << hue << ",1,1\"];\n";
     }
@@ -373,4 +386,73 @@ bool PathGraph::isBranchEdge(MarkerGraphEdgeId edgeId) const
     }
 
     return false;
+}
+
+
+
+
+void PathGraph::Graph::findChains(
+    double minCorrectedJaccard,
+    uint64_t minTotalBaseOffset)
+{
+    Graph& graph = *this;
+
+    // A predicate to select edges with correctedJaccard at least equal to
+    // minCorrectedJaccard. This is used to create the filtered graph below.
+    class EdgePredicate {
+    public:
+        EdgePredicate(
+            const Graph& graph,
+            double minCorrectedJaccard) :
+            graph(&graph),
+            minCorrectedJaccard(minCorrectedJaccard) {}
+        EdgePredicate(const EdgePredicate& that) :
+            graph(that.graph),
+            minCorrectedJaccard(that.minCorrectedJaccard) {}
+        EdgePredicate() :
+            graph(0),
+            minCorrectedJaccard(0) {}
+        const Graph* graph;
+        double minCorrectedJaccard;
+        bool operator()(const edge_descriptor e) const
+        {
+            return (*graph)[e].info.correctedJaccard() >= minCorrectedJaccard;
+        }
+    };
+    const EdgePredicate edgePredicate(graph, minCorrectedJaccard);
+
+    // Create a filtered graph that uses the above predicate to select edges.
+    using FilteredGraph = boost::filtered_graph<Graph, EdgePredicate>;
+    const FilteredGraph filteredGraph(graph, edgePredicate);
+
+    // Find linear chains of edges in the filtered graph.
+    vector< vector<edge_descriptor> > allChains;
+    findLinearChains(filteredGraph, 0, allChains);
+
+    // Only keep the ones that have a sufficient total base offset.
+    chains.clear();
+    for(const vector<edge_descriptor>& chain: allChains) {
+        uint64_t totalBaseOffset = 0;
+        for(const edge_descriptor e: chain) {
+            totalBaseOffset += graph[e].info.offsetInBases;
+        }
+        if(totalBaseOffset >= minTotalBaseOffset) {
+            chains.push_back(chain);
+        }
+
+    }
+    cout << "Found " << chains.size() << " chains in a connected component with " <<
+        num_vertices(graph) << " vertices and " << num_edges(graph) << " edges." << endl;
+
+    // Store chain information in the edges.
+    for(uint64_t chainId=0; chainId<chains.size(); chainId++) {
+        const vector<edge_descriptor>& chain = chains[chainId];
+        for(uint64_t position=0; position<chain.size(); position++) {
+            const edge_descriptor e = chain[position];
+            Edge& edge = graph[e];
+            edge.chainId = chainId;
+            edge.positionInChain = position;
+        }
+    }
+
 }

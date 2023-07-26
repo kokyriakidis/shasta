@@ -84,19 +84,35 @@ private:
     void writeGraphviz() const;
 
 
-    // Represent each connected component as a Graph.
+
+    // Each connected component is processed separately and represented
+    // using classes Graph, Vertex, Edge.
+
     class Vertex {
     public:
+        // The marker graph edge corresponding to this PathGraph vertex.
         MarkerGraphEdgeId edgeId;
     };
+
+
+
     class Edge {
     public:
         uint64_t coverage;
         MarkerGraphEdgePairInfo info;
-        // Flag that is set if the two marker graph edges correspoding to
+
+        // Flag that is set if the two marker graph edges corresponding to
         // the vertices of this PathGraph edge are adjacent.
+        // This is only used to report this information in graphviz output.
         bool adjacent;
+
+        // If this edge belongs ot a chain, store the chainId and position.
+        uint64_t chainId = invalid<uint64_t>;
+        uint64_t positionInChain = invalid<uint64_t>;
     };
+
+
+
     class Graph : public boost::adjacency_list<
         boost::listS,
         boost::vecS,
@@ -104,8 +120,10 @@ private:
         Vertex,
         Edge> {
     public:
+
         std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
         void addVertex(MarkerGraphEdgeId);
+
         void addEdge(
             MarkerGraphEdgeId,
             MarkerGraphEdgeId,
@@ -113,11 +131,21 @@ private:
             const MarkerGraphEdgePairInfo&,
             bool adjacent);
         void writeGraphviz(uint64_t componentId, ostream&, uint64_t minCoverageA) const;
+
+        // Linear chains of edges.
+        vector< vector<edge_descriptor> > chains;
+        void findChains(
+            double minCorrectedJaccard,
+            uint64_t minTotalBaseOffset);
     };
+
+
+
+    // The connected components of the PathGraph.
     vector<Graph> components;
     void createComponents();
 
-    // Index the large components.
+    // Index the large connected components.
     // Sorted by decreasing size.
     uint64_t minComponentSize;
     vector< pair<uint64_t, uint64_t> > componentIndex; // (componentId, size)
