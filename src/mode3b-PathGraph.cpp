@@ -18,7 +18,7 @@ using namespace mode3b;
 #include <iomanip>
 
 
-PathGraph::PathGraph(const Assembler& assembler) :
+GlobalPathGraph::GlobalPathGraph(const Assembler& assembler) :
     assembler(assembler)
 {
     // EXPOSE WHEN CODE STABILIZES.
@@ -60,7 +60,7 @@ PathGraph::PathGraph(const Assembler& assembler) :
 
 
 // Find out if a marker graph edge is a primary edge.
-bool PathGraph::isPrimary(MarkerGraphEdgeId edgeId) const
+bool GlobalPathGraph::isPrimary(MarkerGraphEdgeId edgeId) const
 {
     // Check coverage.
     const MarkerGraph& markerGraph = assembler.markerGraph;
@@ -97,7 +97,7 @@ bool PathGraph::isPrimary(MarkerGraphEdgeId edgeId) const
 
 
 
-void PathGraph::createVertices()
+void GlobalPathGraph::createVertices()
 {
     const MarkerGraph& markerGraph = assembler.markerGraph;
 
@@ -117,7 +117,7 @@ void PathGraph::createVertices()
 // The vertexId is the index in verticesVector.
 // Indexed by OrientedReadId::getValue.
 // Journeys are used to generate edges by "following the reads".
-void PathGraph::computeOrientedReadJourneys()
+void GlobalPathGraph::computeOrientedReadJourneys()
 {
     orientedReadJourneys.clear();
     orientedReadJourneys.resize(assembler.markers.size());
@@ -143,7 +143,7 @@ void PathGraph::computeOrientedReadJourneys()
 
 
 
-void PathGraph::createEdges()
+void GlobalPathGraph::createEdges()
 {
 
     edgesVector.clear();
@@ -185,11 +185,11 @@ void PathGraph::createEdges()
 
 
 
-// Write the entire PathGraph in graphviz format.
-void PathGraph::writeGraphviz() const
+// Write the entire GlobalPathGraph in graphviz format.
+void GlobalPathGraph::writeGraphviz() const
 {
-    ofstream out("PathGraph.dot");
-    out << "digraph PathGraph {\n";
+    ofstream out("GlobalPathGraph.dot");
+    out << "digraph GlobalPathGraph {\n";
 
     for(uint64_t i=0; i<edgesVector.size(); i++) {
         const pair<uint64_t, uint64_t>& edge = edgesVector[i];
@@ -207,8 +207,8 @@ void PathGraph::writeGraphviz() const
 
 
 
-// Write a component of the PathGraph in graphviz format.
-void PathGraph::Graph::writeGraphviz(
+// Write a component of the GlobalPathGraph in graphviz format.
+void GlobalPathGraph::Graph::writeGraphviz(
     uint64_t componentId,
     ostream& out,
     uint64_t minCoverage) const
@@ -254,7 +254,7 @@ void PathGraph::Graph::writeGraphviz(
 
 
 
-void PathGraph::createComponents()
+void GlobalPathGraph::createComponents()
 {
     // Compute connected components.
     const uint64_t n = verticesVector.size();
@@ -322,7 +322,7 @@ void PathGraph::createComponents()
 
 
 
-void PathGraph::Graph::addVertex(MarkerGraphEdgeId edgeId)
+void GlobalPathGraph::Graph::addVertex(MarkerGraphEdgeId edgeId)
 {
     SHASTA_ASSERT(not vertexMap.contains(edgeId));
     vertexMap.insert({edgeId, add_vertex(Vertex{edgeId}, *this)});
@@ -330,7 +330,7 @@ void PathGraph::Graph::addVertex(MarkerGraphEdgeId edgeId)
 
 
 
-void PathGraph::Graph::addEdge(
+void GlobalPathGraph::Graph::addEdge(
     MarkerGraphEdgeId edgeId0,
     MarkerGraphEdgeId edgeId1,
     uint64_t coverage,
@@ -354,7 +354,7 @@ void PathGraph::Graph::addEdge(
 // - Its source vertex has more than one outgoing edge with coverage at least minPrimaryCoverage.
 // OR
 // - Its target vertex has more than one incoming edge with coverage at least minPrimaryCoverage.
-bool PathGraph::isBranchEdge(MarkerGraphEdgeId edgeId) const
+bool GlobalPathGraph::isBranchEdge(MarkerGraphEdgeId edgeId) const
 {
     // Access this marker graph edge and its vertices.
     const MarkerGraph::Edge& edge = assembler.markerGraph.edges[edgeId];
@@ -391,7 +391,7 @@ bool PathGraph::isBranchEdge(MarkerGraphEdgeId edgeId) const
 
 
 
-void PathGraph::Graph::findChains(
+void GlobalPathGraph::Graph::findChains(
     double minCorrectedJaccard,
     uint64_t minTotalBaseOffset)
 {

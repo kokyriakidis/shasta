@@ -59,7 +59,7 @@ void Assembler::findCompleteMarkerGraphPaths(uint64_t threadCount) const
 
 void Assembler::findMode3bPaths() const
 {
-    mode3b::PathGraph pathGraph(*this);
+    mode3b::GlobalPathGraph pathGraph(*this);
 }
 
 

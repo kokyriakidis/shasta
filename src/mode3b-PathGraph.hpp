@@ -32,15 +32,15 @@ primary marker graph edges in between.
 namespace shasta {
     class Assembler;
     namespace mode3b {
-        class PathGraph;
+        class GlobalPathGraph;
     }
 }
 
 
 
-class shasta::mode3b::PathGraph {
+class shasta::mode3b::GlobalPathGraph {
 public:
-    PathGraph(const Assembler&);
+    GlobalPathGraph(const Assembler&);
 private:
     const Assembler& assembler;
 
