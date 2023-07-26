@@ -3,7 +3,7 @@
 
 /*******************************************************************************
 
-In the mode3b::PathGraph, each vertex corresponds to a primary edge of
+In the mode3b::GlobalPathGraph, each vertex corresponds to a primary edge of
 of the marker graph, which is believed to correspond to a single copy
 of sequence. It is characterized as follows:
 - minPrimaryCoverage <= coverage <= maxPrimaryCoverage
@@ -32,9 +32,71 @@ primary marker graph edges in between.
 namespace shasta {
     class Assembler;
     namespace mode3b {
+
+        // The global path graph.
+        // Each vertex corresponds to a primary marker graph edge.
         class GlobalPathGraph;
+
+        // A single connected component of the GlobalPathGraph.
+        class PathGraphVertex;
+        class PathGraphEdge;
+        class PathGraph;
+        using PathGraphGraphBaseClass = boost::adjacency_list<
+            boost::listS,
+            boost::vecS,
+            boost::bidirectionalS,
+            PathGraphVertex,
+            PathGraphEdge>;
     }
 }
+
+
+
+class shasta::mode3b::PathGraphVertex {
+public:
+    // The marker graph edge corresponding to this PathGraph vertex.
+    MarkerGraphEdgeId edgeId;
+};
+
+
+
+class shasta::mode3b::PathGraphEdge {
+public:
+    uint64_t coverage;
+    MarkerGraphEdgePairInfo info;
+
+    // Flag that is set if the two marker graph edges corresponding to
+    // the vertices of this PathGraph edge are adjacent.
+    // This is only used to report this information in graphviz output.
+    bool adjacent;
+
+    // If this edge belongs to a chain, store the chainId and position.
+    uint64_t chainId = invalid<uint64_t>;
+    uint64_t positionInChain = invalid<uint64_t>;
+};
+
+
+
+class shasta::mode3b::PathGraph : public PathGraphGraphBaseClass {
+public:
+
+    std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
+    void addVertex(MarkerGraphEdgeId);
+
+    void addEdge(
+        MarkerGraphEdgeId,
+        MarkerGraphEdgeId,
+        uint64_t coverage,
+        const MarkerGraphEdgePairInfo&,
+        bool adjacent);
+    void writeGraphviz(uint64_t componentId, ostream&, uint64_t minCoverageA) const;
+
+    // Linear chains of edges.
+    vector< vector<edge_descriptor> > chains;
+    void findChains(
+        double minCorrectedJaccard,
+        uint64_t minTotalBaseOffset);
+};
 
 
 
@@ -82,64 +144,6 @@ private:
 
     // Write the entire PathGraph in graphviz format.
     void writeGraphviz() const;
-
-
-
-    // Each connected component is processed separately and represented
-    // using classes Graph, Vertex, Edge.
-
-    class PathGraphVertex {
-    public:
-        // The marker graph edge corresponding to this PathGraph vertex.
-        MarkerGraphEdgeId edgeId;
-    };
-
-
-
-    class PathGraphEdge {
-    public:
-        uint64_t coverage;
-        MarkerGraphEdgePairInfo info;
-
-        // Flag that is set if the two marker graph edges corresponding to
-        // the vertices of this PathGraph edge are adjacent.
-        // This is only used to report this information in graphviz output.
-        bool adjacent;
-
-        // If this edge belongs ot a chain, store the chainId and position.
-        uint64_t chainId = invalid<uint64_t>;
-        uint64_t positionInChain = invalid<uint64_t>;
-    };
-
-
-
-    class PathGraph : public boost::adjacency_list<
-        boost::listS,
-        boost::vecS,
-        boost::bidirectionalS,
-        PathGraphVertex,
-        PathGraphEdge> {
-    public:
-
-        std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
-        void addVertex(MarkerGraphEdgeId);
-
-        void addEdge(
-            MarkerGraphEdgeId,
-            MarkerGraphEdgeId,
-            uint64_t coverage,
-            const MarkerGraphEdgePairInfo&,
-            bool adjacent);
-        void writeGraphviz(uint64_t componentId, ostream&, uint64_t minCoverageA) const;
-
-        // Linear chains of edges.
-        vector< vector<edge_descriptor> > chains;
-        void findChains(
-            double minCorrectedJaccard,
-            uint64_t minTotalBaseOffset);
-    };
-
-
 
     // The connected components of the GlobalPathGraph.
     vector<PathGraph> components;

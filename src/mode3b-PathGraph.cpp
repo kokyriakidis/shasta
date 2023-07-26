@@ -18,6 +18,7 @@ using namespace mode3b;
 #include <iomanip>
 
 
+
 GlobalPathGraph::GlobalPathGraph(const Assembler& assembler) :
     assembler(assembler)
 {
@@ -208,7 +209,7 @@ void GlobalPathGraph::writeGraphviz() const
 
 
 // Write a component of the GlobalPathGraph in graphviz format.
-void GlobalPathGraph::PathGraph::writeGraphviz(
+void PathGraph::writeGraphviz(
     uint64_t componentId,
     ostream& out,
     uint64_t minCoverage) const
@@ -322,7 +323,7 @@ void GlobalPathGraph::createComponents()
 
 
 
-void GlobalPathGraph::PathGraph::addVertex(MarkerGraphEdgeId edgeId)
+void PathGraph::addVertex(MarkerGraphEdgeId edgeId)
 {
     SHASTA_ASSERT(not vertexMap.contains(edgeId));
     vertexMap.insert({edgeId, add_vertex({edgeId}, *this)});
@@ -330,7 +331,7 @@ void GlobalPathGraph::PathGraph::addVertex(MarkerGraphEdgeId edgeId)
 
 
 
-void GlobalPathGraph::PathGraph::addEdge(
+void PathGraph::addEdge(
     MarkerGraphEdgeId edgeId0,
     MarkerGraphEdgeId edgeId1,
     uint64_t coverage,
@@ -391,7 +392,7 @@ bool GlobalPathGraph::isBranchEdge(MarkerGraphEdgeId edgeId) const
 
 
 
-void GlobalPathGraph::PathGraph::findChains(
+void PathGraph::findChains(
     double minCorrectedJaccard,
     uint64_t minTotalBaseOffset)
 {
