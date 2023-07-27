@@ -27,7 +27,8 @@ GlobalPathGraph::GlobalPathGraph(const Assembler& assembler) :
     maxPrimaryCoverage = 25;
     minCoverage = 2;
     minComponentSize = 6;
-    const double minCorrectedJaccardForChain = 0.5;
+    const double minCorrectedJaccardForChain1 = 0.5;    // For chain creation
+    const double minCorrectedJaccardForChain2 = 0.3;    // For chain graph creation
     const uint64_t minTotalBaseOffsetForChain = 200;
 
     createVertices();
@@ -42,12 +43,22 @@ GlobalPathGraph::GlobalPathGraph(const Assembler& assembler) :
 
     createComponents();
 
+
+
     // Find chains.
     for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
         const uint64_t componentId = componentIndex[componentRank].first;
         PathGraph& component = components[componentId];
-        component.findChains(minCorrectedJaccardForChain, minTotalBaseOffsetForChain);
+        component.findChains(minCorrectedJaccardForChain1, minTotalBaseOffsetForChain);
+
+        // Create a graph describing the chains in this connected component
+        // and their connectivity.
+        ChainGraph chainGraph(component, assembler, minCorrectedJaccardForChain2);
+        ofstream out("ChainGraphComponent" + to_string(componentRank) + ".dot");
+        chainGraph.writeGraphviz(out);
     }
+
+
 
     // Graphviz output.
     for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
@@ -239,7 +250,7 @@ void PathGraph::writeGraphviz(
             graph[v0].edgeId << "->" <<
             graph[v1].edgeId << " " <<
             " coverage " << edge.coverage << " J' " <<
-            std::fixed << std::setprecision(2)<< edge.info.correctedJaccard() << " offset " <<
+            std::fixed << std::setprecision(2) << edge.info.correctedJaccard() << " offset " <<
             edge.info.offsetInBases;
         if(edge.adjacent) {
             out << " adjacent";
@@ -456,4 +467,181 @@ void PathGraph::findChains(
         }
     }
 
+}
+
+
+
+ChainGraph::ChainGraph(
+    const PathGraph& pathGraph,
+    const Assembler& assembler,
+    double minCorrectedJaccardForChain) :
+    ChainGraphBaseClass(pathGraph.chains.size())
+{
+    ChainGraph& chainGraph = *this;
+
+    // Two maps that, given a vertex of the PathGraph,
+    // gives the chains that begins/ends there, if any.
+    std::map<PathGraph::vertex_descriptor, vector<uint64_t> > chainBeginMap;
+    std::map<PathGraph::vertex_descriptor, vector<uint64_t> > chainEndMap;
+    for(uint64_t chainId=0; chainId<pathGraph.chains.size(); chainId++) {
+        const vector<PathGraph::edge_descriptor>& chain = pathGraph.chains[chainId];
+        SHASTA_ASSERT(not chain.empty());
+
+        const PathGraph::vertex_descriptor v0 = source(chain.front(), pathGraph);
+        chainBeginMap[v0].push_back(chainId);
+
+        const PathGraph::vertex_descriptor v1 = target(chain.back(), pathGraph);
+        chainEndMap[v1].push_back(chainId);
+    }
+
+
+
+    // Loop over chains.
+    for(uint64_t chainId0=0; chainId0<pathGraph.chains.size(); chainId0++) {
+        const vector<PathGraph::edge_descriptor>& chain0 = pathGraph.chains[chainId0];
+        SHASTA_ASSERT(not chain0.empty());
+
+        // Do a forward BFS starting at the end of this chain.
+        // The BFS gets blocked at vertices where other chains begin.
+        {
+            const PathGraph::vertex_descriptor vStart = target(chain0.back(), pathGraph);
+            std::queue<PathGraph::vertex_descriptor> q;
+            q.push(vStart);
+            std::set<PathGraph::vertex_descriptor> verticesEncountered;
+            verticesEncountered.insert(vStart);
+            while(not q.empty()) {
+
+                // Dequeue a vertex.
+                const PathGraph::vertex_descriptor v0 = q.front();
+                q.pop();
+                // cout << "Dequeued " << pathGraph[v0].edgeId << endl;
+
+                // If any chains begin here, generate an edge between chain0 and those chains.
+                // and don't continue the BFS from here.
+                // Otherwise, continue the BFS.
+                auto it = chainBeginMap.find(v0);
+                if(it == chainBeginMap.end()) {
+                    BGL_FORALL_OUTEDGES(v0, e, pathGraph, PathGraph) {
+                        const PathGraph::vertex_descriptor v1 = target(e, pathGraph);
+                        if(not verticesEncountered.contains(v1)) {
+                            verticesEncountered.insert(v1);
+                            q.push(v1);
+                            // cout << "Enqueued " << pathGraph[v1].edgeId << endl;
+                        }
+                    }
+                } else {
+                    const vector<uint64_t>& chainIds1 = it->second;
+                    for(const uint64_t chainId1: chainIds1) {
+
+                        bool edgeExists;
+                        tie(ignore, edgeExists) = edge(chainId0, chainId1, chainGraph);
+                        if(edgeExists) {
+                            continue;
+                        }
+
+                        const vector<PathGraph::edge_descriptor>& chain1 = pathGraph.chains[chainId1];
+                        const MarkerGraphEdgeId edgeId0 = pathGraph[target(chain0.back(), pathGraph)].edgeId;
+                        const MarkerGraphEdgeId edgeId1 = pathGraph[source(chain1.front(), pathGraph)].edgeId;
+                        MarkerGraphEdgePairInfo info;
+                        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+                        // if(info.correctedJaccard() >= minCorrectedJaccardForChain) {
+                        if(true /*info.correctedJaccard() > 0.*/) {
+                            add_edge(chainId0, chainId1, {info}, chainGraph);
+                        }
+                    }
+                }
+            }
+        }
+
+
+        // Do a backward BFS starting at the beginning of this chain.
+        // The BFS gets blocked at vertices where other chains end.
+        {
+            const PathGraph::vertex_descriptor vStart = source(chain0.front(), pathGraph);
+            std::queue<PathGraph::vertex_descriptor> q;
+            q.push(vStart);
+            std::set<PathGraph::vertex_descriptor> verticesEncountered;
+            verticesEncountered.insert(vStart);
+            while(not q.empty()) {
+
+                // Dequeue a vertex.
+                const PathGraph::vertex_descriptor v0 = q.front();
+                q.pop();
+                // cout << "Dequeued " << pathGraph[v0].edgeId << endl;
+
+                // If any chains ends here, generate an edge between chain0 and those chains.
+                // and don't continue the BFS from here.
+                // Otherwise, continue the BFS.
+                auto it = chainEndMap.find(v0);
+                if(it == chainEndMap.end()) {
+                    BGL_FORALL_INEDGES(v0, e, pathGraph, PathGraph) {
+                        const PathGraph::vertex_descriptor v1 = source(e, pathGraph);
+                        if(not verticesEncountered.contains(v1)) {
+                            verticesEncountered.insert(v1);
+                            q.push(v1);
+                            // cout << "Enqueued " << pathGraph[v1].edgeId << endl;
+                        }
+                    }
+                } else {
+                    const vector<uint64_t>& chainIds1 = it->second;
+                    for(const uint64_t chainId1: chainIds1) {
+
+                        bool edgeExists;
+                        tie(ignore, edgeExists) = edge(chainId1, chainId0, chainGraph);
+                        if(edgeExists) {
+                            continue;
+                        }
+
+                        const vector<PathGraph::edge_descriptor>& chain1 = pathGraph.chains[chainId1];
+                        const MarkerGraphEdgeId edgeId0 = pathGraph[target(chain1.back(), pathGraph)].edgeId;
+                        const MarkerGraphEdgeId edgeId1 = pathGraph[source(chain0.front(), pathGraph)].edgeId;
+                        MarkerGraphEdgePairInfo info;
+                        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+                        // if(info.correctedJaccard() >= minCorrectedJaccardForChain) {
+                        if(true /*info.correctedJaccard() > 0.*/) {
+                            add_edge(chainId1, chainId0, {info}, chainGraph);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    transitiveReduction(chainGraph);
+}
+
+
+
+
+void ChainGraph::writeGraphviz(ostream& out) const
+{
+    const ChainGraph& chainGraph = *this;
+
+    out << std::fixed << std::setprecision(2);
+    out << "digraph ChainGraph {\n";
+
+    BGL_FORALL_VERTICES(v, chainGraph, ChainGraph) {
+        out << v << ";\n";
+    }
+
+    BGL_FORALL_EDGES(e, chainGraph, ChainGraph) {
+        const vertex_descriptor v0 = source(e, chainGraph);
+        const vertex_descriptor v1 = target(e, chainGraph);
+
+        // Color based on corrected Jaccard.
+        const double correctedJaccard = chainGraph[e].info.correctedJaccard();
+        const double hue = correctedJaccard / 3.;   // 0=red, 0.5=yellow, 1=green
+
+        out << v0 << "->" << v1;
+
+        out << "[";
+        if(correctedJaccard > 0.) {
+            out << "label=\"" <<  chainGraph[e].info.correctedJaccard() << "\"";
+        } else {
+            out << "style=dashed";
+        }
+        out << " color=\"" << hue << ",1,1\"";
+        out << "];\n";
+    }
+    out << "}\n";
 }

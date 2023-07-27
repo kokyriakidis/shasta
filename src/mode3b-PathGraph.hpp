@@ -47,6 +47,17 @@ namespace shasta {
             boost::bidirectionalS,
             PathGraphVertex,
             PathGraphEdge>;
+
+        // In the ChainGraph, each vertex represents a chain in a PathGraph.
+        class ChainGraphVertex;
+        class ChainGraphEdge;
+        class ChainGraph;
+        using ChainGraphBaseClass = boost::adjacency_list<
+            boost::listS,
+            boost::vecS,
+            boost::bidirectionalS,
+            ChainGraphVertex,
+            ChainGraphEdge>;
     }
 }
 
@@ -161,6 +172,32 @@ private:
     // - Its target vertex has more than one incoming edge with coverage at least minPrimaryCoverage.
     bool isBranchEdge(MarkerGraphEdgeId) const;
 };
+
+
+
+class shasta::mode3b::ChainGraphVertex {
+public:
+};
+
+
+
+class shasta::mode3b::ChainGraphEdge {
+public:
+    MarkerGraphEdgePairInfo info;
+};
+
+
+
+class shasta::mode3b::ChainGraph : public ChainGraphBaseClass {
+public:
+    ChainGraph(
+        const PathGraph&,
+        const Assembler&,
+        double minCorrectedJaccardForChain);
+    void writeGraphviz(ostream&) const;
+};
+
+
 
 #endif
 
