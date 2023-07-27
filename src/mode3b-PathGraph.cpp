@@ -45,17 +45,43 @@ GlobalPathGraph::GlobalPathGraph(const Assembler& assembler) :
 
 
 
-    // Find chains.
-    for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
-        const uint64_t componentId = componentIndex[componentRank].first;
-        PathGraph& component = components[componentId];
-        component.findChains(minCorrectedJaccardForChain1, minTotalBaseOffsetForChain);
+    // For each connected component of the GlobalPathGraph (a PathGraph)
+    // find chains and generate a ChainGraph.
+    {
+        ofstream csv("Chains.csv");
+        csv << "Component rank,ChainId,Position,EdgeId0,EdgeId1,Corrected Jaccard,Coverage,Base offset\n";
+        for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
+            const uint64_t componentId = componentIndex[componentRank].first;
+            PathGraph& component = components[componentId];
+            component.findChains(minCorrectedJaccardForChain1, minTotalBaseOffsetForChain);
 
-        // Create a graph describing the chains in this connected component
-        // and their connectivity.
-        ChainGraph chainGraph(component, assembler, minCorrectedJaccardForChain2);
-        ofstream out("ChainGraphComponent" + to_string(componentRank) + ".dot");
-        chainGraph.writeGraphviz(out);
+            // Write out the chains to csv.
+            for(uint64_t chainId=0; chainId < component.chains.size(); chainId++) {
+                const vector<PathGraph::edge_descriptor>& chain = component.chains[chainId];
+                for(uint64_t position=0; position < chain.size(); position++) {
+                    const PathGraph::edge_descriptor e = chain[position];
+                    const PathGraphEdge& edge = component[e];
+                    const PathGraph::vertex_descriptor v0 = source(e, component);
+                    const PathGraph::vertex_descriptor v1 = target(e, component);
+                    const MarkerGraphEdgeId edgeId0 = component[v0].edgeId;
+                    const MarkerGraphEdgeId edgeId1 = component[v1].edgeId;
+                    csv << componentRank << ",";
+                    csv << chainId << ",";
+                    csv << position << ",";
+                    csv << edgeId0 << ",";
+                    csv << edgeId1 << ",";
+                    csv << edge.info.correctedJaccard() << ",";
+                    csv << edge.info.common << ",";
+                    csv << edge.info.offsetInBases << "\n";
+                }
+            }
+
+            // Create a graph describing the chains in this connected component
+            // and their connectivity.
+            ChainGraph chainGraph(component, assembler, minCorrectedJaccardForChain2);
+            ofstream out("ChainGraphComponent" + to_string(componentRank) + ".dot");
+            chainGraph.writeGraphviz(out);
+        }
     }
 
 
@@ -544,8 +570,7 @@ ChainGraph::ChainGraph(
                         const MarkerGraphEdgeId edgeId1 = pathGraph[source(chain1.front(), pathGraph)].edgeId;
                         MarkerGraphEdgePairInfo info;
                         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
-                        // if(info.correctedJaccard() >= minCorrectedJaccardForChain) {
-                        if(true /*info.correctedJaccard() > 0.*/) {
+                        if(info.correctedJaccard() >= minCorrectedJaccardForChain) {
                             add_edge(chainId0, chainId1, {info}, chainGraph);
                         }
                     }
@@ -597,8 +622,7 @@ ChainGraph::ChainGraph(
                         const MarkerGraphEdgeId edgeId1 = pathGraph[source(chain0.front(), pathGraph)].edgeId;
                         MarkerGraphEdgePairInfo info;
                         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
-                        // if(info.correctedJaccard() >= minCorrectedJaccardForChain) {
-                        if(true /*info.correctedJaccard() > 0.*/) {
+                        if(info.correctedJaccard() >= minCorrectedJaccardForChain) {
                             add_edge(chainId1, chainId0, {info}, chainGraph);
                         }
                     }
