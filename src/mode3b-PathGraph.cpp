@@ -16,6 +16,7 @@ using namespace mode3b;
 // Standard library.
 #include "fstream.hpp"
 #include <iomanip>
+#include <queue>
 
 
 
@@ -26,7 +27,7 @@ GlobalPathGraph::GlobalPathGraph(const Assembler& assembler) :
     minPrimaryCoverage = 8;
     maxPrimaryCoverage = 25;
     minCoverage = 2;
-    minComponentSize = 6;
+    minComponentSize = 100;
     const double minCorrectedJaccardForChain1 = 0.5;    // For chain creation
     const double minCorrectedJaccardForChain2 = 0.3;    // For chain graph creation
     const uint64_t minTotalBaseOffsetForChain = 200;
@@ -124,10 +125,12 @@ bool GlobalPathGraph::isPrimary(MarkerGraphEdgeId edgeId) const
         return false;
     }
 
+#if 0
     // Check that is also is a branch edge.
     if(not isBranchEdge(edgeId)) {
         return false;
     }
+#endif
 
     // If all above checks passed, this is a primary edge.
     return true;
@@ -176,6 +179,22 @@ void GlobalPathGraph::computeOrientedReadJourneys()
     for(auto& orientedReadJourney: orientedReadJourneys) {
         sort(orientedReadJourney.begin(), orientedReadJourney.end(),
             OrderPairsByFirstOnly<uint32_t, uint64_t>());
+    }
+
+    // Write the journeys to csv.
+    ofstream csv("GlobalPathGraphJourneys.csv");
+    for(ReadId readId=0; readId<assembler.markers.size()/2; readId++) {
+        for(Strand strand=0; strand<2; strand++) {
+            const OrientedReadId orientedReadId(readId, strand);
+            const auto journey = orientedReadJourneys[orientedReadId.getValue()];
+            csv << orientedReadId;
+            for(const auto& p: journey) {
+                const uint64_t vertexId = p.second;
+                const MarkerGraphEdgeId edgeId = verticesVector[vertexId];
+                csv << "," << edgeId;
+            }
+            csv << "\n";
+        }
     }
 }
 
