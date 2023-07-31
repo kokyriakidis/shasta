@@ -26,6 +26,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     maxDistanceInJourney = 20;
     minCoverage = 2;
     minCorrectedJaccard = 0.5;
+    const uint64_t k = 2;   // For k-nn
     minComponentSize = 100;
 
     createVertices();
@@ -38,7 +39,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     createEdges();
     cout << "The path graph has " << edges.size() << " edges." << endl;
 
-    createComponents();
+    createComponents(k);
 
     // Graphviz output.
     for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
@@ -259,7 +260,7 @@ void GlobalPathGraph1::writeGraphviz() const
 
 
 
-void GlobalPathGraph1::createComponents()
+void GlobalPathGraph1::createComponents(uint64_t k)
 {
     // Compute connected components.
     const uint64_t n = vertices.size();
@@ -292,19 +293,6 @@ void GlobalPathGraph1::createComponents()
         components[componentId].addEdge(edgeId0, edgeId1, edge.info);
     }
 
-    // Transitive reduction of each connected component.
-    for(uint64_t componentId=0; componentId<n; componentId++) {
-        PathGraph1& component = components[componentId];
-        if(num_vertices(component) > 2) {
-            try {
-                transitiveReduction(component);
-            } catch(const exception& e) {
-                cout << "Transitive reduction failed for component " <<
-                    componentId << endl;
-            }
-        }
-    }
-
     // Create the componentIndex.
     componentIndex.clear();
     for(uint64_t componentId=0; componentId<n; componentId++) {
@@ -317,6 +305,25 @@ void GlobalPathGraph1::createComponents()
         OrderPairsBySecondOnlyGreater<uint64_t, uint64_t>());
     cout << "Found " << componentIndex.size() << " connected components of the path graph "
         "with at least " << minComponentSize << " vertices." << endl;
+
+#if 0
+    // k-nn followed by transitive reduction of each large connected component.
+    for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
+        const uint64_t componentId = componentIndex[componentRank].first;
+        PathGraph1& component = components[componentId];
+        cout << "Connected component " << componentRank << " has " << num_vertices(component) << " vertices." << endl;
+        cout << "Initial number of edges " << num_edges(component) << endl;
+        component.knn(k);
+        cout << "Number of edges after k-nn " << num_edges(component) << endl;
+        try {
+            transitiveReduction(component);
+        } catch(const exception& e) {
+            cout << "Transitive reduction failed for component " <<
+                componentRank << endl;
+        }
+        cout << "Number of edges after transitive reduction " << num_edges(component) << endl;
+    }
+#endif
 }
 
 
@@ -379,4 +386,68 @@ void PathGraph1::writeGraphviz(
     }
 
     out << "}\n";
+}
+
+
+
+// For each vertex, only keep the best k outgoing and k incoming edges.
+// "Best" as defined by correctedJaccard of the edges.
+void PathGraph1::knn(uint64_t k)
+{
+    PathGraph1& graph = *this;
+
+    // First mark all edges as not to be kept.
+    BGL_FORALL_EDGES(e, graph, PathGraph1) {
+        graph[e].keep = false;
+    }
+
+
+
+    // For each vertex, keep as to be kept the best k outgoing
+    // and incoming edges.
+    vector< pair<edge_descriptor, double> > adjacentEdges;  // With correctedJaccard.
+    BGL_FORALL_VERTICES(v, graph, PathGraph1) {
+
+        // Loop over both directions.
+        for(uint64_t direction=0; direction<2; direction++) {
+            adjacentEdges.clear();
+
+            if(direction == 0) {
+                BGL_FORALL_OUTEDGES(v, e, graph, PathGraph1) {
+                    adjacentEdges.push_back({e, graph[e].info.correctedJaccard()});
+                }
+            } else {
+                BGL_FORALL_INEDGES(v, e, graph, PathGraph1) {
+                    adjacentEdges.push_back({e, graph[e].info.correctedJaccard()});
+                }
+            }
+
+            // Only keep the k best.
+            if(adjacentEdges.size() > k) {
+                std::nth_element(
+                    adjacentEdges.begin(),
+                    adjacentEdges.begin() + k,
+                    adjacentEdges.end(),
+                    OrderPairsBySecondOnlyGreater<edge_descriptor, double>());
+                adjacentEdges.resize(k);
+            }
+
+            // Mark them as to be kept.
+            for(const auto& p:adjacentEdges) {
+                const edge_descriptor e = p.first;
+                graph[e].keep = true;
+            }
+        }
+    }
+
+    // Remove edges not marked as to be kept.
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, graph, PathGraph1) {
+        if(not graph[e].keep) {
+            edgesToBeRemoved.push_back(e);
+        }
+    }
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, graph);
+    }
 }

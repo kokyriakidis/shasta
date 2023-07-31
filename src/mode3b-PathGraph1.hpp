@@ -62,6 +62,7 @@ public:
 class shasta::mode3b::PathGraph1Edge {
 public:
     MarkerGraphEdgePairInfo info;
+    bool keep;  // Used by PathGraph1::knn.
 };
 
 
@@ -77,6 +78,10 @@ public:
         MarkerGraphEdgeId,
         const MarkerGraphEdgePairInfo&);
     void writeGraphviz(uint64_t componentId, ostream&) const;
+
+    // For each vertex, only keep the best k outgoing and k incoming edges.
+    // "Best" as defined by correctedJaccard of the edges.
+    void knn(uint64_t k);
 };
 
 
@@ -135,7 +140,7 @@ private:
 
     // The connected components of the GlobalPathGraph1.
     vector<PathGraph1> components;
-    void createComponents();
+    void createComponents(uint64_t k);
 
     // Index the large connected components.
     // Sorted by decreasing size.
