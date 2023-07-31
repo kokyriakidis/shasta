@@ -107,7 +107,8 @@ private:
     // Parameters used to generate edges.
     uint64_t maxDistanceInJourney;
     uint64_t minCoverage;
-    double minCorrectedJaccard;
+    double minCorrectedJaccard0;  // For the GlobalPathGraph1
+    double minCorrectedJaccard1;  // For the step that creates initial chains.
 
     // Each vertex corresponds to a primary marker graph edge.
     // Store them here.
@@ -140,12 +141,26 @@ private:
 
     // The connected components of the GlobalPathGraph1.
     vector<PathGraph1> components;
-    void createComponents(uint64_t k);
+    void createComponents(
+        double minCorrectedJaccard,
+        uint64_t k);
 
     // Index the large connected components.
     // Sorted by decreasing size.
     uint64_t minComponentSize;
     vector< pair<uint64_t, uint64_t> > componentIndex; // (componentId, size)
+
+    // To create initial chains:
+    // - Use only very strong edges (minCorrectedJaccard >= minCorrectedJaccard1).
+    // - Compute connected components.
+    // - Keep k best outgoing/incoming edges for each vertex.
+    // - Transitive reduction.
+    // - Longest path in each connected component.
+    // This can cause contiguity breaks, which will be recovered later using
+    // a more complete version of the GlobalPathGraph1.
+    void createInitialChains(
+        double minCorrectedJaccard,
+        uint64_t k);
 };
 
 

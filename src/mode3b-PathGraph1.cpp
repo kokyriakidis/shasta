@@ -2,6 +2,7 @@
 #include "mode3b-PathGraph1.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
+#include "longestPath.hpp"
 #include "orderPairs.hpp"
 #include "transitiveReduction.hpp"
 using namespace shasta;
@@ -25,21 +26,19 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     maxPrimaryCoverage = 25;
     maxDistanceInJourney = 20;
     minCoverage = 2;
-    minCorrectedJaccard = 0.5;
-    const uint64_t k = 2;   // For k-nn
+    minCorrectedJaccard0 = 0.5;  // For the GlobalPathGraph1
+    minCorrectedJaccard1 = 0.8;  // For the step that creates initial chains.
+    const uint64_t k = 1;   // For k-nn
     minComponentSize = 100;
 
+    // Create the GlobalPathGraph1.
     createVertices();
-    cout << "The path graph has " << vertices.size() << " vertices. "
-        "Each vertex corresponds to a primary edge of the marker graph. " <<
-        "The marker graph has a total " <<
-        assembler.markerGraph.edges.size() << " edges." << endl;
-
     computeOrientedReadJourneys();
     createEdges();
     cout << "The path graph has " << edges.size() << " edges." << endl;
 
-    createComponents(k);
+    // Create initial chains.
+    createInitialChains(minCorrectedJaccard1, k);
 
     // Graphviz output.
     for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
@@ -48,6 +47,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         ofstream out("PathGraphComponent" + to_string(componentRank) + ".dot");
         component.writeGraphviz(componentRank, out);
     }
+
 }
 
 
@@ -231,7 +231,7 @@ void GlobalPathGraph1::createEdges()
         const MarkerGraphEdgeId edgeId0 = vertices[vertexId0];
         const MarkerGraphEdgeId edgeId1 = vertices[vertexId1];
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, edge.info));
-        if(edge.info.correctedJaccard() >= minCorrectedJaccard) {
+        if(edge.info.correctedJaccard() >= minCorrectedJaccard0) {
             edge.vertexId0 = vertexId0;
             edge.vertexId1 = vertexId1;
             edges.push_back(edge);
@@ -260,7 +260,7 @@ void GlobalPathGraph1::writeGraphviz() const
 
 
 
-void GlobalPathGraph1::createComponents(uint64_t k)
+void GlobalPathGraph1::createComponents(double minCorrectedJaccard, uint64_t k)
 {
     // Compute connected components.
     const uint64_t n = vertices.size();
@@ -271,6 +271,9 @@ void GlobalPathGraph1::createComponents(uint64_t k)
         disjointSets.make_set(i);
     }
     for(const Edge& edge: edges) {
+        if(edge.info.correctedJaccard() < minCorrectedJaccard) {
+            continue;
+        }
         disjointSets.union_set(edge.vertexId0, edge.vertexId1);
     }
 
@@ -284,6 +287,9 @@ void GlobalPathGraph1::createComponents(uint64_t k)
 
     // Create edges of each connected component.
     for(const Edge& edge: edges) {
+        if(edge.info.correctedJaccard() < minCorrectedJaccard) {
+            continue;
+        }
         const uint64_t vertexId0 = edge.vertexId0;
         const uint64_t vertexId1 = edge.vertexId1;
         const uint64_t componentId = disjointSets.find_set(vertexId0);
@@ -306,8 +312,11 @@ void GlobalPathGraph1::createComponents(uint64_t k)
     cout << "Found " << componentIndex.size() << " connected components of the path graph "
         "with at least " << minComponentSize << " vertices." << endl;
 
-#if 0
+
+
     // k-nn followed by transitive reduction of each large connected component.
+    // This can break contiguity, but we still have the complete graph,
+    // and we can recover contiguity in a later step.
     for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
         const uint64_t componentId = componentIndex[componentRank].first;
         PathGraph1& component = components[componentId];
@@ -323,7 +332,7 @@ void GlobalPathGraph1::createComponents(uint64_t k)
         }
         cout << "Number of edges after transitive reduction " << num_edges(component) << endl;
     }
-#endif
+
 }
 
 
@@ -449,5 +458,33 @@ void PathGraph1::knn(uint64_t k)
     }
     for(const edge_descriptor e: edgesToBeRemoved) {
         boost::remove_edge(e, graph);
+    }
+}
+
+
+
+// To create initial chains:
+// - Use only very strong edges (minCorrectedJaccard >= minCorrectedJaccard1).
+// - Compute connected components.
+// - Keep k best outgoing/incoming edges for each vertex.
+// - Transitive reduction.
+// This can cause contiguity breaks, which will be recovered later using
+// a more complete version of the GlobalPathGraph1.
+void GlobalPathGraph1::createInitialChains(
+    double minCorrectedJaccard1,
+    uint64_t k)
+{
+    createComponents(minCorrectedJaccard1, k);
+
+    // Compute the longest path in each component.
+    vector<PathGraph1::vertex_descriptor> chain;
+    for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
+        const uint64_t componentId = componentIndex[componentRank].first;
+        PathGraph1& component = components[componentId];
+        longestPath(component, chain);
+
+        cout << "Component " << componentRank << ": " <<
+            num_vertices(component) << " vertices, " <<
+            num_edges(component) << " edges, longest path " << chain.size() << endl;
     }
 }
