@@ -78,8 +78,56 @@ bool GlobalPathGraph1::isPrimary(MarkerGraphEdgeId edgeId) const
         return false;
     }
 
+#if 0
+    // Check that is also is a branch edge.
+    if(not isBranchEdge(edgeId)) {
+        return false;
+    }
+#endif
+
     // If all above checks passed, this is a primary edge.
     return true;
+}
+
+
+
+// Find out if a marker graph edge is a branch edge.
+// A marker graph edge is a branch edge if:
+// - Its source vertex has more than one outgoing edge with coverage at least minPrimaryCoverage.
+// OR
+// - Its target vertex has more than one incoming edge with coverage at least minPrimaryCoverage.
+bool GlobalPathGraph1::isBranchEdge(MarkerGraphEdgeId edgeId) const
+{
+    // Access this marker graph edge and its vertices.
+    const MarkerGraph::Edge& edge = assembler.markerGraph.edges[edgeId];
+    const MarkerGraphVertexId vertexId0 = edge.source;
+    const MarkerGraphVertexId vertexId1 = edge.target;
+
+    // Check outgoing edges of vertexId0.
+    const auto outgoingEdges0 = assembler.markerGraph.edgesBySource[vertexId0];
+    uint64_t count0 = 0;
+    for(const MarkerGraphEdgeId edgeId0: outgoingEdges0) {
+        if(assembler.markerGraph.edgeCoverage(edgeId0) >= minCoverage) {
+            ++count0;
+        }
+    }
+    if(count0 > 1) {
+        return true;
+    }
+
+    // Check incoming edges of vertexId1.
+    const auto incomingEdges1 = assembler.markerGraph.edgesByTarget[vertexId1];
+    uint64_t count1 = 0;
+    for(const MarkerGraphEdgeId edgeId1: incomingEdges1) {
+        if(assembler.markerGraph.edgeCoverage(edgeId1) >= minCoverage) {
+            ++count1;
+        }
+    }
+    if(count1 > 1) {
+        return true;
+    }
+
+    return false;
 }
 
 

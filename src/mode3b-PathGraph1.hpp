@@ -92,6 +92,13 @@ private:
     uint64_t maxPrimaryCoverage;
     bool isPrimary(MarkerGraphEdgeId) const;
 
+    // Find out if a marker graph edge is a branch edge.
+    // A marker graph edge is a branch edge if:
+    // - Its source vertex has more than one outgoing edge with coverage at least minCoverage.
+    // OR
+    // - Its target vertex has more than one incoming edge with coverage at least minCoverage.
+    bool isBranchEdge(MarkerGraphEdgeId) const;
+
     // Parameters used to generate edges.
     uint64_t maxDistanceInJourney;
     uint64_t minCoverage;
