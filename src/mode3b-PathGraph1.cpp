@@ -21,25 +21,33 @@ using namespace mode3b;
 GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     assembler(assembler)
 {
-    // EXPOSE WHEN CODE STABILIZES.
-    minPrimaryCoverage = 8;
-    maxPrimaryCoverage = 25;
-    maxDistanceInJourney = 20;
-    minCoverage = 2;
-    minCorrectedJaccard0 = 0.5;  // For the GlobalPathGraph1
-    minCorrectedJaccard1 = 0.8;  // For the step that creates initial chains.
+    // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES.
+
+    // The coverage range for primary vertices.
+    // This control the generation of the GlobalPathGraph1 vertices.
+    const uint64_t minPrimaryCoverage = 8;
+    const uint64_t maxPrimaryCoverage = 25;
+
+    // Parameters that control generation of the GlobalPathGraph1 edges.
+    const uint64_t maxDistanceInJourney = 20;
+    const uint64_t minEdgeCoverage = 2;
+    const double minCorrectedJaccard0 = 0.5;
+
+    // Parameters that control the initial creation of chains.
+    const double minCorrectedJaccard1 = 0.8;
+    const uint64_t minComponentSize = 100;
     const uint64_t k = 1;   // For k-nn
-    minComponentSize = 100;
+
 
     // Create the GlobalPathGraph1.
-    createVertices();
+    createVertices(minPrimaryCoverage, maxPrimaryCoverage);
     computeOrientedReadJourneys();
-    createEdges();
-    cout << "The path graph has " << edges.size() << " edges." << endl;
+    createEdges(maxDistanceInJourney, minEdgeCoverage, minCorrectedJaccard0);
 
     // Create initial chains.
-    createInitialChains(minCorrectedJaccard1, k);
+    createInitialChains(minCorrectedJaccard1, minComponentSize, k);
 
+#if 0
     // Graphviz output.
     for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
         const uint64_t componentId = componentIndex[componentRank].first;
@@ -47,13 +55,16 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         ofstream out("PathGraphComponent" + to_string(componentRank) + ".dot");
         component.writeGraphviz(componentRank, out);
     }
-
+#endif
 }
 
 
 
 // Find out if a marker graph edge is a primary edge.
-bool GlobalPathGraph1::isPrimary(MarkerGraphEdgeId edgeId) const
+bool GlobalPathGraph1::isPrimary(
+    MarkerGraphEdgeId edgeId,
+    uint64_t minPrimaryCoverage,
+    uint64_t maxPrimaryCoverage) const
 {
     // Check coverage.
     const MarkerGraph& markerGraph = assembler.markerGraph;
@@ -97,7 +108,9 @@ bool GlobalPathGraph1::isPrimary(MarkerGraphEdgeId edgeId) const
 // - Its source vertex has more than one outgoing edge with coverage at least minPrimaryCoverage.
 // OR
 // - Its target vertex has more than one incoming edge with coverage at least minPrimaryCoverage.
-bool GlobalPathGraph1::isBranchEdge(MarkerGraphEdgeId edgeId) const
+bool GlobalPathGraph1::isBranchEdge(
+    MarkerGraphEdgeId edgeId,
+    uint64_t minEdgeCoverage) const
 {
     // Access this marker graph edge and its vertices.
     const MarkerGraph::Edge& edge = assembler.markerGraph.edges[edgeId];
@@ -108,7 +121,7 @@ bool GlobalPathGraph1::isBranchEdge(MarkerGraphEdgeId edgeId) const
     const auto outgoingEdges0 = assembler.markerGraph.edgesBySource[vertexId0];
     uint64_t count0 = 0;
     for(const MarkerGraphEdgeId edgeId0: outgoingEdges0) {
-        if(assembler.markerGraph.edgeCoverage(edgeId0) >= minCoverage) {
+        if(assembler.markerGraph.edgeCoverage(edgeId0) >= minEdgeCoverage) {
             ++count0;
         }
     }
@@ -120,7 +133,7 @@ bool GlobalPathGraph1::isBranchEdge(MarkerGraphEdgeId edgeId) const
     const auto incomingEdges1 = assembler.markerGraph.edgesByTarget[vertexId1];
     uint64_t count1 = 0;
     for(const MarkerGraphEdgeId edgeId1: incomingEdges1) {
-        if(assembler.markerGraph.edgeCoverage(edgeId1) >= minCoverage) {
+        if(assembler.markerGraph.edgeCoverage(edgeId1) >= minEdgeCoverage) {
             ++count1;
         }
     }
@@ -133,14 +146,16 @@ bool GlobalPathGraph1::isBranchEdge(MarkerGraphEdgeId edgeId) const
 
 
 
-void GlobalPathGraph1::createVertices()
+void GlobalPathGraph1::createVertices(
+    uint64_t minPrimaryCoverage,
+    uint64_t maxPrimaryCoverage)
 {
     const MarkerGraph& markerGraph = assembler.markerGraph;
 
     vertices.clear();
 
     for(MarkerGraphEdgeId edgeId=0; edgeId<markerGraph.edges.size(); edgeId++) {
-        if(isPrimary(edgeId)) {
+        if(isPrimary(edgeId, minPrimaryCoverage, maxPrimaryCoverage)) {
             vertices.push_back(edgeId);
         }
     }
@@ -195,7 +210,10 @@ void GlobalPathGraph1::computeOrientedReadJourneys()
 
 
 
-void GlobalPathGraph1::createEdges()
+void GlobalPathGraph1::createEdges(
+    uint64_t maxDistanceInJourney,
+    uint64_t minEdgeCoverage,
+    double minCorrectedJaccard)
 {
     // Candidate edges are pairs of vertices that appear near each other
     // in oriented read journeys.
@@ -216,10 +234,9 @@ void GlobalPathGraph1::createEdges()
 
     // Deduplicate the candidate edges and count the number of times
     // each of them was found. Keep only the ones that occurred at least
-    // minCoverage times.
+    // minEdgeCoverage times.
     vector<uint64_t> coverage;
-    deduplicateAndCountWithThreshold(candidateEdges, coverage, minCoverage);
-    cout << "Found " << candidateEdges.size() << " candidate edges." << endl;
+    deduplicateAndCountWithThreshold(candidateEdges, coverage, minEdgeCoverage);
 
     // For each candidate edge, compute correctedJaccard, and if high enough
     // generate an edge.
@@ -231,7 +248,7 @@ void GlobalPathGraph1::createEdges()
         const MarkerGraphEdgeId edgeId0 = vertices[vertexId0];
         const MarkerGraphEdgeId edgeId1 = vertices[vertexId1];
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, edge.info));
-        if(edge.info.correctedJaccard() >= minCorrectedJaccard0) {
+        if(edge.info.correctedJaccard() >= minCorrectedJaccard) {
             edge.vertexId0 = vertexId0;
             edge.vertexId1 = vertexId1;
             edges.push_back(edge);
@@ -260,7 +277,10 @@ void GlobalPathGraph1::writeGraphviz() const
 
 
 
-void GlobalPathGraph1::createComponents(double minCorrectedJaccard, uint64_t k)
+void GlobalPathGraph1::createComponents(
+    double minCorrectedJaccard,
+    uint64_t minComponentSize,
+    uint64_t k)
 {
     // Compute connected components.
     const uint64_t n = vertices.size();
@@ -309,8 +329,6 @@ void GlobalPathGraph1::createComponents(double minCorrectedJaccard, uint64_t k)
     }
     sort(componentIndex.begin(), componentIndex.end(),
         OrderPairsBySecondOnlyGreater<uint64_t, uint64_t>());
-    cout << "Found " << componentIndex.size() << " connected components of the path graph "
-        "with at least " << minComponentSize << " vertices." << endl;
 
 
 
@@ -320,17 +338,17 @@ void GlobalPathGraph1::createComponents(double minCorrectedJaccard, uint64_t k)
     for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
         const uint64_t componentId = componentIndex[componentRank].first;
         PathGraph1& component = components[componentId];
-        cout << "Connected component " << componentRank << " has " << num_vertices(component) << " vertices." << endl;
-        cout << "Initial number of edges " << num_edges(component) << endl;
+        // cout << "Connected component " << componentRank << " has " << num_vertices(component) << " vertices." << endl;
+        // cout << "Initial number of edges " << num_edges(component) << endl;
         component.knn(k);
-        cout << "Number of edges after k-nn " << num_edges(component) << endl;
+        // cout << "Number of edges after k-nn " << num_edges(component) << endl;
         try {
             transitiveReduction(component);
         } catch(const exception& e) {
             cout << "Transitive reduction failed for component " <<
                 componentRank << endl;
         }
-        cout << "Number of edges after transitive reduction " << num_edges(component) << endl;
+        // cout << "Number of edges after transitive reduction " << num_edges(component) << endl;
     }
 
 }
@@ -472,9 +490,10 @@ void PathGraph1::knn(uint64_t k)
 // a more complete version of the GlobalPathGraph1.
 void GlobalPathGraph1::createInitialChains(
     double minCorrectedJaccard1,
+    uint64_t minComponentSize,
     uint64_t k)
 {
-    createComponents(minCorrectedJaccard1, k);
+    createComponents(minCorrectedJaccard1, minComponentSize, k);
 
     // Compute the longest path in each component.
     vector<PathGraph1::vertex_descriptor> chain;

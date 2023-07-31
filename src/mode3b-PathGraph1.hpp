@@ -93,29 +93,28 @@ private:
     const Assembler& assembler;
 
     // Find out if a marker graph edge is a primary edge.
-    uint64_t minPrimaryCoverage;
-    uint64_t maxPrimaryCoverage;
-    bool isPrimary(MarkerGraphEdgeId) const;
+    bool isPrimary(
+        MarkerGraphEdgeId,
+        uint64_t minPrimaryCoverage,
+        uint64_t maxPrimaryCoverage) const;
 
     // Find out if a marker graph edge is a branch edge.
     // A marker graph edge is a branch edge if:
-    // - Its source vertex has more than one outgoing edge with coverage at least minCoverage.
+    // - Its source vertex has more than one outgoing edge with coverage at least minEdgeCoverage.
     // OR
-    // - Its target vertex has more than one incoming edge with coverage at least minCoverage.
-    bool isBranchEdge(MarkerGraphEdgeId) const;
-
-    // Parameters used to generate edges.
-    uint64_t maxDistanceInJourney;
-    uint64_t minCoverage;
-    double minCorrectedJaccard0;  // For the GlobalPathGraph1
-    double minCorrectedJaccard1;  // For the step that creates initial chains.
+    // - Its target vertex has more than one incoming edge with coverage at least minEdgeCoverage.
+    bool isBranchEdge(
+        MarkerGraphEdgeId,
+        uint64_t minEdgeCoverage) const;
 
     // Each vertex corresponds to a primary marker graph edge.
     // Store them here.
     // The index in this table is the vertexId.
     // The table is sorted.
     vector<MarkerGraphEdgeId> vertices;
-    void createVertices();
+    void createVertices(
+        uint64_t minPrimaryCoverage,
+        uint64_t maxPrimaryCoverage);
 
     // The "journey" of each oriented read is the sequence of vertices it encounters.
     // It stores pairs (ordinal0, vertexId) for each oriented read, sorted by ordinal0.
@@ -134,7 +133,10 @@ private:
         MarkerGraphEdgePairInfo info;
     };
     vector<Edge> edges;
-    void createEdges();
+    void createEdges(
+        uint64_t maxDistanceInJourney,
+        uint64_t minEdgeCoverage,
+        double minCorrectedJaccard);
 
     // Write the entire PathGraph in graphviz format.
     void writeGraphviz() const;
@@ -143,11 +145,11 @@ private:
     vector<PathGraph1> components;
     void createComponents(
         double minCorrectedJaccard,
+        uint64_t minComponentSize,
         uint64_t k);
 
     // Index the large connected components.
     // Sorted by decreasing size.
-    uint64_t minComponentSize;
     vector< pair<uint64_t, uint64_t> > componentIndex; // (componentId, size)
 
     // To create initial chains:
@@ -160,6 +162,7 @@ private:
     // a more complete version of the GlobalPathGraph1.
     void createInitialChains(
         double minCorrectedJaccard,
+        uint64_t minComponentSize,
         uint64_t k);
 };
 
