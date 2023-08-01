@@ -118,7 +118,14 @@ private:
     // Store them here.
     // The index in this table is the vertexId.
     // The table is sorted.
-    vector<MarkerGraphEdgeId> vertices;
+    class Vertex {
+    public:
+        MarkerGraphEdgeId edgeId;
+        uint64_t chainId = invalid<uint64_t>;
+        uint64_t positionInChain = invalid<uint64_t>;
+        Vertex(MarkerGraphEdgeId edgeId) : edgeId(edgeId) {}
+    };
+    vector<Vertex> vertices;
     void createVertices(
         uint64_t minPrimaryCoverage,
         uint64_t maxPrimaryCoverage);
@@ -164,7 +171,7 @@ private:
     // Transitive reduction of each connected component.
     void transitiveReduction();
 
-    // To create initial chains:
+    // To create seed chains:
     // - Use only very strong edges (minCorrectedJaccard >= minCorrectedJaccard1).
     // - Compute connected components.
     // - Keep k best outgoing/incoming edges for each vertex.
@@ -172,7 +179,9 @@ private:
     // - Longest path in each connected component.
     // This can cause contiguity breaks, which will be recovered later using
     // a more complete version of the GlobalPathGraph1.
-    void createInitialChains(uint64_t minAssembledLength);
+    // Each chain is a vector of vertexIds (indices into the vertices vector).
+    void createSeedChains(uint64_t minEstimatedLength);
+    vector< vector<uint64_t> > seedChains;
 
     // Write each connected component in graphviz format.
     void writeGraphviz(const string& baseName) const;

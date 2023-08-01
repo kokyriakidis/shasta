@@ -38,7 +38,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     const double minCorrectedJaccard1 = 0.8;
     const uint64_t minComponentSize = 3;
     const uint64_t k = 1;   // For k-nn
-    const uint64_t minAssembledLength = 10000;  // Minimum estimated length in bases
+    const uint64_t minEstimatedLength = 10000;  // Minimum estimated length in bases
 
     // Create the GlobalPathGraph1.
     createVertices(minPrimaryCoverage, maxPrimaryCoverage);
@@ -51,7 +51,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     createComponents(minCorrectedJaccard1, minComponentSize);
     knn(k);
     transitiveReduction();
-    createInitialChains(minAssembledLength);
+    createSeedChains(minEstimatedLength);
 }
 
 
@@ -164,7 +164,7 @@ void GlobalPathGraph1::createVertices(
 
     for(MarkerGraphEdgeId edgeId=0; edgeId<markerGraph.edges.size(); edgeId++) {
         if(isPrimary(edgeId, minPrimaryCoverage, maxPrimaryCoverage)) {
-            vertices.push_back(edgeId);
+            vertices.push_back(Vertex(edgeId));
         }
     }
 }
@@ -182,7 +182,7 @@ void GlobalPathGraph1::computeOrientedReadJourneys()
     orientedReadJourneys.resize(assembler.markers.size());
 
     for(uint64_t vertexId=0; vertexId<vertices.size(); vertexId++) {
-        const MarkerGraphEdgeId edgeId = vertices[vertexId];
+        const MarkerGraphEdgeId edgeId = vertices[vertexId].edgeId;
 
         // Loop over MarkerIntervals of this primary marker graph edge.
         const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
@@ -208,7 +208,7 @@ void GlobalPathGraph1::computeOrientedReadJourneys()
             csv << orientedReadId;
             for(const auto& p: journey) {
                 const uint64_t vertexId = p.second;
-                const MarkerGraphEdgeId edgeId = vertices[vertexId];
+                const MarkerGraphEdgeId edgeId = vertices[vertexId].edgeId;
                 csv << "," << edgeId;
             }
             csv << "\n";
@@ -253,8 +253,8 @@ void GlobalPathGraph1::createEdges(
         const uint64_t vertexId0 = p.first;
         const uint64_t vertexId1 = p.second;
         Edge edge;
-        const MarkerGraphEdgeId edgeId0 = vertices[vertexId0];
-        const MarkerGraphEdgeId edgeId1 = vertices[vertexId1];
+        const MarkerGraphEdgeId edgeId0 = vertices[vertexId0].edgeId;
+        const MarkerGraphEdgeId edgeId1 = vertices[vertexId1].edgeId;
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, edge.info));
         if(edge.info.correctedJaccard() >= minCorrectedJaccard) {
             edge.vertexId0 = vertexId0;
@@ -274,8 +274,8 @@ void GlobalPathGraph1::writeGraphviz() const
     out << "digraph GlobalPathGraph {\n";
 
     for(const Edge& edge: edges) {
-        const MarkerGraphEdgeId edgeId0 = vertices[edge.vertexId0];
-        const MarkerGraphEdgeId edgeId1 = vertices[edge.vertexId1];
+        const MarkerGraphEdgeId edgeId0 = vertices[edge.vertexId0].edgeId;
+        const MarkerGraphEdgeId edgeId1 = vertices[edge.vertexId1].edgeId;
         out << edgeId0 << "->";
         out << edgeId1 << ";\n";
     }
@@ -311,7 +311,7 @@ void GlobalPathGraph1::createComponents(
     }
     for(uint64_t vertexId=0; vertexId<n; vertexId++) {
         const uint64_t componentId = disjointSets.find_set(vertexId);
-        allComponents[componentId]->addVertex(vertexId, vertices[vertexId]);
+        allComponents[componentId]->addVertex(vertexId, vertices[vertexId].edgeId);
     }
 
     // Create edges of each connected component.
@@ -323,8 +323,8 @@ void GlobalPathGraph1::createComponents(
         const uint64_t vertexId1 = edge.vertexId1;
         const uint64_t componentId = disjointSets.find_set(vertexId0);
         SHASTA_ASSERT(componentId == disjointSets.find_set(vertexId1));
-        const MarkerGraphEdgeId edgeId0 = vertices[vertexId0];
-        const MarkerGraphEdgeId edgeId1 = vertices[vertexId1];
+        const MarkerGraphEdgeId edgeId0 = vertices[vertexId0].edgeId;
+        const MarkerGraphEdgeId edgeId1 = vertices[vertexId1].edgeId;
         allComponents[componentId]->addEdge(edgeId0, edgeId1, edge.info);
     }
 
@@ -510,18 +510,20 @@ void PathGraph1::knn(uint64_t k)
 
 
 
-// To create initial chains:
+// To create seed chains:
 // - Use only very strong edges (minCorrectedJaccard >= minCorrectedJaccard1).
 // - Compute connected components.
 // - Keep k best outgoing/incoming edges for each vertex.
 // - Transitive reduction.
 // This can cause contiguity breaks, which will be recovered later using
 // a more complete version of the GlobalPathGraph1.
-void GlobalPathGraph1::createInitialChains(uint64_t minAssembledLength)
+void GlobalPathGraph1::createSeedChains(uint64_t minEstimatedLength)
 {
-    ofstream fasta("InitialChains.fasta");
-    ofstream csv("InitialChains.csv");
+    ofstream fasta("SeedChains.fasta");
+    ofstream csv("SeedChains.csv");
     csv << "Rank,Vertices,Edges,Longest path length,Estimated length,Assembled length\n";
+
+    seedChains.clear();
 
     // Compute the longest path in each component.
     vector<PathGraph1::vertex_descriptor> chain;
@@ -541,17 +543,21 @@ void GlobalPathGraph1::createInitialChains(uint64_t minAssembledLength)
             totalBaseOffset += component[e].info.offsetInBases;
         }
 
-        if(totalBaseOffset < minAssembledLength) {
+        if(totalBaseOffset < minEstimatedLength) {
             continue;
         }
 
 
 
         // Generate an AssemblyPath using this chain.
+        vector<uint64_t> chainVertexIds;
         vector<MarkerGraphEdgeId> markerGraphEdgeIds;
         vector<MarkerGraphEdgePairInfo> infos;
         for(uint64_t i=0; i<chain.size(); i++) {
-            markerGraphEdgeIds.push_back(component[chain[i]].edgeId);
+            const PathGraph1::vertex_descriptor v = chain[i];
+            const PathGraph1Vertex& vertex = component[v];
+            chainVertexIds.push_back(vertex.vertexId);
+            markerGraphEdgeIds.push_back(vertex.edgeId);
         }
         for(uint64_t i=1; i<chain.size(); i++) {
             const PathGraph1::vertex_descriptor v0 = chain[i-1];
@@ -567,8 +573,18 @@ void GlobalPathGraph1::createInitialChains(uint64_t minAssembledLength)
         vector<Base> sequence;
         assemblyPath.getSequence(sequence);
 
-        if(sequence.size() < minAssembledLength) {
+        if(sequence.size() < minEstimatedLength) {
             continue;
+        }
+
+        // Store this chain as a new seed chain.
+        const uint64_t chainId = seedChains.size();
+        seedChains.push_back(chainVertexIds);
+        for(uint64_t position=0; position<chainVertexIds.size(); position++) {
+            const uint64_t vertexId = chainVertexIds[position];
+            Vertex& vertex = vertices[vertexId];
+            vertex.chainId = chainId;
+            vertex.positionInChain = position;
         }
 
         csv << componentRank << ",";
