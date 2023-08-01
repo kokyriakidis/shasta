@@ -57,9 +57,8 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
 // Write each connected component in graphviz format.
 void GlobalPathGraph1::writeGraphviz(const string& baseName) const
 {
-    for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
-        const uint64_t componentId = componentIndex[componentRank].first;
-        const PathGraph1& component = components[componentId];
+    for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
+        const PathGraph1& component = *components[componentRank];
         ofstream out(baseName + "-" + to_string(componentRank) + ".dot");
         component.writeGraphviz(componentRank, out);
     }
@@ -304,11 +303,13 @@ void GlobalPathGraph1::createComponents(
     }
 
     // Generate vertices of each connected component.
-    components.clear();
-    components.resize(n);
+    vector< shared_ptr<PathGraph1> > allComponents;
+    for(uint64_t componentId=0; componentId<n; componentId++) {
+        allComponents.push_back(make_shared<PathGraph1>());
+    }
     for(uint64_t i=0; i<n; i++) {
         const uint64_t componentId = disjointSets.find_set(i);
-        components[componentId].addVertex(vertices[i]);
+        allComponents[componentId]->addVertex(vertices[i]);
     }
 
     // Create edges of each connected component.
@@ -322,20 +323,33 @@ void GlobalPathGraph1::createComponents(
         SHASTA_ASSERT(componentId == disjointSets.find_set(vertexId1));
         const MarkerGraphEdgeId edgeId0 = vertices[vertexId0];
         const MarkerGraphEdgeId edgeId1 = vertices[vertexId1];
-        components[componentId].addEdge(edgeId0, edgeId1, edge.info);
+        allComponents[componentId]->addEdge(edgeId0, edgeId1, edge.info);
     }
 
-    // Create the componentIndex.
-    componentIndex.clear();
+    // Only keep the connected components that have at least
+    // minComponentSize vertices.
+    components.clear();
     for(uint64_t componentId=0; componentId<n; componentId++) {
-        const uint64_t componentSize = num_vertices(components[componentId]);
-        if(componentSize >= minComponentSize) {
-            componentIndex.push_back({componentId, componentSize});
+        const shared_ptr<PathGraph1> componentPointer = allComponents[componentId];
+        const PathGraph1& component = *componentPointer;
+        if(num_vertices(component) >= minComponentSize) {
+            components.push_back(componentPointer);
         }
     }
-    sort(componentIndex.begin(), componentIndex.end(),
-        OrderPairsBySecondOnlyGreater<uint64_t, uint64_t>());
 
+
+
+    // Sort the pointers to connected components by decreasing size.
+    class ComponentSorter {
+    public:
+        bool operator()(
+            const shared_ptr<PathGraph1>& x,
+            const shared_ptr<PathGraph1>& y)
+        {
+            return num_vertices(*x) > num_vertices(*y);
+        }
+    };
+    sort(components.begin(), components.end(), ComponentSorter());
 }
 
 
@@ -346,9 +360,8 @@ void GlobalPathGraph1::createComponents(
 // This can break contiguity of the connected component.
 void GlobalPathGraph1::knn(uint64_t k)
 {
-    for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
-        const uint64_t componentId = componentIndex[componentRank].first;
-        PathGraph1& component = components[componentId];
+    for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
+        PathGraph1& component = *components[componentRank];
         component.knn(k);
     }
 }
@@ -359,9 +372,8 @@ void GlobalPathGraph1::knn(uint64_t k)
 // Ths can fail for connected components that contain cycles.
 void GlobalPathGraph1::transitiveReduction()
 {
-    for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
-        const uint64_t componentId = componentIndex[componentRank].first;
-        PathGraph1& component = components[componentId];
+    for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
+        PathGraph1& component = *components[componentRank];
         shasta::transitiveReduction(component);
     }
 }
@@ -506,9 +518,8 @@ void GlobalPathGraph1::createInitialChains()
 
     // Compute the longest path in each component.
     vector<PathGraph1::vertex_descriptor> chain;
-    for(uint64_t componentRank=0; componentRank<componentIndex.size(); componentRank++) {
-        const uint64_t componentId = componentIndex[componentRank].first;
-        PathGraph1& component = components[componentId];
+    for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
+        PathGraph1& component = *components[componentRank];
         longestPath(component, chain);
 
         // Compute total base offset for this chain.

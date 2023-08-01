@@ -25,6 +25,7 @@ A directed edge v0->v1 is generated if:
 
 // Standard library.
 #include "iosfwd.hpp"
+#include "memory.hpp"
 #include "string.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
@@ -143,7 +144,8 @@ private:
     void writeGraphviz() const;
 
     // The connected components of the GlobalPathGraph1.
-    vector<PathGraph1> components;
+    // Stored sorted by decreasing size, as measured by number of vertices.
+    vector< shared_ptr<PathGraph1> > components;
     void createComponents(
         double minCorrectedJaccard,
         uint64_t minComponentSize);
@@ -156,10 +158,6 @@ private:
 
     // Transitive reduction of each connected component.
     void transitiveReduction();
-
-    // Index the large connected components.
-    // Sorted by decreasing size.
-    vector< pair<uint64_t, uint64_t> > componentIndex; // (componentId, size)
 
     // To create initial chains:
     // - Use only very strong edges (minCorrectedJaccard >= minCorrectedJaccard1).
