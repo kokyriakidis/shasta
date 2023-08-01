@@ -3,6 +3,7 @@
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
 #include "longestPath.hpp"
+#include "mode3b-AssemblyPath.hpp"
 #include "orderPairs.hpp"
 #include "transitiveReduction.hpp"
 using namespace shasta;
@@ -516,6 +517,7 @@ void PathGraph1::knn(uint64_t k)
 // a more complete version of the GlobalPathGraph1.
 void GlobalPathGraph1::createInitialChains(uint64_t minEstimatedLength)
 {
+    ofstream fasta("InitialChains.csv");
 
     // Compute the longest path in each component.
     vector<PathGraph1::vertex_descriptor> chain;
@@ -543,5 +545,28 @@ void GlobalPathGraph1::createInitialChains(uint64_t minEstimatedLength)
             num_vertices(component) << " vertices, " <<
             num_edges(component) << " edges, longest path has " << chain.size() <<  " vertices, " <<
             "total base offset " << totalBaseOffset << endl;
+
+
+
+        // Generate an AssemblyPath using this chain.
+        vector<MarkerGraphEdgeId> markerGraphEdgeIds;
+        vector<MarkerGraphEdgePairInfo> infos;
+        for(uint64_t i=0; i<chain.size(); i++) {
+            markerGraphEdgeIds.push_back(component[chain[i]].edgeId);
+        }
+        for(uint64_t i=1; i<chain.size(); i++) {
+            const PathGraph1::vertex_descriptor v0 = chain[i-1];
+            const PathGraph1::vertex_descriptor v1 = chain[i];
+            PathGraph1::edge_descriptor e;
+            bool edgeExists = false;
+            tie(e, edgeExists) = edge(v0, v1, component);
+            infos.push_back(component[e].info);
+        }
+        AssemblyPath assemblyPath(assembler, markerGraphEdgeIds, infos);
+        assemblyPath.writeFasta(fasta, to_string(componentRank));
+
+        vector<Base> sequence;
+        assemblyPath.getSequence(sequence);
+        cout << "Assembled length is " << sequence.size() << endl;
     }
 }
