@@ -38,7 +38,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     const double minCorrectedJaccard1 = 0.8;
     const uint64_t minComponentSize = 3;
     const uint64_t k = 1;   // For k-nn
-    const uint64_t minEstimatedLength = 10000;  // Minimum estimated length in bases
+    const uint64_t minAssembledLength = 10000;  // Minimum estimated length in bases
 
     // Create the GlobalPathGraph1.
     createVertices(minPrimaryCoverage, maxPrimaryCoverage);
@@ -51,7 +51,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     createComponents(minCorrectedJaccard1, minComponentSize);
     knn(k);
     transitiveReduction();
-    createInitialChains(minEstimatedLength);
+    createInitialChains(minAssembledLength);
 }
 
 
@@ -515,9 +515,11 @@ void PathGraph1::knn(uint64_t k)
 // - Transitive reduction.
 // This can cause contiguity breaks, which will be recovered later using
 // a more complete version of the GlobalPathGraph1.
-void GlobalPathGraph1::createInitialChains(uint64_t minEstimatedLength)
+void GlobalPathGraph1::createInitialChains(uint64_t minAssembledLength)
 {
-    ofstream fasta("InitialChains.csv");
+    ofstream fasta("InitialChains.fasta");
+    ofstream csv("InitialChains.csv");
+    csv << "Rank,Vertices,Edges,Longest path length,Estimated length,Assembled length\n";
 
     // Compute the longest path in each component.
     vector<PathGraph1::vertex_descriptor> chain;
@@ -537,14 +539,9 @@ void GlobalPathGraph1::createInitialChains(uint64_t minEstimatedLength)
             totalBaseOffset += component[e].info.offsetInBases;
         }
 
-        if(totalBaseOffset < minEstimatedLength) {
+        if(totalBaseOffset < minAssembledLength) {
             continue;
         }
-
-        cout << "Component " << componentRank << ": " <<
-            num_vertices(component) << " vertices, " <<
-            num_edges(component) << " edges, longest path has " << chain.size() <<  " vertices, " <<
-            "total base offset " << totalBaseOffset << endl;
 
 
 
@@ -567,6 +564,16 @@ void GlobalPathGraph1::createInitialChains(uint64_t minEstimatedLength)
 
         vector<Base> sequence;
         assemblyPath.getSequence(sequence);
-        cout << "Assembled length is " << sequence.size() << endl;
+
+        if(sequence.size() < minAssembledLength) {
+            continue;
+        }
+
+        csv << componentRank << ",";
+        csv << num_vertices(component) << ",";
+        csv << num_edges(component) << ",";
+        csv << chain.size() << ",";
+        csv << totalBaseOffset << ",";
+        csv << sequence.size() << "\n";
     }
 }

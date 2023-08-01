@@ -167,7 +167,7 @@ private:
     // - Longest path in each connected component.
     // This can cause contiguity breaks, which will be recovered later using
     // a more complete version of the GlobalPathGraph1.
-    void createInitialChains(uint64_t minEstimatedLength);
+    void createInitialChains(uint64_t minAssembledLength);
 
     // Write each connected component in graphviz format.
     void writeGraphviz(const string& baseName) const;
