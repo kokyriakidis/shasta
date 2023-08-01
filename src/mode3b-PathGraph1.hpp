@@ -55,6 +55,9 @@ namespace shasta {
 
 class shasta::mode3b::PathGraph1Vertex {
 public:
+    // The corresponding GlobalPathGraph1 vertexId.
+    uint64_t vertexId;
+
     // The marker graph edge corresponding to this PathGraph1 vertex.
     MarkerGraphEdgeId edgeId;
 };
@@ -73,7 +76,9 @@ class shasta::mode3b::PathGraph1 : public PathGraph1GraphBaseClass {
 public:
 
     std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
-    void addVertex(MarkerGraphEdgeId);
+    void addVertex(
+        uint64_t vertexId,
+        MarkerGraphEdgeId);
 
     void addEdge(
         MarkerGraphEdgeId,

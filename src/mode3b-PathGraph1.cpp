@@ -294,8 +294,8 @@ void GlobalPathGraph1::createComponents(
     vector<uint64_t> rank(n);
     vector<uint64_t> parent(n);
     boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
-    for(uint64_t i=0; i<n; i++) {
-        disjointSets.make_set(i);
+    for(uint64_t vertexId=0; vertexId<n; vertexId++) {
+        disjointSets.make_set(vertexId);
     }
     for(const Edge& edge: edges) {
         if(edge.info.correctedJaccard() < minCorrectedJaccard) {
@@ -309,9 +309,9 @@ void GlobalPathGraph1::createComponents(
     for(uint64_t componentId=0; componentId<n; componentId++) {
         allComponents.push_back(make_shared<PathGraph1>());
     }
-    for(uint64_t i=0; i<n; i++) {
-        const uint64_t componentId = disjointSets.find_set(i);
-        allComponents[componentId]->addVertex(vertices[i]);
+    for(uint64_t vertexId=0; vertexId<n; vertexId++) {
+        const uint64_t componentId = disjointSets.find_set(vertexId);
+        allComponents[componentId]->addVertex(vertexId, vertices[vertexId]);
     }
 
     // Create edges of each connected component.
@@ -382,10 +382,12 @@ void GlobalPathGraph1::transitiveReduction()
 
 
 
-void PathGraph1::addVertex(MarkerGraphEdgeId edgeId)
+void PathGraph1::addVertex(
+    uint64_t vertexId,
+    MarkerGraphEdgeId edgeId)
 {
     SHASTA_ASSERT(not vertexMap.contains(edgeId));
-    vertexMap.insert({edgeId, add_vertex({edgeId}, *this)});
+    vertexMap.insert({edgeId, add_vertex({vertexId, edgeId}, *this)});
 }
 
 
