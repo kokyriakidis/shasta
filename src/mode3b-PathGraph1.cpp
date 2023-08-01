@@ -37,6 +37,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     const double minCorrectedJaccard1 = 0.8;
     const uint64_t minComponentSize = 3;
     const uint64_t k = 1;   // For k-nn
+    const uint64_t minEstimatedLength = 10000;  // Minimum estimated length in bases
 
     // Create the GlobalPathGraph1.
     createVertices(minPrimaryCoverage, maxPrimaryCoverage);
@@ -49,7 +50,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     createComponents(minCorrectedJaccard1, minComponentSize);
     knn(k);
     transitiveReduction();
-    createInitialChains();
+    createInitialChains(minEstimatedLength);
 }
 
 
@@ -513,7 +514,7 @@ void PathGraph1::knn(uint64_t k)
 // - Transitive reduction.
 // This can cause contiguity breaks, which will be recovered later using
 // a more complete version of the GlobalPathGraph1.
-void GlobalPathGraph1::createInitialChains()
+void GlobalPathGraph1::createInitialChains(uint64_t minEstimatedLength)
 {
 
     // Compute the longest path in each component.
@@ -532,6 +533,10 @@ void GlobalPathGraph1::createInitialChains()
             tie(e, edgeExists) = edge(v0, v1, component);
             SHASTA_ASSERT(edgeExists);
             totalBaseOffset += component[e].info.offsetInBases;
+        }
+
+        if(totalBaseOffset < minEstimatedLength) {
+            continue;
         }
 
         cout << "Component " << componentRank << ": " <<
