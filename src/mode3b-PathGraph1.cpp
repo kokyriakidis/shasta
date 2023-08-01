@@ -51,7 +51,8 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     createComponents(minCorrectedJaccard1, minComponentSize);
     knn(k);
     transitiveReduction();
-    createSeedChains(minEstimatedLength);
+    bool assembleSeedChains = false;
+    createSeedChains(minEstimatedLength, assembleSeedChains);
 }
 
 
@@ -517,11 +518,17 @@ void PathGraph1::knn(uint64_t k)
 // - Transitive reduction.
 // This can cause contiguity breaks, which will be recovered later using
 // a more complete version of the GlobalPathGraph1.
-void GlobalPathGraph1::createSeedChains(uint64_t minEstimatedLength)
+void GlobalPathGraph1::createSeedChains(
+    uint64_t minEstimatedLength,
+    bool assembleSeedChains)
 {
     ofstream fasta("SeedChains.fasta");
     ofstream csv("SeedChains.csv");
-    csv << "Rank,Vertices,Edges,Longest path length,Estimated length,Assembled length\n";
+    csv << "Rank,Vertices,Edges,Longest path length,Estimated length,";
+    if(assembleSeedChains) {
+        csv << "Assembled length,";
+    }
+    csv << "\n";
 
     seedChains.clear();
 
@@ -547,34 +554,46 @@ void GlobalPathGraph1::createSeedChains(uint64_t minEstimatedLength)
             continue;
         }
 
+        csv << componentRank << ",";
+        csv << num_vertices(component) << ",";
+        csv << num_edges(component) << ",";
+        csv << chain.size() << ",";
+        csv << totalBaseOffset << ",";
+
+        if(assembleSeedChains) {
+
+            // Generate an AssemblyPath using this chain.
+            vector<MarkerGraphEdgeId> markerGraphEdgeIds;
+            vector<MarkerGraphEdgePairInfo> infos;
+            for(uint64_t i=0; i<chain.size(); i++) {
+                const PathGraph1::vertex_descriptor v = chain[i];
+                const PathGraph1Vertex& vertex = component[v];
+                markerGraphEdgeIds.push_back(vertex.edgeId);
+            }
+            for(uint64_t i=1; i<chain.size(); i++) {
+                const PathGraph1::vertex_descriptor v0 = chain[i-1];
+                const PathGraph1::vertex_descriptor v1 = chain[i];
+                PathGraph1::edge_descriptor e;
+                bool edgeExists = false;
+                tie(e, edgeExists) = edge(v0, v1, component);
+                infos.push_back(component[e].info);
+            }
+            AssemblyPath assemblyPath(assembler, markerGraphEdgeIds, infos);
+            assemblyPath.writeFasta(fasta, to_string(componentRank));
+
+            vector<Base> sequence;
+            assemblyPath.getSequence(sequence);
+            csv << sequence.size() << ",";
+        }
+        csv << "\n";
 
 
-        // Generate an AssemblyPath using this chain.
+        // Get the GlobalPathGraph1 vertexIds for the chain.
         vector<uint64_t> chainVertexIds;
-        vector<MarkerGraphEdgeId> markerGraphEdgeIds;
-        vector<MarkerGraphEdgePairInfo> infos;
         for(uint64_t i=0; i<chain.size(); i++) {
             const PathGraph1::vertex_descriptor v = chain[i];
             const PathGraph1Vertex& vertex = component[v];
             chainVertexIds.push_back(vertex.vertexId);
-            markerGraphEdgeIds.push_back(vertex.edgeId);
-        }
-        for(uint64_t i=1; i<chain.size(); i++) {
-            const PathGraph1::vertex_descriptor v0 = chain[i-1];
-            const PathGraph1::vertex_descriptor v1 = chain[i];
-            PathGraph1::edge_descriptor e;
-            bool edgeExists = false;
-            tie(e, edgeExists) = edge(v0, v1, component);
-            infos.push_back(component[e].info);
-        }
-        AssemblyPath assemblyPath(assembler, markerGraphEdgeIds, infos);
-        assemblyPath.writeFasta(fasta, to_string(componentRank));
-
-        vector<Base> sequence;
-        assemblyPath.getSequence(sequence);
-
-        if(sequence.size() < minEstimatedLength) {
-            continue;
         }
 
         // Store this chain as a new seed chain.
@@ -587,11 +606,5 @@ void GlobalPathGraph1::createSeedChains(uint64_t minEstimatedLength)
             vertex.positionInChain = position;
         }
 
-        csv << componentRank << ",";
-        csv << num_vertices(component) << ",";
-        csv << num_edges(component) << ",";
-        csv << chain.size() << ",";
-        csv << totalBaseOffset << ",";
-        csv << sequence.size() << "\n";
     }
 }

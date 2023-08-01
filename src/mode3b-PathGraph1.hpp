@@ -180,7 +180,9 @@ private:
     // This can cause contiguity breaks, which will be recovered later using
     // a more complete version of the GlobalPathGraph1.
     // Each chain is a vector of vertexIds (indices into the vertices vector).
-    void createSeedChains(uint64_t minEstimatedLength);
+    void createSeedChains(
+        uint64_t minEstimatedLength,
+        bool assembleSeedChains);
     vector< vector<uint64_t> > seedChains;
 
     // Write each connected component in graphviz format.
