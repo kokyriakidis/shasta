@@ -4,6 +4,7 @@
 #include "deduplicate.hpp"
 #include "longestPath.hpp"
 #include "mode3b-AssemblyPath.hpp"
+#include "MurmurHash2.hpp"
 #include "orderPairs.hpp"
 #include "transitiveReduction.hpp"
 using namespace shasta;
@@ -53,17 +54,24 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     transitiveReduction();
     bool assembleSeedChains = false;
     createSeedChains(minEstimatedLength, assembleSeedChains);
+
+    // Attempt to display the seed chains.
+    createComponents(minCorrectedJaccard0, 100);
+    knn(3);
+    transitiveReduction();
+    const bool colorChains = true;
+    writeGraphviz("PathGraph", colorChains);
 }
 
 
 
 // Write each connected component in graphviz format.
-void GlobalPathGraph1::writeGraphviz(const string& baseName) const
+void GlobalPathGraph1::writeGraphviz(const string& baseName, bool colorChains) const
 {
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         const PathGraph1& component = *components[componentRank];
         ofstream out(baseName + "-" + to_string(componentRank) + ".dot");
-        component.writeGraphviz(componentRank, out);
+        component.writeGraphviz(componentRank, colorChains, out);
     }
 }
 
@@ -311,8 +319,10 @@ void GlobalPathGraph1::createComponents(
         allComponents.push_back(make_shared<PathGraph1>());
     }
     for(uint64_t vertexId=0; vertexId<n; vertexId++) {
+        const Vertex& vertex = vertices[vertexId];
         const uint64_t componentId = disjointSets.find_set(vertexId);
-        allComponents[componentId]->addVertex(vertexId, vertices[vertexId].edgeId);
+        allComponents[componentId]->addVertex(vertexId,
+            vertex.edgeId, vertex.chainId, vertex.positionInChain);
     }
 
     // Create edges of each connected component.
@@ -385,10 +395,13 @@ void GlobalPathGraph1::transitiveReduction()
 
 void PathGraph1::addVertex(
     uint64_t vertexId,
-    MarkerGraphEdgeId edgeId)
+    MarkerGraphEdgeId edgeId,
+    uint64_t chainId,
+    uint64_t positionInChain)
 {
     SHASTA_ASSERT(not vertexMap.contains(edgeId));
-    vertexMap.insert({edgeId, add_vertex({vertexId, edgeId}, *this)});
+    const vertex_descriptor v = add_vertex({vertexId, edgeId, chainId, positionInChain}, *this);
+    vertexMap.insert({edgeId, v});
 }
 
 
@@ -413,13 +426,33 @@ void PathGraph1::addEdge(
 // Write a component of the GlobalPathGraph in graphviz format.
 void PathGraph1::writeGraphviz(
     uint64_t componentId,
+    bool colorChains,
     ostream& out) const
 {
     const PathGraph1& graph = *this;
     out << "digraph PathGraphComponent" << componentId << " {\n";
 
     BGL_FORALL_VERTICES(v, graph, PathGraph1) {
-        out << graph[v].edgeId << ";\n";
+        const PathGraph1Vertex& vertex = graph[v];
+        out << vertex.edgeId;
+
+        // Tooltip.
+        out << " [tooltip=\"";
+        out << vertex.edgeId;
+        if(vertex.chainId != invalid<uint64_t>) {
+            out << " " << vertex.chainId << ":" << vertex.positionInChain;
+        }
+        out << "\"";
+
+        if(colorChains) {
+            if(vertex.chainId == invalid<uint64_t>) {
+                out << " color=black";
+            } else {
+                const uint32_t hue = MurmurHash2(&vertex.chainId, sizeof(vertex.chainId), 231) % 100;
+                out << " color=\"" << 0.01 * double(hue) << ",1,1\"";
+            }
+        }
+        out << "];\n";
     }
 
     BGL_FORALL_EDGES(e, graph, PathGraph1) {
@@ -427,9 +460,6 @@ void PathGraph1::writeGraphviz(
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
 
-        // Color based on corrected Jaccard.
-        const double correctedJaccard = edge.info.correctedJaccard();
-        const double hue = correctedJaccard / 3.;   // 0=red, 0.5=yellow, 1=green
 
         out <<
             graph[v0].edgeId << "->" <<
@@ -438,8 +468,31 @@ void PathGraph1::writeGraphviz(
             graph[v0].edgeId << "->" <<
             graph[v1].edgeId << " " <<
             std::fixed << std::setprecision(2) << edge.info.correctedJaccard() << " " <<
-            edge.info.offsetInBases;
-        out << "\" color=\"" << hue << ",1,1\"];\n";
+            edge.info.offsetInBases << "\"";
+
+        // Color.
+        if(colorChains) {
+            out << " style=invis";
+#if 0
+            const uint64_t chainId0 = graph[v0].chainId;
+            const uint64_t chainId1 = graph[v1].chainId;
+            if(
+                (chainId0 != invalid<uint64_t>) and
+                (chainId1 != invalid<uint64_t>) and
+                (chainId0 == chainId1)) {
+                const uint32_t hue = MurmurHash2(&chainId0, sizeof(chainId0), 231) % 100;
+                out << " color=\"" << 0.01 * double(hue) << ",1,1\"";
+            } else {
+                // out << " color=\"0,0,0,0.1\" arrowhead=none";
+                out << " style=invis";
+            }
+#endif
+        } else {
+            const double correctedJaccard = edge.info.correctedJaccard();
+            const double hue = correctedJaccard / 3.;   // 0=red, 0.5=yellow, 1=green
+            out << " color=\"" << hue << ",1,1\"";
+        }
+        out << "];\n";
     }
 
     out << "}\n";

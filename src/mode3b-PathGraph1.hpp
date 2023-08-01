@@ -60,6 +60,10 @@ public:
 
     // The marker graph edge corresponding to this PathGraph1 vertex.
     MarkerGraphEdgeId edgeId;
+
+    // Chain and position in chain, if any.
+    uint64_t chainId = invalid<uint64_t>;
+    uint64_t positionInChain = invalid<uint64_t>;
 };
 
 
@@ -78,13 +82,15 @@ public:
     std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
     void addVertex(
         uint64_t vertexId,
-        MarkerGraphEdgeId);
+        MarkerGraphEdgeId,
+        uint64_t chainId,
+        uint64_t positionInChain);
 
     void addEdge(
         MarkerGraphEdgeId,
         MarkerGraphEdgeId,
         const MarkerGraphEdgePairInfo&);
-    void writeGraphviz(uint64_t componentId, ostream&) const;
+    void writeGraphviz(uint64_t componentId, bool colorChains, ostream&) const;
 
     // For each vertex, only keep the best k outgoing and k incoming edges.
     // "Best" as defined by correctedJaccard of the edges.
@@ -186,7 +192,7 @@ private:
     vector< vector<uint64_t> > seedChains;
 
     // Write each connected component in graphviz format.
-    void writeGraphviz(const string& baseName) const;
+    void writeGraphviz(const string& baseName, bool colorChains) const;
 };
 
 
