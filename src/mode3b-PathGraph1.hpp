@@ -190,6 +190,7 @@ private:
         uint64_t minEstimatedLength,
         bool assembleSeedChains);
     vector< vector<uint64_t> > seedChains;
+    void connectSeedChains();
 
     // Write each connected component in graphviz format.
     void writeGraphviz(const string& baseName, bool colorChains) const;

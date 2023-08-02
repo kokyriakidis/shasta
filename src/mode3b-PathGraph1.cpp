@@ -52,15 +52,18 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     createComponents(minCorrectedJaccard1, minComponentSize);
     knn(k);
     transitiveReduction();
-    bool assembleSeedChains = false;
+    bool assembleSeedChains = true;
     createSeedChains(minEstimatedLength, assembleSeedChains);
+    connectSeedChains();
 
+#if 0
     // Attempt to display the seed chains.
     createComponents(minCorrectedJaccard0, 100);
     knn(3);
     transitiveReduction();
     const bool colorChains = true;
     writeGraphviz("PathGraph", colorChains);
+#endif
 }
 
 
@@ -577,11 +580,7 @@ void GlobalPathGraph1::createSeedChains(
 {
     ofstream fasta("SeedChains.fasta");
     ofstream csv("SeedChains.csv");
-    csv << "Rank,Vertices,Edges,Longest path length,Estimated length,";
-    if(assembleSeedChains) {
-        csv << "Assembled length,";
-    }
-    csv << "\n";
+    csv << "ChainId,Vertices,Edges,Longest path length,Estimated length\n";
 
     seedChains.clear();
 
@@ -606,12 +605,8 @@ void GlobalPathGraph1::createSeedChains(
         if(totalBaseOffset < minEstimatedLength) {
             continue;
         }
+        const uint64_t chainId = seedChains.size();
 
-        csv << componentRank << ",";
-        csv << num_vertices(component) << ",";
-        csv << num_edges(component) << ",";
-        csv << chain.size() << ",";
-        csv << totalBaseOffset << ",";
 
         if(assembleSeedChains) {
 
@@ -632,13 +627,8 @@ void GlobalPathGraph1::createSeedChains(
                 infos.push_back(component[e].info);
             }
             AssemblyPath assemblyPath(assembler, markerGraphEdgeIds, infos);
-            assemblyPath.writeFasta(fasta, to_string(componentRank));
-
-            vector<Base> sequence;
-            assemblyPath.getSequence(sequence);
-            csv << sequence.size() << ",";
+            assemblyPath.writeFasta(fasta, to_string(chainId));
         }
-        csv << "\n";
 
 
         // Get the GlobalPathGraph1 vertexIds for the chain.
@@ -650,7 +640,6 @@ void GlobalPathGraph1::createSeedChains(
         }
 
         // Store this chain as a new seed chain.
-        const uint64_t chainId = seedChains.size();
         seedChains.push_back(chainVertexIds);
         for(uint64_t position=0; position<chainVertexIds.size(); position++) {
             const uint64_t vertexId = chainVertexIds[position];
@@ -659,5 +648,80 @@ void GlobalPathGraph1::createSeedChains(
             vertex.positionInChain = position;
         }
 
+        csv << chainId << ",";
+        csv << num_vertices(component) << ",";
+        csv << num_edges(component) << ",";
+        csv << chain.size() << ",";
+        csv << totalBaseOffset << ",";
+        csv << "\n";
+
     }
+}
+
+
+
+void GlobalPathGraph1::connectSeedChains()
+{
+
+    // Compute the journey of each oriented read on the seed chains,
+    // that is the sequence of seed chain visited by each oriented read.
+    vector< vector<uint64_t> > orientedReadSeedChainsJourneys(orientedReadJourneys.size());
+
+    // Loop over all oriented reads.
+    for(uint64_t i=0; i<orientedReadJourneys.size(); i++) {
+        const vector< pair<uint32_t, uint64_t> >& journey = orientedReadJourneys[i];
+        vector<uint64_t>& seedChainsJourney = orientedReadSeedChainsJourneys[i];
+
+        // Loop over the journey of this oriented read.
+        for(const auto& p: journey) {
+
+            // Find the chain.
+            const uint64_t vertexId = p.second;
+            SHASTA_ASSERT(vertexId < vertices.size());
+            const Vertex& vertex = vertices[vertexId];
+            const uint64_t chainId = vertex.chainId;
+
+            // If no chain here, do nothing.
+            if(chainId == invalid<uint64_t>) {
+                continue;
+            }
+            SHASTA_ASSERT(chainId < seedChains.size());
+
+            // Append the chain to the seed chain journey, if different from the last one.
+            if(seedChainsJourney.empty() or chainId != seedChainsJourney.back()) {
+                seedChainsJourney.push_back(chainId);
+            }
+        }
+    }
+
+
+    // Count adjacent pairs of chains in journeys.
+    vector< pair<uint64_t, uint64_t> > chainPairs;
+    for(uint64_t i=0; i<orientedReadJourneys.size(); i++) {
+        const vector<uint64_t>& seedChainsJourney = orientedReadSeedChainsJourneys[i];
+        for(uint64_t j=1; j<seedChainsJourney.size(); j++) {
+            chainPairs.push_back({seedChainsJourney[j-1], seedChainsJourney[j]});
+        }
+    }
+    vector<uint64_t> coverage;
+    deduplicateAndCount(chainPairs, coverage);
+
+    cout << "Found " << chainPairs.size() << " chain pairs for " <<
+        seedChains.size() << " seed chains." << endl;
+    ofstream out("SeedChains.dot");
+    out << "digraph SeedChains{\n";
+    for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
+        out << chainId << " [label=\"" << chainId << "\\n" << seedChains[chainId].size() << "\"];\n";
+    }
+    for(uint64_t i=0; i<chainPairs.size(); i++) {
+        const auto& p = chainPairs[i];
+        if(coverage[i] < 6) {
+            continue;
+        }
+        out << p.first << "->" << p.second <<
+            "[label=\"" << coverage[i] << "\"];\n";
+    }
+    out << "}\n";
+
+
 }
