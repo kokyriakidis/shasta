@@ -35,7 +35,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     const uint64_t minEdgeCoverage = 2;
     const double minCorrectedJaccard0 = 0.5;
 
-    // Parameters that control the initial creation of chains.
+    // Parameters that control the creation of seed chains.
     const double minCorrectedJaccard1 = 0.8;
     const uint64_t minComponentSize = 3;
     const uint64_t k = 1;   // For k-nn
@@ -46,14 +46,14 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     computeOrientedReadJourneys();
     createEdges(maxDistanceInJourney, minEdgeCoverage, minCorrectedJaccard0);
 
-    // To create initial chains, use only the best edges and
+    // To create seed chains, use only the best edges and
     // do K-nn and transitive reduction, then compute the longest path
     // in each connected component.
     createComponents(minCorrectedJaccard1, minComponentSize);
     knn(k);
     transitiveReduction();
-    bool assembleSeedChains = true;
-    createSeedChains(minEstimatedLength, assembleSeedChains);
+    createSeedChains(minEstimatedLength);
+    // assembleSeedChains();
     connectSeedChains();
 
 #if 0
@@ -575,8 +575,7 @@ void PathGraph1::knn(uint64_t k)
 // This can cause contiguity breaks, which will be recovered later using
 // a more complete version of the GlobalPathGraph1.
 void GlobalPathGraph1::createSeedChains(
-    uint64_t minEstimatedLength,
-    bool assembleSeedChains)
+    uint64_t minEstimatedLength)
 {
     ofstream fasta("SeedChains.fasta");
     ofstream csv("SeedChains.csv");
@@ -584,65 +583,43 @@ void GlobalPathGraph1::createSeedChains(
 
     seedChains.clear();
 
-    // Compute the longest path in each component.
-    vector<PathGraph1::vertex_descriptor> chain;
+    // Loop over connected components.
+    vector<PathGraph1::vertex_descriptor> chainVertices;
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         PathGraph1& component = *components[componentRank];
-        longestPath(component, chain);
 
-        // Compute total base offset for this chain.
-        uint64_t totalBaseOffset = 0;
-        for(uint64_t i=1; i<chain.size(); i++) {
-            const PathGraph1::vertex_descriptor v0 = chain[i-1];
-            const PathGraph1::vertex_descriptor v1 = chain[i];
+        // Compute the longest path in this component.
+        longestPath(component, chainVertices);
+
+        // Use this longest path to create a tentative Chain.
+        Chain chain;
+        for(const PathGraph1::vertex_descriptor v: chainVertices) {
+            chain.vertexIds.push_back(component[v].vertexId);
+        }
+        for(uint64_t i=1; i<chainVertices.size(); i++) {
+            const PathGraph1::vertex_descriptor v0 = chainVertices[i-1];
+            const PathGraph1::vertex_descriptor v1 = chainVertices[i];
             PathGraph1::edge_descriptor e;
             bool edgeExists = false;
             tie(e, edgeExists) = edge(v0, v1, component);
             SHASTA_ASSERT(edgeExists);
-            totalBaseOffset += component[e].info.offsetInBases;
+            chain.infos.push_back(component[e].info);
         }
 
+        // Compute total base offset for this chain.
+        uint64_t totalBaseOffset = chain.totalOffset();
+
+        // If too short, discard it.
         if(totalBaseOffset < minEstimatedLength) {
             continue;
         }
-        const uint64_t chainId = seedChains.size();
 
-
-        if(assembleSeedChains) {
-
-            // Generate an AssemblyPath using this chain.
-            vector<MarkerGraphEdgeId> markerGraphEdgeIds;
-            vector<MarkerGraphEdgePairInfo> infos;
-            for(uint64_t i=0; i<chain.size(); i++) {
-                const PathGraph1::vertex_descriptor v = chain[i];
-                const PathGraph1Vertex& vertex = component[v];
-                markerGraphEdgeIds.push_back(vertex.edgeId);
-            }
-            for(uint64_t i=1; i<chain.size(); i++) {
-                const PathGraph1::vertex_descriptor v0 = chain[i-1];
-                const PathGraph1::vertex_descriptor v1 = chain[i];
-                PathGraph1::edge_descriptor e;
-                bool edgeExists = false;
-                tie(e, edgeExists) = edge(v0, v1, component);
-                infos.push_back(component[e].info);
-            }
-            AssemblyPath assemblyPath(assembler, markerGraphEdgeIds, infos);
-            assemblyPath.writeFasta(fasta, to_string(chainId));
-        }
-
-
-        // Get the GlobalPathGraph1 vertexIds for the chain.
-        vector<uint64_t> chainVertexIds;
-        for(uint64_t i=0; i<chain.size(); i++) {
-            const PathGraph1::vertex_descriptor v = chain[i];
-            const PathGraph1Vertex& vertex = component[v];
-            chainVertexIds.push_back(vertex.vertexId);
-        }
 
         // Store this chain as a new seed chain.
-        seedChains.push_back(chainVertexIds);
-        for(uint64_t position=0; position<chainVertexIds.size(); position++) {
-            const uint64_t vertexId = chainVertexIds[position];
+        const uint64_t chainId = seedChains.size();
+        seedChains.push_back(chain);
+        for(uint64_t position=0; position<chain.vertexIds.size(); position++) {
+            const uint64_t vertexId = chain.vertexIds[position];
             Vertex& vertex = vertices[vertexId];
             vertex.chainId = chainId;
             vertex.positionInChain = position;
@@ -651,10 +628,41 @@ void GlobalPathGraph1::createSeedChains(
         csv << chainId << ",";
         csv << num_vertices(component) << ",";
         csv << num_edges(component) << ",";
-        csv << chain.size() << ",";
+        csv << chain.vertexIds.size() << ",";
         csv << totalBaseOffset << ",";
         csv << "\n";
 
+    }
+}
+
+
+
+// Compute total base offset for this chain.
+uint64_t GlobalPathGraph1::Chain::totalOffset() const
+{
+    uint64_t totalBaseOffset = 0;
+    for(const MarkerGraphEdgePairInfo& info: infos) {
+        totalBaseOffset += info.offsetInBases;
+    }
+    return totalBaseOffset;
+}
+
+
+
+void GlobalPathGraph1::assembleSeedChains() const
+{
+    ofstream fasta("SeedChains.fasta");
+
+    for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
+        const Chain& chain = seedChains[chainId];
+
+        // Generate an AssemblyPath using this chain.
+        vector<MarkerGraphEdgeId> markerGraphEdgeIds;
+        for(const uint64_t vertexId: chain.vertexIds) {
+            markerGraphEdgeIds.push_back(vertices[vertexId].edgeId);
+        }
+        AssemblyPath assemblyPath(assembler, markerGraphEdgeIds, chain.infos);
+        assemblyPath.writeFasta(fasta, to_string(chainId));
     }
 }
 
@@ -711,7 +719,7 @@ void GlobalPathGraph1::connectSeedChains()
     ofstream out("SeedChains.dot");
     out << "digraph SeedChains{\n";
     for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
-        out << chainId << " [label=\"" << chainId << "\\n" << seedChains[chainId].size() << "\"];\n";
+        out << chainId << " [label=\"C" << chainId << "\\n" << seedChains[chainId].totalOffset() << "\"];\n";
     }
     for(uint64_t i=0; i<chainPairs.size(); i++) {
         const auto& p = chainPairs[i];

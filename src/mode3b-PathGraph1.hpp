@@ -177,6 +177,26 @@ private:
     // Transitive reduction of each connected component.
     void transitiveReduction();
 
+
+
+    // A chain is a sequence of vertices (not necessarily a path)
+    // that can be used to generate an AssemblyPath.
+    class Chain {
+    public:
+
+        // The vertexIds (indices in the vertices vector) of
+        // the vertices of this chain.
+        vector<uint64_t> vertexIds;
+
+        // The MarkerGraphEdgePairInfos in between the vertices.
+        // infos.size() is always vertexids.size() - 1;
+        vector<MarkerGraphEdgePairInfo> infos;
+
+        uint64_t totalOffset() const;
+    };
+
+
+
     // To create seed chains:
     // - Use only very strong edges (minCorrectedJaccard >= minCorrectedJaccard1).
     // - Compute connected components.
@@ -186,10 +206,9 @@ private:
     // This can cause contiguity breaks, which will be recovered later using
     // a more complete version of the GlobalPathGraph1.
     // Each chain is a vector of vertexIds (indices into the vertices vector).
-    void createSeedChains(
-        uint64_t minEstimatedLength,
-        bool assembleSeedChains);
-    vector< vector<uint64_t> > seedChains;
+    void createSeedChains(uint64_t minEstimatedLength);
+    void assembleSeedChains() const;
+    vector<Chain> seedChains;
     void connectSeedChains();
 
     // Write each connected component in graphviz format.
