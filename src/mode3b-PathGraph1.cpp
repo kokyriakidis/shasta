@@ -53,6 +53,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     knn(k);
     transitiveReduction();
     createSeedChains(minEstimatedLength);
+    writeSeedChainsDetails();
     // assembleSeedChains();
     connectSeedChains();
 
@@ -579,7 +580,7 @@ void GlobalPathGraph1::createSeedChains(
 {
     ofstream fasta("SeedChains.fasta");
     ofstream csv("SeedChains.csv");
-    csv << "ChainId,Vertices,Edges,Longest path length,Estimated length\n";
+    csv << "ChainId,Vertices,Edges,First,Last,Longest path length,Estimated length\n";
 
     seedChains.clear();
 
@@ -628,6 +629,8 @@ void GlobalPathGraph1::createSeedChains(
         csv << chainId << ",";
         csv << num_vertices(component) << ",";
         csv << num_edges(component) << ",";
+        csv << vertices[chain.vertexIds.front()].edgeId << ",";
+        csv << vertices[chain.vertexIds.back()].edgeId << ",";
         csv << chain.vertexIds.size() << ",";
         csv << totalBaseOffset << ",";
         csv << "\n";
@@ -664,6 +667,33 @@ void GlobalPathGraph1::assembleSeedChains() const
         AssemblyPath assemblyPath(assembler, markerGraphEdgeIds, chain.infos);
         assemblyPath.writeFasta(fasta, to_string(chainId));
     }
+}
+
+
+
+void GlobalPathGraph1::writeSeedChainsDetails() const
+{
+    ofstream csv("SeedChainsDetails.csv");
+    csv << "Chain,Position,Marker graph edge,Corrected Jaccard to next\n";
+
+    for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
+        const Chain& chain = seedChains[chainId];
+
+        for(uint64_t position=0; position<chain.vertexIds.size(); position++) {
+            const uint64_t vertexId = chain.vertexIds[position];
+
+            csv <<
+                chainId << "," <<
+                position << "," <<
+                vertices[vertexId].edgeId << ",";
+            if(position != chain.vertexIds.size()-1) {
+                csv << chain.infos[position].correctedJaccard() << ",";
+            }
+            csv << "\n";
+        }
+
+    }
+
 }
 
 
@@ -726,8 +756,20 @@ void GlobalPathGraph1::connectSeedChains()
         if(coverage[i] < 6) {
             continue;
         }
+
+        const uint64_t chainId0 = p.first;
+        const uint64_t chainId1 = p.second;
+        const Chain& chain0 = seedChains[chainId0];
+        const Chain& chain1 = seedChains[chainId1];
+
+        const MarkerGraphEdgeId edgeId0 = vertices[chain0.vertexIds.back()].edgeId;
+        const MarkerGraphEdgeId edgeId1 = vertices[chain1.vertexIds.front()].edgeId;
+        MarkerGraphEdgePairInfo info;
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+
+        out << std::fixed << std::setprecision(2);
         out << p.first << "->" << p.second <<
-            "[label=\"" << coverage[i] << "\"];\n";
+            "[label=\"" << coverage[i] << "\\n" << info.correctedJaccard() << "\"];\n";
     }
     out << "}\n";
 

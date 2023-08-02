@@ -207,6 +207,7 @@ private:
     // a more complete version of the GlobalPathGraph1.
     // Each chain is a vector of vertexIds (indices into the vertices vector).
     void createSeedChains(uint64_t minEstimatedLength);
+    void writeSeedChainsDetails() const;
     void assembleSeedChains() const;
     vector<Chain> seedChains;
     void connectSeedChains();
