@@ -6,6 +6,7 @@
 #include "mode3b-AssemblyPath.hpp"
 #include "MurmurHash2.hpp"
 #include "orderPairs.hpp"
+#include "timestamp.hpp"
 #include "transitiveReduction.hpp"
 using namespace shasta;
 using namespace mode3b;
@@ -23,59 +24,94 @@ using namespace mode3b;
 GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     assembler(assembler)
 {
-    // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES.
+    // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
+    // ARE DEFINED BEFORE EACH PHASE THAT USES THEM.
 
-    // The coverage range for primary vertices.
-    // This controls the generation of the GlobalPathGraph1 vertices.
-    const uint64_t minPrimaryCoverage = 8;
-    const uint64_t maxPrimaryCoverage = 25;
+    // Create GlobalPathGraph1 vertices.
+    {
+        const uint64_t minPrimaryCoverage = 8;
+        const uint64_t maxPrimaryCoverage = 25;
+        cout << timestamp << "Creating vertices." << endl;
+        createVertices(minPrimaryCoverage, maxPrimaryCoverage);
+        cout << timestamp << "Found " << vertices.size() << " vertices." << endl;
+        computeOrientedReadJourneys();
+    }
 
-    // Parameters that control generation of the GlobalPathGraph1 edges.
-    const uint64_t maxDistanceInJourney = 20;
-    const uint64_t minEdgeCoverage = 2;
-    const double minCorrectedJaccard0 = 0.5;
+    // Create GlobalPathGraph1 edges.
+    {
+        const uint64_t maxDistanceInJourney = unlimited<uint64_t>;
+        const uint64_t minEdgeCoverage = 2;
+        const double minCorrectedJaccard = 0.8;
+        cout << timestamp << "Creating edges." << endl;
+        createEdges(maxDistanceInJourney, minEdgeCoverage, minCorrectedJaccard);
+        cout << timestamp << "Found " << edges.size() << " edges." << endl;
+    }
 
-    // Parameters that control the creation of seed chains.
-    const double minCorrectedJaccard1 = 0.8;
-    const uint64_t minComponentSize = 3;
-    const uint64_t k = 1;   // For k-nn
-    const uint64_t minEstimatedLength = 10000;  // Minimum estimated length in bases
+    // Initial display.
+    {
+        const double minCorrectedJaccard = 0.;  // Start with all edges in the GlobalPathGraph1.
+        const uint64_t minComponentSize = 100;
+        createComponents(minCorrectedJaccard, minComponentSize);
 
-    // Create the GlobalPathGraph1.
-    createVertices(minPrimaryCoverage, maxPrimaryCoverage);
-    computeOrientedReadJourneys();
-    createEdges(maxDistanceInJourney, minEdgeCoverage, minCorrectedJaccard0);
+        // Clean it up a bit for easier display.
+        const uint64_t k = 3;
+        knn(k);
+        transitiveReduction();
 
+        writeGraphviz("PathGraph");
+    }
+
+#if 0
     // To create seed chains, use only the best edges and
     // do K-nn and transitive reduction, then compute the longest path
     // in each connected component.
-    createComponents(minCorrectedJaccard1, minComponentSize);
-    knn(k);
-    transitiveReduction();
-    createSeedChains(minEstimatedLength);
-    writeSeedChainsDetails();
-    // assembleSeedChains();
-    connectSeedChains();
+    {
 
-#if 0
-    // Attempt to display the seed chains.
-    createComponents(minCorrectedJaccard0, 100);
-    knn(3);
-    transitiveReduction();
-    const bool colorChains = true;
-    writeGraphviz("PathGraph", colorChains);
+        // Compute connected components using only the best edges.
+        const double minCorrectedJaccard = 0.8;
+        const uint64_t minComponentSize = 3;
+        createComponents(minCorrectedJaccard, minComponentSize);
+
+        // K-nn and transitive reduction.
+        // The transitive reduction is not really needed because it does not
+        // change the longest path, but it can be useful if we want to display
+        // the connected components at this stage.
+        const uint64_t k = 1;
+        knn(k);
+        transitiveReduction();
+
+        // Create the seed chains.
+        // Only keep the ones that are long enough.
+        // Minimum estimated length is in bases.
+        const uint64_t minEstimatedLength = 10000;
+        createSeedChains(minEstimatedLength);
+        writeSeedChainsDetails();
+        // assembleSeedChains();
+    }
+
+
+
+    // To connect seed chains, use the most permissive minCorrectedJaccard0
+    // and don't do K-n or transitive reduction.
+    // Then walk the graph to connect chains.
+    {
+        const double minCorrectedJaccard = 0.5;
+        const uint64_t minComponentSize = 100;
+        createComponents(minCorrectedJaccard, minComponentSize);
+        // connectSeedChains1();
+    }
 #endif
 }
 
 
 
 // Write each connected component in graphviz format.
-void GlobalPathGraph1::writeGraphviz(const string& baseName, bool colorChains) const
+void GlobalPathGraph1::writeGraphviz(const string& baseName) const
 {
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         const PathGraph1& component = *components[componentRank];
         ofstream out(baseName + "-" + to_string(componentRank) + ".dot");
-        component.writeGraphviz(componentRank, colorChains, out);
+        component.writeGraphviz(componentRank, out);
     }
 }
 
@@ -249,15 +285,21 @@ void GlobalPathGraph1::createEdges(
                     break;
                 }
                 candidateEdges.push_back({journey[position0].second, journey[position1].second});
+                if((candidateEdges.size() % 1000000) == 0) {
+                    cout << i << "/" << orientedReadJourneys.size() << " " << candidateEdges.size() << endl;
+                }
             }
         }
     }
+    cout << timestamp << "Found " << candidateEdges.size() << " candidate edges, including duplicates." << endl;
 
     // Deduplicate the candidate edges and count the number of times
     // each of them was found. Keep only the ones that occurred at least
     // minEdgeCoverage times.
     vector<uint64_t> coverage;
     deduplicateAndCountWithThreshold(candidateEdges, coverage, minEdgeCoverage);
+    cout << timestamp << "After deduplication, there are " << candidateEdges.size() << " candidate edges." << endl;
+    candidateEdges.shrink_to_fit();
 
     // For each candidate edge, compute correctedJaccard, and if high enough
     // generate an edge.
@@ -326,7 +368,8 @@ void GlobalPathGraph1::createComponents(
         const Vertex& vertex = vertices[vertexId];
         const uint64_t componentId = disjointSets.find_set(vertexId);
         allComponents[componentId]->addVertex(vertexId,
-            vertex.edgeId, vertex.chainId, vertex.positionInChain);
+            vertex.edgeId, vertex.chainId, vertex.positionInChain,
+            vertex.isFirstInChain, vertex.isLastInChain);
     }
 
     // Create edges of each connected component.
@@ -401,10 +444,18 @@ void PathGraph1::addVertex(
     uint64_t vertexId,
     MarkerGraphEdgeId edgeId,
     uint64_t chainId,
-    uint64_t positionInChain)
+    uint64_t positionInChain,
+    bool isFirstInChain,
+    bool isLastInChain)
 {
     SHASTA_ASSERT(not vertexMap.contains(edgeId));
-    const vertex_descriptor v = add_vertex({vertexId, edgeId, chainId, positionInChain}, *this);
+    const vertex_descriptor v = add_vertex({
+        vertexId,
+        edgeId,
+        chainId,
+        positionInChain,
+        isFirstInChain,
+        isLastInChain}, *this);
     vertexMap.insert({edgeId, v});
 }
 
@@ -430,7 +481,6 @@ void PathGraph1::addEdge(
 // Write a component of the GlobalPathGraph in graphviz format.
 void PathGraph1::writeGraphviz(
     uint64_t componentId,
-    bool colorChains,
     ostream& out) const
 {
     const PathGraph1& graph = *this;
@@ -448,12 +498,15 @@ void PathGraph1::writeGraphviz(
         }
         out << "\"";
 
-        if(colorChains) {
-            if(vertex.chainId == invalid<uint64_t>) {
-                out << " color=black";
+        if(vertex.chainId != invalid<uint64_t>) {
+            if(vertex.isFirstInChain) {
+                out << " color=blue";
+            } else if(vertex.isLastInChain) {
+                out << " color=orange";
             } else {
-                const uint32_t hue = MurmurHash2(&vertex.chainId, sizeof(vertex.chainId), 231) % 100;
-                out << " color=\"" << 0.01 * double(hue) << ",1,1\"";
+                // const uint32_t hue = MurmurHash2(&vertex.chainId, sizeof(vertex.chainId), 231) % 100;
+                // out << " color=\"" << 0.01 * double(hue) << ",0.4,1\"";
+                out << " color=cyan";
             }
         }
         out << "];\n";
@@ -475,27 +528,9 @@ void PathGraph1::writeGraphviz(
             edge.info.offsetInBases << "\"";
 
         // Color.
-        if(colorChains) {
-            out << " style=invis";
-#if 0
-            const uint64_t chainId0 = graph[v0].chainId;
-            const uint64_t chainId1 = graph[v1].chainId;
-            if(
-                (chainId0 != invalid<uint64_t>) and
-                (chainId1 != invalid<uint64_t>) and
-                (chainId0 == chainId1)) {
-                const uint32_t hue = MurmurHash2(&chainId0, sizeof(chainId0), 231) % 100;
-                out << " color=\"" << 0.01 * double(hue) << ",1,1\"";
-            } else {
-                // out << " color=\"0,0,0,0.1\" arrowhead=none";
-                out << " style=invis";
-            }
-#endif
-        } else {
-            const double correctedJaccard = edge.info.correctedJaccard();
-            const double hue = correctedJaccard / 3.;   // 0=red, 0.5=yellow, 1=green
-            out << " color=\"" << hue << ",1,1\"";
-        }
+        const double correctedJaccard = edge.info.correctedJaccard();
+        const double hue = correctedJaccard / 3.;   // 0=red, 0.5=yellow, 1=green
+        out << " color=\"" << hue << ",1,1\"";
         out << "];\n";
     }
 
@@ -624,6 +659,8 @@ void GlobalPathGraph1::createSeedChains(
             Vertex& vertex = vertices[vertexId];
             vertex.chainId = chainId;
             vertex.positionInChain = position;
+            vertex.isFirstInChain = (position == 0);
+            vertex.isLastInChain = (position == chain.vertexIds.size() - 1);
         }
 
         csv << chainId << ",";
@@ -698,7 +735,8 @@ void GlobalPathGraph1::writeSeedChainsDetails() const
 
 
 
-void GlobalPathGraph1::connectSeedChains()
+// Connect seed chains by following reads.
+void GlobalPathGraph1::connectSeedChains0()
 {
 
     // Compute the journey of each oriented read on the seed chains,

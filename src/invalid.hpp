@@ -8,6 +8,7 @@
 
 namespace shasta {
     template<class T> static const T invalid = std::numeric_limits<T>::max();
+    template<class T> static const T unlimited = std::numeric_limits<T>::max();
 }
 
 #endif

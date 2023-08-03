@@ -64,6 +64,8 @@ public:
     // Chain and position in chain, if any.
     uint64_t chainId = invalid<uint64_t>;
     uint64_t positionInChain = invalid<uint64_t>;
+    bool isFirstInChain = false;
+    bool isLastInChain = false;
 };
 
 
@@ -84,13 +86,15 @@ public:
         uint64_t vertexId,
         MarkerGraphEdgeId,
         uint64_t chainId,
-        uint64_t positionInChain);
+        uint64_t positionInChain,
+        bool isFirstInChain,
+        bool isLastInChain);
 
     void addEdge(
         MarkerGraphEdgeId,
         MarkerGraphEdgeId,
         const MarkerGraphEdgePairInfo&);
-    void writeGraphviz(uint64_t componentId, bool colorChains, ostream&) const;
+    void writeGraphviz(uint64_t componentId, ostream&) const;
 
     // For each vertex, only keep the best k outgoing and k incoming edges.
     // "Best" as defined by correctedJaccard of the edges.
@@ -129,6 +133,8 @@ private:
         MarkerGraphEdgeId edgeId;
         uint64_t chainId = invalid<uint64_t>;
         uint64_t positionInChain = invalid<uint64_t>;
+        bool isFirstInChain = false;
+        bool isLastInChain = false;
         Vertex(MarkerGraphEdgeId edgeId) : edgeId(edgeId) {}
     };
     vector<Vertex> vertices;
@@ -210,10 +216,15 @@ private:
     void writeSeedChainsDetails() const;
     void assembleSeedChains() const;
     vector<Chain> seedChains;
-    void connectSeedChains();
+
+    // Connect seed chains by following reads.
+    void connectSeedChains0();
+
+    // Connect seed chains by walking the graph.
+    void connectSeedChains1();
 
     // Write each connected component in graphviz format.
-    void writeGraphviz(const string& baseName, bool colorChains) const;
+    void writeGraphviz(const string& baseNames) const;
 };
 
 
