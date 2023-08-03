@@ -39,17 +39,18 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
 
     // Create GlobalPathGraph1 edges.
     {
-        const uint64_t maxDistanceInJourney = unlimited<uint64_t>;
-        const uint64_t minEdgeCoverage = 2;
+        const uint64_t maxDistanceInJourney = 20;
+        const uint64_t minEdgeCoverage = 3;
         const double minCorrectedJaccard = 0.8;
         cout << timestamp << "Creating edges." << endl;
-        createEdges(maxDistanceInJourney, minEdgeCoverage, minCorrectedJaccard);
+        createEdges0(maxDistanceInJourney, minEdgeCoverage, minCorrectedJaccard);
+        // createEdges1(minEdgeCoverage, minCorrectedJaccard); // Unlimited distance (non-local).
         cout << timestamp << "Found " << edges.size() << " edges." << endl;
     }
 
     // Initial display.
     {
-        const double minCorrectedJaccard = 0.;  // Start with all edges in the GlobalPathGraph1.
+        const double minCorrectedJaccard = 0.8;
         const uint64_t minComponentSize = 100;
         createComponents(minCorrectedJaccard, minComponentSize);
 
@@ -58,10 +59,9 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         knn(k);
         transitiveReduction();
 
-        writeGraphviz("PathGraph");
+        writeGraphviz("PathGraph", minCorrectedJaccard, 1.);
     }
 
-#if 0
     // To create seed chains, use only the best edges and
     // do K-nn and transitive reduction, then compute the longest path
     // in each connected component.
@@ -72,46 +72,50 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         const uint64_t minComponentSize = 3;
         createComponents(minCorrectedJaccard, minComponentSize);
 
-        // K-nn and transitive reduction.
-        // The transitive reduction is not really needed because it does not
+        // K-nn.
+        const uint64_t k = 3;
+        knn(k);
+
+        // Transitive reduction is not really needed because it does not
         // change the longest path, but it can be useful if we want to display
         // the connected components at this stage.
-        const uint64_t k = 1;
-        knn(k);
-        transitiveReduction();
+        // transitiveReduction();
 
         // Create the seed chains.
         // Only keep the ones that are long enough.
         // Minimum estimated length is in bases.
         const uint64_t minEstimatedLength = 10000;
         createSeedChains(minEstimatedLength);
+        cout << "Found " << seedChains.size() << " seed chains." << endl;
         writeSeedChainsDetails();
         // assembleSeedChains();
     }
 
 
 
-    // To connect seed chains, use the most permissive minCorrectedJaccard0
-    // and don't do K-n or transitive reduction.
+    // To connect seed chains, don't do K-n or transitive reduction.
     // Then walk the graph to connect chains.
     {
-        const double minCorrectedJaccard = 0.5;
+        const double minCorrectedJaccard = 0.8;
         const uint64_t minComponentSize = 100;
         createComponents(minCorrectedJaccard, minComponentSize);
-        // connectSeedChains1();
+        connectSeedChains0();
     }
-#endif
+
 }
 
 
 
 // Write each connected component in graphviz format.
-void GlobalPathGraph1::writeGraphviz(const string& baseName) const
+void GlobalPathGraph1::writeGraphviz(
+    const string& baseName,
+    double redJ,
+    double greenJ) const
 {
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         const PathGraph1& component = *components[componentRank];
         ofstream out(baseName + "-" + to_string(componentRank) + ".dot");
-        component.writeGraphviz(componentRank, out);
+        component.writeGraphviz(componentRank, redJ, greenJ,out);
     }
 }
 
@@ -248,6 +252,24 @@ void GlobalPathGraph1::computeOrientedReadJourneys()
             OrderPairsByFirstOnly<uint32_t, uint64_t>());
     }
 
+
+
+    // Store journey information in the vertices.
+    for(ReadId readId=0; readId<assembler.markers.size()/2; readId++) {
+        for(Strand strand=0; strand<2; strand++) {
+            const OrientedReadId orientedReadId(readId, strand);
+            const auto journey = orientedReadJourneys[orientedReadId.getValue()];
+
+            for(uint64_t position=0; position<journey.size(); position++) {
+                const auto& p = journey[position];
+                const uint64_t vertexId = p.second;
+                vertices[vertexId].journeyInfoItems.push_back({orientedReadId, position});
+            }
+        }
+    }
+
+
+
     // Write the journeys to csv.
     ofstream csv("GlobalPathGraphJourneys.csv");
     for(ReadId readId=0; readId<assembler.markers.size()/2; readId++) {
@@ -267,7 +289,7 @@ void GlobalPathGraph1::computeOrientedReadJourneys()
 
 
 
-void GlobalPathGraph1::createEdges(
+void GlobalPathGraph1::createEdges0(
     uint64_t maxDistanceInJourney,
     uint64_t minEdgeCoverage,
     double minCorrectedJaccard)
@@ -285,9 +307,6 @@ void GlobalPathGraph1::createEdges(
                     break;
                 }
                 candidateEdges.push_back({journey[position0].second, journey[position1].second});
-                if((candidateEdges.size() % 1000000) == 0) {
-                    cout << i << "/" << orientedReadJourneys.size() << " " << candidateEdges.size() << endl;
-                }
             }
         }
     }
@@ -318,6 +337,78 @@ void GlobalPathGraph1::createEdges(
         }
     }
 
+}
+
+
+
+void GlobalPathGraph1::createEdges1(
+    uint64_t minEdgeCoverage,
+    double minCorrectedJaccard)
+{
+    // Vector to store the children of a single vertex.
+    // The first element of each pair if the vertexId of the child.
+    vector< pair<uint64_t, MarkerGraphEdgePairInfo> > children;
+
+    // Loop over all vertices.
+    Edge edge;
+    for(edge.vertexId0=0; edge.vertexId0<vertices.size(); edge.vertexId0++) {
+        if((edge.vertexId0 % 10000) == 0) {
+            cout << edge.vertexId0 << "/" << vertices.size() << endl;
+        }
+
+        // Find its children.
+        findChildren(edge.vertexId0, minEdgeCoverage, minCorrectedJaccard, children);
+
+        // Store them.
+        for(const auto& p: children) {
+            edge.vertexId1 = p.first;
+            edge.info = p.second;
+            edges.push_back(edge);
+        }
+    }
+}
+
+
+
+// Find children edges of vertexId0.
+// The first element of each pair of the children vector
+// is the vertexId of the child vertex.
+void GlobalPathGraph1::findChildren(
+    uint64_t vertexId0,
+    uint64_t minEdgeCoverage,
+    double minCorrectedJaccard,
+    vector< pair<uint64_t, MarkerGraphEdgePairInfo> >& children)
+{
+    const Vertex& vertex0 = vertices[vertexId0];
+    const MarkerGraphEdgeId edgeId0 = vertex0.edgeId;
+
+    // Find vertices encountered later on journeys that go through here.
+    vector<uint64_t> candidateChildren;
+    for(const auto& journeyInfoItem: vertex0.journeyInfoItems) {
+        const OrientedReadId orientedReadId = journeyInfoItem.orientedReadId;
+        const auto& journey = orientedReadJourneys[orientedReadId.getValue()];
+        for(uint64_t position = journeyInfoItem.positionInJourney+1;
+            position < journey.size(); position++) {
+            candidateChildren.push_back(journey[position].second);
+        }
+    }
+
+    // Count the candidate children and only keep the ones
+    // that occurred at least minEdgeCoverage times.
+    vector<uint64_t> coverage;
+    deduplicateAndCountWithThreshold(candidateChildren, coverage, minEdgeCoverage);
+
+    // Store the ones that have sufficient correctedJaccard.
+    children.clear();
+    MarkerGraphEdgePairInfo info;
+    for(const uint64_t vertexId1: candidateChildren) {
+        const Vertex& vertex1 = vertices[vertexId1];
+        const MarkerGraphEdgeId edgeId1 = vertex1.edgeId;
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+        if(info.correctedJaccard() >= minCorrectedJaccard) {
+            children.push_back({vertexId1, info});
+        }
+    }
 }
 
 
@@ -428,6 +519,16 @@ void GlobalPathGraph1::knn(uint64_t k)
 
 
 
+void GlobalPathGraph1::kClosest(uint64_t k)
+{
+    for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
+        PathGraph1& component = *components[componentRank];
+        component.kClosest(k);
+    }
+}
+
+
+
 // Transitive reduction of each connected component.
 // Ths can fail for connected components that contain cycles.
 void GlobalPathGraph1::transitiveReduction()
@@ -481,6 +582,8 @@ void PathGraph1::addEdge(
 // Write a component of the GlobalPathGraph in graphviz format.
 void PathGraph1::writeGraphviz(
     uint64_t componentId,
+    double redJ,
+    double greenJ,
     ostream& out) const
 {
     const PathGraph1& graph = *this;
@@ -529,8 +632,14 @@ void PathGraph1::writeGraphviz(
 
         // Color.
         const double correctedJaccard = edge.info.correctedJaccard();
-        const double hue = correctedJaccard / 3.;   // 0=red, 0.5=yellow, 1=green
-        out << " color=\"" << hue << ",1,1\"";
+        if(correctedJaccard <= redJ) {
+            out << " color=red";
+        } else if(correctedJaccard >= greenJ) {
+            out << " color=green";
+        } else {
+            const double hue = (correctedJaccard - redJ) / (3. * (greenJ - redJ));
+            out << " color=\"" << hue << ",1,1\"";
+        }
         out << "];\n";
     }
 
@@ -578,6 +687,69 @@ void PathGraph1::knn(uint64_t k)
                     adjacentEdges.begin() + k,
                     adjacentEdges.end(),
                     OrderPairsBySecondOnlyGreater<edge_descriptor, double>());
+                adjacentEdges.resize(k);
+            }
+
+            // Mark them as to be kept.
+            for(const auto& p:adjacentEdges) {
+                const edge_descriptor e = p.first;
+                graph[e].keep = true;
+            }
+        }
+    }
+
+    // Remove edges not marked as to be kept.
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, graph, PathGraph1) {
+        if(not graph[e].keep) {
+            edgesToBeRemoved.push_back(e);
+        }
+    }
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, graph);
+    }
+}
+
+
+
+// Keep the k closest outgoing and incoming edges for each vertex.
+void PathGraph1::kClosest(uint64_t k)
+{
+    PathGraph1& graph = *this;
+
+    // First mark all edges as not to be kept.
+    BGL_FORALL_EDGES(e, graph, PathGraph1) {
+        graph[e].keep = false;
+    }
+
+
+
+    // For each vertex, mark as to be kept the closest k outgoing
+    // and incoming edges.
+    vector< pair<edge_descriptor, uint64_t> > adjacentEdges;  // With estimated offset.
+    BGL_FORALL_VERTICES(v, graph, PathGraph1) {
+
+        // Loop over both directions.
+        for(uint64_t direction=0; direction<2; direction++) {
+            adjacentEdges.clear();
+
+            if(direction == 0) {
+                BGL_FORALL_OUTEDGES(v, e, graph, PathGraph1) {
+                    adjacentEdges.push_back({e, graph[e].info.offsetInBases});
+                }
+            } else {
+                BGL_FORALL_INEDGES(v, e, graph, PathGraph1) {
+                    adjacentEdges.push_back({e, graph[e].info.offsetInBases});
+                }
+            }
+
+            // Only keep the k best.
+            if(adjacentEdges.size() > k) {
+                std::nth_element(
+                    adjacentEdges.begin(),
+                    adjacentEdges.begin() + k,
+                    adjacentEdges.end(),
+                    OrderPairsBySecondOnly<edge_descriptor, uint64_t>());
                 adjacentEdges.resize(k);
             }
 

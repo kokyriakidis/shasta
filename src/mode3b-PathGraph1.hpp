@@ -18,6 +18,7 @@ A directed edge v0->v1 is generated if:
 
 // Shasta.
 #include "MarkerGraphEdgePairInfo.hpp"
+#include "ReadId.hpp"
 #include "shastaTypes.hpp"
 
 // Boost libraries.
@@ -94,11 +95,18 @@ public:
         MarkerGraphEdgeId,
         MarkerGraphEdgeId,
         const MarkerGraphEdgePairInfo&);
-    void writeGraphviz(uint64_t componentId, ostream&) const;
+    void writeGraphviz(
+        uint64_t componentId,
+        double redJ,
+        double greenJ,
+        ostream&) const;
 
     // For each vertex, only keep the best k outgoing and k incoming edges.
     // "Best" as defined by correctedJaccard of the edges.
     void knn(uint64_t k);
+
+    // Keep the k closest outgoing and incoming edges for each vertex.
+    void kClosest(uint64_t k);
 };
 
 
@@ -124,6 +132,8 @@ private:
         MarkerGraphEdgeId,
         uint64_t minEdgeCoverage) const;
 
+
+
     // Each vertex corresponds to a primary marker graph edge.
     // Store them here.
     // The index in this table is the vertexId.
@@ -136,6 +146,14 @@ private:
         bool isFirstInChain = false;
         bool isLastInChain = false;
         Vertex(MarkerGraphEdgeId edgeId) : edgeId(edgeId) {}
+
+        // Information on the oriented reads that visit this vertex.
+        class JourneyInfoItem {
+        public:
+            OrientedReadId orientedReadId;
+            uint64_t positionInJourney;
+        };
+        vector<JourneyInfoItem> journeyInfoItems;
     };
     vector<Vertex> vertices;
     void createVertices(
@@ -159,10 +177,23 @@ private:
         MarkerGraphEdgePairInfo info;
     };
     vector<Edge> edges;
-    void createEdges(
+    void createEdges0(
         uint64_t maxDistanceInJourney,
         uint64_t minEdgeCoverage,
         double minCorrectedJaccard);
+    void createEdges1(
+        uint64_t minEdgeCoverage,
+        double minCorrectedJaccard);
+
+    // Find children edges of vertexId0.
+    // The first element of each pair of the children vector
+    // is the vertexId of the child vertex.
+    void findChildren(
+        uint64_t vertexId0,
+        uint64_t minEdgeCoverage,
+        double minCorrectedJaccard,
+        vector< pair<uint64_t, MarkerGraphEdgePairInfo> >& children);
+
 
     // Write the entire PathGraph in graphviz format.
     void writeGraphviz() const;
@@ -179,6 +210,9 @@ private:
     // as measured by correctedJaccard of each edge.
     // This can break contiguity of the connected component.
     void knn(uint64_t k);
+
+    // Keep the k closest outgoing and incoming edges for each vertex.
+    void kClosest(uint64_t k);
 
     // Transitive reduction of each connected component.
     void transitiveReduction();
@@ -224,7 +258,10 @@ private:
     void connectSeedChains1();
 
     // Write each connected component in graphviz format.
-    void writeGraphviz(const string& baseNames) const;
+    void writeGraphviz(
+        const string& baseName,
+        double redJ,
+        double greenJ) const;
 };
 
 
