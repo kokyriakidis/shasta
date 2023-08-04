@@ -13,6 +13,9 @@ using namespace mode3b;
 
 // Boost libraries.
 #include "boost/graph/iteration_macros.hpp"
+#include <boost/multi_index_container.hpp>
+#include <boost/multi_index/ordered_index.hpp>
+#include <boost/multi_index/member.hpp>
 #include <boost/pending/disjoint_sets.hpp>
 
 // Standard library.
@@ -48,6 +51,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         cout << timestamp << "Found " << edges.size() << " edges." << endl;
     }
 
+#if 0
     // Initial display.
     {
         const double minCorrectedJaccard = 0.8;
@@ -61,6 +65,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
 
         writeGraphviz("PathGraph", minCorrectedJaccard, 1.);
     }
+#endif
 
     // To create seed chains, use only the best edges and
     // do K-nn and transitive reduction, then compute the longest path
@@ -93,13 +98,11 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
 
 
 
-    // To connect seed chains, don't do K-n or transitive reduction.
-    // Then walk the graph to connect chains.
+    // Connect seed chains.
     {
-        const double minCorrectedJaccard = 0.8;
-        const uint64_t minComponentSize = 100;
-        createComponents(minCorrectedJaccard, minComponentSize);
-        connectSeedChains0();
+        const uint64_t minEdgeCoverage = 4;
+        const double minCorrectedJaccard = 0.6;
+        connectSeedChains1(minEdgeCoverage, minCorrectedJaccard);
     }
 
 }
@@ -907,7 +910,7 @@ void GlobalPathGraph1::writeSeedChainsDetails() const
 
 
 
-// Connect seed chains by following reads.
+// Connect seed chains by following reads on the graph.
 void GlobalPathGraph1::connectSeedChains0()
 {
 
@@ -984,4 +987,119 @@ void GlobalPathGraph1::connectSeedChains0()
     out << "}\n";
 
 
+}
+
+
+
+// To connect a chain to the next, use a shortest path algorithm (Dijkstra algorithm)
+// starting at the last vertex of the chain. The shortest path does not run
+// on the GlobalGraph1 or one of its connected components.
+// Instead, it runs on the implicit graph defined by findChildren,
+// with the length of an edge defined by offsetInBases.
+// Uses a boost::multi_index_container as the data structure in
+// Dijkstra's algorithm.
+// See:
+// https://en.wikipedia.org/wiki/Dijkstra's_algorithm
+// https://www.boost.org/doc/libs/1_82_0/libs/multi_index/doc/tutorial/basics.html#multiple_sort
+void GlobalPathGraph1::connectSeedChains1(
+    uint64_t minEdgeCoverage,
+    double minCorrectedJaccard
+    )
+{
+    using boost::multi_index_container;
+    using boost::multi_index::indexed_by;
+    using boost::multi_index::member;
+    using boost::multi_index::ordered_unique;
+    using boost::multi_index::ordered_non_unique;
+
+    // Information about a vertex stored during the Dijkstra algorithm.
+    class VertexInfo {
+    public:
+        uint64_t vertexId;
+        uint64_t tentativeDistance;
+    };
+
+    // The container used to store VertexInfos,
+    // with the two indices to support the required operations.
+    using VertexContainer = multi_index_container<VertexInfo,
+        indexed_by <
+        ordered_unique< member<VertexInfo, uint64_t, &VertexInfo::vertexId> >,
+        ordered_non_unique< member<VertexInfo, uint64_t, &VertexInfo::tentativeDistance> >
+        > >;
+
+    // Last argument for findChildren below, defined here to reduce
+    // memory allocation activity.
+    vector< pair<uint64_t, MarkerGraphEdgePairInfo> > children;
+
+    ofstream out("SeedChains.dot");
+    out << "digraph SeedChains {\n";
+
+    // Loop over chains.
+    for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
+
+        cout << "Working on chain " << chainId << endl;
+        const Chain& chain = seedChains[chainId];
+        const uint64_t chainLastVertexId = chain.vertexIds.back();
+        cout << "Last vertex of chain " <<  vertices[chainLastVertexId].edgeId << " is starting vertex for search." << endl;
+
+        // Start the Dijkstra algorithm with this as the only seen vertex.
+        VertexContainer seen;
+        const auto& seenById = seen.get<0>();
+        auto& seenByDistance = seen.get<1>();   // Not const so we can erase by distance.
+        seen.insert({chainLastVertexId, 0});
+
+        VertexContainer visited;
+        const auto& visitedById = visited.get<0>();
+
+        // Dijkstra loop.
+        while(not seen.empty()) {
+
+            // Visit the vertex with the lowest distance.
+            auto it = seenByDistance.begin();
+            VertexInfo v0 = *it;
+            visited.insert(*it);
+            seenByDistance.erase(it);
+            // cout << "Visiting " << vertices[v0.vertexId].edgeId << endl;
+
+            // If it belongs to a different chain, we are done.
+            const uint64_t chainId0 = vertices[v0.vertexId].chainId;
+            if(chainId0 != invalid<uint64_t> and chainId0 != chainId) {
+                cout << vertices[v0.vertexId].edgeId << " is on chain " << chainId0 <<
+                    " at distance " << v0.tentativeDistance << endl;
+                out << chainId << "->" << chainId0 << ";\n";
+                break;
+            }
+
+            // Find its children.
+            findChildren(v0.vertexId, minEdgeCoverage, minCorrectedJaccard, children);
+
+            // Loop over the unvisited children.
+            for(const auto& child: children) {
+                const uint64_t vertexId1 = child.first;
+                // cout << "Found child " << vertices[vertexId1].edgeId << endl;
+                if(visitedById.find(vertexId1) != visitedById.end()) {
+                    // cout << "Already visited." << endl;
+                    continue;
+                }
+
+                const MarkerGraphEdgePairInfo& info = child.second;
+                SHASTA_ASSERT(info.offsetInBases > 0);
+
+                // Update the tentative distance of the child,
+                // adding it to the seenVertices if not present.
+                auto it = seenById.find(vertexId1);
+                const uint64_t distance1 = v0.tentativeDistance + info.offsetInBases;
+                if(it == seenById.end()) {
+                    seen.insert({vertexId1, distance1});
+                } else {
+                    VertexInfo seenVertex1 = *it;
+                    seenVertex1.tentativeDistance = min(seenVertex1.tentativeDistance, distance1);
+                    seen.replace(it, seenVertex1);
+                }
+
+            }
+        }
+
+    }
+    out << "}\n";
 }

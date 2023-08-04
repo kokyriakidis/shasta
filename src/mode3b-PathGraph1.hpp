@@ -255,7 +255,10 @@ private:
     void connectSeedChains0();
 
     // Connect seed chains by walking the graph.
-    void connectSeedChains1();
+    void connectSeedChains1(
+        uint64_t minEdgeCoverage,
+        double minCorrectedJaccard
+        );
 
     // Write each connected component in graphviz format.
     void writeGraphviz(
