@@ -21,6 +21,7 @@ using namespace mode3b;
 // Standard library.
 #include "fstream.hpp"
 #include <iomanip>
+#include <numeric>
 
 
 
@@ -93,18 +94,19 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         createSeedChains(minEstimatedLength);
         cout << "Found " << seedChains.size() << " seed chains." << endl;
         writeSeedChainsDetails();
+        writeSeedChainsStatistics();
         // assembleSeedChains();
     }
 
 
-
+#if 0
     // Connect seed chains.
     {
         const uint64_t minEdgeCoverage = 4;
         const double minCorrectedJaccard = 0.6;
         connectSeedChains1(minEdgeCoverage, minCorrectedJaccard);
     }
-
+#endif
 }
 
 
@@ -906,6 +908,98 @@ void GlobalPathGraph1::writeSeedChainsDetails() const
 
     }
 
+}
+
+
+
+void GlobalPathGraph1::writeSeedChainsStatistics() const
+{
+    const uint64_t minChainLength = 200000;
+    const uint64_t binWidth = 5000;
+
+    class Bin {
+    public:
+        uint64_t n;
+        uint64_t commonSum = 0;
+        uint64_t commonSum2 = 0;
+        void add(uint64_t common)
+        {
+            n++;
+            commonSum += common;
+            commonSum2 += common * common;
+        }
+        double commonAverage() const
+        {
+            return double(commonSum) / double(n);
+        }
+        double commonSigma() const
+        {
+            return sqrt(double(commonSum2) / double(n) - commonAverage() * commonAverage());
+        }
+    };
+    vector<Bin> bins;
+
+
+    MarkerGraphEdgePairInfo info;
+    for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
+        const Chain& chain = seedChains[chainId];
+        if(chain.totalOffset() < minChainLength) {
+            continue;
+        }
+
+        // Choose a subset of the chain vertices to use for statistics.
+        vector<uint64_t> vertexIds;
+        const uint64_t desiredVertexCount = 100;
+        if(desiredVertexCount < chain.vertexIds.size()) {
+            const double ratio = double(desiredVertexCount) / double(chain.vertexIds.size());
+            const uint32_t hashThreshold = uint32_t(ratio * double(std::numeric_limits<uint32_t>::max()));
+            for(const uint64_t vertexId: chain.vertexIds) {
+                if(MurmurHash2(&vertexId, sizeof(vertexId), 231) < hashThreshold) {
+                    vertexIds.push_back(vertexId);
+                }
+            }
+        } else {
+            vertexIds = chain.vertexIds;
+        }
+        cout << "Chain " << chainId << ": using " << vertexIds.size() <<
+            " chain vertices for statistics out of " << chain.vertexIds.size() << " total." << endl;
+
+        // Now loop over pairs of the vertices we selected.
+        for(uint64_t i0=0; i0<vertexIds.size(); i0++) {
+            const uint64_t vertexId0 = vertexIds[i0];
+            const MarkerGraphEdgeId edgeId0 = vertices[vertexId0].edgeId;
+            for(uint64_t i1=i0+1; i1<vertexIds.size(); i1++) {
+                const uint64_t vertexId1 = vertexIds[i1];
+                const MarkerGraphEdgeId edgeId1 = vertices[vertexId1].edgeId;
+                SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+                if(info.common == 0) {
+                    continue;
+                }
+
+                // Access the bin for this offset.
+                const uint64_t binId = info.offsetInBases / binWidth;
+                if(binId >= bins.size()) {
+                    bins.resize(binId + 1);
+                }
+                bins[binId].add(info.common);
+            }
+        }
+    }
+
+    ofstream csv("SeedChainsStatistics.csv");
+    csv << "BinMin,BinMid,BinMax,Coverage,Coverage sigma\n";
+    for(uint64_t binId=0; binId<bins.size(); binId++) {
+        const Bin& bin = bins[binId];
+        const uint64_t binMin = binId * binWidth;
+        const uint64_t binMax = binMin + binWidth;
+        const uint64_t binMid = (binMin + binMax) / 2;
+        csv <<
+            binMin << "," <<
+            binMid << "," <<
+            binMax << "," <<
+            bin.commonAverage() << "," <<
+            bin.commonSigma() << "\n";
+    }
 }
 
 

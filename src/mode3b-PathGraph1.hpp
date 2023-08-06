@@ -248,6 +248,7 @@ private:
     // Each chain is a vector of vertexIds (indices into the vertices vector).
     void createSeedChains(uint64_t minEstimatedLength);
     void writeSeedChainsDetails() const;
+    void writeSeedChainsStatistics() const;
     void assembleSeedChains() const;
     vector<Chain> seedChains;
 
