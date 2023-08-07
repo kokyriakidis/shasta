@@ -107,6 +107,10 @@ public:
 
     // Keep the k closest outgoing and incoming edges for each vertex.
     void kClosest(uint64_t k);
+
+    // Create the connected components of this PathGraph1,
+    // without changing the PathGraph1 itself.
+    vector< shared_ptr<PathGraph1> > createConnectedComponents(uint64_t minComponentSize) const;
 };
 
 
@@ -271,7 +275,9 @@ private:
         );
 
     // Use the ChainConnectors to stitch together the seed chains.
-    void stitchSeedChains(const vector<ChainConnector>&);
+    void stitchSeedChains(
+        const vector<ChainConnector>&,
+        uint64_t minComponentSize);
 
 
     // Write each connected component in graphviz format.

@@ -12,7 +12,7 @@ using namespace shasta;
 using namespace mode3b;
 
 // Boost libraries.
-#include "boost/graph/iteration_macros.hpp"
+#include <boost/graph/iteration_macros.hpp>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/member.hpp>
@@ -133,7 +133,10 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
 
 
     // Use the ChainConnectors to stitch together the seed chains.
-    stitchSeedChains(connectors);
+    {
+        const uint64_t minComponentSize = 3;
+        stitchSeedChains(connectors, minComponentSize);
+    }
 
 }
 
@@ -1274,7 +1277,9 @@ void GlobalPathGraph1::ChainConnector::reverse()
 
 
 // Use the ChainConnectors to stitch together the seed chains.
-void GlobalPathGraph1::stitchSeedChains(const vector<ChainConnector>& connectors)
+void GlobalPathGraph1::stitchSeedChains(
+    const vector<ChainConnector>& connectors,
+    uint64_t minComponentSize)
 {
 
     // Create a PathGraph1 containing the chains and the connectors.
@@ -1350,4 +1355,103 @@ void GlobalPathGraph1::stitchSeedChains(const vector<ChainConnector>& connectors
 
     ofstream out("StitchedSeedChains.dot");
     graph.writeGraphviz(0, 0.5, 1., out);
+
+    cout << "The stitched graph has " << num_vertices(graph) << " vertices and " <<
+        num_edges(graph) << " edges." << endl;
+
+
+    // Compute connected components of the stitched graph.
+    const vector< shared_ptr<PathGraph1> > componentPointers =
+        graph.createConnectedComponents(minComponentSize);
+    cout << "The stitched graph has " << componentPointers.size() <<
+        " connected components." << endl;
+}
+
+
+
+// Create the connected components of this PathGraph1,
+// without changing the PathGraph1 itself.
+vector< shared_ptr<PathGraph1> > PathGraph1::createConnectedComponents(
+    uint64_t minComponentSize) const
+{
+    const PathGraph1& graph = *this;
+
+    // Compute connected components.
+    // We can't use boost::connected_components because it only works
+    // for undirected graphs.
+    const uint64_t n = num_vertices(graph);
+    vector<uint64_t> rank(n);
+    vector<uint64_t> parent(n);
+    boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
+    for(uint64_t vertexId=0; vertexId<n; vertexId++) {
+        disjointSets.make_set(vertexId);
+    }
+    BGL_FORALL_EDGES(e, graph, PathGraph1) {
+        const PathGraph1::vertex_descriptor v0 = source(e, graph);
+        const PathGraph1::vertex_descriptor v1 = target(e, graph);
+        disjointSets.union_set(v0, v1);
+    }
+
+
+    // Gather the vertices in each connected component.
+    vector< shared_ptr<PathGraph1> > allComponentPointers(num_vertices(graph));
+    BGL_FORALL_VERTICES(v, graph, PathGraph1) {
+        const PathGraph1Vertex& vertex = graph[v];
+        const uint64_t componentId = disjointSets.find_set(v);
+        shared_ptr<PathGraph1>& componentPointer = allComponentPointers[componentId];
+        if(not componentPointer) {
+            componentPointer = make_shared<PathGraph1>();
+        }
+        PathGraph1& component = *componentPointer;
+        component.addVertex(
+            vertex.vertexId,
+            vertex.edgeId,
+            vertex.chainId,
+            vertex.positionInChain,
+            vertex.isFirstInChain,
+            vertex.isLastInChain);
+    }
+
+
+    // Gather the edges in each connected component.
+    BGL_FORALL_EDGES(e, graph, PathGraph1) {
+        const PathGraph1::vertex_descriptor v0 = source(e, graph);
+        const PathGraph1::vertex_descriptor v1 = target(e, graph);
+        const uint64_t edgeId0 = graph[v0].edgeId;
+        const uint64_t edgeId1 = graph[v1].edgeId;
+        const uint64_t componentId = disjointSets.find_set(v0);
+        SHASTA_ASSERT(componentId == disjointSets.find_set(v1));
+        shared_ptr<PathGraph1>& componentPointer = allComponentPointers[componentId];
+        SHASTA_ASSERT(componentPointer);
+        PathGraph1& component = *componentPointer;
+        component.addEdge(
+            edgeId0,
+            edgeId1,
+            graph[e].info);
+    }
+
+
+
+    // Keep only the components with at least minComponentSize vertices
+    // and sort them by size.
+    vector< pair<shared_ptr<PathGraph1>, uint64_t> > componentPointersWithSizes;
+    for(const shared_ptr<PathGraph1>& p: allComponentPointers) {
+        if(p) {
+            const uint64_t componentSize = num_vertices(*p);
+            if(componentSize >= minComponentSize) {
+                componentPointersWithSizes.push_back({p, componentSize});
+            }
+        }
+    }
+    sort(componentPointersWithSizes.begin(), componentPointersWithSizes.end(),
+        OrderPairsBySecondOnlyGreater<shared_ptr<PathGraph1>, uint64_t>());
+
+
+    // For now return all components, including the empty ones.
+    // But we want to remove the small ones and sort them by size.
+    vector< shared_ptr<PathGraph1> > componentPointers;
+    for(const auto& p: componentPointersWithSizes) {
+        componentPointers.push_back(p.first);
+    }
+    return componentPointers;
 }
