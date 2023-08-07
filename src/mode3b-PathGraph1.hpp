@@ -270,6 +270,10 @@ private:
         vector<ChainConnector>&
         );
 
+    // Use the ChainConnectors to stitch together the seed chains.
+    void stitchSeedChains(const vector<ChainConnector>&);
+
+
     // Write each connected component in graphviz format.
     void writeGraphviz(
         const string& baseName,

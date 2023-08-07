@@ -101,10 +101,10 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
 
 
     // Connect seed chains.
+    vector<ChainConnector> connectors;
     {
         const uint64_t minEdgeCoverage = 4;
         const double minCorrectedJaccard = 0.6;
-        vector<ChainConnector> connectors;
         connectSeedChains1(minEdgeCoverage, minCorrectedJaccard, connectors);
 
         // Write the chain connectors.
@@ -130,6 +130,10 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
             }
         }
     }
+
+
+    // Use the ChainConnectors to stitch together the seed chains.
+    stitchSeedChains(connectors);
 
 }
 
@@ -1195,8 +1199,8 @@ void GlobalPathGraph1::connectSeedChains1(
             // Create a new connector.
             const uint64_t chainId0 = vertices[v0.vertexId].chainId;
             if(chainId0 != invalid<uint64_t> and chainId0 != chainId) {
-                cout << vertices[v0.vertexId].edgeId << " is on chain " << chainId0 <<
-                    " at distance " << v0.distance << endl;
+                // cout << vertices[v0.vertexId].edgeId << " is on chain " << chainId0 <<
+                //     " at distance " << v0.distance << endl;
                 out << chainId << "->" << chainId0 << ";\n";
 
                 // To construct the connector between these two chains,
@@ -1265,4 +1269,85 @@ void GlobalPathGraph1::ChainConnector::reverse()
 {
     std::reverse(vertexIds.begin(), vertexIds.end());
     std::reverse(infos.begin(), infos.end());
+}
+
+
+
+// Use the ChainConnectors to stitch together the seed chains.
+void GlobalPathGraph1::stitchSeedChains(const vector<ChainConnector>& connectors)
+{
+
+    // Create a PathGraph1 containing the chains and the connectors.
+    PathGraph1 graph;
+
+
+
+    // Add the vertices and edges of the chains.
+    for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
+        // cout << "Adding vertices and edges for chain " << chainId << endl;
+        const Chain& chain = seedChains[chainId];
+
+        // Add the vertices of this chain.
+        for(uint64_t position=0; position<chain.vertexIds.size(); position++) {
+            const uint64_t vertexId = chain.vertexIds[position];
+            const MarkerGraphEdgeId edgeId = vertices[vertexId].edgeId;
+            graph.addVertex(
+                vertexId,
+                edgeId,
+                chainId,
+                position,
+                position == 0,
+                position == (chain.vertexIds.size() - 1));
+            // cout << "Adding vertex for " << edgeId << endl;
+        }
+
+        // Add the edges of this chain
+        for(uint64_t position=0; position<chain.vertexIds.size()-1; position++) {
+            const uint64_t vertexId0 = chain.vertexIds[position];
+            const uint64_t vertexId1 = chain.vertexIds[position + 1];
+            const Vertex& vertex0 = vertices[vertexId0];
+            const Vertex& vertex1 = vertices[vertexId1];
+            graph.addEdge(vertex0.edgeId, vertex1.edgeId, chain.infos[position]);
+        }
+    }
+
+
+
+    // Add the vertices and edges of the connectors.
+    for(const ChainConnector& connector: connectors) {
+        // cout << "Adding vertices and edges for connector between chains " <<
+        //    connector.chainId0 << " " << connector.chainId1 << endl;
+
+        // Add the vertices of this connector, except for the first and last
+        // which are part of chains.
+        for(uint64_t position=1; position<connector.vertexIds.size()-1; position++) {
+            const uint64_t vertexId = connector.vertexIds[position];
+            const MarkerGraphEdgeId edgeId = vertices[vertexId].edgeId;
+            // cout << "Adding vertex for " << edgeId << endl;
+            // The vertex could have already been added as part of another connector.
+            if(not graph.vertexMap.contains(edgeId)) {
+                graph.addVertex(
+                    vertexId,
+                    edgeId,
+                    invalid<uint64_t>,
+                    invalid<uint64_t>,
+                    false,
+                    false);
+            }
+       }
+
+        // Add the edges of this connector.
+        for(uint64_t position=0; position<connector.infos.size(); position++) {
+            const uint64_t vertexId0 = connector.vertexIds[position];
+            const uint64_t vertexId1 = connector.vertexIds[position + 1];
+            const Vertex& vertex0 = vertices[vertexId0];
+            const Vertex& vertex1 = vertices[vertexId1];
+            // cout << "Adding edge for " << vertex0.edgeId << " " << vertex1.edgeId << endl;
+            graph.addEdge(vertex0.edgeId, vertex1.edgeId, connector.infos[position]);
+        }
+
+    }
+
+    ofstream out("StitchedSeedChains.dot");
+    graph.writeGraphviz(0, 0.5, 1., out);
 }
