@@ -99,14 +99,38 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     }
 
 
-#if 0
+
     // Connect seed chains.
     {
         const uint64_t minEdgeCoverage = 4;
         const double minCorrectedJaccard = 0.6;
-        connectSeedChains1(minEdgeCoverage, minCorrectedJaccard);
+        vector<ChainConnector> connectors;
+        connectSeedChains1(minEdgeCoverage, minCorrectedJaccard, connectors);
+
+        // Write the chain connectors.
+        ofstream csv("ChainConnectors.csv");
+        csv << "ChainId0,ChainId1,Position,EdgeId0,EdgeId1,Common,Offset,J,J'\n";
+        for(const ChainConnector& connector: connectors) {
+            for(uint64_t position=0; position<connector.infos.size(); position++) {
+                const MarkerGraphEdgePairInfo& info = connector.infos[position];
+                const uint64_t vertexId0 = connector.vertexIds[position];
+                const uint64_t vertexId1 = connector.vertexIds[position + 1];
+                const MarkerGraphEdgeId edgeId0 = vertices[vertexId0].edgeId;
+                const MarkerGraphEdgeId edgeId1 = vertices[vertexId1].edgeId;
+                csv <<
+                    connector.chainId0 << "," <<
+                    connector.chainId1 << "," <<
+                    position << "," <<
+                    edgeId0 << "," <<
+                    edgeId1 << "," <<
+                    info.common << "," <<
+                    info.offsetInBases << "," <<
+                    info.jaccard() << "," <<
+                    info.correctedJaccard() << "\n";
+            }
+        }
     }
-#endif
+
 }
 
 
@@ -961,8 +985,6 @@ void GlobalPathGraph1::writeSeedChainsStatistics() const
         } else {
             vertexIds = chain.vertexIds;
         }
-        cout << "Chain " << chainId << ": using " << vertexIds.size() <<
-            " chain vertices for statistics out of " << chain.vertexIds.size() << " total." << endl;
 
         // Now loop over pairs of the vertices we selected.
         for(uint64_t i0=0; i0<vertexIds.size(); i0++) {
@@ -1097,7 +1119,8 @@ void GlobalPathGraph1::connectSeedChains0()
 // https://www.boost.org/doc/libs/1_82_0/libs/multi_index/doc/tutorial/basics.html#multiple_sort
 void GlobalPathGraph1::connectSeedChains1(
     uint64_t minEdgeCoverage,
-    double minCorrectedJaccard
+    double minCorrectedJaccard,
+    vector<ChainConnector>& connectors
     )
 {
     using boost::multi_index_container;
@@ -1106,19 +1129,30 @@ void GlobalPathGraph1::connectSeedChains1(
     using boost::multi_index::ordered_unique;
     using boost::multi_index::ordered_non_unique;
 
+
+
     // Information about a vertex stored during the Dijkstra algorithm.
     class VertexInfo {
     public:
         uint64_t vertexId;
-        uint64_t tentativeDistance;
+
+        // The sum of offsets starting at the start vertex.
+        uint64_t distance;
+
+        // The vertex that achieved that distance
+        // and the corresponding MarkerGraphEdgePairInfo.
+        uint64_t parent;
+        MarkerGraphEdgePairInfo info;
     };
+
+
 
     // The container used to store VertexInfos,
     // with the two indices to support the required operations.
     using VertexContainer = multi_index_container<VertexInfo,
         indexed_by <
         ordered_unique< member<VertexInfo, uint64_t, &VertexInfo::vertexId> >,
-        ordered_non_unique< member<VertexInfo, uint64_t, &VertexInfo::tentativeDistance> >
+        ordered_non_unique< member<VertexInfo, uint64_t, &VertexInfo::distance> >
         > >;
 
     // Last argument for findChildren below, defined here to reduce
@@ -1128,19 +1162,21 @@ void GlobalPathGraph1::connectSeedChains1(
     ofstream out("SeedChains.dot");
     out << "digraph SeedChains {\n";
 
+    connectors.clear();
+
     // Loop over chains.
     for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
 
-        cout << "Working on chain " << chainId << endl;
+        // cout << "Working on chain " << chainId << endl;
         const Chain& chain = seedChains[chainId];
         const uint64_t chainLastVertexId = chain.vertexIds.back();
-        cout << "Last vertex of chain " <<  vertices[chainLastVertexId].edgeId << " is starting vertex for search." << endl;
+        // cout << "Last vertex of chain " <<  vertices[chainLastVertexId].edgeId << " is starting vertex for search." << endl;
 
         // Start the Dijkstra algorithm with this as the only seen vertex.
         VertexContainer seen;
         const auto& seenById = seen.get<0>();
         auto& seenByDistance = seen.get<1>();   // Not const so we can erase by distance.
-        seen.insert({chainLastVertexId, 0});
+        seen.insert({chainLastVertexId, 0, invalid<uint64_t>, MarkerGraphEdgePairInfo()});
 
         VertexContainer visited;
         const auto& visitedById = visited.get<0>();
@@ -1156,11 +1192,32 @@ void GlobalPathGraph1::connectSeedChains1(
             // cout << "Visiting " << vertices[v0.vertexId].edgeId << endl;
 
             // If it belongs to a different chain, we are done.
+            // Create a new connector.
             const uint64_t chainId0 = vertices[v0.vertexId].chainId;
             if(chainId0 != invalid<uint64_t> and chainId0 != chainId) {
                 cout << vertices[v0.vertexId].edgeId << " is on chain " << chainId0 <<
-                    " at distance " << v0.tentativeDistance << endl;
+                    " at distance " << v0.distance << endl;
                 out << chainId << "->" << chainId0 << ";\n";
+
+                // To construct the connector between these two chains,
+                // walk back.
+                connectors.resize(connectors.size() + 1);
+                ChainConnector& connector = connectors.back();
+                connector.chainId0 = chainId;
+                connector.chainId1 = chainId0;
+                uint64_t vertexId = v0.vertexId;
+                while(true) {
+                    connector.vertexIds.push_back(vertexId);
+                    if(vertexId == chainLastVertexId) {
+                        break;
+                    }
+                    const auto it = visitedById.find(vertexId);
+                    SHASTA_ASSERT(it != visitedById.end());
+                    const VertexInfo& vertexInfo = *it;
+                    connector.infos.push_back(vertexInfo.info);
+                    vertexId = vertexInfo.parent;
+                }
+                connector.reverse();
                 break;
             }
 
@@ -1182,13 +1239,17 @@ void GlobalPathGraph1::connectSeedChains1(
                 // Update the tentative distance of the child,
                 // adding it to the seenVertices if not present.
                 auto it = seenById.find(vertexId1);
-                const uint64_t distance1 = v0.tentativeDistance + info.offsetInBases;
+                const uint64_t distance1 = v0.distance + info.offsetInBases;
                 if(it == seenById.end()) {
-                    seen.insert({vertexId1, distance1});
+                    seen.insert({vertexId1, distance1, v0.vertexId, info});
                 } else {
                     VertexInfo seenVertex1 = *it;
-                    seenVertex1.tentativeDistance = min(seenVertex1.tentativeDistance, distance1);
-                    seen.replace(it, seenVertex1);
+                    if(distance1 < seenVertex1.distance) {
+                        seenVertex1.distance = distance1;
+                        seenVertex1.parent = v0.vertexId;
+                        seenVertex1.info = info;
+                        seen.replace(it, seenVertex1);
+                    }
                 }
 
             }
@@ -1196,4 +1257,12 @@ void GlobalPathGraph1::connectSeedChains1(
 
     }
     out << "}\n";
+}
+
+
+
+void GlobalPathGraph1::ChainConnector::reverse()
+{
+    std::reverse(vertexIds.begin(), vertexIds.end());
+    std::reverse(infos.begin(), infos.end());
 }

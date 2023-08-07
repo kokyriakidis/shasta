@@ -256,9 +256,18 @@ private:
     void connectSeedChains0();
 
     // Connect seed chains by walking the graph.
+    class ChainConnector {
+    public:
+        uint64_t chainId0;
+        uint64_t chainId1;
+        vector<uint64_t> vertexIds;
+        vector<MarkerGraphEdgePairInfo> infos;
+        void reverse();
+    };
     void connectSeedChains1(
         uint64_t minEdgeCoverage,
-        double minCorrectedJaccard
+        double minCorrectedJaccard,
+        vector<ChainConnector>&
         );
 
     // Write each connected component in graphviz format.
