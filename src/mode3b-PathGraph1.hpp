@@ -237,19 +237,18 @@ private:
 
 
 
-    // To create seed chains:
-    // - Use only very strong edges (minCorrectedJaccard >= minCorrectedJaccard1).
-    // - Compute connected components.
-    // - Keep k best outgoing/incoming edges for each vertex.
-    // - Transitive reduction.
-    // - Longest path in each connected component.
-    // This can cause contiguity breaks, which will be recovered later using
-    // a more complete version of the GlobalPathGraph1.
-    // Each chain is a vector of vertexIds (indices into the vertices vector).
-    void createSeedChains(uint64_t minEstimatedLength);
+    // For each connected component, use the longest path
+    // to create a Chain. Only keep the ones that are sufficiently long.
+    // This also stores chain information in the vertices.
+    void createChainsFromComponents(
+        uint64_t minEstimatedLength,
+        vector<Chain>&);
+
+    // Seed chains.
+    vector<Chain> seedChains;
+    void writeSeedChains() const;
     void writeSeedChainsDetails() const;
     void writeSeedChainsStatistics() const;
-    vector<Chain> seedChains;
 
     // Connect seed chains by following reads.
     void connectSeedChains0();
@@ -270,6 +269,8 @@ private:
         );
 
     // Use the ChainConnectors to stitch together the seed chains.
+    // The replaces the connected components with the connected
+    // components of the stitched graph.
     void stitchSeedChains(
         const vector<ChainConnector>&,
         uint64_t minComponentSize);

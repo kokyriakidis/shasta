@@ -68,11 +68,11 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     }
 #endif
 
-    // To create seed chains, use only the best edges and
-    // do K-nn and transitive reduction, then compute the longest path
-    // in each connected component.
-    {
 
+
+    // To create seed chains, create connected components using only the best edges,
+    // then compute the longest path in each connected component.
+    {
         // Compute connected components using only the best edges.
         const double minCorrectedJaccard = 0.8;
         const uint64_t minComponentSize = 3;
@@ -91,13 +91,14 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         // Only keep the ones that are long enough.
         // Minimum estimated length is in bases.
         const uint64_t minEstimatedLength = 10000;
-        createSeedChains(minEstimatedLength);
+        createChainsFromComponents(minEstimatedLength, seedChains);
         cout << "Found " << seedChains.size() << " seed chains." << endl;
+        writeSeedChains();
         writeSeedChainsDetails();
         writeSeedChainsStatistics();
 
-        ofstream fasta("SeedChains.fasta");
-        assembleChains(seedChains, fasta);
+        // ofstream fasta("SeedChains.fasta");
+        // assembleChains(seedChains, fasta);
     }
 
 
@@ -134,10 +135,19 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     }
 
 
-    // Use the ChainConnectors to stitch together the seed chains.
+    // Use the ChainConnectors to stitch together the seed chains,
+    // then assemble the chains obtained in this way.
     {
         const uint64_t minComponentSize = 3;
         stitchSeedChains(connectors, minComponentSize);
+
+        vector<Chain> chains;
+        const uint64_t minEstimatedLength = 10000;
+        createChainsFromComponents(minEstimatedLength, chains);
+        cout << "Found " << chains.size() << " chains." << endl;
+
+        ofstream fasta("Chains.fasta");
+        assembleChains(chains, fasta);
     }
 
 }
@@ -736,21 +746,22 @@ void PathGraph1::knn(uint64_t k)
 
 
 
-// To create seed chains:
-// - Use only very strong edges (minCorrectedJaccard >= minCorrectedJaccard1).
-// - Compute connected components.
-// - Keep k best outgoing/incoming edges for each vertex.
-// - Transitive reduction.
-// This can cause contiguity breaks, which will be recovered later using
-// a more complete version of the GlobalPathGraph1.
-void GlobalPathGraph1::createSeedChains(
-    uint64_t minEstimatedLength)
+// For each connected component, use the longest path
+// to create a Chain. Only keep the ones that are sufficiently long.
+// This also stores chain information in the vertices.
+void GlobalPathGraph1::createChainsFromComponents(
+    uint64_t minEstimatedLength,
+    vector<Chain>& chains)
 {
-    ofstream fasta("SeedChains.fasta");
-    ofstream csv("SeedChains.csv");
-    csv << "ChainId,Vertices,Edges,First,Last,Longest path length,Estimated length\n";
+    chains.clear();
 
-    seedChains.clear();
+    // Clear chain information from the vertices.
+    for(GlobalPathGraph1Vertex& vertex: vertices) {
+        vertex.chainId = invalid<uint64_t>;
+        vertex.positionInChain = invalid<uint64_t>;
+        vertex.isFirstInChain = false;
+        vertex.isLastInChain = false;
+    }
 
     // Loop over connected components.
     vector<PathGraph1::vertex_descriptor> chainVertices;
@@ -784,9 +795,9 @@ void GlobalPathGraph1::createSeedChains(
         }
 
 
-        // Store this chain as a new seed chain.
-        const uint64_t chainId = seedChains.size();
-        seedChains.push_back(chain);
+        // Store this chain as a new chain.
+        const uint64_t chainId = chains.size();
+        chains.push_back(chain);
         for(uint64_t position=0; position<chain.vertexIds.size(); position++) {
             const uint64_t vertexId = chain.vertexIds[position];
             GlobalPathGraph1Vertex& vertex = vertices[vertexId];
@@ -795,16 +806,6 @@ void GlobalPathGraph1::createSeedChains(
             vertex.isFirstInChain = (position == 0);
             vertex.isLastInChain = (position == chain.vertexIds.size() - 1);
         }
-
-        csv << chainId << ",";
-        csv << num_vertices(component) << ",";
-        csv << num_edges(component) << ",";
-        csv << vertices[chain.vertexIds.front()].edgeId << ",";
-        csv << vertices[chain.vertexIds.back()].edgeId << ",";
-        csv << chain.vertexIds.size() << ",";
-        csv << totalBaseOffset << ",";
-        csv << "\n";
-
     }
 }
 
@@ -837,6 +838,27 @@ void GlobalPathGraph1::assembleChains(
         AssemblyPath assemblyPath(assembler, markerGraphEdgeIds, chain.infos);
         assemblyPath.writeFasta(fasta, to_string(chainId));
     }
+}
+
+
+
+void GlobalPathGraph1::writeSeedChains() const
+{
+    ofstream csv("SeedChains.csv");
+    csv << "ChainId,First,Last,Length,Estimated length\n";
+
+    for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
+        const Chain& chain = seedChains[chainId];
+
+        csv << chainId << ",";
+        csv << vertices[chain.vertexIds.front()].edgeId << ",";
+        csv << vertices[chain.vertexIds.back()].edgeId << ",";
+        csv << chain.vertexIds.size() << ",";
+        csv << chain.totalOffset() << ",";
+        csv << "\n";
+
+    }
+
 }
 
 
@@ -1273,11 +1295,13 @@ void GlobalPathGraph1::stitchSeedChains(
         num_edges(graph) << " edges." << endl;
 
 
-    // Compute connected components of the stitched graph.
-    const vector< shared_ptr<PathGraph1> > componentPointers =
-        graph.createConnectedComponents(minComponentSize);
-    cout << "The stitched graph has " << componentPointers.size() <<
+    // Replace our existing connected components with
+    // the connected components of the stitched graph.
+    components = graph.createConnectedComponents(minComponentSize);
+    cout << "The stitched graph has " << components.size() <<
         " connected components." << endl;
+
+
 }
 
 
