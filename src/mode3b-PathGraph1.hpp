@@ -38,6 +38,7 @@ namespace shasta {
         // The global path graph.
         // Each vertex corresponds to a primary marker graph edge.
         class GlobalPathGraph1;
+        class GlobalPathGraph1Vertex;
 
         // A single connected component of the GlobalPathGraph.
         class PathGraph1Vertex;
@@ -115,6 +116,27 @@ public:
 
 
 
+class shasta::mode3b::GlobalPathGraph1Vertex {
+public:
+    MarkerGraphEdgeId edgeId;
+    uint64_t chainId = invalid<uint64_t>;
+    uint64_t positionInChain = invalid<uint64_t>;
+    bool isFirstInChain = false;
+    bool isLastInChain = false;
+
+    GlobalPathGraph1Vertex(MarkerGraphEdgeId edgeId) : edgeId(edgeId) {}
+
+    // Information on the oriented reads that visit this vertex.
+    class JourneyInfoItem {
+    public:
+        OrientedReadId orientedReadId;
+        uint64_t positionInJourney;
+    };
+    vector<JourneyInfoItem> journeyInfoItems;
+};
+
+
+
 class shasta::mode3b::GlobalPathGraph1 {
 public:
     GlobalPathGraph1(const Assembler&);
@@ -136,30 +158,11 @@ private:
         MarkerGraphEdgeId,
         uint64_t minEdgeCoverage) const;
 
-
-
     // Each vertex corresponds to a primary marker graph edge.
     // Store them here.
     // The index in this table is the vertexId.
-    // The table is sorted.
-    class Vertex {
-    public:
-        MarkerGraphEdgeId edgeId;
-        uint64_t chainId = invalid<uint64_t>;
-        uint64_t positionInChain = invalid<uint64_t>;
-        bool isFirstInChain = false;
-        bool isLastInChain = false;
-        Vertex(MarkerGraphEdgeId edgeId) : edgeId(edgeId) {}
-
-        // Information on the oriented reads that visit this vertex.
-        class JourneyInfoItem {
-        public:
-            OrientedReadId orientedReadId;
-            uint64_t positionInJourney;
-        };
-        vector<JourneyInfoItem> journeyInfoItems;
-    };
-    vector<Vertex> vertices;
+    // The table is sorted by MarkerGraphEdgeId.
+    vector<GlobalPathGraph1Vertex> vertices;
     void createVertices(
         uint64_t minPrimaryCoverage,
         uint64_t maxPrimaryCoverage);

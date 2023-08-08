@@ -253,7 +253,7 @@ void GlobalPathGraph1::createVertices(
 
     for(MarkerGraphEdgeId edgeId=0; edgeId<markerGraph.edges.size(); edgeId++) {
         if(isPrimary(edgeId, minPrimaryCoverage, maxPrimaryCoverage)) {
-            vertices.push_back(Vertex(edgeId));
+            vertices.push_back(GlobalPathGraph1Vertex(edgeId));
         }
     }
 }
@@ -415,7 +415,7 @@ void GlobalPathGraph1::findChildren(
     double minCorrectedJaccard,
     vector< pair<uint64_t, MarkerGraphEdgePairInfo> >& children)
 {
-    const Vertex& vertex0 = vertices[vertexId0];
+    const GlobalPathGraph1Vertex& vertex0 = vertices[vertexId0];
     const MarkerGraphEdgeId edgeId0 = vertex0.edgeId;
 
     // Find vertices encountered later on journeys that go through here.
@@ -438,7 +438,7 @@ void GlobalPathGraph1::findChildren(
     children.clear();
     MarkerGraphEdgePairInfo info;
     for(const uint64_t vertexId1: candidateChildren) {
-        const Vertex& vertex1 = vertices[vertexId1];
+        const GlobalPathGraph1Vertex& vertex1 = vertices[vertexId1];
         const MarkerGraphEdgeId edgeId1 = vertex1.edgeId;
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
         if(info.correctedJaccard() >= minCorrectedJaccard) {
@@ -492,7 +492,7 @@ void GlobalPathGraph1::createComponents(
         allComponents.push_back(make_shared<PathGraph1>());
     }
     for(uint64_t vertexId=0; vertexId<n; vertexId++) {
-        const Vertex& vertex = vertices[vertexId];
+        const GlobalPathGraph1Vertex& vertex = vertices[vertexId];
         const uint64_t componentId = disjointSets.find_set(vertexId);
         allComponents[componentId]->addVertex(vertexId,
             vertex.edgeId, vertex.chainId, vertex.positionInChain,
@@ -864,7 +864,7 @@ void GlobalPathGraph1::createSeedChains(
         seedChains.push_back(chain);
         for(uint64_t position=0; position<chain.vertexIds.size(); position++) {
             const uint64_t vertexId = chain.vertexIds[position];
-            Vertex& vertex = vertices[vertexId];
+            GlobalPathGraph1Vertex& vertex = vertices[vertexId];
             vertex.chainId = chainId;
             vertex.positionInChain = position;
             vertex.isFirstInChain = (position == 0);
@@ -1052,7 +1052,7 @@ void GlobalPathGraph1::connectSeedChains0()
             // Find the chain.
             const uint64_t vertexId = p.second;
             SHASTA_ASSERT(vertexId < vertices.size());
-            const Vertex& vertex = vertices[vertexId];
+            const GlobalPathGraph1Vertex& vertex = vertices[vertexId];
             const uint64_t chainId = vertex.chainId;
 
             // If no chain here, do nothing.
@@ -1310,8 +1310,8 @@ void GlobalPathGraph1::stitchSeedChains(
         for(uint64_t position=0; position<chain.vertexIds.size()-1; position++) {
             const uint64_t vertexId0 = chain.vertexIds[position];
             const uint64_t vertexId1 = chain.vertexIds[position + 1];
-            const Vertex& vertex0 = vertices[vertexId0];
-            const Vertex& vertex1 = vertices[vertexId1];
+            const GlobalPathGraph1Vertex& vertex0 = vertices[vertexId0];
+            const GlobalPathGraph1Vertex& vertex1 = vertices[vertexId1];
             graph.addEdge(vertex0.edgeId, vertex1.edgeId, chain.infos[position]);
         }
     }
@@ -1345,8 +1345,8 @@ void GlobalPathGraph1::stitchSeedChains(
         for(uint64_t position=0; position<connector.infos.size(); position++) {
             const uint64_t vertexId0 = connector.vertexIds[position];
             const uint64_t vertexId1 = connector.vertexIds[position + 1];
-            const Vertex& vertex0 = vertices[vertexId0];
-            const Vertex& vertex1 = vertices[vertexId1];
+            const GlobalPathGraph1Vertex& vertex0 = vertices[vertexId0];
+            const GlobalPathGraph1Vertex& vertex1 = vertices[vertexId1];
             // cout << "Adding edge for " << vertex0.edgeId << " " << vertex1.edgeId << endl;
             graph.addEdge(vertex0.edgeId, vertex1.edgeId, connector.infos[position]);
         }
