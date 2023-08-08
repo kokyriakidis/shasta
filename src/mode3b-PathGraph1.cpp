@@ -143,15 +143,21 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
 
 
 // Write each connected component in graphviz format.
-void GlobalPathGraph1::writeGraphviz(
+void GlobalPathGraph1::writeComponentsGraphviz(
     const string& baseName,
     double redJ,
     double greenJ) const
 {
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         const PathGraph1& component = *components[componentRank];
-        ofstream out(baseName + "-" + to_string(componentRank) + ".dot");
-        component.writeGraphviz(vertices, componentRank, redJ, greenJ,out);
+
+        // Generate names for the file and the graph in the file.
+        // For the latter, use '_' instead of '-' is forced by Graphviz syntax rules.
+        const string fileName  = baseName + "-Component-" + to_string(componentRank) + ".dot";
+        const string graphName = baseName + "_Component_" + to_string(componentRank);
+
+        ofstream out(fileName);
+        component.writeGraphviz(vertices, graphName, redJ, greenJ,out);
     }
 }
 
@@ -606,13 +612,13 @@ void PathGraph1::addEdge(
 // Write a PathGraph1 in graphviz format.
 void PathGraph1::writeGraphviz(
     const vector<GlobalPathGraph1Vertex>& globalVertices,
-    uint64_t componentId,
+    const string& graphName,
     double redJ,
     double greenJ,
     ostream& out) const
 {
     const PathGraph1& graph = *this;
-    out << "digraph PathGraphComponent" << componentId << " {\n";
+    out << "digraph " << graphName << " {\n";
 
     BGL_FORALL_VERTICES(v, graph, PathGraph1) {
         const PathGraph1Vertex& vertex = graph[v];

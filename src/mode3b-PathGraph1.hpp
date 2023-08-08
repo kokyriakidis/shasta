@@ -40,7 +40,7 @@ namespace shasta {
         class GlobalPathGraph1;
         class GlobalPathGraph1Vertex;
 
-        // A subset of the GlobalPathGraph, for example
+        // A subset of the GlobalPathGraph1, for example
         // a single connected component, represented as a Boost graph.
         class PathGraph1Vertex;
         class PathGraph1Edge;
@@ -76,6 +76,8 @@ public:
 
 
 
+// A subset of the GlobalPathGraph1, for example
+// a single connected component, represented as a Boost graph.
 class shasta::mode3b::PathGraph1 : public PathGraph1GraphBaseClass {
 public:
 
@@ -88,9 +90,10 @@ public:
         MarkerGraphEdgeId,
         MarkerGraphEdgeId,
         const MarkerGraphEdgePairInfo&);
+
     void writeGraphviz(
         const vector<GlobalPathGraph1Vertex>& globalVertices,
-        uint64_t componentId,
+        const string& graphName,
         double redJ,
         double greenJ,
         ostream&) const;
@@ -194,10 +197,6 @@ private:
         double minCorrectedJaccard,
         vector< pair<uint64_t, MarkerGraphEdgePairInfo> >& children);
 
-
-    // Write the entire PathGraph in graphviz format.
-    void writeGraphviz() const;
-
     // The connected components of the GlobalPathGraph1.
     // Stored sorted by decreasing size, as measured by number of vertices.
     vector< shared_ptr<PathGraph1> > components;
@@ -276,8 +275,11 @@ private:
         uint64_t minComponentSize);
 
 
+    // Write the entire PathGraph in graphviz format.
+    void writeGraphviz() const;
+
     // Write each connected component in graphviz format.
-    void writeGraphviz(
+    void writeComponentsGraphviz(
         const string& baseName,
         double redJ,
         double greenJ) const;
