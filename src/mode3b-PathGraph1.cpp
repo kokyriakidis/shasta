@@ -151,7 +151,7 @@ void GlobalPathGraph1::writeGraphviz(
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         const PathGraph1& component = *components[componentRank];
         ofstream out(baseName + "-" + to_string(componentRank) + ".dot");
-        component.writeGraphviz(componentRank, redJ, greenJ,out);
+        component.writeGraphviz(vertices, componentRank, redJ, greenJ,out);
     }
 }
 
@@ -494,9 +494,7 @@ void GlobalPathGraph1::createComponents(
     for(uint64_t vertexId=0; vertexId<n; vertexId++) {
         const GlobalPathGraph1Vertex& vertex = vertices[vertexId];
         const uint64_t componentId = disjointSets.find_set(vertexId);
-        allComponents[componentId]->addVertex(vertexId,
-            vertex.edgeId, vertex.chainId, vertex.positionInChain,
-            vertex.isFirstInChain, vertex.isLastInChain);
+        allComponents[componentId]->addVertex(vertexId, vertex.edgeId);
     }
 
     // Create edges of each connected component.
@@ -579,20 +577,10 @@ void GlobalPathGraph1::transitiveReduction()
 
 void PathGraph1::addVertex(
     uint64_t vertexId,
-    MarkerGraphEdgeId edgeId,
-    uint64_t chainId,
-    uint64_t positionInChain,
-    bool isFirstInChain,
-    bool isLastInChain)
+    MarkerGraphEdgeId edgeId)
 {
     SHASTA_ASSERT(not vertexMap.contains(edgeId));
-    const vertex_descriptor v = add_vertex({
-        vertexId,
-        edgeId,
-        chainId,
-        positionInChain,
-        isFirstInChain,
-        isLastInChain}, *this);
+    const vertex_descriptor v = add_vertex({vertexId, edgeId}, *this);
     vertexMap.insert({edgeId, v});
 }
 
@@ -615,8 +603,9 @@ void PathGraph1::addEdge(
 
 
 
-// Write a component of the GlobalPathGraph in graphviz format.
+// Write a PathGraph1 in graphviz format.
 void PathGraph1::writeGraphviz(
+    const vector<GlobalPathGraph1Vertex>& globalVertices,
     uint64_t componentId,
     double redJ,
     double greenJ,
@@ -627,20 +616,21 @@ void PathGraph1::writeGraphviz(
 
     BGL_FORALL_VERTICES(v, graph, PathGraph1) {
         const PathGraph1Vertex& vertex = graph[v];
+        const GlobalPathGraph1Vertex& globalVertex = globalVertices[vertex.vertexId];
         out << vertex.edgeId;
 
         // Tooltip.
         out << " [tooltip=\"";
         out << vertex.edgeId;
-        if(vertex.chainId != invalid<uint64_t>) {
-            out << " " << vertex.chainId << ":" << vertex.positionInChain;
+        if(globalVertex.chainId != invalid<uint64_t>) {
+            out << " " << globalVertex.chainId << ":" << globalVertex.positionInChain;
         }
         out << "\"";
 
-        if(vertex.chainId != invalid<uint64_t>) {
-            if(vertex.isFirstInChain) {
+        if(globalVertex.chainId != invalid<uint64_t>) {
+            if(globalVertex.isFirstInChain) {
                 out << " color=blue";
-            } else if(vertex.isLastInChain) {
+            } else if(globalVertex.isLastInChain) {
                 out << " color=orange";
             } else {
                 // const uint32_t hue = MurmurHash2(&vertex.chainId, sizeof(vertex.chainId), 231) % 100;
@@ -1296,13 +1286,7 @@ void GlobalPathGraph1::stitchSeedChains(
         for(uint64_t position=0; position<chain.vertexIds.size(); position++) {
             const uint64_t vertexId = chain.vertexIds[position];
             const MarkerGraphEdgeId edgeId = vertices[vertexId].edgeId;
-            graph.addVertex(
-                vertexId,
-                edgeId,
-                chainId,
-                position,
-                position == 0,
-                position == (chain.vertexIds.size() - 1));
+            graph.addVertex(vertexId, edgeId);
             // cout << "Adding vertex for " << edgeId << endl;
         }
 
@@ -1331,13 +1315,7 @@ void GlobalPathGraph1::stitchSeedChains(
             // cout << "Adding vertex for " << edgeId << endl;
             // The vertex could have already been added as part of another connector.
             if(not graph.vertexMap.contains(edgeId)) {
-                graph.addVertex(
-                    vertexId,
-                    edgeId,
-                    invalid<uint64_t>,
-                    invalid<uint64_t>,
-                    false,
-                    false);
+                graph.addVertex(vertexId, edgeId);
             }
        }
 
@@ -1354,7 +1332,7 @@ void GlobalPathGraph1::stitchSeedChains(
     }
 
     ofstream out("StitchedSeedChains.dot");
-    graph.writeGraphviz(0, 0.5, 1., out);
+    graph.writeGraphviz(vertices, 0, 0.5, 1., out);
 
     cout << "The stitched graph has " << num_vertices(graph) << " vertices and " <<
         num_edges(graph) << " edges." << endl;
@@ -1405,11 +1383,7 @@ vector< shared_ptr<PathGraph1> > PathGraph1::createConnectedComponents(
         PathGraph1& component = *componentPointer;
         component.addVertex(
             vertex.vertexId,
-            vertex.edgeId,
-            vertex.chainId,
-            vertex.positionInChain,
-            vertex.isFirstInChain,
-            vertex.isLastInChain);
+            vertex.edgeId);
     }
 
 

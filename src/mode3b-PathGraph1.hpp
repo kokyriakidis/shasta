@@ -40,7 +40,8 @@ namespace shasta {
         class GlobalPathGraph1;
         class GlobalPathGraph1Vertex;
 
-        // A single connected component of the GlobalPathGraph.
+        // A subset of the GlobalPathGraph, for example
+        // a single connected component, represented as a Boost graph.
         class PathGraph1Vertex;
         class PathGraph1Edge;
         class PathGraph1;
@@ -57,17 +58,12 @@ namespace shasta {
 
 class shasta::mode3b::PathGraph1Vertex {
 public:
+
     // The corresponding GlobalPathGraph1 vertexId.
     uint64_t vertexId;
 
-    // The marker graph edge corresponding to this PathGraph1 vertex.
+    // The corresponding marker graph edgeId.
     MarkerGraphEdgeId edgeId;
-
-    // Chain and position in chain, if any.
-    uint64_t chainId = invalid<uint64_t>;
-    uint64_t positionInChain = invalid<uint64_t>;
-    bool isFirstInChain = false;
-    bool isLastInChain = false;
 };
 
 
@@ -86,17 +82,14 @@ public:
     std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
     void addVertex(
         uint64_t vertexId,
-        MarkerGraphEdgeId,
-        uint64_t chainId,
-        uint64_t positionInChain,
-        bool isFirstInChain,
-        bool isLastInChain);
+        MarkerGraphEdgeId);
 
     void addEdge(
         MarkerGraphEdgeId,
         MarkerGraphEdgeId,
         const MarkerGraphEdgePairInfo&);
     void writeGraphviz(
+        const vector<GlobalPathGraph1Vertex>& globalVertices,
         uint64_t componentId,
         double redJ,
         double greenJ,
