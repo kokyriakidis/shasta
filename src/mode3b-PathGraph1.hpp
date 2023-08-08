@@ -71,7 +71,6 @@ public:
 class shasta::mode3b::PathGraph1Edge {
 public:
     MarkerGraphEdgePairInfo info;
-    bool keep;  // Used by PathGraph1::knn.
 };
 
 
@@ -101,9 +100,6 @@ public:
     // For each vertex, only keep the best k outgoing and k incoming edges.
     // "Best" as defined by correctedJaccard of the edges.
     void knn(uint64_t k);
-
-    // Keep the k closest outgoing and incoming edges for each vertex.
-    void kClosest(uint64_t k);
 
     // Create the connected components of this PathGraph1,
     // without changing the PathGraph1 itself.
@@ -209,9 +205,6 @@ private:
     // as measured by correctedJaccard of each edge.
     // This can break contiguity of the connected component.
     void knn(uint64_t k);
-
-    // Keep the k closest outgoing and incoming edges for each vertex.
-    void kClosest(uint64_t k);
 
     // Transitive reduction of each connected component.
     void transitiveReduction();

@@ -559,16 +559,6 @@ void GlobalPathGraph1::knn(uint64_t k)
 
 
 
-void GlobalPathGraph1::kClosest(uint64_t k)
-{
-    for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
-        PathGraph1& component = *components[componentRank];
-        component.kClosest(k);
-    }
-}
-
-
-
 // Transitive reduction of each connected component.
 // Ths can fail for connected components that contain cycles.
 void GlobalPathGraph1::transitiveReduction()
@@ -686,14 +676,10 @@ void PathGraph1::knn(uint64_t k)
 {
     PathGraph1& graph = *this;
 
-    // First mark all edges as not to be kept.
-    BGL_FORALL_EDGES(e, graph, PathGraph1) {
-        graph[e].keep = false;
-    }
+    // Store here the edges we want to keep.
+    std::set<edge_descriptor> edgesToBeKept;
 
-
-
-    // For each vertex, keep as to be kept the best k outgoing
+    // For each vertex, mark as to be kept the best k outgoing
     // and incoming edges.
     vector< pair<edge_descriptor, double> > adjacentEdges;  // With correctedJaccard.
     BGL_FORALL_VERTICES(v, graph, PathGraph1) {
@@ -725,7 +711,7 @@ void PathGraph1::knn(uint64_t k)
             // Mark them as to be kept.
             for(const auto& p:adjacentEdges) {
                 const edge_descriptor e = p.first;
-                graph[e].keep = true;
+                edgesToBeKept.insert(e);
             }
         }
     }
@@ -733,70 +719,7 @@ void PathGraph1::knn(uint64_t k)
     // Remove edges not marked as to be kept.
     vector<edge_descriptor> edgesToBeRemoved;
     BGL_FORALL_EDGES(e, graph, PathGraph1) {
-        if(not graph[e].keep) {
-            edgesToBeRemoved.push_back(e);
-        }
-    }
-    for(const edge_descriptor e: edgesToBeRemoved) {
-        boost::remove_edge(e, graph);
-    }
-}
-
-
-
-// Keep the k closest outgoing and incoming edges for each vertex.
-void PathGraph1::kClosest(uint64_t k)
-{
-    PathGraph1& graph = *this;
-
-    // First mark all edges as not to be kept.
-    BGL_FORALL_EDGES(e, graph, PathGraph1) {
-        graph[e].keep = false;
-    }
-
-
-
-    // For each vertex, mark as to be kept the closest k outgoing
-    // and incoming edges.
-    vector< pair<edge_descriptor, uint64_t> > adjacentEdges;  // With estimated offset.
-    BGL_FORALL_VERTICES(v, graph, PathGraph1) {
-
-        // Loop over both directions.
-        for(uint64_t direction=0; direction<2; direction++) {
-            adjacentEdges.clear();
-
-            if(direction == 0) {
-                BGL_FORALL_OUTEDGES(v, e, graph, PathGraph1) {
-                    adjacentEdges.push_back({e, graph[e].info.offsetInBases});
-                }
-            } else {
-                BGL_FORALL_INEDGES(v, e, graph, PathGraph1) {
-                    adjacentEdges.push_back({e, graph[e].info.offsetInBases});
-                }
-            }
-
-            // Only keep the k best.
-            if(adjacentEdges.size() > k) {
-                std::nth_element(
-                    adjacentEdges.begin(),
-                    adjacentEdges.begin() + k,
-                    adjacentEdges.end(),
-                    OrderPairsBySecondOnly<edge_descriptor, uint64_t>());
-                adjacentEdges.resize(k);
-            }
-
-            // Mark them as to be kept.
-            for(const auto& p:adjacentEdges) {
-                const edge_descriptor e = p.first;
-                graph[e].keep = true;
-            }
-        }
-    }
-
-    // Remove edges not marked as to be kept.
-    vector<edge_descriptor> edgesToBeRemoved;
-    BGL_FORALL_EDGES(e, graph, PathGraph1) {
-        if(not graph[e].keep) {
+        if(not edgesToBeKept.contains(e)) {
             edgesToBeRemoved.push_back(e);
         }
     }
@@ -1338,7 +1261,7 @@ void GlobalPathGraph1::stitchSeedChains(
     }
 
     ofstream out("StitchedSeedChains.dot");
-    graph.writeGraphviz(vertices, 0, 0.5, 1., out);
+    graph.writeGraphviz(vertices, "StitchedSeedChains", 0.5, 1., out);
 
     cout << "The stitched graph has " << num_vertices(graph) << " vertices and " <<
         num_edges(graph) << " edges." << endl;
