@@ -39,6 +39,7 @@ namespace shasta {
         // Each vertex corresponds to a primary marker graph edge.
         class GlobalPathGraph1;
         class GlobalPathGraph1Vertex;
+        class GlobalPathGraph1Edge;
 
         // A subset of the GlobalPathGraph1, for example
         // a single connected component, represented as a Boost graph.
@@ -129,6 +130,16 @@ public:
 
 
 
+
+class shasta::mode3b::GlobalPathGraph1Edge {
+public:
+    uint64_t vertexId0;
+    uint64_t vertexId1;
+    MarkerGraphEdgePairInfo info;
+};
+
+
+
 class shasta::mode3b::GlobalPathGraph1 {
 public:
     GlobalPathGraph1(const Assembler&);
@@ -167,15 +178,7 @@ private:
     vector < vector< pair<uint32_t, uint64_t> > > orientedReadJourneys;
     void computeOrientedReadJourneys();
 
-    // Follow the reads to find edges of the PathGraph.
-    // Each edge is stored as a pair of vertexIds (indexes into vertices vector).
-    class Edge {
-    public:
-        uint64_t vertexId0;
-        uint64_t vertexId1;
-        MarkerGraphEdgePairInfo info;
-    };
-    vector<Edge> edges;
+    vector<GlobalPathGraph1Edge> edges;
     void createEdges0(
         uint64_t maxDistanceInJourney,
         uint64_t minEdgeCoverage,
@@ -196,6 +199,11 @@ private:
     // The connected components of the GlobalPathGraph1.
     // Stored sorted by decreasing size, as measured by number of vertices.
     vector< shared_ptr<PathGraph1> > components;
+
+    // Create connected components.
+    // This only considers edges with corrected Jaccard at least equal to
+    // minCorrectedJaccard, and only stores connected components with at
+    // least minComponentSize vertices.
     void createComponents(
         double minCorrectedJaccard,
         uint64_t minComponentSize);

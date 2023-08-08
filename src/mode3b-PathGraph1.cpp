@@ -368,7 +368,7 @@ void GlobalPathGraph1::createEdges0(
     for(const auto& p: candidateEdges) {
         const uint64_t vertexId0 = p.first;
         const uint64_t vertexId1 = p.second;
-        Edge edge;
+        GlobalPathGraph1Edge edge;
         const MarkerGraphEdgeId edgeId0 = vertices[vertexId0].edgeId;
         const MarkerGraphEdgeId edgeId1 = vertices[vertexId1].edgeId;
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, edge.info));
@@ -392,7 +392,7 @@ void GlobalPathGraph1::createEdges1(
     vector< pair<uint64_t, MarkerGraphEdgePairInfo> > children;
 
     // Loop over all vertices.
-    Edge edge;
+    GlobalPathGraph1Edge edge;
     for(edge.vertexId0=0; edge.vertexId0<vertices.size(); edge.vertexId0++) {
         if((edge.vertexId0 % 10000) == 0) {
             cout << edge.vertexId0 << "/" << vertices.size() << endl;
@@ -461,7 +461,7 @@ void GlobalPathGraph1::writeGraphviz() const
     ofstream out("GlobalPathGraph.dot");
     out << "digraph GlobalPathGraph {\n";
 
-    for(const Edge& edge: edges) {
+    for(const GlobalPathGraph1Edge& edge: edges) {
         const MarkerGraphEdgeId edgeId0 = vertices[edge.vertexId0].edgeId;
         const MarkerGraphEdgeId edgeId1 = vertices[edge.vertexId1].edgeId;
         out << edgeId0 << "->";
@@ -473,6 +473,10 @@ void GlobalPathGraph1::writeGraphviz() const
 
 
 
+// Create connected components.
+// This only considers edges with corrected Jaccard at least equal to
+// minCorrectedJaccard, and only stores connected components with at
+// least minComponentSize vertices.
 void GlobalPathGraph1::createComponents(
     double minCorrectedJaccard,
     uint64_t minComponentSize)
@@ -485,7 +489,7 @@ void GlobalPathGraph1::createComponents(
     for(uint64_t vertexId=0; vertexId<n; vertexId++) {
         disjointSets.make_set(vertexId);
     }
-    for(const Edge& edge: edges) {
+    for(const GlobalPathGraph1Edge& edge: edges) {
         if(edge.info.correctedJaccard() < minCorrectedJaccard) {
             continue;
         }
@@ -504,7 +508,7 @@ void GlobalPathGraph1::createComponents(
     }
 
     // Create edges of each connected component.
-    for(const Edge& edge: edges) {
+    for(const GlobalPathGraph1Edge& edge: edges) {
         if(edge.info.correctedJaccard() < minCorrectedJaccard) {
             continue;
         }
