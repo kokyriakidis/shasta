@@ -249,7 +249,6 @@ private:
     void createSeedChains(uint64_t minEstimatedLength);
     void writeSeedChainsDetails() const;
     void writeSeedChainsStatistics() const;
-    void assembleSeedChains() const;
     vector<Chain> seedChains;
 
     // Connect seed chains by following reads.
@@ -275,6 +274,9 @@ private:
         const vector<ChainConnector>&,
         uint64_t minComponentSize);
 
+    // This generates an AssemblyPath for each of the Chains passed in,
+    // then assembles the AssemblyPath and writes assembled sequence to fasta.
+    void assembleChains(const vector<Chain>&, ostream& fasta) const;
 
     // Write the entire PathGraph in graphviz format.
     void writeGraphviz() const;

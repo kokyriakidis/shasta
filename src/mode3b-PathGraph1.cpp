@@ -95,7 +95,9 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         cout << "Found " << seedChains.size() << " seed chains." << endl;
         writeSeedChainsDetails();
         writeSeedChainsStatistics();
-        // assembleSeedChains();
+
+        ofstream fasta("SeedChains.fasta");
+        assembleChains(seedChains, fasta);
     }
 
 
@@ -820,12 +822,12 @@ uint64_t GlobalPathGraph1::Chain::totalOffset() const
 
 
 
-void GlobalPathGraph1::assembleSeedChains() const
+void GlobalPathGraph1::assembleChains(
+    const vector<Chain>& chains,
+    ostream& fasta) const
 {
-    ofstream fasta("SeedChains.fasta");
-
-    for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
-        const Chain& chain = seedChains[chainId];
+    for(uint64_t chainId=0; chainId<chains.size(); chainId++) {
+        const Chain& chain = chains[chainId];
 
         // Generate an AssemblyPath using this chain.
         vector<MarkerGraphEdgeId> markerGraphEdgeIds;
