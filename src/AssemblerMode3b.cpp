@@ -1,7 +1,8 @@
 // Shasta
 #include "Assembler.hpp"
 #include "LocalMarkerGraph1.hpp"
-#include "mode3b-PathFiller1.hpp"
+// #include "mode3b-PathFiller1.hpp"
+#include "mode3b-PathFiller2.hpp"
 #include "mode3b-PathFinder.hpp"
 #include "mode3b-PathGraph1.hpp"
 #include "mode3b-AssemblyPath.hpp"
@@ -187,10 +188,14 @@ void Assembler::fillMode3bAssemblyPathStep(const vector<string>& request, ostrea
     }
 
     // Fill this assembly step.
+#if 0
     mode3b::PathFiller1 filler(*this, edgeIdA, edgeIdB, html,
         showGraph,
         showVertices,
         showVertexLabels,
         showEdgeLabels,
         showDebugInformation);
+#endif
+    mode3b::PathFiller2DisplayOptions options(html);
+    mode3b::PathFiller2 filler(*this, edgeIdA, edgeIdB, options);
 }
