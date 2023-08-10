@@ -17,11 +17,21 @@ PathFiller2::PathFiller2(
     html(options.html)
 
 {
+    // PARAMETERS THAT SHOULD BE EXPOSED WHEN CODE STABILIZES.
+
+    // The estimated offset gets extended by this ratio to
+    // decide how much to extend reads that only appear in edgeIdA or edgeIdB.
+    double estimatedOffsetRatio = 1.1;
+
+
+
     checkAssumptions();
     gatherOrientedReads();
     writeOrientedReads();
-
+    estimateOffset();
+    createVertices(estimatedOffsetRatio);
 }
+
 
 
 void PathFiller2::checkAssumptions() const
@@ -130,7 +140,7 @@ void PathFiller2::writeOrientedReads() const
     }
 
     html <<
-        "<p>"
+        "<h2>Oriented reads</h2>"
         "<table>"
         "<tr>"
         "<th>Index"
@@ -232,3 +242,137 @@ uint64_t PathFiller2::getOrientedReadIndex(OrientedReadId orientedReadId) const
     return it - orientedReadInfos.begin();
 }
 
+
+
+void PathFiller2::estimateOffset()
+{
+    int64_t n = 0;
+    int64_t sum = 0;
+    for(const OrientedReadInfo& info: orientedReadInfos) {
+        if(info.isOnA() and info.isOnB()) {
+            n++;
+            sum += info.positionOffset0();
+            sum += info.positionOffset1();
+        }
+    }
+    estimatedOffset = sum / (2*n);
+
+    if(html) {
+        html << "<p>Estimated offset is " << estimatedOffset << " bases.";
+    }
+}
+
+
+
+// Create vertices by following the portion of each oriented read we will use for assembly.
+void PathFiller2::createVertices(double estimatedOffsetRatio)
+{
+    PathFiller2& graph = *this;
+    const int64_t offsetThreshold = int64_t(estimatedOffsetRatio * double(estimatedOffset));
+
+    // During this phase there is at most one vertex corresponding to
+    // each marker graph vertex.
+    std::map<MarkerGraphVertexId, vertex_descriptor> vertexMap;
+
+
+    // Loop over our oriented reads.
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        OrientedReadInfo& info = orientedReadInfos[i];
+        const OrientedReadId orientedReadId = info.orientedReadId;
+        info.vertices.clear();
+
+        // Oriented reads that appear on both edgeIdA and edgeIdB.
+        if(info.isOnA() and info.isOnB()) {
+            info.firstOrdinal = info.ordinalAndPositionA0.ordinal;
+            info.lastOrdinal =  info.ordinalAndPositionB1.ordinal;
+            for(int64_t ordinal=info.firstOrdinal; ordinal<=info.lastOrdinal; ordinal++) {
+                createVerticesHelper(i, ordinal, vertexMap);
+            }
+        }
+
+        // Oriented reads that appear on edgeIdA but not on edgeIdB.
+        else if(info.isOnA() and not info.isOnB()) {
+            info.firstOrdinal = info.ordinalAndPositionA0.ordinal;
+            const int64_t maxPosition = info.ordinalAndPositionA1.position + offsetThreshold;
+            const int64_t markerCount = int64_t(assembler.markers.size(orientedReadId.getValue()));
+            for(int64_t ordinal=info.firstOrdinal; ordinal<markerCount; ordinal++) {
+                const MarkerId markerId = assembler.getMarkerId(orientedReadId, uint32_t(ordinal));
+                const int64_t position = int64_t(assembler.markers.begin()[markerId].position);
+                if(position > maxPosition) {
+                    break;
+                }
+                createVerticesHelper(i, ordinal, vertexMap);
+                info.lastOrdinal = ordinal;
+            }
+        }
+
+        // Oriented reads that appear on edgeIdB but not on edgeIdA.
+        else if(info.isOnB() and not info.isOnA()) {
+            info.lastOrdinal = info.ordinalAndPositionB1.ordinal;
+            const int64_t minPosition = info.ordinalAndPositionB0.position - offsetThreshold;
+            for(int64_t ordinal=info.lastOrdinal; ordinal>=0; ordinal--) {
+                const MarkerId markerId = assembler.getMarkerId(orientedReadId, uint32_t(ordinal));
+                const int64_t position = int64_t(assembler.markers.begin()[markerId].position);
+                if(position < minPosition) {
+                    break;
+                }
+                createVerticesHelper(i, ordinal, vertexMap);
+                info.firstOrdinal = ordinal;
+            }
+            reverse(info.vertices.begin(), info.vertices.end());
+        }
+
+        else {
+            SHASTA_ASSERT(0);
+        }
+    }
+
+    if(html) {
+        html << "<p>Found " << num_vertices(graph) << " vertices." << endl;
+    }
+}
+
+
+
+void PathFiller2::createVerticesHelper(
+    uint64_t i,
+    int64_t ordinal,
+    std::map<MarkerGraphVertexId, vertex_descriptor>& vertexMap)
+{
+    PathFiller2& graph = *this;
+    OrientedReadInfo& info = orientedReadInfos[i];
+    const OrientedReadId orientedReadId = info.orientedReadId;
+
+    // Find the marker graph vertex that contains this ordinal.
+    const MarkerGraphVertexId vertexId =
+        assembler.getGlobalMarkerGraphVertex(orientedReadId, uint32_t(ordinal));
+    SHASTA_ASSERT(vertexId != invalid<MarkerGraphVertexId>);
+
+    // Get the corresponding vertex descriptor, creating the vertex
+    // if necessary.
+    vertex_descriptor v;
+    auto it = vertexMap.find(vertexId);
+    if(it == vertexMap.end()) {
+        v = add_vertex(PathFiller2Vertex(vertexId, orientedReadInfos.size()), graph);
+        vertexMap.insert(make_pair(vertexId, v));
+    } else {
+        v = it->second;
+    }
+
+    // Store this ordinal in the vertex.
+    PathFiller2Vertex& vertex = graph[v];
+    vertex.ordinals[i].push_back(ordinal);
+
+    // Store this vertex in the OrientedReadInfo.
+    info.vertices.push_back(v);
+}
+
+
+
+PathFiller2Vertex::PathFiller2Vertex(
+    MarkerGraphVertexId vertexId,
+    uint64_t orientedReadCount) :
+    vertexId(vertexId),
+    ordinals(orientedReadCount)
+{
+}
