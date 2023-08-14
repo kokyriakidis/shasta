@@ -1,9 +1,15 @@
+// Shasta.
 #include "mode3b-PathFiller2.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
 #include "Reads.hpp"
 using namespace shasta;
 using namespace mode3b;
+
+// Boost libraries.
+#include <boost/graph/iteration_macros.hpp>
+
+
 
 PathFiller2::PathFiller2(
     const Assembler& assembler,
@@ -23,6 +29,8 @@ PathFiller2::PathFiller2(
     // decide how much to extend reads that only appear in edgeIdA or edgeIdB.
     double estimatedOffsetRatio = 1.1;
 
+    const uint64_t minVertexCoverage = 8;
+
 
 
     checkAssumptions();
@@ -30,6 +38,7 @@ PathFiller2::PathFiller2(
     writeOrientedReads();
     estimateOffset();
     createVertices(estimatedOffsetRatio);
+    removeLowCoverageVertices(minVertexCoverage);
 }
 
 
@@ -257,8 +266,8 @@ void PathFiller2::estimateOffset()
     }
     estimatedOffset = sum / (2*n);
 
-    if(html) {
-        html << "<p>Estimated offset is " << estimatedOffset << " bases.";
+    if(html and options.showDebugInformation) {
+        html << "<br>Estimated offset is " << estimatedOffset << " bases.";
     }
 }
 
@@ -327,8 +336,8 @@ void PathFiller2::createVertices(double estimatedOffsetRatio)
         }
     }
 
-    if(html) {
-        html << "<p>Found " << num_vertices(graph) << " vertices." << endl;
+    if(html and options.showDebugInformation) {
+        html << "<br>After initial creation, there are " << num_vertices(graph) << " vertices." << endl;
     }
 }
 
@@ -375,4 +384,62 @@ PathFiller2Vertex::PathFiller2Vertex(
     vertexId(vertexId),
     ordinals(orientedReadCount)
 {
+}
+
+
+
+void PathFiller2::removeLowCoverageVertices(uint64_t minVertexCoverage)
+{
+    PathFiller2& graph = *this;
+
+    vector<vertex_descriptor> verticesToBeRemoved;
+    BGL_FORALL_VERTICES(v, graph, PathFiller2) {
+        if(graph[v].coverage() < minVertexCoverage) {
+            verticesToBeRemoved.push_back(v);
+        }
+    }
+
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        removeVertex(v);
+    }
+
+    if(html and options.showDebugInformation) {
+        html << "<br>After removing vertices with coverage less than " <<
+            minVertexCoverage <<
+            ", there are " << num_vertices(graph) << " vertices." << endl;
+    }
+}
+
+
+
+void PathFiller2::removeVertex(vertex_descriptor v)
+{
+    PathFiller2& graph = *this;
+
+    // Before removing the vertex, we have to record this fact
+    // in the oriented reads that visit this vertex.
+    const PathFiller2Vertex& vertex = graph[v];
+    for(uint64_t i=0; i<vertex.ordinals.size(); i++) {
+        OrientedReadInfo& info = orientedReadInfos[i];
+        for(const uint64_t ordinal: vertex.ordinals[i]) {
+            info.vertexAtOrdinal(ordinal) = null_vertex();
+        }
+    }
+
+    // Now we can remove the vertex.
+    clear_vertex(v, graph);
+    remove_vertex(v, graph);
+
+}
+
+
+
+// Return the total number of ordinals.
+uint64_t PathFiller2Vertex::coverage() const
+{
+    uint64_t c = 0;
+    for(const auto& v: ordinals) {
+        c += v.size();
+    }
+    return c;
 }

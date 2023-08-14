@@ -41,6 +41,12 @@ public:
     // If this is not open, no output takes place.
     ostream& html;
 
+    bool showGraph = false;
+    bool showVertices = false;
+    bool showVertexLabels = false;
+    bool showEdgeLabels = false;
+    bool showDebugInformation = false;
+
     PathFiller2DisplayOptions(ostream& html) : html(html) {}
 };
 
@@ -181,7 +187,14 @@ private:
         // The vertices corresponding to each of the ordinals of
         // this oriented read between firstOrdinal and lastOrdinal included.
         vector<vertex_descriptor> vertices;
-        vertex_descriptor getVertex(uint32_t ordinal) const;
+        vertex_descriptor& vertexAtOrdinal(uint64_t ordinal)
+        {
+            return vertices[ordinal - firstOrdinal];
+        }
+        const vertex_descriptor& vertexAtOrdinal(uint64_t ordinal) const
+        {
+            return vertices[ordinal - firstOrdinal];
+        }
     };
 
 
@@ -211,6 +224,8 @@ private:
         int64_t ordinal,
         std::map<MarkerGraphVertexId, vertex_descriptor>& vertexMap);
 
+    void removeLowCoverageVertices(uint64_t minVertexCoverage);
+    void removeVertex(vertex_descriptor);
 };
 
 #endif

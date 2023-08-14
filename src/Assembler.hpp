@@ -2360,6 +2360,8 @@ public:
     // Given two consecutive primary edges, find the secondary edges
     // in between.
     void fillMode3bAssemblyPathStep(const vector<string>&, ostream&);
+    void fillMode3bAssemblyPathStep1(const vector<string>&, ostream&); // Uses class mode3b::PathFiller1
+    void fillMode3bAssemblyPathStep2(const vector<string>&, ostream&); // Uses class mode3b::PathFiller2
 
     void exploreMode3bPathGraph(const vector<string>& request, ostream& html);
     void findMode3bPaths() const;
