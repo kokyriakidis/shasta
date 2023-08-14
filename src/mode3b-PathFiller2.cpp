@@ -3,6 +3,7 @@
 #include "approximateTopologicalSort.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
+#include "globalMsa.hpp"
 #include "orderPairs.hpp"
 #include "platformDependent.hpp"
 #include "Reads.hpp"
@@ -47,8 +48,6 @@ PathFiller2::PathFiller2(
 
 
 
-    PathFiller2& graph = *this;
-
     // Oriented reads.
     checkAssumptions();
     gatherOrientedReads();
@@ -62,37 +61,41 @@ PathFiller2::PathFiller2(
 
     // Edges.
     createEdges();
-
-#if 0
-    // Initial display of the graph.
-    if(html and options.showGraph) {
-        html << "<h2>Initial assembly graph</h2>";
-        html << "<p>The initial assembly graph has " << num_vertices(graph) <<
-            " vertices and " << num_edges(graph) << " edges.";
-        approximateTopologicalSort();
-        writeGraph();
-    }
-#endif
+    writeGraph("Initial assembly graph");
 
     // Remove strongly connected components, then regerenerate
     // edges from scratch with the remaining vertices.
     removeStrongComponents();
     removeAllEdges();
     createEdges();
+    writeGraph("Assembly graph after removal of strong connected components");
 
-    findAssemblyPath();
-
-    // Display the graph.
-    if(html and options.showGraph) {
-        html << "<h2>Assembly graph</h2>";
-        html << "<p>The assembly graph has " << num_vertices(graph) <<
-            " vertices and " << num_edges(graph) << " edges.";
-        approximateTopologicalSort();
-        writeGraph();
-    }
     if(html and options.showDebugInformation) {
         vertexCoverageHistogram();
         edgeCoverageHistogram();
+    }
+
+    // Assemble.
+    findAssemblyPath();
+    assembleAssemblyPathEdges();
+    writeGraph("Assembly graph after assembly");
+
+    // Write assembled sequence.
+    if(html) {
+        vector<Base> sequence;
+        getSequence(true, sequence);
+
+        html <<
+            "<h2>Assembled sequence</h2>"
+            "Assembled sequence including the first and last edge is " <<
+            sequence.size() << " bases long."
+            "<pre style='font-family:monospace'>\n";
+        copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(html));
+        html << "</pre>";
+
+        ofstream fasta("PathFiller2.fasta");
+        fasta << ">PathFiller2 " << sequence.size() << endl;
+        copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(fasta));
     }
 
 }
@@ -744,6 +747,21 @@ void PathFiller2::approximateTopologicalSort()
 
 
 
+void PathFiller2::writeGraph(const string& title)
+{
+    PathFiller2& graph = *this;
+
+    if(html and options.showGraph) {
+        html << "<h2>" << title << "</h2>";
+        html << "<p>The assembly graph has " << num_vertices(graph) <<
+            " vertices and " << num_edges(graph) << " edges.";
+        approximateTopologicalSort();
+        writeGraph();
+    }
+}
+
+
+
 void PathFiller2::writeGraph() const
 {
     // Write out the graph in graphviz format.
@@ -866,6 +884,12 @@ void PathFiller2::writeGraphviz(ostream& out) const
         if(options.showEdgeLabels) {
             out << " label=\"";
             out << "Coverage = " << coverage;
+            /*
+            if(not edge.sequence.empty()) {
+                out << "\\n";
+                copy(edge.sequence.begin(), edge.sequence.end(), ostream_iterator<Base>(out));
+            }
+            */
             out << "\"";
         }
 
@@ -1085,6 +1109,8 @@ void PathFiller2::findAssemblyPath()
             vB = v;
         }
     }
+    SHASTA_ASSERT(vA != null_vertex());
+    SHASTA_ASSERT(vB != null_vertex());
 
 
     // Main iteration loop.
@@ -1113,5 +1139,127 @@ void PathFiller2::findAssemblyPath()
 
     if(html and options.showDebugInformation) {
         html << "<br>The assembly path has " << assemblyPath.size() << " edges.";
+    }
+}
+
+
+
+void PathFiller2::assembleAssemblyPathEdges()
+{
+    for(const edge_descriptor e: assemblyPath) {
+        assembleEdge(e);
+    }
+}
+
+
+
+void PathFiller2::assembleEdge(edge_descriptor e)
+{
+    const bool debug = false;
+    PathFiller2& graph = *this;
+    PathFiller2Edge& edge = graph[e];
+
+    const uint64_t k = assembler.assemblerInfo->k;
+    SHASTA_ASSERT((k % 2) == 0);
+    const uint64_t kHalf = k / 2;
+
+    if(debug) {
+        const vertex_descriptor v0 = source(e, graph);
+        const vertex_descriptor v1 = target(e, graph);
+        cout << "PathFiller2::assembleEdge begins for edge " <<
+            graph[v0].stringId() << " " << graph[v1].stringId() << endl;
+    }
+
+
+    // Gather the sequences of the contributing oriented reads.
+    // Each sequence is stored with the number of distinct reads that
+    // have that sequence.
+    vector< pair<vector<Base>, uint64_t> > orientedReadSequences;
+
+    // Loop over oriented reads.
+    vector<Base> orientedReadSequence;
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        const OrientedReadId orientedReadId = orientedReadInfos[i].orientedReadId;
+        const vector< pair<int64_t, int64_t> >& orientedReadMarkerIntervals = edge.markerIntervals[i];
+        if(orientedReadMarkerIntervals.empty()) {
+            continue;
+        }
+
+        // Find the first and last ordinals of this oriented read on this edge.
+        const int64_t ordinal0 = orientedReadMarkerIntervals.front().first;
+        const int64_t ordinal1 = orientedReadMarkerIntervals.back().second;
+
+        // Find the corresponding MarkerIds.
+        const MarkerId markerId0 = assembler.getMarkerId(orientedReadId, uint32_t(ordinal0));
+        const MarkerId markerId1 = assembler.getMarkerId(orientedReadId, uint32_t(ordinal1));
+
+        // And the corresponding positions in the oriented reads.
+        const uint64_t position0 = assembler.markers.begin()[markerId0].position + kHalf;
+        const uint64_t position1 = assembler.markers.begin()[markerId1].position + kHalf;
+
+        // Now we can get the sequence contributed by this oriented read.
+        orientedReadSequence.clear();
+        for(uint64_t position=position0; position!=position1; position++) {
+            const Base base = assembler.getReads().getOrientedReadBase(orientedReadId, uint32_t(position));
+            orientedReadSequence.push_back(base);
+        }
+
+        if(debug) {
+            copy(orientedReadSequence.begin(), orientedReadSequence.end(),
+                ostream_iterator<Base>(cout));
+            cout << " " << orientedReadId << endl;
+        }
+
+        // Store it.
+        bool found = false;
+        for(auto& p: orientedReadSequences) {
+            if(p.first == orientedReadSequence) {
+                ++p.second;
+                found = true;
+                break;
+            }
+        }
+        if(not found) {
+            orientedReadSequences.push_back(make_pair(orientedReadSequence, 1));
+        }
+    }
+
+    // Do the MSA.
+    vector<Base> consensus;
+    globalMsaSpoa(orientedReadSequences, consensus);
+    if(debug) {
+        copy(consensus.begin(), consensus.end(), ostream_iterator<Base>(cout));
+        cout << " Consensus" << endl;
+    }
+
+    // Store the consensus in the edge.
+    edge.sequence = consensus;
+
+    if(debug) {
+        const vertex_descriptor v0 = source(e, graph);
+        const vertex_descriptor v1 = target(e, graph);
+        cout << "PathFiller1::assembleEdge ends for edge " <<
+            graph[v0].stringId() << " " << graph[v1].stringId() << endl;
+    }
+
+}
+
+
+
+void PathFiller2::getSequence(
+    bool includeFirstAndLastEdge,
+    vector<Base>& sequence) const
+{
+    SHASTA_ASSERT(assemblyPath.size() >= 2);
+    const PathFiller2& graph = *this;
+
+    const uint64_t begin = includeFirstAndLastEdge ? 0 : 1;
+    const uint64_t end = includeFirstAndLastEdge ? assemblyPath.size() : (assemblyPath.size() - 1);
+
+    sequence.clear();
+    for(uint64_t i=begin; i!=end; ++i) {
+        const edge_descriptor e = assemblyPath[i];
+        const vector<Base>& edgeSequence = graph[e].sequence;
+        copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
     }
 }

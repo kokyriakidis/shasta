@@ -97,8 +97,8 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         writeSeedChainsDetails();
         writeSeedChainsStatistics();
 
-        // ofstream fasta("SeedChains.fasta");
-        // assembleChains(seedChains, fasta);
+        ofstream fasta("SeedChains.fasta");
+        assembleChains(seedChains, fasta);
     }
 
 
@@ -146,8 +146,8 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         createChainsFromComponents(minEstimatedLength, chains);
         cout << "Found " << chains.size() << " chains." << endl;
 
-        // ofstream fasta("Chains.fasta");
-        // assembleChains(chains, fasta);
+        ofstream fasta("Chains.fasta");
+        assembleChains(chains, fasta);
     }
 
 }

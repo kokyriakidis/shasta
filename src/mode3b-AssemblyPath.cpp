@@ -1,5 +1,6 @@
 #include "mode3b-AssemblyPath.hpp"
-#include "mode3b-PathFiller1.hpp"
+// #include "mode3b-PathFiller1.hpp"
+#include "mode3b-PathFiller2.hpp"
 #include "mode3b-PathFinder.hpp"
 #include "Assembler.hpp"
 #include "MarkerInterval.hpp"
@@ -136,8 +137,13 @@ void AssemblyPath::assemble()
         // cout << "Assembling between primary edges " << edgeIdA << " " << edgeIdB << endl;
         Step& step = steps[i];
         ostream html(0);
+#if 0
         PathFiller1 pathFiller(assembler, edgeIdA, edgeIdB, html, false, false, false, false, false);
         pathFiller.getSecondarySequence(step.sequence);
+#else
+        PathFiller2 pathFiller(assembler, edgeIdA, edgeIdB, html);
+        pathFiller.getSequence(false, step.sequence);
+#endif
         // cout << "Coverage " << pathFiller.coverage() << " , assembled length " << step.sequence.size() << endl;
     }
 }

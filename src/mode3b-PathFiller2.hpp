@@ -98,6 +98,10 @@ public:
 
     // Set by approximateTopologicalSort and only used for display.
     bool isDagEdge = false;
+
+    // Sequence assembled using MSA of the sequences contributes by each
+    // MarkerInterval.
+    vector<Base> sequence;
 };
 
 
@@ -113,6 +117,10 @@ public:
         MarkerGraphEdgeId edgeIdA,
         MarkerGraphEdgeId edgeIdB,
         const PathFiller2DisplayOptions&);
+
+    void getSequence(
+        bool includeFirstAndLastEdge,
+        vector<Base>&) const;
 
 private:
 
@@ -251,10 +259,15 @@ private:
     vector<edge_descriptor> assemblyPath;
     void findAssemblyPath();
 
+    // Assemble edges using MSA.
+    // Sequences stored in the marker graph are not used.
+    void assembleAssemblyPathEdges();
+    void assembleEdge(edge_descriptor);
 
     // Output.
     void approximateTopologicalSort();
     void writeGraph() const;
+    void writeGraph(const string& title);
     void writeGraphviz(ostream&) const;
     void vertexCoverageHistogram() const;
     void edgeCoverageHistogram() const;
