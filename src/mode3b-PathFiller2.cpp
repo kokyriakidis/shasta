@@ -35,14 +35,19 @@ PathFiller2::PathFiller2(
     // Control vertex splitting.
     const int64_t maxBaseSkip = 300;
 
-
+    // Oriented reads.
     checkAssumptions();
     gatherOrientedReads();
     writeOrientedReads();
     estimateOffset();
+
+    // Vertices.
     createVertices(estimatedOffsetRatio);
     removeLowCoverageVertices(minVertexCoverage);
     splitVertices(maxBaseSkip);
+
+    // Edges.
+    createEdges();
 }
 
 
@@ -593,5 +598,63 @@ void PathFiller2::splitVertices(int64_t maxBaseSkip)
         html << "<br>" << splitCount << " vertices were split into one or more new vertices." << endl;
         html << "<br>After splitting vertices, there are " <<
             num_vertices(graph) << " vertices." << endl;
+    }
+}
+
+
+
+void PathFiller2::createEdges()
+{
+    PathFiller2& graph = *this;
+
+    // Loop over oriented reads.
+    // Follow each oriented read over the vertices it visits.
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        const OrientedReadInfo& info = orientedReadInfos[i];
+
+        vertex_descriptor vPrevious = null_vertex();
+        int64_t ordinalPrevious = invalid<uint32_t>;
+
+        // Loop over the vertices visited by this oriented read.
+        for(int64_t ordinal=info.firstOrdinal; ordinal<=info.lastOrdinal; ordinal++) {
+            const vertex_descriptor v = info.vertexAtOrdinal(ordinal);
+
+            // No vertex. Skip.
+            if(v == null_vertex()) {
+                continue;
+            }
+
+            // We found a vertex, and we don't have a previous vertex.
+            // Store this vertex as the previous vertex.
+            if(vPrevious == null_vertex()) {
+                vPrevious = v;
+                ordinalPrevious = ordinal;
+                continue;
+            }
+
+            // We found a vertex, and we also have a previous vertex.
+            // Add an edge between these two vertices if necessary,
+            // then add a MarkerInterval to it to describe the
+            // transition of this oriented read from vPrevious to v.
+            edge_descriptor e;
+            bool edgeExists = false;
+            tie(e, edgeExists) = edge(vPrevious, v, graph);
+            if(not edgeExists) {
+                bool edgeWasAdded = false;
+                tie(e, edgeWasAdded) = add_edge(vPrevious, v, graph);
+                SHASTA_ASSERT(edgeWasAdded);
+                graph[e].markerIntervals.resize(orientedReadInfos.size());
+            }
+            graph[e].markerIntervals[i].push_back({ordinalPrevious, ordinal});
+
+            // Replace the previous vertex with this one.
+            vPrevious = v;
+            ordinalPrevious = ordinal;
+
+        }
+    }
+
+    if(html and options.showDebugInformation) {
+        html << "<br>There are " << num_edges(graph) << " edges." << endl;
     }
 }

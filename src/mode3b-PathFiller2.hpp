@@ -12,6 +12,7 @@
 
 // Standard library.
 #include "iosfwd.hpp"
+#include "utility.hpp"
 #include "vector.hpp"
 
 
@@ -83,6 +84,15 @@ public:
 
 class shasta::mode3b::PathFiller2Edge {
 public:
+
+    // The MarkerIntervals in this edge for each of the oriented reads.
+    // If cycles are present within this local marker graph,
+    // an oriented read can have more than one MarkerInterval in an edge.
+    // This vector has the same size as the PathFiller::orientedReadInfos vector
+    // and is indexed in the same way.
+    // This only stores the ordinals for the MarkerInterval as
+    // the OrientedReadId is stored in the orientedReadInfos vector.
+    vector< vector< pair<int64_t, int64_t> > > markerIntervals;
 };
 
 
@@ -224,6 +234,9 @@ private:
     void removeLowCoverageVertices(uint64_t minVertexCoverage);
     void removeVertex(vertex_descriptor);
     void splitVertices(int64_t maxBaseSkip);
+
+    void createEdges();
+
 };
 
 #endif
