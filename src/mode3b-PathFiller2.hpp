@@ -93,6 +93,11 @@ public:
     // This only stores the ordinals for the MarkerInterval as
     // the OrientedReadId is stored in the orientedReadInfos vector.
     vector< vector< pair<int64_t, int64_t> > > markerIntervals;
+
+    uint64_t coverage() const;
+
+    // Set by approximateTopologicalSort and only used for display.
+    bool isDagEdge = false;
 };
 
 
@@ -236,6 +241,11 @@ private:
     void splitVertices(int64_t maxBaseSkip);
 
     void createEdges();
+
+    // Output.
+    void approximateTopologicalSort();
+    void writeGraph() const;
+    void writeGraphviz(ostream&) const;
 
 };
 

@@ -1,14 +1,23 @@
 // Shasta.
 #include "mode3b-PathFiller2.hpp"
+#include "approximateTopologicalSort.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
+#include "orderPairs.hpp"
+#include "platformDependent.hpp"
 #include "Reads.hpp"
+#include "runCommandWithTimeout.hpp"
 using namespace shasta;
 using namespace mode3b;
 
 // Boost libraries.
 #include <boost/graph/iteration_macros.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
+// Standard library.
+#include "fstream.hpp"
 
 
 PathFiller2::PathFiller2(
@@ -29,11 +38,15 @@ PathFiller2::PathFiller2(
     // decide how much to extend reads that only appear in edgeIdA or edgeIdB.
     double estimatedOffsetRatio = 1.1;
 
-    // Te minimum coverage for a vertex to be created.
+    // The minimum coverage for a vertex to be created.
     const uint64_t minVertexCoverage = 8;
 
     // Control vertex splitting.
     const int64_t maxBaseSkip = 300;
+
+
+
+    PathFiller2& graph = *this;
 
     // Oriented reads.
     checkAssumptions();
@@ -48,6 +61,15 @@ PathFiller2::PathFiller2(
 
     // Edges.
     createEdges();
+
+    // Initial display of the graph.
+    if(html and options.showGraph) {
+        html << "<h2>Initial assembly graph</h2>";
+        html << "<p>The initial assembly graph has " << num_vertices(graph) <<
+            " vertices and " << num_edges(graph) << " edges.";
+        approximateTopologicalSort();
+        writeGraph();
+    }
 }
 
 
@@ -448,6 +470,18 @@ uint64_t PathFiller2Vertex::coverage() const
 
 
 
+// Return the total number of marker intervals.
+uint64_t PathFiller2Edge::coverage() const
+{
+    uint64_t c = 0;
+    for(const auto& v: markerIntervals) {
+        c += v.size();
+    }
+    return c;
+}
+
+
+
 void PathFiller2::splitVertices(int64_t maxBaseSkip)
 {
 
@@ -657,4 +691,172 @@ void PathFiller2::createEdges()
     if(html and options.showDebugInformation) {
         html << "<br>There are " << num_edges(graph) << " edges." << endl;
     }
+}
+
+
+
+// Approximate topological sort is only used to improve the
+// display of the graph and make it faster.
+// It sets the vertex ranks and isDagEdge flags in the edges.
+void PathFiller2::approximateTopologicalSort()
+{
+    PathFiller2& graph = *this;
+
+    vector< pair<edge_descriptor, uint64_t> > edgesWithCoverage;
+    BGL_FORALL_EDGES(e, graph, PathFiller2) {
+        edgesWithCoverage.push_back({e, graph[e].coverage()});
+    }
+    sort(edgesWithCoverage.begin(), edgesWithCoverage.end(),
+        OrderPairsBySecondOnlyGreater<edge_descriptor, uint64_t>());
+
+    vector<edge_descriptor> sortedEdges;
+    for(const auto& p: edgesWithCoverage) {
+        sortedEdges.push_back(p.first);
+    }
+
+    shasta::approximateTopologicalSort(graph, sortedEdges);
+}
+
+
+
+void PathFiller2::writeGraph() const
+{
+    // Write out the graph in graphviz format.
+    const string uuid = to_string(boost::uuids::random_generator()());
+    const string dotFileName = tmpDirectory() + uuid + ".dot";
+    {
+        ofstream dotFile(dotFileName);
+        writeGraphviz(dotFile);
+    }
+
+    // Compute layout in svg format.
+    const string command = "dot -O -T svg " + dotFileName;
+    bool timeoutTriggered = false;
+    bool signalOccurred = false;
+    int returnCode = 0;
+    const double timeout = 600;
+    runCommandWithTimeout(command, timeout, timeoutTriggered, signalOccurred, returnCode);
+    if(returnCode!=0 or signalOccurred) {
+        throw runtime_error("An error occurred while running the following command: " + command);
+    }
+    if(timeoutTriggered) {
+        std::filesystem::remove(dotFileName);
+        throw runtime_error("Timeout during graph layout computation.");
+    }
+
+    // Remove the .dot file.
+    std::filesystem::remove(dotFileName);
+
+    // Copy the svg file to html.
+    const string svgFileName = dotFileName + ".svg";
+    ifstream svgFile(svgFileName);
+    html << "<p>" << svgFile.rdbuf();
+    svgFile.close();
+
+    // Remove the .svg file.
+    std::filesystem::remove(svgFileName);
+}
+
+
+
+void PathFiller2::writeGraphviz(ostream& out) const
+{
+    const PathFiller2& graph = *this;
+
+    // S and V for edges HSV.
+    const double S = 0.7;
+    const double V = 1.;
+
+
+    out <<
+        "digraph PathFiller2 {\n"
+        "mclimit=0.01;\n"       // For layout speed
+        "edge [penwidth=6];\n"
+        "node [fontname=\"Courier New\"];\n"
+        "edge [fontname=\"Courier New\"];\n";
+
+    if(options.showVertices) {
+        if(options.showVertexLabels) {
+            out << "node [shape=rectangle];\n";
+        } else {
+            out << "node [shape=point width=0.2];\n";
+        }
+    } else {
+        out << "node [shape=point style=invis];\n";
+    }
+
+
+    // To help Graphviz compute the layout, write vertices in rank order.
+    vector< pair<vertex_descriptor, uint64_t> > verticesWithRank;
+    BGL_FORALL_VERTICES(v, graph, PathFiller2) {
+        verticesWithRank.push_back({v, graph[v].rank});
+    }
+    sort(verticesWithRank.begin(), verticesWithRank.end(),
+        OrderPairsBySecondOnly<vertex_descriptor, uint64_t>());
+    for(const auto& p: verticesWithRank) {
+        const vertex_descriptor v = p.first;
+        const PathFiller2Vertex& vertex = graph[v];
+        out << "\"" << vertex.stringId() << "\" [";
+        out << "tooltip=\"" << vertex.stringId() << "\\n" << vertex.coverage() << "\"";
+        if(options.showVertexLabels) {
+            out << " label=\"" << vertex.stringId() << "\\n" << vertex.coverage() << "\"";
+        }
+        out << "];\n";
+    }
+
+
+
+    // Write the edges.
+    BGL_FORALL_EDGES(e, graph, PathFiller2) {
+
+        const PathFiller2Edge& edge = graph[e];
+        const uint64_t coverage = edge.coverage();
+        const auto v0 = source(e, graph);
+        const auto v1 = target(e, graph);
+
+        // Compute the hue based on coverage.
+        double H;
+        if(coverage >= orientedReadInfos.size()) {
+            H = 1./3.;
+        } else {
+            H = (double(coverage - 1) / (3. * double(orientedReadInfos.size() - 1)));
+        }
+        const string colorString = "\"" + to_string(H) + " " + to_string(S) + " " + to_string(V) + "\"";
+
+        out << "\"" << graph[v0].stringId() << "\"->\"" << graph[v1].stringId() << "\" [";
+
+        // Color is based on coverage.
+        out << " color=" << colorString;
+
+        // Tooltip.
+        out << " tooltip=\"";
+        out << "Coverage " << coverage << "\\n";
+        out << "\"";
+
+        // Label.
+        if(options.showEdgeLabels) {
+            out << " label=\"";
+            out << "Coverage = " << coverage;
+            out << "\"";
+        }
+
+        if(not edge.isDagEdge) {
+            out << " constraint=false";
+        }
+        out << "];\n";
+
+    }
+
+    out << "}\n";
+}
+
+
+
+string PathFiller2Vertex::stringId() const
+{
+    string s = to_string(vertexId);
+    if(replicaIndex) {
+        s += "." + to_string(replicaIndex);
+    }
+    return s;
 }
