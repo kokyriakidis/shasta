@@ -241,6 +241,11 @@ private:
     void splitVertices(int64_t maxBaseSkip);
 
     void createEdges();
+    void removeAllEdges();
+
+    // Remove all vertices in non-trivial strongly connected components.
+    void removeStrongComponents();
+
 
     // Output.
     void approximateTopologicalSort();

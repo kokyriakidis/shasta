@@ -12,6 +12,7 @@ using namespace mode3b;
 
 // Boost libraries.
 #include <boost/graph/iteration_macros.hpp>
+#include <boost/graph/strong_components.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -62,6 +63,7 @@ PathFiller2::PathFiller2(
     // Edges.
     createEdges();
 
+#if 0
     // Initial display of the graph.
     if(html and options.showGraph) {
         html << "<h2>Initial assembly graph</h2>";
@@ -69,7 +71,22 @@ PathFiller2::PathFiller2(
             " vertices and " << num_edges(graph) << " edges.";
         approximateTopologicalSort();
         writeGraph();
+    }
+#endif
 
+    // Remove strongly connected components, then regerenerate
+    // edges from scratch with the remaining vertices.
+    removeStrongComponents();
+    removeAllEdges();
+    createEdges();
+
+    // Display the graph.
+    if(html and options.showGraph) {
+        html << "<h2>Assembly graph</h2>";
+        html << "<p>The assembly graph has " << num_vertices(graph) <<
+            " vertices and " << num_edges(graph) << " edges.";
+        approximateTopologicalSort();
+        writeGraph();
     }
     if(html and options.showDebugInformation) {
         vertexCoverageHistogram();
@@ -936,3 +953,90 @@ void PathFiller2::edgeCoverageHistogram() const
     html << "</table>";
 }
 
+
+
+void PathFiller2::removeAllEdges()
+{
+    PathFiller2& graph = *this;
+    vector<edge_descriptor> allEdges;
+    BGL_FORALL_EDGES(e, graph, PathFiller2) {
+        allEdges.push_back(e);
+    }
+
+    for(const edge_descriptor e: allEdges) {
+        boost::remove_edge(e, graph);
+    }
+}
+
+
+
+void PathFiller2::removeStrongComponents()
+{
+    PathFiller2& graph = *this;
+    uint64_t removedCount = 0;
+
+    // Map the vertices to integers.
+    uint64_t vertexIndex = 0;
+    std::map<vertex_descriptor, uint64_t> vertexMap;
+    BGL_FORALL_VERTICES(v, graph, PathFiller2) {
+        vertexMap.insert({v, vertexIndex++});
+    }
+
+    // Compute strong components.
+    std::map<vertex_descriptor, uint64_t> componentMap;
+    boost::strong_components(
+        graph,
+        boost::make_assoc_property_map(componentMap),
+        boost::vertex_index_map(boost::make_assoc_property_map(vertexMap)));
+
+    // Gather the vertices in each strong component.
+    std::map<uint64_t, vector<vertex_descriptor> > componentVertices;
+    for(const auto& p: componentMap) {
+        componentVertices[p.second].push_back(p.first);
+    }
+
+
+
+    // Keep the non-trivial ones.
+    // A non-trivial strong component has at least one internal edge.
+    // This means that it either has more than one vertex,
+    // or it consists of a single vertex with a self-edge.
+    for(const auto& p: componentVertices) {
+
+        // Figure out if it is non-trivial.
+        bool isNonTrivial;
+        if(p.second.size() > 1) {
+
+            // More than one vertex. Certainly non-trivial.
+            isNonTrivial = true;
+        } else if (p.second.size() == 1) {
+
+            // Only one vertex. Non-trivial if self-edge present.
+            const vertex_descriptor v = p.second.front();
+            bool selfEdgeExists = false;
+            tie(ignore, selfEdgeExists) = edge(v, v, graph);
+            isNonTrivial = selfEdgeExists;
+        } else {
+
+            // Empty. This should never happen.
+            SHASTA_ASSERT(0);
+        }
+
+        // If non-trivial, remove all of its vertices.
+        if(isNonTrivial) {
+            for(const vertex_descriptor v: p.second) {
+                removeVertex(v);
+                ++removedCount;
+            }
+        }
+    }
+
+    if(html and options.showDebugInformation) {
+        html <<
+            "<br>Removed " << removedCount <<
+            " vertices in non-trivial strongly connected components."
+            "<br>The graph has now " << num_vertices(graph) <<
+            " vertices.";
+
+    }
+}
