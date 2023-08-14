@@ -69,6 +69,11 @@ PathFiller2::PathFiller2(
             " vertices and " << num_edges(graph) << " edges.";
         approximateTopologicalSort();
         writeGraph();
+
+    }
+    if(html and options.showDebugInformation) {
+        vertexCoverageHistogram();
+        edgeCoverageHistogram();
     }
 }
 
@@ -860,3 +865,74 @@ string PathFiller2Vertex::stringId() const
     }
     return s;
 }
+
+
+
+void PathFiller2::vertexCoverageHistogram() const
+{
+    if(not html) {
+        return;
+    }
+
+    const PathFiller2& graph = *this;
+    vector<uint64_t> histogram;
+    BGL_FORALL_VERTICES(v, graph, PathFiller2) {
+        const uint64_t coverage = graph[v].coverage();
+
+        if(coverage >= histogram.size()) {
+            histogram.resize(coverage + 1, 0);
+        }
+        ++histogram[coverage];
+    }
+
+    html <<
+        "<h2>Vertex coverage histogram</h2>"
+        "<table>"
+        "<tr><th>Coverage<th>Frequency";
+    for(uint64_t coverage=0; coverage< histogram.size(); coverage++) {
+        const uint64_t frequency = histogram[coverage];
+        if(frequency) {
+            html <<
+                "<tr>"
+                "<td class=centered>" << coverage <<
+                "<td class=centered>" << frequency;
+        }
+    }
+    html << "</table>";
+}
+
+
+
+void PathFiller2::edgeCoverageHistogram() const
+{
+    if(not html) {
+        return;
+    }
+
+    const PathFiller2& graph = *this;
+    vector<uint64_t> histogram;
+    BGL_FORALL_EDGES(e, graph, PathFiller2) {
+        const uint64_t coverage = graph[e].coverage();
+
+        if(coverage >= histogram.size()) {
+            histogram.resize(coverage + 1, 0);
+        }
+        ++histogram[coverage];
+    }
+
+    html <<
+        "<h2>Edge coverage histogram</h2>"
+        "<table>"
+        "<tr><th>Coverage<th>Frequency";
+    for(uint64_t coverage=0; coverage< histogram.size(); coverage++) {
+        const uint64_t frequency = histogram[coverage];
+        if(frequency) {
+            html <<
+                "<tr>"
+                "<td class=centered>" << coverage <<
+                "<td class=centered>" << frequency;
+        }
+    }
+    html << "</table>";
+}
+

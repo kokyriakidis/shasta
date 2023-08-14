@@ -246,6 +246,8 @@ private:
     void approximateTopologicalSort();
     void writeGraph() const;
     void writeGraphviz(ostream&) const;
+    void vertexCoverageHistogram() const;
+    void edgeCoverageHistogram() const;
 
 };
 
