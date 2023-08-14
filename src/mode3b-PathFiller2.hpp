@@ -159,25 +159,20 @@ private:
             return orientedReadId < that.orientedReadId;
         }
 
+        // The ordinal offset between the source vertex of edgeIdA
+        // and the target vertex of edgeIdB.
         int64_t ordinalOffset() const
         {
             SHASTA_ASSERT(isOnA() and isOnB());
-            const int64_t offset0 = ordinalAndPositionB0.ordinal - ordinalAndPositionA0.ordinal;
-            const int64_t offset1 = ordinalAndPositionB1.ordinal - ordinalAndPositionA1.ordinal;
-            SHASTA_ASSERT(offset0 == offset1);
-            return offset0;
+            return ordinalAndPositionB1.ordinal - ordinalAndPositionA0.ordinal;
         }
 
-        int64_t positionOffset0() const
+        // The base offset between the source vertex of edgeIdA
+        // and the target vertex of edgeIdB.
+        int64_t positionOffset() const
         {
             SHASTA_ASSERT(isOnA() and isOnB());
-            return ordinalAndPositionB0.position - ordinalAndPositionA0.position;
-        }
-
-        int64_t positionOffset1() const
-        {
-            SHASTA_ASSERT(isOnA() and isOnB());
-            return ordinalAndPositionB1.position - ordinalAndPositionA1.position;
+            return ordinalAndPositionB1.position - ordinalAndPositionA0.position;
         }
 
         // The first and last ordinals of this oriented read used for this assembly.
@@ -213,19 +208,22 @@ private:
     // The index of an OrientedReadId is its index in the orientedReadInfos vector.
     uint64_t getOrientedReadIndex(OrientedReadId) const;
 
-    // Estimated offset in bases, using the oriented reads that appear
+    // Estimated offset in bases between the source vertex of edgeIdA
+    // and the target vertex of edgeIdB.
+    // The estimate is done using the oriented reads that appear
     // both in edgeIdA and edgeIdB.
-    int64_t estimatedOffset;
+    int64_t estimatedA0B1Offset;
     void estimateOffset();
 
+    // Vertex creation.
     void createVertices(double estimatedOffsetRatio);
     void createVerticesHelper(
         uint64_t i,
         int64_t ordinal,
         std::map<MarkerGraphVertexId, vertex_descriptor>& vertexMap);
-
     void removeLowCoverageVertices(uint64_t minVertexCoverage);
     void removeVertex(vertex_descriptor);
+    void splitVertices(int64_t maxBaseSkip);
 };
 
 #endif
