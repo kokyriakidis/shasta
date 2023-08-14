@@ -246,6 +246,11 @@ private:
     // Remove all vertices in non-trivial strongly connected components.
     void removeStrongComponents();
 
+    // The assembly path, including edgeIdA at the beginning
+    // and edgeIdB at the end.
+    vector<edge_descriptor> assemblyPath;
+    void findAssemblyPath();
+
 
     // Output.
     void approximateTopologicalSort();

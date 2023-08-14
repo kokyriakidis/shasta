@@ -80,6 +80,8 @@ PathFiller2::PathFiller2(
     removeAllEdges();
     createEdges();
 
+    findAssemblyPath();
+
     // Display the graph.
     if(html and options.showGraph) {
         html << "<h2>Assembly graph</h2>";
@@ -92,6 +94,7 @@ PathFiller2::PathFiller2(
         vertexCoverageHistogram();
         edgeCoverageHistogram();
     }
+
 }
 
 
@@ -789,6 +792,10 @@ void PathFiller2::writeGraphviz(ostream& out) const
     const double S = 0.7;
     const double V = 1.;
 
+    // Gather assembly path edges.
+    vector<edge_descriptor> sortedAssemblyPathEdges = assemblyPath;
+    sort(sortedAssemblyPathEdges.begin(), sortedAssemblyPathEdges.end());
+
 
     out <<
         "digraph PathFiller2 {\n"
@@ -865,6 +872,15 @@ void PathFiller2::writeGraphviz(ostream& out) const
         if(not edge.isDagEdge) {
             out << " constraint=false";
         }
+
+        // If we have an assembly path and this edge is not on the assembly path,
+        // draw it dashed.
+        if(not assemblyPath.empty()) {
+            if(not std::binary_search(sortedAssemblyPathEdges.begin(), sortedAssemblyPathEdges.end(), e)) {
+                out << " style=dashed";
+            }
+        }
+
         out << "];\n";
 
     }
@@ -1038,5 +1054,64 @@ void PathFiller2::removeStrongComponents()
             "<br>The graph has now " << num_vertices(graph) <<
             " vertices.";
 
+    }
+}
+
+
+
+void PathFiller2::findAssemblyPath()
+{
+    const PathFiller2& graph = *this;
+    assemblyPath.clear();
+
+
+    // Find the first and last vertex of the path we are looking for.
+    const MarkerGraph::Edge& edgeA = assembler.markerGraph.edges[edgeIdA];
+    const MarkerGraph::Edge& edgeB = assembler.markerGraph.edges[edgeIdB];
+    const MarkerGraphVertexId vertexIdA0 = edgeA.source;
+    const MarkerGraphVertexId vertexIdB1 = edgeB.target;
+    vertex_descriptor vA = null_vertex();
+    vertex_descriptor vB = null_vertex();
+    BGL_FORALL_VERTICES(v, graph, PathFiller2) {
+        const PathFiller2Vertex& vertex = graph[v];
+        if(vertex.vertexId == vertexIdA0) {
+            SHASTA_ASSERT(vertex.replicaIndex == 0);
+            SHASTA_ASSERT(vA == null_vertex());
+            vA = v;
+        }
+        if(vertex.vertexId == vertexIdB1) {
+            SHASTA_ASSERT(vertex.replicaIndex == 0);
+            SHASTA_ASSERT(vB == null_vertex());
+            vB = v;
+        }
+    }
+
+
+    // Main iteration loop.
+    vertex_descriptor v = vA;
+    while(v != vB) {
+
+        // Find the edge with the most coverage.
+        edge_descriptor eNext;
+        uint64_t bestCoverage = 0;
+        BGL_FORALL_OUTEDGES(v, e, graph, PathFiller2) {
+            const uint64_t coverage = graph[e].coverage();
+            if(coverage > bestCoverage) {
+                eNext = e;
+                bestCoverage = coverage;
+            }
+        }
+        SHASTA_ASSERT(bestCoverage > 0);
+
+        // Store this edge.
+        assemblyPath.push_back(eNext);
+        v = target(eNext, graph);
+    }
+
+    // As constructed, the assemblyPath includes edgeIdA and edgeIB.
+    SHASTA_ASSERT(assemblyPath.size() >= 2);
+
+    if(html and options.showDebugInformation) {
+        html << "<br>The assembly path has " << assemblyPath.size() << " edges.";
     }
 }
