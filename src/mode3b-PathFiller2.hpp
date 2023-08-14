@@ -131,6 +131,12 @@ private:
     const PathFiller2DisplayOptions& options;
     ostream& html;
 
+    // The vertices of edgeIdA and edgeIdB.
+    MarkerGraphVertexId vertexIdA0;
+    MarkerGraphVertexId vertexIdA1;
+    MarkerGraphVertexId vertexIdB0;
+    MarkerGraphVertexId vertexIdB1;
+
     void checkAssumptions() const;
 
 

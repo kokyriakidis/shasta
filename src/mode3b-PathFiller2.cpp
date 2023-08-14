@@ -46,6 +46,13 @@ PathFiller2::PathFiller2(
     // Control vertex splitting.
     const int64_t maxBaseSkip = 300;
 
+    // Store the vertices of edgeIdA and edgeIdB.
+    const MarkerGraph::Edge& edgeA = assembler.markerGraph.edges[edgeIdA];
+    const MarkerGraph::Edge& edgeB = assembler.markerGraph.edges[edgeIdB];
+    vertexIdA0 = edgeA.source;
+    vertexIdA1 = edgeA.target;
+    vertexIdB0 = edgeB.source;
+    vertexIdB1 = edgeB.target;
 
 
     // Oriented reads.
@@ -122,12 +129,6 @@ void PathFiller2::checkAssumptions() const
     }
 
     // Neither can their source and target vertices.
-    const MarkerGraph::Edge& edgeA = markerGraph.edges[edgeIdA];
-    const MarkerGraph::Edge& edgeB = markerGraph.edges[edgeIdB];
-    const MarkerGraphVertexId vertexIdA0 = edgeA.source;
-    const MarkerGraphVertexId vertexIdA1 = edgeA.target;
-    const MarkerGraphVertexId vertexIdB0 = edgeB.source;
-    const MarkerGraphVertexId vertexIdB1 = edgeB.target;
     if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdA0, markers)) {
         throw runtime_error("Duplicated oriented read on source vertex of edgeIdA.");
     }
@@ -515,10 +516,6 @@ void PathFiller2::splitVertices(int64_t maxBaseSkip)
 
     PathFiller2& graph = *this;
 
-    // The vertices of edgeIdA and edgeIdB should not be split.
-    const MarkerGraph::Edge& edgeA = assembler.markerGraph.edges[edgeIdA];
-    const MarkerGraph::Edge& edgeB = assembler.markerGraph.edges[edgeIdB];
-
     // Gather the vertices we have now so we can safely iterate over them.
     vector<vertex_descriptor> initialVertices;
     BGL_FORALL_VERTICES(v, graph, PathFiller2) {
@@ -548,10 +545,10 @@ void PathFiller2::splitVertices(int64_t maxBaseSkip)
 
         // If this is a vertex of edgeIdA or edgeIdB, don't split it.
         const MarkerGraphVertexId vertexId = vertex.vertexId;
-        if( vertexId == edgeA.source or
-            vertexId == edgeA.target or
-            vertexId == edgeB.source or
-            vertexId == edgeB.target
+        if( vertexId == vertexIdA0 or
+            vertexId == vertexIdA1 or
+            vertexId == vertexIdB0 or
+            vertexId == vertexIdB1
             ) {
             continue;
         }
@@ -1090,10 +1087,6 @@ void PathFiller2::findAssemblyPath()
 
 
     // Find the first and last vertex of the path we are looking for.
-    const MarkerGraph::Edge& edgeA = assembler.markerGraph.edges[edgeIdA];
-    const MarkerGraph::Edge& edgeB = assembler.markerGraph.edges[edgeIdB];
-    const MarkerGraphVertexId vertexIdA0 = edgeA.source;
-    const MarkerGraphVertexId vertexIdB1 = edgeB.target;
     vertex_descriptor vA = null_vertex();
     vertex_descriptor vB = null_vertex();
     BGL_FORALL_VERTICES(v, graph, PathFiller2) {
