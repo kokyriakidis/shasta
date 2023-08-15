@@ -97,8 +97,8 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         writeSeedChainsDetails();
         writeSeedChainsStatistics();
 
-        ofstream fasta("SeedChains.fasta");
-        assembleChains(seedChains, fasta);
+        // ofstream fasta("SeedChains.fasta");
+        // assembleChains(seedChains, fasta);
     }
 
 
@@ -146,8 +146,8 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         createChainsFromComponents(minEstimatedLength, chains);
         cout << "Found " << chains.size() << " chains." << endl;
 
-        ofstream fasta("Chains.fasta");
-        assembleChains(chains, fasta);
+        // ofstream fasta("Chains.fasta");
+        // assembleChains(chains, fasta);
     }
 
 }
@@ -1120,11 +1120,17 @@ void GlobalPathGraph1::connectSeedChains1(
 
     // Loop over chains.
     for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
+        const bool debug = false; // (chainId == 16);
 
-        // cout << "Working on chain " << chainId << endl;
+        if(debug) {
+            cout << "Working on chain " << chainId << endl;
+        }
         const Chain& chain = seedChains[chainId];
         const uint64_t chainLastVertexId = chain.vertexIds.back();
-        // cout << "Last vertex of chain " <<  vertices[chainLastVertexId].edgeId << " is starting vertex for search." << endl;
+        if(debug) {
+            cout << "Last vertex of chain " <<  vertices[chainLastVertexId].edgeId <<
+                " is starting vertex for search." << endl;
+        }
 
         // Start the Dijkstra algorithm with this as the only seen vertex.
         VertexContainer seen;
@@ -1143,14 +1149,18 @@ void GlobalPathGraph1::connectSeedChains1(
             VertexInfo v0 = *it;
             visited.insert(*it);
             seenByDistance.erase(it);
-            // cout << "Visiting " << vertices[v0.vertexId].edgeId << endl;
+            if(debug) {
+                cout << "Visiting " << vertices[v0.vertexId].edgeId << endl;
+            }
 
             // If it belongs to a different chain, we are done.
             // Create a new connector.
             const uint64_t chainId0 = vertices[v0.vertexId].chainId;
             if(chainId0 != invalid<uint64_t> and chainId0 != chainId) {
-                // cout << vertices[v0.vertexId].edgeId << " is on chain " << chainId0 <<
-                //     " at distance " << v0.distance << endl;
+                if(debug) {
+                    cout << vertices[v0.vertexId].edgeId << " is on chain " << chainId0 <<
+                        " at distance " << v0.distance << endl;
+                }
                 out << chainId << "->" << chainId0 << ";\n";
 
                 // To construct the connector between these two chains,
@@ -1181,9 +1191,13 @@ void GlobalPathGraph1::connectSeedChains1(
             // Loop over the unvisited children.
             for(const auto& child: children) {
                 const uint64_t vertexId1 = child.first;
-                // cout << "Found child " << vertices[vertexId1].edgeId << endl;
+                if(debug) {
+                    cout << "Found child " << vertices[vertexId1].edgeId << endl;
+                }
                 if(visitedById.find(vertexId1) != visitedById.end()) {
-                    // cout << "Already visited." << endl;
+                    if(debug) {
+                        cout << "Already visited." << endl;
+                    }
                     continue;
                 }
 
