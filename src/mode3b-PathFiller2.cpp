@@ -46,13 +46,11 @@ PathFiller2::PathFiller2(
     // Control vertex splitting.
     const int64_t maxBaseSkip = 300;
 
-    // Store the vertices of edgeIdA and edgeIdB.
+    // Store the source target of edgeIdA and the source vertex of edgeIdB.
     const MarkerGraph::Edge& edgeA = assembler.markerGraph.edges[edgeIdA];
     const MarkerGraph::Edge& edgeB = assembler.markerGraph.edges[edgeIdB];
-    vertexIdA0 = edgeA.source;
-    vertexIdA1 = edgeA.target;
-    vertexIdB0 = edgeB.source;
-    vertexIdB1 = edgeB.target;
+    vertexIdA = edgeA.target;
+    vertexIdB = edgeB.source;
 
 
     // Oriented reads.
@@ -90,7 +88,7 @@ PathFiller2::PathFiller2(
     // Write assembled sequence.
     if(html) {
         vector<Base> sequence;
-        getSequence(true, sequence);
+        getCompleteSequence(sequence);
 
         html <<
             "<h2>Assembled sequence</h2>"
@@ -129,17 +127,11 @@ void PathFiller2::checkAssumptions() const
     }
 
     // Neither can their source and target vertices.
-    if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdA0, markers)) {
-        throw runtime_error("Duplicated oriented read on source vertex of edgeIdA.");
-    }
-    if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdA1, markers)) {
+    if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdA, markers)) {
         throw runtime_error("Duplicated oriented read on target vertex of edgeIdA.");
     }
-    if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdB0, markers)) {
+    if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdB, markers)) {
         throw runtime_error("Duplicated oriented read on source vertex of edgeIdB.");
-    }
-    if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdB1, markers)) {
-        throw runtime_error("Duplicated oriented read on target vertex of edgeIdB.");
     }
 }
 
@@ -171,15 +163,9 @@ void PathFiller2::gatherOrientedReads()
         const uint64_t i = getOrientedReadIndex(orientedReadId);
         OrientedReadInfo& info = orientedReadInfos[i];
 
-        const uint32_t ordinal0 = markerInterval.ordinals[0];
-        const MarkerId markerId0 = assembler.getMarkerId(orientedReadId, ordinal0);
-        info.ordinalAndPositionA0 = {ordinal0, assembler.markers.begin()[markerId0].position};
-
-        const uint32_t ordinal1 = markerInterval.ordinals[1];
-        const MarkerId markerId1 = assembler.getMarkerId(orientedReadId, ordinal1);
-        info.ordinalAndPositionA1 = {ordinal1, assembler.markers.begin()[markerId1].position};
-
-        SHASTA_ASSERT(ordinal1 == ordinal0 + 1);
+        const uint32_t ordinal = markerInterval.ordinals[1];    // Because vertexIdA is the target of edgeIdA
+        const MarkerId markerId = assembler.getMarkerId(orientedReadId, ordinal);
+        info.ordinalAndPositionA = {ordinal, assembler.markers.begin()[markerId].position};
     }
 
     // Fill in the OrdinalAndPositions of the oriented reads that appear in edgeIdB.
@@ -188,15 +174,9 @@ void PathFiller2::gatherOrientedReads()
         const uint64_t i = getOrientedReadIndex(orientedReadId);
         OrientedReadInfo& info = orientedReadInfos[i];
 
-        const uint32_t ordinal0 = markerInterval.ordinals[0];
-        const MarkerId markerId0 = assembler.getMarkerId(orientedReadId, ordinal0);
-        info.ordinalAndPositionB0 = {ordinal0, assembler.markers.begin()[markerId0].position};
-
-        const uint32_t ordinal1 = markerInterval.ordinals[1];
-        const MarkerId markerId1 = assembler.getMarkerId(orientedReadId, ordinal1);
-        info.ordinalAndPositionB1 = {ordinal1, assembler.markers.begin()[markerId1].position};
-
-        SHASTA_ASSERT(ordinal1 == ordinal0 + 1);
+        const uint32_t ordinal = markerInterval.ordinals[0];    // Because vertexIdB is the source of edgeIdB
+        const MarkerId markerId = assembler.getMarkerId(orientedReadId, ordinal);
+        info.ordinalAndPositionB = {ordinal, assembler.markers.begin()[markerId].position};
     }
 }
 
@@ -214,16 +194,12 @@ void PathFiller2::writeOrientedReads() const
         "<tr>"
         "<th>Index"
         "<th>Oriented<br>read"
-        "<th>OrdinalA0"
-        "<th>OrdinalA1"
-        "<th>OrdinalB0"
-        "<th>OrdinalB1"
+        "<th>OrdinalA"
+        "<th>OrdinalB"
         "<th>Ordinal<br>offset"
-        "<th>PositionA0"
-        "<th>PositionA1"
-        "<th>PositionB0"
-        "<th>PositionB1"
-        "<th>Position<br>offset"
+        "<th>PositionA"
+        "<th>PositionB"
+         "<th>Position<br>offset"
         ;
 
     for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
@@ -236,21 +212,12 @@ void PathFiller2::writeOrientedReads() const
 
         html << "<td class=centered>";
         if(info.isOnA()) {
-            html << info.ordinalAndPositionA0.ordinal;
-        }
-
-        html << "<td class=centered>";
-        if(info.isOnA()) {
-            html << info.ordinalAndPositionA1.ordinal;
-        }
-        html << "<td class=centered>";
-        if(info.isOnB()) {
-            html << info.ordinalAndPositionB0.ordinal;
+            html << info.ordinalAndPositionA.ordinal;
         }
 
         html << "<td class=centered>";
         if(info.isOnB()) {
-            html << info.ordinalAndPositionB1.ordinal;
+            html << info.ordinalAndPositionB.ordinal;
         }
 
         html << "<td class=centered>";
@@ -260,21 +227,12 @@ void PathFiller2::writeOrientedReads() const
 
         html << "<td class=centered>";
         if(info.isOnA()) {
-            html << info.ordinalAndPositionA0.position;
-        }
-
-        html << "<td class=centered>";
-        if(info.isOnA()) {
-            html << info.ordinalAndPositionA1.position;
-        }
-        html << "<td class=centered>";
-        if(info.isOnB()) {
-            html << info.ordinalAndPositionB0.position;
+            html << info.ordinalAndPositionA.position;
         }
 
         html << "<td class=centered>";
         if(info.isOnB()) {
-            html << info.ordinalAndPositionB1.position;
+            html << info.ordinalAndPositionB.position;
         }
 
         html << "<td class=centered>";
@@ -317,10 +275,10 @@ void PathFiller2::estimateOffset()
             sum += info.positionOffset();
         }
     }
-    estimatedA0B1Offset = int64_t(std::round(double(sum) / double(n)));
+    estimatedABOffset = int64_t(std::round(double(sum) / double(n)));
 
     if(html and options.showDebugInformation) {
-        html << "<br>Estimated offset is " << estimatedA0B1Offset << " bases.";
+        html << "<br>Estimated offset is " << estimatedABOffset << " bases.";
     }
 }
 
@@ -330,7 +288,7 @@ void PathFiller2::estimateOffset()
 void PathFiller2::createVertices(double estimatedOffsetRatio)
 {
     PathFiller2& graph = *this;
-    const int64_t offsetThreshold = int64_t(estimatedOffsetRatio * double(estimatedA0B1Offset));
+    const int64_t offsetThreshold = int64_t(estimatedOffsetRatio * double(estimatedABOffset));
 
     // During this phase there is at most one vertex corresponding to
     // each marker graph vertex.
@@ -345,8 +303,8 @@ void PathFiller2::createVertices(double estimatedOffsetRatio)
 
         // Oriented reads that appear on both edgeIdA and edgeIdB.
         if(info.isOnA() and info.isOnB()) {
-            info.firstOrdinal = info.ordinalAndPositionA0.ordinal;
-            info.lastOrdinal =  info.ordinalAndPositionB1.ordinal;
+            info.firstOrdinal = info.ordinalAndPositionA.ordinal;
+            info.lastOrdinal =  info.ordinalAndPositionB.ordinal;
             for(int64_t ordinal=info.firstOrdinal; ordinal<=info.lastOrdinal; ordinal++) {
                 createVerticesHelper(i, ordinal, vertexMap);
             }
@@ -354,8 +312,8 @@ void PathFiller2::createVertices(double estimatedOffsetRatio)
 
         // Oriented reads that appear on edgeIdA but not on edgeIdB.
         else if(info.isOnA() and not info.isOnB()) {
-            info.firstOrdinal = info.ordinalAndPositionA0.ordinal;
-            const int64_t maxPosition = info.ordinalAndPositionA1.position + offsetThreshold;
+            info.firstOrdinal = info.ordinalAndPositionA.ordinal;
+            const int64_t maxPosition = info.ordinalAndPositionA.position + offsetThreshold;
             const int64_t markerCount = int64_t(assembler.markers.size(orientedReadId.getValue()));
             for(int64_t ordinal=info.firstOrdinal; ordinal<markerCount; ordinal++) {
                 const MarkerId markerId = assembler.getMarkerId(orientedReadId, uint32_t(ordinal));
@@ -370,8 +328,8 @@ void PathFiller2::createVertices(double estimatedOffsetRatio)
 
         // Oriented reads that appear on edgeIdB but not on edgeIdA.
         else if(info.isOnB() and not info.isOnA()) {
-            info.lastOrdinal = info.ordinalAndPositionB1.ordinal;
-            const int64_t minPosition = info.ordinalAndPositionB0.position - offsetThreshold;
+            info.lastOrdinal = info.ordinalAndPositionB.ordinal;
+            const int64_t minPosition = info.ordinalAndPositionB.position - offsetThreshold;
             for(int64_t ordinal=info.lastOrdinal; ordinal>=0; ordinal--) {
                 const MarkerId markerId = assembler.getMarkerId(orientedReadId, uint32_t(ordinal));
                 const int64_t position = int64_t(assembler.markers.begin()[markerId].position);
@@ -543,13 +501,10 @@ void PathFiller2::splitVertices(int64_t maxBaseSkip)
         const PathFiller2Vertex& vertex = graph[v];
         SHASTA_ASSERT(vertex.ordinals.size() == orientedReadInfos.size());
 
-        // If this is a vertex of edgeIdA or edgeIdB, don't split it.
+        // Don't split vertexIdA or vertexIdB
         const MarkerGraphVertexId vertexId = vertex.vertexId;
-        if( vertexId == vertexIdA0 or
-            vertexId == vertexIdA1 or
-            vertexId == vertexIdB0 or
-            vertexId == vertexIdB1
-            ) {
+        if( vertexId == vertexIdA or
+            vertexId == vertexIdB) {
             continue;
         }
 
@@ -572,21 +527,21 @@ void PathFiller2::splitVertices(int64_t maxBaseSkip)
                 if(info.isOnA() and info.isOnB()) {
 
                     // Base offsets from A0 and to B1.
-                    const int64_t offsetFromA0 = position - info.ordinalAndPositionA0.position;
-                    const int64_t offsetToB1 = info.ordinalAndPositionB1.position - position;
+                    const int64_t offsetFromA = position - info.ordinalAndPositionA.position;
+                    const int64_t offsetToB = info.ordinalAndPositionB.position - position;
 
                     // Average both estimates.
-                    ordinalInfo.estimatedOffset = (offsetFromA0 + estimatedA0B1Offset - offsetToB1) / 2;
+                    ordinalInfo.estimatedOffset = (offsetFromA + estimatedABOffset - offsetToB) / 2;
 
                 } else if(info.isOnA() and not info.isOnB()) {
 
-                    const int64_t offsetFromA0 = position - info.ordinalAndPositionA0.position;
-                    ordinalInfo.estimatedOffset = offsetFromA0;
+                    const int64_t offsetFromA = position - info.ordinalAndPositionA.position;
+                    ordinalInfo.estimatedOffset = offsetFromA;
 
                 } else if(info.isOnB() and not info.isOnA()) {
 
-                    const int64_t offsetToB1 = info.ordinalAndPositionB1.position - position;
-                    ordinalInfo.estimatedOffset = estimatedA0B1Offset - offsetToB1;
+                    const int64_t offsetToB = info.ordinalAndPositionB.position - position;
+                    ordinalInfo.estimatedOffset = estimatedABOffset - offsetToB;
 
                 } else {
                     SHASTA_ASSERT(0);
@@ -845,6 +800,12 @@ void PathFiller2::writeGraphviz(ostream& out) const
         if(options.showVertexLabels) {
             out << " label=\"" << vertex.stringId() << "\\n" << vertex.coverage() << "\"";
         }
+        if(vertex.vertexId == vertexIdA) {
+            out << "style=filled fillcolor=lightgreen";
+        }
+        if(vertex.vertexId == vertexIdB) {
+            out << "style=filled fillcolor=pink";
+        }
         out << "];\n";
     }
 
@@ -1060,9 +1021,14 @@ void PathFiller2::removeStrongComponents()
         }
 
         // If non-trivial, remove all of its vertices.
+        // But don't remove vertexIdA or vertexIdB.
         if(isNonTrivial) {
             for(const vertex_descriptor v: p.second) {
-                removeVertex(v);
+                const PathFiller2Vertex& vertex = graph[v];
+                if(vertex.vertexId == vertexIdA or vertex.vertexId == vertexIdB) {
+                    continue;
+                }
+                 removeVertex(v);
                 ++removedCount;
             }
         }
@@ -1091,12 +1057,12 @@ void PathFiller2::findAssemblyPath()
     vertex_descriptor vB = null_vertex();
     BGL_FORALL_VERTICES(v, graph, PathFiller2) {
         const PathFiller2Vertex& vertex = graph[v];
-        if(vertex.vertexId == vertexIdA0) {
+        if(vertex.vertexId == vertexIdA) {
             SHASTA_ASSERT(vertex.replicaIndex == 0);
             SHASTA_ASSERT(vA == null_vertex());
             vA = v;
         }
-        if(vertex.vertexId == vertexIdB1) {
+        if(vertex.vertexId == vertexIdB) {
             SHASTA_ASSERT(vertex.replicaIndex == 0);
             SHASTA_ASSERT(vB == null_vertex());
             vB = v;
@@ -1126,9 +1092,6 @@ void PathFiller2::findAssemblyPath()
         assemblyPath.push_back(eNext);
         v = target(eNext, graph);
     }
-
-    // As constructed, the assemblyPath includes edgeIdA and edgeIB.
-    SHASTA_ASSERT(assemblyPath.size() >= 2);
 
     if(html and options.showDebugInformation) {
         html << "<br>The assembly path has " << assemblyPath.size() << " edges.";
@@ -1239,20 +1202,39 @@ void PathFiller2::assembleEdge(edge_descriptor e)
 
 
 
-void PathFiller2::getSequence(
-    bool includeFirstAndLastEdge,
+// Get the sequence between edgeIdA and edgeIdB.
+// This does not include the sequences od edgeIdA and edgeIdB themselves.
+void PathFiller2::getSecondarySequence(
     vector<Base>& sequence) const
 {
-    SHASTA_ASSERT(assemblyPath.size() >= 2);
     const PathFiller2& graph = *this;
 
-    const uint64_t begin = includeFirstAndLastEdge ? 0 : 1;
-    const uint64_t end = includeFirstAndLastEdge ? assemblyPath.size() : (assemblyPath.size() - 1);
-
     sequence.clear();
-    for(uint64_t i=begin; i!=end; ++i) {
-        const edge_descriptor e = assemblyPath[i];
+    for(const edge_descriptor e: assemblyPath) {
         const vector<Base>& edgeSequence = graph[e].sequence;
         copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
     }
 }
+
+
+// Get the complete sequence, including the sequences of edgeIdA and edgeIdB.
+void PathFiller2::getCompleteSequence(vector<Base>& sequence) const
+{
+    SHASTA_ASSERT(assemblyPath.size() >= 2);
+    const PathFiller2& graph = *this;
+
+    sequence.clear();
+
+    const auto edgeASequence = assembler.markerGraph.edgeSequence[edgeIdA];
+    copy(edgeASequence.begin(), edgeASequence.end(), back_inserter(sequence));
+
+    for(const edge_descriptor e: assemblyPath) {
+        const vector<Base>& edgeSequence = graph[e].sequence;
+        copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
+    }
+
+    const auto edgeBSequence = assembler.markerGraph.edgeSequence[edgeIdB];
+    copy(edgeBSequence.begin(), edgeBSequence.end(), back_inserter(sequence));
+
+}
+

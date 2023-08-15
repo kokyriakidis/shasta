@@ -142,7 +142,7 @@ void AssemblyPath::assemble()
         pathFiller.getSecondarySequence(step.sequence);
 #else
         PathFiller2 pathFiller(assembler, edgeIdA, edgeIdB, html);
-        pathFiller.getSequence(false, step.sequence);
+        pathFiller.getSecondarySequence(step.sequence);
 #endif
         // cout << "Coverage " << pathFiller.coverage() << " , assembled length " << step.sequence.size() << endl;
     }

@@ -118,8 +118,13 @@ public:
         MarkerGraphEdgeId edgeIdB,
         const PathFiller2DisplayOptions&);
 
-    void getSequence(
-        bool includeFirstAndLastEdge,
+    // Get the sequence between edgeIdA and edgeIdB.
+    // This does not include the sequences od edgeIdA and edgeIdB themselves.
+    void getSecondarySequence(
+        vector<Base>&) const;
+
+    // Get the complete sequence, including the sequences of edgeIdA and edgeIdB.
+    void getCompleteSequence(
         vector<Base>&) const;
 
 private:
@@ -131,11 +136,10 @@ private:
     const PathFiller2DisplayOptions& options;
     ostream& html;
 
-    // The vertices of edgeIdA and edgeIdB.
-    MarkerGraphVertexId vertexIdA0;
-    MarkerGraphVertexId vertexIdA1;
-    MarkerGraphVertexId vertexIdB0;
-    MarkerGraphVertexId vertexIdB1;
+    // The assembly path will start at the target vertex of edgeIdA and
+    // end at the source vertex of edgeIdB. Store their vertex ids.
+    MarkerGraphVertexId vertexIdA;      // Target vertex of edgeIdA
+    MarkerGraphVertexId vertexIdB;      // Source vertex of edgeIdB
 
     void checkAssumptions() const;
 
@@ -164,22 +168,20 @@ private:
             orientedReadId(orientedReadId)
             {}
 
-        // The position of the source and target vertex of edgeIdA in this oriented read.
-        // If this oriented read does not appear in edgeIdA, these are left uninitialized.
-        OrdinalAndPosition ordinalAndPositionA0;
-        OrdinalAndPosition ordinalAndPositionA1;
+        // The position of vertexIdA in this oriented read.
+        // If this oriented read does not appear in edgeIdA, this is left uninitialized.
+        OrdinalAndPosition ordinalAndPositionA;
         bool isOnA() const
         {
-            return ordinalAndPositionA0.isValid();
+            return ordinalAndPositionA.isValid();
         }
 
-        // The position of the source and target vertex of edgeIdB in this oriented read.
+        // The position of vertexIdB in this oriented read.
         // If this oriented read does not appear in edgeIdB, this is left uninitialized.
-        OrdinalAndPosition ordinalAndPositionB0;
-        OrdinalAndPosition ordinalAndPositionB1;
-        bool isOnB() const
+        OrdinalAndPosition ordinalAndPositionB;
+         bool isOnB() const
         {
-            return ordinalAndPositionB0.isValid();
+            return ordinalAndPositionB.isValid();
         }
 
         // Order by OrientedReadId.
@@ -193,18 +195,19 @@ private:
         int64_t ordinalOffset() const
         {
             SHASTA_ASSERT(isOnA() and isOnB());
-            return ordinalAndPositionB1.ordinal - ordinalAndPositionA0.ordinal;
+            return ordinalAndPositionB.ordinal - ordinalAndPositionA.ordinal;
         }
 
-        // The base offset between the source vertex of edgeIdA
-        // and the target vertex of edgeIdB.
+        // The base offset between the vertexIdA and vertexIdB.
         int64_t positionOffset() const
         {
             SHASTA_ASSERT(isOnA() and isOnB());
-            return ordinalAndPositionB1.position - ordinalAndPositionA0.position;
+            return ordinalAndPositionB.position - ordinalAndPositionA.position;
         }
 
         // The first and last ordinals of this oriented read used for this assembly.
+        // For reads on edgeIdA, firstOrdinal equals ordinalAndPositionA.ordinal.
+        // For reads on edgeIdB, lastOrdinal equals ordinalAndPositionB.ordinal.
         int64_t firstOrdinal;
         int64_t lastOrdinal;
 
@@ -237,11 +240,10 @@ private:
     // The index of an OrientedReadId is its index in the orientedReadInfos vector.
     uint64_t getOrientedReadIndex(OrientedReadId) const;
 
-    // Estimated offset in bases between the source vertex of edgeIdA
-    // and the target vertex of edgeIdB.
+    // Estimated offset in bases between vertexIdA and vertexIdB.
     // The estimate is done using the oriented reads that appear
     // both in edgeIdA and edgeIdB.
-    int64_t estimatedA0B1Offset;
+    int64_t estimatedABOffset;
     void estimateOffset();
 
     // Vertex creation.
