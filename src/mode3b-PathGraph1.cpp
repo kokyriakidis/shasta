@@ -91,6 +91,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         // Only keep the ones that are long enough.
         // Minimum estimated length is in bases.
         const uint64_t minEstimatedLength = 10000;
+        cout << "Creating seed chains." << endl;
         createChainsFromComponents(minEstimatedLength, seedChains);
         cout << "Found " << seedChains.size() << " seed chains." << endl;
         writeSeedChains();
@@ -143,6 +144,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
 
         vector<Chain> chains;
         const uint64_t minEstimatedLength = 10000;
+        cout << "Creating chains." << endl;
         createChainsFromComponents(minEstimatedLength, chains);
         cout << "Found " << chains.size() << " chains." << endl;
 
@@ -797,6 +799,7 @@ void GlobalPathGraph1::createChainsFromComponents(
 
         // Store this chain as a new chain.
         const uint64_t chainId = chains.size();
+        cout << "Chain " << chainId << " base offset " << totalBaseOffset << endl;
         chains.push_back(chain);
         for(uint64_t position=0; position<chain.vertexIds.size(); position++) {
             const uint64_t vertexId = chain.vertexIds[position];
@@ -1077,6 +1080,40 @@ void GlobalPathGraph1::connectSeedChains1(
     vector<ChainConnector>& connectors
     )
 {
+
+    ofstream out("SeedChains.dot");
+    out << "digraph SeedChains {\n";
+
+    connectors.clear();
+
+    // Loop over chains.
+    for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
+        connectSeedChain1(chainId, minEdgeCoverage, minCorrectedJaccard, connectors, out);
+    }
+    out << "}\n";
+}
+
+
+
+void GlobalPathGraph1::connectSeedChain1(
+    uint64_t chainId,
+    uint64_t minEdgeCoverage,
+    double minCorrectedJaccard,
+    vector<ChainConnector>& connectors,
+    ostream& out
+    )
+{
+    const bool debug = false; // (chainId == 16);
+
+    if(debug) {
+        cout << "Working on chain " << chainId << endl;
+    }
+    const Chain& chain = seedChains[chainId];
+    const uint64_t chainLastVertexId = chain.vertexIds.back();
+    if(debug) {
+        cout << "Last vertex of chain " <<  vertices[chainLastVertexId].edgeId <<
+            " is starting vertex for search." << endl;
+    }
     using boost::multi_index_container;
     using boost::multi_index::indexed_by;
     using boost::multi_index::member;
@@ -1099,8 +1136,6 @@ void GlobalPathGraph1::connectSeedChains1(
         MarkerGraphEdgePairInfo info;
     };
 
-
-
     // The container used to store VertexInfos,
     // with the two indices to support the required operations.
     using VertexContainer = multi_index_container<VertexInfo,
@@ -1113,118 +1148,96 @@ void GlobalPathGraph1::connectSeedChains1(
     // memory allocation activity.
     vector< pair<uint64_t, MarkerGraphEdgePairInfo> > children;
 
-    ofstream out("SeedChains.dot");
-    out << "digraph SeedChains {\n";
+    // Start the Dijkstra algorithm with this as the only seen vertex.
+    VertexContainer seen;
+    const auto& seenById = seen.get<0>();
+    auto& seenByDistance = seen.get<1>();   // Not const so we can erase by distance.
+    seen.insert({chainLastVertexId, 0, invalid<uint64_t>, MarkerGraphEdgePairInfo()});
 
-    connectors.clear();
+    VertexContainer visited;
+    const auto& visitedById = visited.get<0>();
 
-    // Loop over chains.
-    for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
-        const bool debug = false; // (chainId == 16);
+    // Dijkstra loop.
+    while(not seen.empty()) {
 
+        // Visit the vertex with the lowest distance.
+        auto it = seenByDistance.begin();
+        VertexInfo v0 = *it;
+        visited.insert(*it);
+        seenByDistance.erase(it);
         if(debug) {
-            cout << "Working on chain " << chainId << endl;
-        }
-        const Chain& chain = seedChains[chainId];
-        const uint64_t chainLastVertexId = chain.vertexIds.back();
-        if(debug) {
-            cout << "Last vertex of chain " <<  vertices[chainLastVertexId].edgeId <<
-                " is starting vertex for search." << endl;
+            cout << "Visiting " << vertices[v0.vertexId].edgeId << endl;
         }
 
-        // Start the Dijkstra algorithm with this as the only seen vertex.
-        VertexContainer seen;
-        const auto& seenById = seen.get<0>();
-        auto& seenByDistance = seen.get<1>();   // Not const so we can erase by distance.
-        seen.insert({chainLastVertexId, 0, invalid<uint64_t>, MarkerGraphEdgePairInfo()});
-
-        VertexContainer visited;
-        const auto& visitedById = visited.get<0>();
-
-        // Dijkstra loop.
-        while(not seen.empty()) {
-
-            // Visit the vertex with the lowest distance.
-            auto it = seenByDistance.begin();
-            VertexInfo v0 = *it;
-            visited.insert(*it);
-            seenByDistance.erase(it);
+        // If it belongs to a different chain, we are done.
+        // Create a new connector.
+        const uint64_t chainId0 = vertices[v0.vertexId].chainId;
+        if(chainId0 != invalid<uint64_t> and chainId0 != chainId) {
             if(debug) {
-                cout << "Visiting " << vertices[v0.vertexId].edgeId << endl;
+                cout << vertices[v0.vertexId].edgeId << " is on chain " << chainId0 <<
+                    " at distance " << v0.distance << endl;
             }
+            out << chainId << "->" << chainId0 << ";\n";
 
-            // If it belongs to a different chain, we are done.
-            // Create a new connector.
-            const uint64_t chainId0 = vertices[v0.vertexId].chainId;
-            if(chainId0 != invalid<uint64_t> and chainId0 != chainId) {
-                if(debug) {
-                    cout << vertices[v0.vertexId].edgeId << " is on chain " << chainId0 <<
-                        " at distance " << v0.distance << endl;
+            // To construct the connector between these two chains,
+            // walk back.
+            connectors.resize(connectors.size() + 1);
+            ChainConnector& connector = connectors.back();
+            connector.chainId0 = chainId;
+            connector.chainId1 = chainId0;
+            uint64_t vertexId = v0.vertexId;
+            while(true) {
+                connector.vertexIds.push_back(vertexId);
+                if(vertexId == chainLastVertexId) {
+                    break;
                 }
-                out << chainId << "->" << chainId0 << ";\n";
-
-                // To construct the connector between these two chains,
-                // walk back.
-                connectors.resize(connectors.size() + 1);
-                ChainConnector& connector = connectors.back();
-                connector.chainId0 = chainId;
-                connector.chainId1 = chainId0;
-                uint64_t vertexId = v0.vertexId;
-                while(true) {
-                    connector.vertexIds.push_back(vertexId);
-                    if(vertexId == chainLastVertexId) {
-                        break;
-                    }
-                    const auto it = visitedById.find(vertexId);
-                    SHASTA_ASSERT(it != visitedById.end());
-                    const VertexInfo& vertexInfo = *it;
-                    connector.infos.push_back(vertexInfo.info);
-                    vertexId = vertexInfo.parent;
-                }
-                connector.reverse();
-                break;
+                const auto it = visitedById.find(vertexId);
+                SHASTA_ASSERT(it != visitedById.end());
+                const VertexInfo& vertexInfo = *it;
+                connector.infos.push_back(vertexInfo.info);
+                vertexId = vertexInfo.parent;
             }
-
-            // Find its children.
-            findChildren(v0.vertexId, minEdgeCoverage, minCorrectedJaccard, children);
-
-            // Loop over the unvisited children.
-            for(const auto& child: children) {
-                const uint64_t vertexId1 = child.first;
-                if(debug) {
-                    cout << "Found child " << vertices[vertexId1].edgeId << endl;
-                }
-                if(visitedById.find(vertexId1) != visitedById.end()) {
-                    if(debug) {
-                        cout << "Already visited." << endl;
-                    }
-                    continue;
-                }
-
-                const MarkerGraphEdgePairInfo& info = child.second;
-                SHASTA_ASSERT(info.offsetInBases > 0);
-
-                // Update the tentative distance of the child,
-                // adding it to the seenVertices if not present.
-                auto it = seenById.find(vertexId1);
-                const uint64_t distance1 = v0.distance + info.offsetInBases;
-                if(it == seenById.end()) {
-                    seen.insert({vertexId1, distance1, v0.vertexId, info});
-                } else {
-                    VertexInfo seenVertex1 = *it;
-                    if(distance1 < seenVertex1.distance) {
-                        seenVertex1.distance = distance1;
-                        seenVertex1.parent = v0.vertexId;
-                        seenVertex1.info = info;
-                        seen.replace(it, seenVertex1);
-                    }
-                }
-
-            }
+            connector.reverse();
+            break;
         }
 
+        // Find its children.
+        findChildren(v0.vertexId, minEdgeCoverage, minCorrectedJaccard, children);
+
+        // Loop over the unvisited children.
+        for(const auto& child: children) {
+            const uint64_t vertexId1 = child.first;
+            if(debug) {
+                cout << "Found child " << vertices[vertexId1].edgeId << endl;
+            }
+            if(visitedById.find(vertexId1) != visitedById.end()) {
+                if(debug) {
+                    cout << "Already visited." << endl;
+                }
+                continue;
+            }
+
+            const MarkerGraphEdgePairInfo& info = child.second;
+            SHASTA_ASSERT(info.offsetInBases > 0);
+
+            // Update the tentative distance of the child,
+            // adding it to the seenVertices if not present.
+            auto it = seenById.find(vertexId1);
+            const uint64_t distance1 = v0.distance + info.offsetInBases;
+            if(it == seenById.end()) {
+                seen.insert({vertexId1, distance1, v0.vertexId, info});
+            } else {
+                VertexInfo seenVertex1 = *it;
+                if(distance1 < seenVertex1.distance) {
+                    seenVertex1.distance = distance1;
+                    seenVertex1.parent = v0.vertexId;
+                    seenVertex1.info = info;
+                    seen.replace(it, seenVertex1);
+                }
+            }
+
+        }
     }
-    out << "}\n";
 }
 
 

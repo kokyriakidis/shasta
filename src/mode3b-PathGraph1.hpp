@@ -267,6 +267,13 @@ private:
         double minCorrectedJaccard,
         vector<ChainConnector>&
         );
+    void connectSeedChain1(
+        uint64_t chainId,
+        uint64_t minEdgeCoverage,
+        double minCorrectedJaccard,
+        vector<ChainConnector>&,
+        ostream& out
+        );
 
     // Use the ChainConnectors to stitch together the seed chains.
     // The replaces the connected components with the connected
