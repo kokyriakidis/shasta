@@ -195,6 +195,11 @@ private:
         uint64_t minEdgeCoverage,
         double minCorrectedJaccard,
         vector< pair<uint64_t, MarkerGraphEdgePairInfo> >& children);
+    void findParents(
+        uint64_t vertexId0,
+        uint64_t minEdgeCoverage,
+        double minCorrectedJaccard,
+        vector< pair<uint64_t, MarkerGraphEdgePairInfo> >& parents);
 
     // The connected components of the GlobalPathGraph1.
     // Stored sorted by decreasing size, as measured by number of vertices.
@@ -269,6 +274,7 @@ private:
         );
     void connectSeedChain1(
         uint64_t chainId,
+        uint64_t direction, // 0 = forward, 1 = backward
         uint64_t minEdgeCoverage,
         double minCorrectedJaccard,
         vector<ChainConnector>&,

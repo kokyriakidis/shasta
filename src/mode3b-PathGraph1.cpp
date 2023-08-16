@@ -148,8 +148,8 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         createChainsFromComponents(minEstimatedLength, chains);
         cout << "Found " << chains.size() << " chains." << endl;
 
-        // ofstream fasta("Chains.fasta");
-        // assembleChains(chains, fasta);
+        ofstream fasta("Chains.fasta");
+        assembleChains(chains, fasta);
     }
 
 }
@@ -463,6 +463,46 @@ void GlobalPathGraph1::findChildren(
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
         if(info.correctedJaccard() >= minCorrectedJaccard) {
             children.push_back({vertexId1, info});
+        }
+    }
+}
+
+
+
+void GlobalPathGraph1::findParents(
+    uint64_t vertexId0,
+    uint64_t minEdgeCoverage,
+    double minCorrectedJaccard,
+    vector< pair<uint64_t, MarkerGraphEdgePairInfo> >& parents)
+{
+    const GlobalPathGraph1Vertex& vertex0 = vertices[vertexId0];
+    const MarkerGraphEdgeId edgeId0 = vertex0.edgeId;
+
+    // Find vertices encountered earlier on journeys that go through here.
+    vector<uint64_t> candidateParents;
+    for(const auto& journeyInfoItem: vertex0.journeyInfoItems) {
+        const OrientedReadId orientedReadId = journeyInfoItem.orientedReadId;
+        const auto& journey = orientedReadJourneys[orientedReadId.getValue()];
+        for(int64_t position = int64_t(journeyInfoItem.positionInJourney)-1;
+            position>=0; position--) {
+            candidateParents.push_back(journey[position].second);
+        }
+    }
+
+    // Count the candidate parents and only keep the ones
+    // that occurred at least minEdgeCoverage times.
+    vector<uint64_t> coverage;
+    deduplicateAndCountWithThreshold(candidateParents, coverage, minEdgeCoverage);
+
+    // Store the ones that have sufficient correctedJaccard.
+    parents.clear();
+    MarkerGraphEdgePairInfo info;
+    for(const uint64_t vertexId1: candidateParents) {
+        const GlobalPathGraph1Vertex& vertex1 = vertices[vertexId1];
+        const MarkerGraphEdgeId edgeId1 = vertex1.edgeId;
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId1, edgeId0, info));
+        if(info.correctedJaccard() >= minCorrectedJaccard) {
+            parents.push_back({vertexId1, info});
         }
     }
 }
@@ -1088,15 +1128,20 @@ void GlobalPathGraph1::connectSeedChains1(
 
     // Loop over chains.
     for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
-        connectSeedChain1(chainId, minEdgeCoverage, minCorrectedJaccard, connectors, out);
+        for(uint64_t direction=0; direction<2; direction++) {
+            connectSeedChain1(chainId, direction,
+                minEdgeCoverage, minCorrectedJaccard, connectors, out);
+        }
     }
     out << "}\n";
 }
 
 
 
+// Names here refer to direction=0 (forward).
 void GlobalPathGraph1::connectSeedChain1(
     uint64_t chainId,
+    uint64_t direction, // 0 = forward, 1 = backward
     uint64_t minEdgeCoverage,
     double minCorrectedJaccard,
     vector<ChainConnector>& connectors,
@@ -1106,10 +1151,10 @@ void GlobalPathGraph1::connectSeedChain1(
     const bool debug = false; // (chainId == 16);
 
     if(debug) {
-        cout << "Working on chain " << chainId << endl;
+        cout << "Working on chain " << chainId << " direction " << direction << endl;
     }
     const Chain& chain = seedChains[chainId];
-    const uint64_t chainLastVertexId = chain.vertexIds.back();
+    const uint64_t chainLastVertexId = (direction == 0) ? chain.vertexIds.back() : chain.vertexIds.front();
     if(debug) {
         cout << "Last vertex of chain " <<  vertices[chainLastVertexId].edgeId <<
             " is starting vertex for search." << endl;
@@ -1177,7 +1222,11 @@ void GlobalPathGraph1::connectSeedChain1(
                 cout << vertices[v0.vertexId].edgeId << " is on chain " << chainId0 <<
                     " at distance " << v0.distance << endl;
             }
-            out << chainId << "->" << chainId0 << ";\n";
+            if(direction == 0) {
+                out << chainId << "->" << chainId0 << ";\n";
+            } else {
+                out << chainId0 << "->" << chainId << ";\n";
+            }
 
             // To construct the connector between these two chains,
             // walk back.
@@ -1197,12 +1246,19 @@ void GlobalPathGraph1::connectSeedChain1(
                 connector.infos.push_back(vertexInfo.info);
                 vertexId = vertexInfo.parent;
             }
-            connector.reverse();
+            if(direction == 0) {
+                connector.reverse();
+            }
             break;
         }
 
         // Find its children.
-        findChildren(v0.vertexId, minEdgeCoverage, minCorrectedJaccard, children);
+        if(direction == 0) {
+            findChildren(v0.vertexId, minEdgeCoverage, minCorrectedJaccard, children);
+        } else {
+            findParents (v0.vertexId, minEdgeCoverage, minCorrectedJaccard, children);
+        }
+
 
         // Loop over the unvisited children.
         for(const auto& child: children) {
