@@ -42,7 +42,7 @@ PathFiller2::PathFiller2(
     double estimatedOffsetRatio = 1.1;
 
     // The minimum coverage for a vertex to be created.
-    const uint64_t minVertexCoverage = 8;
+    const uint64_t minVertexCoverage = 12;
 
     // Control vertex splitting.
     const int64_t maxBaseSkip = 300;
@@ -413,9 +413,14 @@ void PathFiller2::removeLowCoverageVertices(uint64_t minVertexCoverage)
 
     vector<vertex_descriptor> verticesToBeRemoved;
     BGL_FORALL_VERTICES(v, graph, PathFiller2) {
-        if(graph[v].coverage() < minVertexCoverage) {
-            verticesToBeRemoved.push_back(v);
+        auto& vertex = graph[v];
+        if((vertex.vertexId == vertexIdA) or (vertex.vertexId == vertexIdB)) {
+            continue;
         }
+        if(graph[v].coverage() >= minVertexCoverage) {
+            continue;
+        }
+        verticesToBeRemoved.push_back(v);
     }
 
     for(const vertex_descriptor v: verticesToBeRemoved) {
@@ -1115,8 +1120,51 @@ void PathFiller2::findAssemblyPath()
 
 void PathFiller2::assembleAssemblyPathEdges()
 {
+    PathFiller2& graph = *this;
+
     for(const edge_descriptor e: assemblyPath) {
+
+        if(html and options.showAssemblyDetails) {
+            const vertex_descriptor v0 = source(e, graph);
+            const vertex_descriptor v1 = target(e, graph);
+            html << "<h2>Assembly details for edge " <<
+                graph[v0].stringId() << " to " << graph[v1].stringId() << "</h2>";
+        }
+
         assembleEdge(e);
+
+    }
+
+
+
+    if(html and options.showAssemblyDetails) {
+        html <<
+            "<h2>Assembly path</h2>"
+            "<table>"
+            "<tr><th>Vertex0<th>Vertex1<th>Begin<th>End<th>Length<th class=left>Sequence";
+
+        uint64_t position = 0;
+        for(const edge_descriptor e: assemblyPath) {
+            const auto& edge = graph[e];
+            const vertex_descriptor v0 = source(e, graph);
+            const vertex_descriptor v1 = target(e, graph);
+
+            const uint64_t length = edge.sequence.size();
+            const uint64_t end = position + length;
+            html <<
+                "<tr>"
+                "<td class=centered>" << graph[v0].stringId() <<
+                "<td class=centered>" << graph[v1].stringId() <<
+                "<td class=centered>" << position <<
+                "<td class=centered>" << end <<
+                "<td class=centered>" << length <<
+                "<td style='font-family:monospace'>";
+            copy(edge.sequence.begin(), edge.sequence.end(), ostream_iterator<Base>(html));
+
+            position += length;
+        }
+
+        html << "</table>";
     }
 }
 
@@ -1136,7 +1184,7 @@ void PathFiller2::assembleEdge(edge_descriptor e)
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
         cout << "PathFiller2::assembleEdge begins for edge " <<
-            graph[v0].stringId() << " " << graph[v1].stringId() << endl;
+            graph[v0].stringId() << " to " << graph[v1].stringId() << endl;
     }
 
 

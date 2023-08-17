@@ -46,6 +46,7 @@ public:
     bool showVertices = false;
     bool showVertexLabels = false;
     bool showEdgeLabels = false;
+    bool showAssemblyDetails = false;
     bool showDebugInformation = false;
 
     PathFiller2DisplayOptions(ostream& html) : html(html) {}

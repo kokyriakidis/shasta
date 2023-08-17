@@ -243,6 +243,9 @@ void Assembler::fillMode3bAssemblyPathStep2(const vector<string>& request, ostre
     string showEdgeLabelsString;
     options.showEdgeLabels = getParameterValue(request, "showEdgeLabels", showEdgeLabelsString);
 
+    string showAssemblyDetailsString;
+    options.showAssemblyDetails = getParameterValue(request, "showAssemblyDetails", showAssemblyDetailsString);
+
     string showDebugInformationString;
     options.showDebugInformation = getParameterValue(request, "showDebugInformation", showDebugInformationString);
 
@@ -280,6 +283,11 @@ void Assembler::fillMode3bAssemblyPathStep2(const vector<string>& request, ostre
         "<th class=left>Display edge labels"
         "<td class=centered><input type=checkbox name=showEdgeLabels" <<
         (options.showEdgeLabels ? " checked" : "") << ">"
+
+        "<tr>"
+        "<th class=left>Display assembly details"
+        "<td class=centered><input type=checkbox name=showAssemblyDetails" <<
+        (options.showAssemblyDetails ? " checked" : "") << ">"
 
         "<tr>"
         "<th class=left>Display debug information"
