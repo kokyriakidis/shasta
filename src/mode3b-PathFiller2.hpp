@@ -76,6 +76,10 @@ public:
     uint64_t color = invalid<uint64_t>;
     uint64_t rank = invalid<uint64_t>;
 
+    // Flags used by removeInaccessibleVertices.
+    bool isAccessibleA = false;
+    bool isAccessibleB = false;
+
     PathFiller2Vertex(MarkerGraphVertexId, uint64_t orientedReadCount);
     PathFiller2Vertex() {}
 };
@@ -261,6 +265,11 @@ private:
 
     // Remove all vertices in non-trivial strongly connected components.
     void removeStrongComponents();
+
+    // Remove vertices that are not accessible from vertexIdA
+    // or from which vertexIdB is not accessible.
+    // Returns the number of vertices that were removed.
+    uint64_t removeInaccessibleVertices();
 
     // The assembly path, including edgeIdA at the beginning
     // and edgeIdB at the end.
