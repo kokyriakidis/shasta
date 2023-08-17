@@ -98,8 +98,8 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         writeSeedChainsDetails();
         writeSeedChainsStatistics();
 
-        // ofstream fasta("SeedChains.fasta");
-        // assembleChains(seedChains, fasta);
+        ofstream fasta("SeedChains.fasta");
+        assembleChains(seedChains, fasta, "SeedChain-");
     }
 
 
@@ -149,7 +149,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         cout << "Found " << chains.size() << " chains." << endl;
 
         ofstream fasta("Chains.fasta");
-        assembleChains(chains, fasta);
+        assembleChains(chains, fasta, "Chain-");
     }
 
 }
@@ -891,7 +891,8 @@ uint64_t GlobalPathGraph1::Chain::totalOffset() const
 
 void GlobalPathGraph1::assembleChains(
     const vector<Chain>& chains,
-    ostream& fasta) const
+    ostream& fasta,
+    const string& csvPrefix) const
 {
     for(uint64_t chainId=0; chainId<chains.size(); chainId++) {
         const Chain& chain = chains[chainId];
@@ -903,6 +904,9 @@ void GlobalPathGraph1::assembleChains(
         }
         AssemblyPath assemblyPath(assembler, markerGraphEdgeIds, chain.infos);
         assemblyPath.writeFasta(fasta, to_string(chainId));
+
+        ofstream csv(csvPrefix + to_string(chainId) + ".csv");
+        assemblyPath.writeCsv(csv);
     }
 }
 

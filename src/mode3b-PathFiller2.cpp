@@ -96,11 +96,11 @@ PathFiller2::PathFiller2(
     // Write assembled sequence.
     if(html) {
         vector<Base> sequence;
-        getCompleteSequence(sequence);
+        getSecondarySequence(sequence);
 
         html <<
             "<h2>Assembled sequence</h2>"
-            "Assembled sequence including the first and last edge is " <<
+            "Assembled sequence not including the first and last edge is " <<
             sequence.size() << " bases long."
             "<pre style='font-family:monospace'>\n";
         copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(html));
@@ -849,7 +849,7 @@ void PathFiller2::writeGraphviz(ostream& out) const
         // Label.
         if(options.showEdgeLabels) {
             out << " label=\"";
-            out << "Coverage = " << coverage;
+            out << coverage;
             /*
             if(not edge.sequence.empty()) {
                 out << "\\n";

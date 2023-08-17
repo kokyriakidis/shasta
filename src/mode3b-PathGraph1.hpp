@@ -300,7 +300,10 @@ private:
 
     // This generates an AssemblyPath for each of the Chains passed in,
     // then assembles the AssemblyPath and writes assembled sequence to fasta.
-    void assembleChains(const vector<Chain>&, ostream& fasta) const;
+    void assembleChains(
+        const vector<Chain>&,
+        ostream& fasta,
+        const string& csvPrefix) const;
 
     // Write the entire PathGraph in graphviz format.
     void writeGraphviz() const;
