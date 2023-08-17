@@ -280,6 +280,29 @@ void GlobalPathGraph1::createVertices(
 
 
 
+// Return the vertexId corresponding to a given MarkerGraphEdgeId, or
+// invalid<MarkerGraphEdgeId> if no such a vertex exists.
+uint64_t GlobalPathGraph1::getVertexId(MarkerGraphEdgeId edgeId) const
+{
+    GlobalPathGraph1Vertex targetVertex(edgeId);
+    auto it = std::lower_bound(vertices.begin(), vertices.end(), targetVertex);
+
+    if((it == vertices.end()) or (it->edgeId != edgeId)) {
+
+        // Not found.
+        return invalid<uint64_t>;
+
+    } else {
+
+        // Found it. Return its vertexId.
+        return it - vertices.begin();
+
+    }
+}
+
+
+
+
 // The "journey" of each oriented read is the sequence of vertices it encounters.
 // It stores pairs (ordinal0, vertexId) for each oriented read, sorted by ordinal0.
 // The vertexId is the index in verticesVector.
@@ -1471,3 +1494,6 @@ vector< shared_ptr<PathGraph1> > PathGraph1::createConnectedComponents(
     }
     return componentPointers;
 }
+
+
+

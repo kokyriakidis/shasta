@@ -126,6 +126,12 @@ public:
         uint64_t positionInJourney;
     };
     vector<JourneyInfoItem> journeyInfoItems;
+
+    // Compare by edgeId only.
+    bool operator<(const GlobalPathGraph1Vertex& that) const
+    {
+        return edgeId < that.edgeId;
+    }
 };
 
 
@@ -169,6 +175,10 @@ private:
     void createVertices(
         uint64_t minPrimaryCoverage,
         uint64_t maxPrimaryCoverage);
+
+    // Return the vertexId corresponding to a given MarkerGraphEdgeId, or
+    // invalid<MarkerGraphEdgeId> if no such a vertex exists.
+    uint64_t getVertexId(MarkerGraphEdgeId) const;
 
     // The "journey" of each oriented read is the sequence of vertices it encounters.
     // It stores pairs (ordinal0, vertexId) for each oriented read, sorted by ordinal0.
