@@ -105,6 +105,11 @@ public:
     // Create the connected components of this PathGraph1,
     // without changing the PathGraph1 itself.
     vector< shared_ptr<PathGraph1> > createConnectedComponents(uint64_t minComponentSize) const;
+
+    // Store id in vertexTable[vertexId] for all vertices in this subset.
+    void fillVertexTable(
+        uint64_t id,
+        vector<uint64_t>& vertexTable) const;
 };
 
 
@@ -171,7 +176,9 @@ private:
     // Store them here.
     // The index in this table is the vertexId.
     // The table is sorted by MarkerGraphEdgeId.
-    vector<GlobalPathGraph1Vertex> vertices;
+    // It cannot be names "vertices" because of name conflicts with the Boost graph
+    // iteration macros.
+    vector<GlobalPathGraph1Vertex> verticesVector;
     void createVertices(
         uint64_t minPrimaryCoverage,
         uint64_t maxPrimaryCoverage);
@@ -239,7 +246,7 @@ private:
     class Chain {
     public:
 
-        // The vertexIds (indices in the vertices vector) of
+        // The vertexIds (indices in the verticesVector) of
         // the vertices of this chain.
         vector<uint64_t> vertexIds;
 
@@ -290,6 +297,8 @@ private:
         vector<ChainConnector>&,
         ostream& out
         );
+    void connectSeedChains2();
+    void connectSeedChains2(uint64_t componentId, const PathGraph1& component);
 
     // Use the ChainConnectors to stitch together the seed chains.
     // The replaces the connected components with the connected
