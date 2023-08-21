@@ -106,10 +106,6 @@ public:
     // without changing the PathGraph1 itself.
     vector< shared_ptr<PathGraph1> > createConnectedComponents(uint64_t minComponentSize) const;
 
-    // Store id in vertexTable[vertexId] for all vertices in this subset.
-    void fillVertexTable(
-        uint64_t id,
-        vector<uint64_t>& vertexTable) const;
 };
 
 
@@ -251,7 +247,7 @@ private:
         vector<uint64_t> vertexIds;
 
         // The MarkerGraphEdgePairInfos in between the vertices.
-        // infos.size() is always vertexids.size() - 1;
+        // infos.size() is always vertexIds.size() - 1;
         vector<MarkerGraphEdgePairInfo> infos;
 
         uint64_t totalOffset() const;
@@ -297,8 +293,25 @@ private:
         vector<ChainConnector>&,
         ostream& out
         );
-    void connectSeedChains2();
-    void connectSeedChains2(uint64_t componentId, const PathGraph1& component);
+    void connectSeedChains2(
+        uint64_t minCommonCount,
+        double minCorrectedJaccard);
+    void connectSeedChains2(
+        uint64_t componentId,
+        const PathGraph1& component,
+        uint64_t minCommonCount,
+        double minCorrectedJaccard,
+        ostream&);
+
+    // Extend a chain forward until we bump into another chain.
+    // This returns the chainId of the chain we found, or invalid<uint64_t>
+    // if none found.
+    uint64_t extendChainForward(
+        uint64_t chainId,
+        Chain&,
+        const PathGraph1& component,
+        uint64_t minCommonCount,
+        double minCorrectedJaccard) const;
 
     // Use the ChainConnectors to stitch together the seed chains.
     // The replaces the connected components with the connected

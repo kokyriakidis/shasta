@@ -34,7 +34,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     // Create GlobalPathGraph1 vertices.
     {
         const uint64_t minPrimaryCoverage = 8;
-        const uint64_t maxPrimaryCoverage = 25;
+        const uint64_t maxPrimaryCoverage = 35;
         cout << timestamp << "Creating vertices." << endl;
         createVertices(minPrimaryCoverage, maxPrimaryCoverage);
         cout << timestamp << "Found " << verticesVector.size() << " vertices." << endl;
@@ -122,15 +122,18 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     // Connect seed chains.
     vector<ChainConnector> connectors;
     {
-        const double minCorrectedJaccardForComponents = 0;
+        const double minCorrectedJaccardForComponents = 0.;
         const uint64_t minComponentSize = 3;
-        // const uint64_t minCommonForConnector = 3;
-        // const double minCorrectedJaccardForConnector = 0.7;
+        const uint64_t minCommonForConnector = 3;
+        const double minCorrectedJaccardForConnector = 0.5;
 
         // Compute connected components.
         createComponents(minCorrectedJaccardForComponents, minComponentSize);
+        writeComponentsGraphviz("PathGraph", minCorrectedJaccardForComponents, 1.);
 
-        connectSeedChains2();
+        connectSeedChains2(
+            minCommonForConnector,
+            minCorrectedJaccardForConnector);
     }
 
 
@@ -733,18 +736,25 @@ void PathGraph1::writeGraphviz(
         out << vertex.edgeId;
         if(globalVertex.chainId != invalid<uint64_t>) {
             out << " " << globalVertex.chainId << ":" << globalVertex.positionInChain;
+            if(globalVertex.isFirstInChain) {
+                out << " first in chain";
+            }
+            if(globalVertex.isLastInChain) {
+                out << " last in chain";
+            }
         }
         out << "\"";
 
+        // If it belongs to a chain, color it.
         if(globalVertex.chainId != invalid<uint64_t>) {
             if(globalVertex.isFirstInChain) {
-                out << " color=blue";
+                out << " style=filled fillcolor=blue";
             } else if(globalVertex.isLastInChain) {
-                out << " color=orange";
+                out << " style=filled fillcolor=orange";
             } else {
                 // const uint32_t hue = MurmurHash2(&vertex.chainId, sizeof(vertex.chainId), 231) % 100;
                 // out << " color=\"" << 0.01 * double(hue) << ",0.4,1\"";
-                out << " color=cyan";
+                out << " style=filled fillcolor=cyan";
             }
         }
         out << "];\n";
@@ -755,14 +765,13 @@ void PathGraph1::writeGraphviz(
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
 
-
         out <<
             graph[v0].edgeId << "->" <<
             graph[v1].edgeId <<
             " [tooltip=\"" <<
             graph[v0].edgeId << "->" <<
             graph[v1].edgeId << " " <<
-            edge.info.common <<
+            edge.info.common << " " <<
             std::fixed << std::setprecision(2) << edge.info.correctedJaccard() << " " <<
             edge.info.offsetInBases << "\"";
 
@@ -1534,7 +1543,9 @@ vector< shared_ptr<PathGraph1> > PathGraph1::createConnectedComponents(
 
 
 
-void GlobalPathGraph1::connectSeedChains2()
+void GlobalPathGraph1::connectSeedChains2(
+    uint64_t minCommonCount,
+    double minCorrectedJaccard)
 {
 
     // Check that each seed chain appears entirely in a single connected component.
@@ -1558,20 +1569,27 @@ void GlobalPathGraph1::connectSeedChains2()
         }
     }
 
+    ofstream out("SeedChains.dot");
+    out << "digraph SeedChains {\n";
 
     // Process each component independently.
     for(uint64_t componentId=0; componentId<components.size(); componentId++) {
         const shared_ptr<const PathGraph1>& componentPointer = components[componentId];
         const PathGraph1& component = *componentPointer;
-        connectSeedChains2(componentId, component);
+        connectSeedChains2(componentId, component, minCommonCount, minCorrectedJaccard, out);
     }
+
+    out << "}\n";
 }
 
 
 
 void GlobalPathGraph1::connectSeedChains2(
     uint64_t componentId,
-    const PathGraph1& component)
+    const PathGraph1& component,
+    uint64_t minCommonCount,
+    double minCorrectedJaccard,
+    ostream& out)
 {
 
     // Find the seed chains that appear in this connected component.
@@ -1585,24 +1603,202 @@ void GlobalPathGraph1::connectSeedChains2(
     }
 
     // Loop over the seed chains that appear in this connected component.
-    for(const uint64_t seedChainId: seedChainIds) {
-        cout << "Finding conectors for seed chain " << seedChainId <<
+    for(const uint64_t seedChainId0: seedChainIds) {
+        const Chain& seedChain = seedChains[seedChainId0];
+        SHASTA_ASSERT(not seedChain.vertexIds.empty());
+
+        // Extend this chain forward.
+        cout << "Extending forward seed chain " << seedChainId0 <<
             " in connected component " << componentId << endl;
+        Chain extendedChain = seedChain;
+        const uint64_t seedChainId1 =
+            extendChainForward(seedChainId0, extendedChain, component, minCommonCount, minCorrectedJaccard);
+
+        if(seedChainId1 == invalid<uint64_t>) {
+            cout << "Extension did not reach another chain." << endl;
+        } else {
+            cout << "Reached seed chain " << seedChainId1 << endl;
+            out << seedChainId0 << "->" << seedChainId1 << ";\n";
+        }
+
     }
 }
 
 
-// Store id in vertexTable[vertexId] for all vertices in this subset.
-void PathGraph1::fillVertexTable(
-    uint64_t id,
-    vector<uint64_t>& vertexTable) const
+// Extend a chain forward until we bump into another chain.
+// This returns the chainId of the chain we found, or invalid<uint64_t>
+// if none found.
+uint64_t GlobalPathGraph1::extendChainForward(
+    uint64_t chainId,
+    Chain& chain,
+    const PathGraph1& component,
+    uint64_t minCommonCount,
+    double minCorrectedJaccard) const
 {
-    const PathGraph1& graph = *this;
+    using boost::multi_index_container;
+    using boost::multi_index::indexed_by;
+    using boost::multi_index::member;
+    using boost::multi_index::ordered_unique;
+    using boost::multi_index::ordered_non_unique;
 
-    BGL_FORALL_VERTICES(v, graph, PathGraph1) {
-        const uint64_t vertexId = graph[v].vertexId;
-        SHASTA_ASSERT(vertexId < vertexTable.size());
-        SHASTA_ASSERT(vertexTable[vertexId] == invalid<uint64_t>);
-        vertexTable[vertexId] = id;
+    // Information about a vertex stored during the shortest path algorithm.
+    class VertexInfo {
+    public:
+        PathGraph1::vertex_descriptor v;
+
+        // The sum of offsets starting at the start vertex.
+        uint64_t distance;
+    };
+
+    // The container used to store VertexInfos,
+    // with the two indices to support the required operations.
+    using VertexContainer = multi_index_container<VertexInfo,
+        indexed_by <
+        ordered_unique< member<VertexInfo, PathGraph1::vertex_descriptor, &VertexInfo::v> >,
+        ordered_non_unique< member<VertexInfo, uint64_t, &VertexInfo::distance> >
+        > >;
+
+    const bool debug = false;
+
+    // Outer iteration loop.
+    // At each iteration we add one vertex to the Chain.
+    while(true) {
+
+        const uint64_t vertexIdA = chain.vertexIds.back();
+        const MarkerGraphEdgeId edgeIdA = verticesVector[vertexIdA].edgeId;
+
+        const auto itA = component.vertexMap.find(edgeIdA);
+        SHASTA_ASSERT(itA != component.vertexMap.end());
+        const PathGraph1::vertex_descriptor vA = itA->second;
+        SHASTA_ASSERT(component[vA].vertexId == vertexIdA);
+
+        if(debug) {
+            cout << "Extending forward a chain with " << chain.vertexIds.size() <<
+                " vertices, current last vertex is " << edgeIdA << endl;
+        }
+
+        // Do a shortest path search, starting at vA and moving forward.
+        // Stop the search if we find a vertex with sufficient
+        // commonCount and correctedJaccard relative to vA.
+
+        // Start the Dijkstra algorithm with this as the only seen vertex.
+        VertexContainer seen;
+        const auto& seenByVertexDescriptor = seen.get<0>();
+        auto& seenByDistance = seen.get<1>();   // Not const so we can erase by distance.
+        seen.insert({vA, 0});
+
+        VertexContainer visited;
+        const auto& visitedByVertexDescriptor = visited.get<0>();
+
+        // Dijkstra shortest path loop.
+        bool wasExtended = false;
+        while(not seen.empty()) {
+
+            // Visit the vertex with the lowest distance.
+            auto it0 = seenByDistance.begin();
+            VertexInfo vertexInfo0 = *it0;
+            const PathGraph1::vertex_descriptor v0 = vertexInfo0.v;
+            const uint64_t distance0 = vertexInfo0.distance;
+            const uint64_t edgeId0 = verticesVector[component[v0].vertexId].edgeId;
+            visited.insert(*it0);
+            seenByDistance.erase(it0);
+
+            // Check it against vA.
+            // LATER WE SHOULD ALSO CHECK AGAINST THE LAST FEW VERTICES IN THE CHAIN.
+            if(v0 != vA) {
+                MarkerGraphEdgePairInfo infoA0;
+                SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeIdA, edgeId0, infoA0));
+                if(debug) {
+                    cout << "Visiting " << edgeId0 <<
+                        " at distance " << distance0 <<
+                        " common " << infoA0.common;
+                    if(infoA0.common > 0) {
+                        cout << ", J' " << infoA0.correctedJaccard() <<
+                            ", base offset " << infoA0.offsetInBases;
+                    }
+                    cout << endl;
+                }
+
+                // If this is good enough, use it to extend the chain and stop the shortest path search.
+                if(
+                    infoA0.offsetInBases>=0 and
+                    infoA0.common >= minCommonCount and
+                    infoA0.correctedJaccard() >= minCorrectedJaccard) {
+                    wasExtended = true;
+                    chain.vertexIds.push_back(component[v0].vertexId);
+                    chain.infos.push_back(infoA0);
+                    if(debug) {
+                        cout << "Chain extended with " << edgeId0 <<
+                            " at distance " << distance0 <<
+                            " common " << infoA0.common << " , J' " << infoA0.correctedJaccard() <<
+                            " , base offset " << infoA0.offsetInBases << endl;
+                    }
+
+                    // If we reached another chain, stop here.
+                    const uint64_t chainId0 = verticesVector[component[v0].vertexId].chainId;
+                    if(chainId0 != invalid<uint64_t> and chainId0 != chainId) {
+                        if(debug) {
+                            cout << "Reached chain " << chainId0 << endl;
+                        }
+                        return chainId0;
+                    }
+
+                    break;
+                }
+            }
+
+            // Loop over the unvisited children.
+            BGL_FORALL_OUTEDGES(v0, e, component, PathGraph1) {
+                const PathGraph1::vertex_descriptor v1 = target(e, component);
+                if(debug) {
+                    cout << "Found child " << verticesVector[component[v1].vertexId].edgeId << endl;
+                }
+                if(visitedByVertexDescriptor.find(v1) != visitedByVertexDescriptor.end()) {
+                    if(debug) {
+                        cout << "Already visited." << endl;
+                    }
+                    continue;
+                }
+
+                const MarkerGraphEdgePairInfo& info = component[e].info;
+                SHASTA_ASSERT(info.offsetInBases > 0);
+
+                // Update the tentative distance of the child,
+                // adding it to the seenVertices if not present.
+                auto it1 = seenByVertexDescriptor.find(v1);
+                const uint64_t distance1 = distance0 + info.offsetInBases;
+                if(it1 == seenByVertexDescriptor.end()) {
+                    seen.insert({v1, distance1});
+                    if(debug) {
+                        cout << "Seen: " << verticesVector[component[v1].vertexId].edgeId <<
+                            " at distance " << distance1 << endl;
+                    }
+                } else {
+                    VertexInfo seenVertex1 = *it1;
+                    if(distance1 < seenVertex1.distance) {
+                        seenVertex1.distance = distance1;
+                        seen.replace(it1, seenVertex1);
+                        if(debug) {
+                            cout << "Seen: updated " << verticesVector[component[v1].vertexId].edgeId <<
+                                ", new distance " << distance1 << endl;
+                        }
+                    }
+                }
+            }
+        }
+
+        if(not wasExtended) {
+            if(debug) {
+                cout << "Shortest path search terminated." << endl;
+            }
+            break;
+        }
     }
+
+    // If getting here, chain extension ended before we reached another chain.
+    if(debug) {
+        cout << "Forward chain extension did not reach another chain." << endl;
+    }
+    return invalid<uint64_t>;
 }
+
