@@ -34,7 +34,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     // Create GlobalPathGraph1 vertices.
     {
         const uint64_t minPrimaryCoverage = 8;
-        const uint64_t maxPrimaryCoverage = 35;
+        const uint64_t maxPrimaryCoverage = 30;
         cout << timestamp << "Creating vertices." << endl;
         createVertices(minPrimaryCoverage, maxPrimaryCoverage);
         cout << timestamp << "Found " << verticesVector.size() << " vertices." << endl;
@@ -44,7 +44,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     // Create GlobalPathGraph1 edges using strict criteria suitable
     // for the generation of seed chains.
     {
-        const uint64_t maxDistanceInJourney = 50;
+        const uint64_t maxDistanceInJourney = 20;
         const uint64_t minEdgeCoverage = 3;
         const double minCorrectedJaccard = 0.8;
         cout << timestamp << "Creating edges." << endl;
@@ -128,7 +128,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         const double minCorrectedJaccardForComponents = 0.;
         const uint64_t minComponentSize = 3;
         const uint64_t minCommonForConnector = 3;
-        const double minCorrectedJaccardForConnector = 0.6;
+        const double minCorrectedJaccardForConnector = 0.7;
 
         // Compute connected components.
         createComponents(minCorrectedJaccardForComponents, minComponentSize);
@@ -165,9 +165,11 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         createChainsFromComponents(minEstimatedLength, chains);
         cout << "Found " << chains.size() << " chains." << endl;
 
+#if 1
         cout << timestamp << "Assembling the chains." << endl;
         ofstream fasta("Chains.fasta");
         assembleChains(chains, fasta, "Chain-");
+#endif
     }
 
 }
@@ -225,7 +227,7 @@ bool GlobalPathGraph1::isPrimary(
         return false;
     }
 
-#if 1
+#if 0
     // Check that is also is a branch edge.
     if(not isBranchEdge(edgeId, minPrimaryCoverage)) {
         return false;
