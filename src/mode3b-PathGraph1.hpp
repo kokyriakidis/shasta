@@ -279,6 +279,7 @@ private:
         vector<uint64_t> vertexIds;
         vector<MarkerGraphEdgePairInfo> infos;
         void reverse();
+        uint64_t totalOffset() const;
     };
     void connectSeedChains1(
         uint64_t minEdgeCoverage,
@@ -295,13 +296,16 @@ private:
         );
     void connectSeedChains2(
         uint64_t minCommonCount,
-        double minCorrectedJaccard);
+        double minCorrectedJaccard,
+        vector<ChainConnector>&);
     void connectSeedChains2(
         uint64_t componentId,
         const PathGraph1& component,
         uint64_t minCommonCount,
         double minCorrectedJaccard,
-        ostream&);
+        ostream&,
+        vector<ChainConnector>&);
+    void writeConnectors(const vector<ChainConnector>&) const;
 
     // Extend a chain forward until we bump into another chain.
     // This returns the chainId of the chain we found, or invalid<uint64_t>

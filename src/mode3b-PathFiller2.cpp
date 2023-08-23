@@ -42,7 +42,7 @@ PathFiller2::PathFiller2(
     double estimatedOffsetRatio = 1.1;
 
     // The minimum coverage for a vertex to be created.
-    const uint64_t minVertexCoverage = 12;
+    const uint64_t minVertexCoverage = 10;
 
     // Control vertex splitting.
     const int64_t maxBaseSkip = 300;

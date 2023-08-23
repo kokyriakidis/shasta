@@ -44,7 +44,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     // Create GlobalPathGraph1 edges using strict criteria suitable
     // for the generation of seed chains.
     {
-        const uint64_t maxDistanceInJourney = 20;
+        const uint64_t maxDistanceInJourney = 50;
         const uint64_t minEdgeCoverage = 3;
         const double minCorrectedJaccard = 0.8;
         cout << timestamp << "Creating edges." << endl;
@@ -78,6 +78,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         const double minCorrectedJaccard = 0.8;
         const uint64_t minComponentSize = 3;
         createComponents(minCorrectedJaccard, minComponentSize);
+        writeComponentsGraphviz("PathGraphA", minCorrectedJaccard, 1.);
 
         // K-nn.
         const uint64_t k = 3;
@@ -99,10 +100,12 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         writeSeedChainsDetails();
         writeSeedChainsStatistics();
 
-        // ofstream fasta("SeedChains.fasta");
-        // assembleChains(seedChains, fasta, "SeedChain-");
+#if 1
+        cout << timestamp << "Assembling the seed chains." << endl;
+        ofstream fasta("SeedChains.fasta");
+        assembleChains(seedChains, fasta, "SeedChain-");
+#endif
     }
-
 
 
     // Recreate GlobalPathGraph1 edges using criteria suitable
@@ -125,50 +128,29 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         const double minCorrectedJaccardForComponents = 0.;
         const uint64_t minComponentSize = 3;
         const uint64_t minCommonForConnector = 3;
-        const double minCorrectedJaccardForConnector = 0.5;
+        const double minCorrectedJaccardForConnector = 0.6;
 
         // Compute connected components.
         createComponents(minCorrectedJaccardForComponents, minComponentSize);
-        writeComponentsGraphviz("PathGraph", minCorrectedJaccardForComponents, 1.);
+        writeComponentsGraphviz("PathGraphB", minCorrectedJaccardForComponents, 1.);
 
         connectSeedChains2(
             minCommonForConnector,
-            minCorrectedJaccardForConnector);
+            minCorrectedJaccardForConnector,
+            connectors);
     }
 
 
 
 #if 0
-    // Connect seed chains.
-    vector<ChainConnector> connectors;
     {
         const uint64_t minEdgeCoverage = 4;
         const double minCorrectedJaccard = 0.6;
         connectSeedChains1(minEdgeCoverage, minCorrectedJaccard, connectors);
-
-        // Write the chain connectors.
-        ofstream csv("ChainConnectors.csv");
-        csv << "ChainId0,ChainId1,Position,EdgeId0,EdgeId1,Common,Offset,J,J'\n";
-        for(const ChainConnector& connector: connectors) {
-            for(uint64_t position=0; position<connector.infos.size(); position++) {
-                const MarkerGraphEdgePairInfo& info = connector.infos[position];
-                const uint64_t vertexId0 = connector.vertexIds[position];
-                const uint64_t vertexId1 = connector.vertexIds[position + 1];
-                const MarkerGraphEdgeId edgeId0 = vertices[vertexId0].edgeId;
-                const MarkerGraphEdgeId edgeId1 = vertices[vertexId1].edgeId;
-                csv <<
-                    connector.chainId0 << "," <<
-                    connector.chainId1 << "," <<
-                    position << "," <<
-                    edgeId0 << "," <<
-                    edgeId1 << "," <<
-                    info.common << "," <<
-                    info.offsetInBases << "," <<
-                    info.jaccard() << "," <<
-                    info.correctedJaccard() << "\n";
-            }
-        }
     }
+#endif
+
+    writeConnectors(connectors);
 
 
     // Use the ChainConnectors to stitch together the seed chains,
@@ -183,10 +165,11 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         createChainsFromComponents(minEstimatedLength, chains);
         cout << "Found " << chains.size() << " chains." << endl;
 
+        cout << timestamp << "Assembling the chains." << endl;
         ofstream fasta("Chains.fasta");
         assembleChains(chains, fasta, "Chain-");
     }
-#endif
+
 }
 
 
@@ -242,9 +225,9 @@ bool GlobalPathGraph1::isPrimary(
         return false;
     }
 
-#if 0
+#if 1
     // Check that is also is a branch edge.
-    if(not isBranchEdge(edgeId)) {
+    if(not isBranchEdge(edgeId, minPrimaryCoverage)) {
         return false;
     }
 #endif
@@ -931,6 +914,17 @@ uint64_t GlobalPathGraph1::Chain::totalOffset() const
 
 
 
+uint64_t GlobalPathGraph1::ChainConnector::totalOffset() const
+{
+    uint64_t totalBaseOffset = 0;
+    for(const MarkerGraphEdgePairInfo& info: infos) {
+        totalBaseOffset += info.offsetInBases;
+    }
+    return totalBaseOffset;
+}
+
+
+
 void GlobalPathGraph1::assembleChains(
     const vector<Chain>& chains,
     ostream& fasta,
@@ -938,6 +932,7 @@ void GlobalPathGraph1::assembleChains(
 {
     for(uint64_t chainId=0; chainId<chains.size(); chainId++) {
         const Chain& chain = chains[chainId];
+        cout << timestamp << chainId << "/" << chains.size() << endl;
 
         // Generate an AssemblyPath using this chain.
         vector<MarkerGraphEdgeId> markerGraphEdgeIds;
@@ -1545,7 +1540,8 @@ vector< shared_ptr<PathGraph1> > PathGraph1::createConnectedComponents(
 
 void GlobalPathGraph1::connectSeedChains2(
     uint64_t minCommonCount,
-    double minCorrectedJaccard)
+    double minCorrectedJaccard,
+    vector<ChainConnector>& connectors)
 {
 
     // Check that each seed chain appears entirely in a single connected component.
@@ -1571,12 +1567,17 @@ void GlobalPathGraph1::connectSeedChains2(
 
     ofstream out("SeedChains.dot");
     out << "digraph SeedChains {\n";
+    for(uint64_t seedChainId=0; seedChainId!=seedChains.size(); seedChainId++) {
+        const Chain& seedChain = seedChains[seedChainId];
+        out << seedChainId << " [label=\"" << seedChainId << "\\n" << seedChain.totalOffset() << "\"];\n";
+    }
 
     // Process each component independently.
+    connectors.clear();
     for(uint64_t componentId=0; componentId<components.size(); componentId++) {
         const shared_ptr<const PathGraph1>& componentPointer = components[componentId];
         const PathGraph1& component = *componentPointer;
-        connectSeedChains2(componentId, component, minCommonCount, minCorrectedJaccard, out);
+        connectSeedChains2(componentId, component, minCommonCount, minCorrectedJaccard, out, connectors);
     }
 
     out << "}\n";
@@ -1589,7 +1590,8 @@ void GlobalPathGraph1::connectSeedChains2(
     const PathGraph1& component,
     uint64_t minCommonCount,
     double minCorrectedJaccard,
-    ostream& out)
+    ostream& out,
+    vector<ChainConnector>& connectors)
 {
 
     // Find the seed chains that appear in this connected component.
@@ -1616,11 +1618,24 @@ void GlobalPathGraph1::connectSeedChains2(
 
         if(seedChainId1 == invalid<uint64_t>) {
             cout << "Extension did not reach another chain." << endl;
-        } else {
-            cout << "Reached seed chain " << seedChainId1 << endl;
-            out << seedChainId0 << "->" << seedChainId1 << ";\n";
+            continue;
         }
 
+        cout << "Reached seed chain " << seedChainId1 << endl;
+
+        // Create a connector between these two chains.
+        // Use the portion of the extendedChain that is past the end of the seedChain.
+        connectors.resize(connectors.size() + 1);
+        ChainConnector& connector = connectors.back();
+        connector.chainId0 = seedChainId0;
+        connector.chainId1 = seedChainId1;
+        connector.vertexIds.push_back(seedChain.vertexIds.back());
+        for(uint64_t i = seedChain.infos.size(); i < extendedChain.infos.size(); i++) {
+            connector.vertexIds.push_back(extendedChain.vertexIds[i+1]);
+            connector.infos.push_back(extendedChain.infos[i]);
+        }
+        out << seedChainId0 << "->" << seedChainId1 <<
+            " [label=\"" << connector.totalOffset() << "\"];\n";
     }
 }
 
@@ -1802,3 +1817,29 @@ uint64_t GlobalPathGraph1::extendChainForward(
     return invalid<uint64_t>;
 }
 
+
+
+void GlobalPathGraph1::writeConnectors(const vector<ChainConnector>& connectors) const
+{
+    ofstream csv("ChainConnectors.csv");
+    csv << "ChainId0,ChainId1,Position,EdgeId0,EdgeId1,Common,Offset,J,J'\n";
+    for(const ChainConnector& connector: connectors) {
+        for(uint64_t position=0; position<connector.infos.size(); position++) {
+            const MarkerGraphEdgePairInfo& info = connector.infos[position];
+            const uint64_t vertexId0 = connector.vertexIds[position];
+            const uint64_t vertexId1 = connector.vertexIds[position + 1];
+            const MarkerGraphEdgeId edgeId0 = verticesVector[vertexId0].edgeId;
+            const MarkerGraphEdgeId edgeId1 = verticesVector[vertexId1].edgeId;
+            csv <<
+                connector.chainId0 << "," <<
+                connector.chainId1 << "," <<
+                position << "," <<
+                edgeId0 << "," <<
+                edgeId1 << "," <<
+                info.common << "," <<
+                info.offsetInBases << "," <<
+                info.jaccard() << "," <<
+                info.correctedJaccard() << "\n";
+        }
+    }
+}
