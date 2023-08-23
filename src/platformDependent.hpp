@@ -1,6 +1,7 @@
 #ifndef SHASTA_PLATFORM_DEPENDENT_HPP
 #define SHASTA_PLATFORM_DEPENDENT_HPP
 
+#include "cstdint.hpp"
 #include "string.hpp"
 
 namespace shasta {

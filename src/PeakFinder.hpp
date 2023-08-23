@@ -50,6 +50,7 @@
 ***********************************************************************************************************************/
 
 
+#include "cstdint.hpp"
 #include "stdexcept.hpp"
 #include "iostream.hpp"
 #include "utility.hpp"

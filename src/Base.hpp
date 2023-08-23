@@ -11,6 +11,7 @@
 #include "SHASTA_ASSERT.hpp"
 
 #include "array.hpp"
+#include "cstdint.hpp"
 #include "iostream.hpp"
 #include "stdexcept.hpp"
 #include "string.hpp"

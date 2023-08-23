@@ -33,6 +33,7 @@
 
 // Standard library.
 #include "cstddef.hpp"
+#include "cstdint.hpp"
 #include <queue>
 #include "vector.hpp"
 

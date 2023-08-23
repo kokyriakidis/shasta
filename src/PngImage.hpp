@@ -2,6 +2,7 @@
 #define SHASTA_PNG_IMAGE_HPP
 
 #include <png.h>
+#include "cstdint.hpp"
 #include "string.hpp"
 #include "vector.hpp"
 
