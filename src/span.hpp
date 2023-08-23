@@ -2,6 +2,7 @@
 #define SHASTA_SPAN_HPP
 
 #include "algorithm.hpp"
+#include "cstdint.hpp"
 #include "iostream.hpp"
 #include "iterator.hpp"
 #include <span>

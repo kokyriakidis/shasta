@@ -1,6 +1,7 @@
 #if !defined(__DSET64_GCC_ATOMIC_HPP)
 #define __DSET64_GCC_ATOMIC_HPP
 
+#include <cstdint>
 #include <stdexcept>
 
 /**
