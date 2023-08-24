@@ -108,6 +108,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     }
 
 
+
 #if 0
 
     // EXPERIMENT WITH connectSeedChains2.
@@ -1194,6 +1195,9 @@ void GlobalPathGraph1::connectSeedChains1(
 
     ofstream out("SeedChains.dot");
     out << "digraph SeedChains {\n";
+    for(uint64_t chainId=0; chainId<seedChains.size(); chainId++) {
+        out << chainId << " [label=\"SC" << chainId << "\"];\n";
+    }
 
     connectors.clear();
 
@@ -1219,7 +1223,7 @@ void GlobalPathGraph1::connectSeedChain1(
     ostream& out
     )
 {
-    const bool debug = false; // (chainId == 16);
+    const bool debug = false; // (chainId == 16) and (direction == 0);
 
     if(debug) {
         cout << "Working on chain " << chainId << " direction " << direction << endl;
