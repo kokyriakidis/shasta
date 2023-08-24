@@ -34,7 +34,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     // Create GlobalPathGraph1 vertices.
     {
         const uint64_t minPrimaryCoverage = 8;
-        const uint64_t maxPrimaryCoverage = 30;
+        const uint64_t maxPrimaryCoverage = 25;
         cout << timestamp << "Creating vertices." << endl;
         createVertices(minPrimaryCoverage, maxPrimaryCoverage);
         cout << timestamp << "Found " << verticesVector.size() << " vertices." << endl;
@@ -100,13 +100,17 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         writeSeedChainsDetails();
         writeSeedChainsStatistics();
 
-#if 1
+#if 0
         cout << timestamp << "Assembling the seed chains." << endl;
         ofstream fasta("SeedChains.fasta");
         assembleChains(seedChains, fasta, "SeedChain-");
 #endif
     }
 
+
+#if 0
+
+    // EXPERIMENT WITH connectSeedChains2.
 
     // Recreate GlobalPathGraph1 edges using criteria suitable
     // for the rest of the process.
@@ -139,16 +143,17 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
             minCorrectedJaccardForConnector,
             connectors);
     }
+#endif
 
 
 
-#if 0
+    vector<ChainConnector> connectors;
     {
         const uint64_t minEdgeCoverage = 4;
         const double minCorrectedJaccard = 0.6;
         connectSeedChains1(minEdgeCoverage, minCorrectedJaccard, connectors);
     }
-#endif
+
 
     writeConnectors(connectors);
 
