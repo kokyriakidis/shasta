@@ -149,8 +149,9 @@ public:
 
 class shasta::mode3b::GlobalPathGraph1 {
 public:
-    GlobalPathGraph1(const Assembler&);
+    static void assemble(const Assembler&);
 private:
+    GlobalPathGraph1(const Assembler&);
     const Assembler& assembler;
 
     // Find out if a marker graph edge is a primary edge.
@@ -245,6 +246,9 @@ private:
         // The vertexIds (indices in the verticesVector) of
         // the vertices of this chain.
         vector<uint64_t> vertexIds;
+
+        // The corresponding MarkerGraphEdgeIds.
+        vector<MarkerGraphEdgeId> edgeIds;
 
         // The MarkerGraphEdgePairInfos in between the vertices.
         // infos.size() is always vertexIds.size() - 1;

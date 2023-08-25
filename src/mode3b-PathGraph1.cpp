@@ -25,9 +25,126 @@ using namespace mode3b;
 
 
 
+void GlobalPathGraph1::assemble(const Assembler& assembler)
+{
+    // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
+    // ARE DEFINED BEFORE EACH PHASE THAT USES THEM.
+
+    // Create a first version of the GlobalPathGraph1 to find seed chains.
+    vector<Chain> seedChains;
+    {
+        const uint64_t minPrimaryCoverage = 8;
+        const uint64_t maxPrimaryCoverage = 25;
+        const uint64_t maxDistanceInJourney = 20;
+        const uint64_t minEdgeCoverage = 3;
+        const double minCorrectedJaccard = 0.8;
+        const uint64_t minComponentSize = 3;
+        const uint64_t k = 3;
+        const uint64_t minEstimatedLength = 10000;
+
+        GlobalPathGraph1 graph(assembler);
+        graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
+        graph.computeOrientedReadJourneys();
+        graph.createEdges0(maxDistanceInJourney, minEdgeCoverage, minCorrectedJaccard);
+        graph.createComponents(minCorrectedJaccard, minComponentSize);
+        graph.knn(k);
+
+        // Transitive reduction is not really needed because it does not
+        // change the longest path in each connected component,
+        // but it can be useful if we want to display
+        // the connected components at this stage.
+        // graph.transitiveReduction();
+
+        // Output each connected component in a separate file.
+        // This can create a large number of files.
+        // graph.writeComponentsGraphviz("PathGraphA", minCorrectedJaccard, 1.);
+
+        graph.createChainsFromComponents(minEstimatedLength, graph.seedChains);
+        cout << "Found " << graph.seedChains.size() << " seed chains." << endl;
+        graph.writeSeedChains();
+        graph.writeSeedChainsDetails();
+        graph.writeSeedChainsStatistics();
+        seedChains = graph.seedChains;
+
+#if 1
+        ofstream fasta("SeedChains.fasta");
+        graph.assembleChains(graph.seedChains, fasta, "SeedChain-");
+#endif
+    }
+
+
+
+    // Create a new GlobalPathGraph1 with less strict criteria
+    // for vertex creation. This will be used to connect
+    // the seed chains we found.
+    // Note we don't need to create edges here because connectSeedChains1
+    // does not use them. It only uses the oriented read journeys.
+    {
+        const uint64_t minPrimaryCoverage = 8;
+        const uint64_t maxPrimaryCoverage = 25;
+        const uint64_t minEdgeCoverage = 4;
+        const double minCorrectedJaccard = 0.6;
+        const uint64_t minComponentSize = 3;
+        const uint64_t minEstimatedLength = 10000;
+
+        GlobalPathGraph1 graph(assembler);
+        graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
+        graph.computeOrientedReadJourneys();
+
+        // Store in this new graph the seed chains we found earlier.
+        // We have to update the vertexIds and store chain information
+        // in the vertices.
+        for(uint64_t seedChainId=0; seedChainId<seedChains.size(); seedChainId++) {
+            Chain& seedChain = seedChains[seedChainId];
+            SHASTA_ASSERT(seedChain.vertexIds.size() == seedChain.edgeIds.size());
+            for(uint64_t position=0; position<seedChain.vertexIds.size(); position++) {
+
+                // Update the vertexId to reflect the vertex numbering
+                // of this new graph.
+                const MarkerGraphEdgeId edgeId = seedChain.edgeIds[position];
+                const uint64_t vertexId = graph.getVertexId(edgeId);
+                seedChain.vertexIds[position] = vertexId;
+
+                // Store chain information in the vertex.
+                GlobalPathGraph1Vertex& vertex = graph.verticesVector[vertexId];
+                SHASTA_ASSERT(vertex.chainId == invalid<uint64_t>);
+                SHASTA_ASSERT(vertex.positionInChain == invalid<uint64_t>);
+                vertex.chainId = seedChainId;
+                vertex.positionInChain = position;
+                vertex.isFirstInChain = (position == 0);
+                vertex.isLastInChain = (position == seedChain.vertexIds.size() - 1);
+            }
+
+        }
+        graph.seedChains = seedChains;
+
+        vector<ChainConnector> connectors;
+        graph.connectSeedChains1(minEdgeCoverage, minCorrectedJaccard, connectors);
+        graph.writeConnectors(connectors);
+
+        // Use the ChainConnectors to stitch together the seed chains.
+        graph.stitchSeedChains(connectors, minComponentSize);
+
+        vector<Chain> chains;
+        graph.createChainsFromComponents(minEstimatedLength, chains);
+        cout << "Found " << chains.size() << " chains." << endl;
+
+#if 1
+        cout << timestamp << "Assembling the chains." << endl;
+        ofstream fasta("Chains.fasta");
+        graph.assembleChains(chains, fasta, "Chain-");
+#endif
+    }
+}
+
+
+
 GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     assembler(assembler)
 {
+#if 0
+    // The code below was moved to GlobalPathGraph1::assemble.
+
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
     // ARE DEFINED BEFORE EACH PHASE THAT USES THEM.
 
@@ -177,7 +294,7 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
         assembleChains(chains, fasta, "Chain-");
 #endif
     }
-
+#endif
 }
 
 
@@ -235,6 +352,8 @@ bool GlobalPathGraph1::isPrimary(
 
 #if 0
     // Check that is also is a branch edge.
+    // Requiring this is too strict and removes opportunities for
+    // finding paths.
     if(not isBranchEdge(edgeId, minPrimaryCoverage)) {
         return false;
     }
@@ -415,14 +534,14 @@ void GlobalPathGraph1::createEdges0(
             }
         }
     }
-    cout << timestamp << "Found " << candidateEdges.size() << " candidate edges, including duplicates." << endl;
+    // cout << timestamp << "Found " << candidateEdges.size() << " candidate edges, including duplicates." << endl;
 
     // Deduplicate the candidate edges and count the number of times
     // each of them was found. Keep only the ones that occurred at least
     // minEdgeCoverage times.
     vector<uint64_t> coverage;
     deduplicateAndCountWithThreshold(candidateEdges, coverage, minEdgeCoverage);
-    cout << timestamp << "After deduplication, there are " << candidateEdges.size() << " candidate edges." << endl;
+    // cout << timestamp << "After deduplication, there are " << candidateEdges.size() << " candidate edges." << endl;
     candidateEdges.shrink_to_fit();
 
     // For each candidate edge, compute correctedJaccard, and if high enough
@@ -872,7 +991,9 @@ void GlobalPathGraph1::createChainsFromComponents(
         // Use this longest path to create a tentative Chain.
         Chain chain;
         for(const PathGraph1::vertex_descriptor v: chainVertices) {
-            chain.vertexIds.push_back(component[v].vertexId);
+            const uint64_t vertexId = component[v].vertexId;
+            chain.vertexIds.push_back(vertexId);
+            chain.edgeIds.push_back(verticesVector[vertexId].edgeId);
         }
         for(uint64_t i=1; i<chainVertices.size(); i++) {
             const PathGraph1::vertex_descriptor v0 = chainVertices[i-1];
@@ -895,7 +1016,7 @@ void GlobalPathGraph1::createChainsFromComponents(
 
         // Store this chain as a new chain.
         const uint64_t chainId = chains.size();
-        cout << "Chain " << chainId << " base offset " << totalBaseOffset << endl;
+        // cout << "Chain " << chainId << " base offset " << totalBaseOffset << endl;
         chains.push_back(chain);
         for(uint64_t position=0; position<chain.vertexIds.size(); position++) {
             const uint64_t vertexId = chain.vertexIds[position];
