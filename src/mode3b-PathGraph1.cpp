@@ -59,6 +59,7 @@ void GlobalPathGraph1::assemble(const Assembler& assembler)
         // This can create a large number of files.
         // graph.writeComponentsGraphviz("PathGraphA", minCorrectedJaccard, 1.);
 
+
         graph.createChainsFromComponents(minEstimatedLength, graph.seedChains);
         cout << "Found " << graph.seedChains.size() << " seed chains." << endl;
         graph.writeSeedChains();
@@ -66,7 +67,7 @@ void GlobalPathGraph1::assemble(const Assembler& assembler)
         graph.writeSeedChainsStatistics();
         seedChains = graph.seedChains;
 
-#if 1
+#if 0
         ofstream fasta("SeedChains.fasta");
         graph.assembleChains(graph.seedChains, fasta, "SeedChain-");
 #endif
@@ -77,8 +78,6 @@ void GlobalPathGraph1::assemble(const Assembler& assembler)
     // Create a new GlobalPathGraph1 with less strict criteria
     // for vertex creation. This will be used to connect
     // the seed chains we found.
-    // Note we don't need to create edges here because connectSeedChains1
-    // does not use them. It only uses the oriented read journeys.
     {
         const uint64_t minPrimaryCoverage = 8;
         const uint64_t maxPrimaryCoverage = 25;
@@ -86,41 +85,45 @@ void GlobalPathGraph1::assemble(const Assembler& assembler)
         const double minCorrectedJaccard = 0.6;
         const uint64_t minComponentSize = 3;
         const uint64_t minEstimatedLength = 10000;
+        const uint64_t connectSeedChainsMethod = 1;
 
         GlobalPathGraph1 graph(assembler);
         graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
         graph.computeOrientedReadJourneys();
 
         // Store in this new graph the seed chains we found earlier.
-        // We have to update the vertexIds and store chain information
-        // in the vertices.
-        for(uint64_t seedChainId=0; seedChainId<seedChains.size(); seedChainId++) {
-            Chain& seedChain = seedChains[seedChainId];
-            SHASTA_ASSERT(seedChain.vertexIds.size() == seedChain.edgeIds.size());
-            for(uint64_t position=0; position<seedChain.vertexIds.size(); position++) {
+        graph.storeSeedChains(seedChains);
 
-                // Update the vertexId to reflect the vertex numbering
-                // of this new graph.
-                const MarkerGraphEdgeId edgeId = seedChain.edgeIds[position];
-                const uint64_t vertexId = graph.getVertexId(edgeId);
-                seedChain.vertexIds[position] = vertexId;
-
-                // Store chain information in the vertex.
-                GlobalPathGraph1Vertex& vertex = graph.verticesVector[vertexId];
-                SHASTA_ASSERT(vertex.chainId == invalid<uint64_t>);
-                SHASTA_ASSERT(vertex.positionInChain == invalid<uint64_t>);
-                vertex.chainId = seedChainId;
-                vertex.positionInChain = position;
-                vertex.isFirstInChain = (position == 0);
-                vertex.isLastInChain = (position == seedChain.vertexIds.size() - 1);
-            }
-
+        // If using connectSeedChains2, we also generate the edges
+        // by just incrementally following the reads and accepting all edges.
+        if(connectSeedChainsMethod == 2) {
+            const uint64_t maxDistanceInJourney = 1;
+            const uint64_t minEdgeCoverage = 1;
+            const double minCorrectedJaccard = 0.;
+            graph.createEdges0(maxDistanceInJourney, minEdgeCoverage, minCorrectedJaccard);
         }
-        graph.seedChains = seedChains;
 
+
+
+        // Compute connectors to join pairs of seed chains.
         vector<ChainConnector> connectors;
-        graph.connectSeedChains1(minEdgeCoverage, minCorrectedJaccard, connectors);
+        if(connectSeedChainsMethod == 1) {
+            graph.connectSeedChains1(minEdgeCoverage, minCorrectedJaccard, connectors);
+        } else if(connectSeedChainsMethod == 2) {
+
+            // Compute connected components.
+            const double minCorrectedJaccardForComponents = 0.;
+            graph.createComponents(minCorrectedJaccardForComponents, minComponentSize);
+            graph.writeComponentsGraphviz("PathGraphB", minCorrectedJaccardForComponents, 1.);
+
+            graph.connectSeedChains2(minEdgeCoverage, minCorrectedJaccard, connectors);
+        }
+        else {
+            SHASTA_ASSERT(0);
+        }
         graph.writeConnectors(connectors);
+
+
 
         // Use the ChainConnectors to stitch together the seed chains.
         graph.stitchSeedChains(connectors, minComponentSize);
@@ -129,7 +132,7 @@ void GlobalPathGraph1::assemble(const Assembler& assembler)
         graph.createChainsFromComponents(minEstimatedLength, chains);
         cout << "Found " << chains.size() << " chains." << endl;
 
-#if 1
+#if 0
         cout << timestamp << "Assembling the chains." << endl;
         ofstream fasta("Chains.fasta");
         graph.assembleChains(chains, fasta, "Chain-");
@@ -295,6 +298,38 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
 #endif
     }
 #endif
+}
+
+
+
+// Store in this PathGraph1 the seed chains found in another PathGraph1
+void GlobalPathGraph1::storeSeedChains(const vector<Chain>& seedChainsArgument)
+{
+    seedChains = seedChainsArgument;
+
+    for(uint64_t seedChainId=0; seedChainId<seedChains.size(); seedChainId++) {
+        Chain& seedChain = seedChains[seedChainId];
+        SHASTA_ASSERT(seedChain.vertexIds.size() == seedChain.edgeIds.size());
+
+        for(uint64_t position=0; position<seedChain.vertexIds.size(); position++) {
+
+            // Update the vertexId to reflect the vertex numbering
+            // of this new graph.
+            const MarkerGraphEdgeId edgeId = seedChain.edgeIds[position];
+            const uint64_t vertexId = getVertexId(edgeId);
+            SHASTA_ASSERT(vertexId != invalid<uint64_t>);
+            seedChain.vertexIds[position] = vertexId;
+
+            // Store chain information in the vertex.
+            GlobalPathGraph1Vertex& vertex = verticesVector[vertexId];
+            SHASTA_ASSERT(vertex.chainId == invalid<uint64_t>);
+            SHASTA_ASSERT(vertex.positionInChain == invalid<uint64_t>);
+            vertex.chainId = seedChainId;
+            vertex.positionInChain = position;
+            vertex.isFirstInChain = (position == 0);
+            vertex.isLastInChain = (position == seedChain.vertexIds.size() - 1);
+        }
+    }
 }
 
 
@@ -1016,7 +1051,7 @@ void GlobalPathGraph1::createChainsFromComponents(
 
         // Store this chain as a new chain.
         const uint64_t chainId = chains.size();
-        // cout << "Chain " << chainId << " base offset " << totalBaseOffset << endl;
+        cout << "Chain " << chainId << " has estimated length " << totalBaseOffset << endl;
         chains.push_back(chain);
         for(uint64_t position=0; position<chain.vertexIds.size(); position++) {
             const uint64_t vertexId = chain.vertexIds[position];

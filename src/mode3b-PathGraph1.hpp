@@ -272,6 +272,9 @@ private:
     void writeSeedChainsDetails() const;
     void writeSeedChainsStatistics() const;
 
+    // Store in this PathGraph1 the seed chains found in another PathGraph1
+    void storeSeedChains(const vector<Chain>&);
+
     // Connect seed chains by following reads.
     void connectSeedChains0();
 
