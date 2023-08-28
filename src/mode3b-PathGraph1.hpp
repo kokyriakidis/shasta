@@ -72,6 +72,7 @@ public:
 class shasta::mode3b::PathGraph1Edge {
 public:
     MarkerGraphEdgePairInfo info;
+    uint64_t coverage;
 };
 
 
@@ -89,7 +90,8 @@ public:
     void addEdge(
         MarkerGraphEdgeId,
         MarkerGraphEdgeId,
-        const MarkerGraphEdgePairInfo&);
+        const MarkerGraphEdgePairInfo&,
+        uint64_t coverage);
 
     void writeGraphviz(
         const vector<GlobalPathGraph1Vertex>& globalVertices,
@@ -147,6 +149,12 @@ public:
     uint64_t vertexId0;
     uint64_t vertexId1;
     MarkerGraphEdgePairInfo info;
+
+    // The number of oriented reads for which the journey contains
+    // a transition from vertexId0 to vertexId1.
+    // This is less than or equal to info.common.
+    // Only filled in by createEdges0.
+    uint64_t coverage = invalid<uint64_t>;
 };
 
 

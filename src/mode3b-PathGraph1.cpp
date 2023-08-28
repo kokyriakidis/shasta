@@ -154,16 +154,18 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
 {
     const uint64_t minPrimaryCoverage = 8;
     const uint64_t maxPrimaryCoverage = 35;
+    const uint64_t minEdgeCoverage = 2;
+    const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
 
     GlobalPathGraph1 graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
     graph.computeOrientedReadJourneys();
-    graph.createEdges0(1, 1, 0.);
+    graph.createEdges0(1, minEdgeCoverage, minCorrectedJaccard);
 
-    graph.createComponents(0., minComponentSize);
+    graph.createComponents(minCorrectedJaccard, minComponentSize);
     graph.writeComponentsGraphviz("PathGraph", 0., 1., true, true, true, true);
-    graph.writeComponentsGraphviz("PathGraph-Compact", 0., 1., false, false, false, false);
+    graph.writeComponentsGraphviz("PathGraph_Compact", 0., 1., false, false, false, false);
 }
 
 
@@ -610,12 +612,17 @@ void GlobalPathGraph1::createEdges0(
     vector<uint64_t> coverage;
     deduplicateAndCountWithThreshold(candidateEdges, coverage, minEdgeCoverage);
     // cout << timestamp << "After deduplication, there are " << candidateEdges.size() << " candidate edges." << endl;
+    SHASTA_ASSERT(candidateEdges.size() == coverage.size());
     candidateEdges.shrink_to_fit();
+    coverage.shrink_to_fit();
 
     // For each candidate edge, compute correctedJaccard, and if high enough
     // generate an edge.
     edges.clear();
-    for(const auto& p: candidateEdges) {
+    for(uint64_t i=0; i<candidateEdges.size(); i++) {
+        const uint64_t c = coverage[i];
+        SHASTA_ASSERT(c >= minEdgeCoverage);
+        const auto& p = candidateEdges[i];
         const uint64_t vertexId0 = p.first;
         const uint64_t vertexId1 = p.second;
         GlobalPathGraph1Edge edge;
@@ -625,6 +632,7 @@ void GlobalPathGraph1::createEdges0(
         if(edge.info.correctedJaccard() >= minCorrectedJaccard) {
             edge.vertexId0 = vertexId0;
             edge.vertexId1 = vertexId1;
+            edge.coverage = c;
             edges.push_back(edge);
         }
     }
@@ -808,7 +816,7 @@ void GlobalPathGraph1::createComponents(
         SHASTA_ASSERT(componentId == disjointSets.find_set(vertexId1));
         const MarkerGraphEdgeId edgeId0 = verticesVector[vertexId0].edgeId;
         const MarkerGraphEdgeId edgeId1 = verticesVector[vertexId1].edgeId;
-        allComponents[componentId]->addEdge(edgeId0, edgeId1, edge.info);
+        allComponents[componentId]->addEdge(edgeId0, edgeId1, edge.info, edge.coverage);
     }
 
     // Only keep the connected components that have at least
@@ -879,7 +887,8 @@ void PathGraph1::addVertex(
 void PathGraph1::addEdge(
     MarkerGraphEdgeId edgeId0,
     MarkerGraphEdgeId edgeId1,
-    const MarkerGraphEdgePairInfo& info)
+    const MarkerGraphEdgePairInfo& info,
+    uint64_t coverage)
 {
     auto it0 = vertexMap.find(edgeId0);
     auto it1 = vertexMap.find(edgeId1);
@@ -888,7 +897,7 @@ void PathGraph1::addEdge(
     const vertex_descriptor v0 = it0->second;
     const vertex_descriptor v1 = it1->second;
 
-    add_edge(v0, v1, {info}, *this);
+    add_edge(v0, v1, {info, coverage}, *this);
 }
 
 
@@ -987,7 +996,11 @@ void PathGraph1::writeGraphviz(
             out <<
                 "tooltip=\"" <<
                 graph[v0].edgeId << "->" <<
-                graph[v1].edgeId << " " <<
+                graph[v1].edgeId << " ";
+            if(edge.coverage != invalid<uint64_t>) {
+                out << edge.coverage << "/";
+            }
+            out <<
                 edge.info.common << " " <<
                 std::fixed << std::setprecision(2) << edge.info.correctedJaccard() << " " <<
                 edge.info.offsetInBases << "\" ";
@@ -995,7 +1008,11 @@ void PathGraph1::writeGraphviz(
 
         if(labels) {
             out <<
-                "label=\"" <<
+                "label=\"";
+            if(edge.coverage != invalid<uint64_t>) {
+                out << edge.coverage << "/";
+            }
+            out <<
                 edge.info.common << "\\n" <<
                 std::fixed << std::setprecision(2) << edge.info.correctedJaccard() << "\\n" <<
                 edge.info.offsetInBases << "\" ";
@@ -1655,7 +1672,7 @@ void GlobalPathGraph1::stitchSeedChains(
             const uint64_t vertexId1 = chain.vertexIds[position + 1];
             const GlobalPathGraph1Vertex& vertex0 = verticesVector[vertexId0];
             const GlobalPathGraph1Vertex& vertex1 = verticesVector[vertexId1];
-            graph.addEdge(vertex0.edgeId, vertex1.edgeId, chain.infos[position]);
+            graph.addEdge(vertex0.edgeId, vertex1.edgeId, chain.infos[position], invalid<uint64_t>);
         }
     }
 
@@ -1685,7 +1702,7 @@ void GlobalPathGraph1::stitchSeedChains(
             const GlobalPathGraph1Vertex& vertex0 = verticesVector[vertexId0];
             const GlobalPathGraph1Vertex& vertex1 = verticesVector[vertexId1];
             // cout << "Adding edge for " << vertex0.edgeId << " " << vertex1.edgeId << endl;
-            graph.addEdge(vertex0.edgeId, vertex1.edgeId, connector.infos[position]);
+            graph.addEdge(vertex0.edgeId, vertex1.edgeId, connector.infos[position], invalid<uint64_t>);
         }
 
     }
@@ -1762,7 +1779,8 @@ vector< shared_ptr<PathGraph1> > PathGraph1::createConnectedComponents(
         component.addEdge(
             edgeId0,
             edgeId1,
-            graph[e].info);
+            graph[e].info,
+            graph[e].coverage);
     }
 
 
