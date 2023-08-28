@@ -27,6 +27,13 @@ using namespace mode3b;
 
 void GlobalPathGraph1::assemble(const Assembler& assembler)
 {
+    assemble1(assembler);
+}
+
+
+
+void GlobalPathGraph1::assemble0(const Assembler& assembler)
+    {
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
     // ARE DEFINED BEFORE EACH PHASE THAT USES THEM.
 
@@ -114,7 +121,8 @@ void GlobalPathGraph1::assemble(const Assembler& assembler)
             // Compute connected components.
             const double minCorrectedJaccardForComponents = 0.;
             graph.createComponents(minCorrectedJaccardForComponents, minComponentSize);
-            graph.writeComponentsGraphviz("PathGraphB", minCorrectedJaccardForComponents, 1.);
+            graph.writeComponentsGraphviz("PathGraphB", minCorrectedJaccardForComponents, 1.,
+                false, true, true, true);
 
             graph.connectSeedChains2(minEdgeCoverage, minCorrectedJaccard, connectors);
         }
@@ -138,6 +146,24 @@ void GlobalPathGraph1::assemble(const Assembler& assembler)
         graph.assembleChains(chains, fasta, "Chain-");
 #endif
     }
+}
+
+
+
+void GlobalPathGraph1::assemble1(const Assembler& assembler)
+{
+    const uint64_t minPrimaryCoverage = 8;
+    const uint64_t maxPrimaryCoverage = 35;
+    const uint64_t minComponentSize = 3;
+
+    GlobalPathGraph1 graph(assembler);
+    graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
+    graph.computeOrientedReadJourneys();
+    graph.createEdges0(1, 1, 0.);
+
+    graph.createComponents(0., minComponentSize);
+    graph.writeComponentsGraphviz("PathGraph", 0., 1., true, true, true, true);
+    graph.writeComponentsGraphviz("PathGraph-Compact", 0., 1., false, false, false, false);
 }
 
 
@@ -338,7 +364,11 @@ void GlobalPathGraph1::storeSeedChains(const vector<Chain>& seedChainsArgument)
 void GlobalPathGraph1::writeComponentsGraphviz(
     const string& baseName,
     double redJ,
-    double greenJ) const
+    double greenJ,
+    bool labels,
+    bool tooltips,
+    bool colorVertices,
+    bool colorEdges) const
 {
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         const PathGraph1& component = *components[componentRank];
@@ -349,7 +379,10 @@ void GlobalPathGraph1::writeComponentsGraphviz(
         const string graphName = baseName + "_Component_" + to_string(componentRank);
 
         ofstream out(fileName);
-        component.writeGraphviz(verticesVector, graphName, redJ, greenJ,out);
+        component.writeGraphviz(verticesVector, graphName,
+            redJ, greenJ,
+            labels, tooltips, colorVertices, colorEdges,
+            out);
     }
 }
 
@@ -535,11 +568,11 @@ void GlobalPathGraph1::computeOrientedReadJourneys()
         for(Strand strand=0; strand<2; strand++) {
             const OrientedReadId orientedReadId(readId, strand);
             const auto journey = orientedReadJourneys[orientedReadId.getValue()];
-            csv << orientedReadId;
+            csv << orientedReadId << ",";
             for(const auto& p: journey) {
                 const uint64_t vertexId = p.second;
                 const MarkerGraphEdgeId edgeId = verticesVector[vertexId].edgeId;
-                csv << "," << edgeId;
+                csv << edgeId << ",";
             }
             csv << "\n";
         }
@@ -866,6 +899,10 @@ void PathGraph1::writeGraphviz(
     const string& graphName,
     double redJ,
     double greenJ,
+    bool labels,
+    bool tooltips,
+    bool colorVertices,
+    bool colorEdges,
     ostream& out) const
 {
     const PathGraph1& graph = *this;
@@ -876,34 +913,62 @@ void PathGraph1::writeGraphviz(
         const GlobalPathGraph1Vertex& globalVertex = globalVertices[vertex.vertexId];
         out << vertex.edgeId;
 
-        // Tooltip.
-        out << " [tooltip=\"";
-        out << vertex.edgeId;
-        if(globalVertex.chainId != invalid<uint64_t>) {
-            out << " " << globalVertex.chainId << ":" << globalVertex.positionInChain;
-            if(globalVertex.isFirstInChain) {
-                out << " first in chain";
-            }
-            if(globalVertex.isLastInChain) {
-                out << " last in chain";
-            }
+        if(labels or tooltips or colorVertices) {
+            out << "[";
         }
-        out << "\"";
+
+        if(labels) {
+            out << "label=\"";
+            out << vertex.edgeId << "\\n" << globalVertex.journeyInfoItems.size();
+            if(globalVertex.chainId != invalid<uint64_t>) {
+                out << "\\n" << globalVertex.chainId << ":" << globalVertex.positionInChain;
+                if(globalVertex.isFirstInChain) {
+                    out << "\\nFirst in chain";
+                }
+                if(globalVertex.isLastInChain) {
+                    out << "\\nLast in chain";
+                }
+            }
+            out << "\" ";
+        }
+
+        if(tooltips) {
+            out << "tooltip=\"";
+            out << vertex.edgeId;
+            if(globalVertex.chainId != invalid<uint64_t>) {
+                out << " " << globalVertex.chainId << ":" << globalVertex.positionInChain;
+                if(globalVertex.isFirstInChain) {
+                    out << " first in chain";
+                }
+                if(globalVertex.isLastInChain) {
+                    out << " last in chain";
+                }
+            }
+            out << "\" ";
+        }
 
         // If it belongs to a chain, color it.
-        if(globalVertex.chainId != invalid<uint64_t>) {
-            if(globalVertex.isFirstInChain) {
-                out << " style=filled fillcolor=blue";
-            } else if(globalVertex.isLastInChain) {
-                out << " style=filled fillcolor=orange";
-            } else {
-                // const uint32_t hue = MurmurHash2(&vertex.chainId, sizeof(vertex.chainId), 231) % 100;
-                // out << " color=\"" << 0.01 * double(hue) << ",0.4,1\"";
-                out << " style=filled fillcolor=cyan";
+        if(colorVertices) {
+            if(globalVertex.chainId != invalid<uint64_t>) {
+                if(globalVertex.isFirstInChain) {
+                    out << " style=filled fillcolor=blue ";
+                } else if(globalVertex.isLastInChain) {
+                    out << " style=filled fillcolor=orange ";
+                } else {
+                    // const uint32_t hue = MurmurHash2(&vertex.chainId, sizeof(vertex.chainId), 231) % 100;
+                    // out << " color=\"" << 0.01 * double(hue) << ",0.4,1\"";
+                    out << " style=filled fillcolor=cyan ";
+                }
             }
         }
-        out << "];\n";
+
+        if(labels or tooltips or colorVertices) {
+            out << "]";
+        }
+        out << ";\n";
     }
+
+
 
     BGL_FORALL_EDGES(e, graph, PathGraph1) {
         const PathGraph1Edge& edge = graph[e];
@@ -912,25 +977,48 @@ void PathGraph1::writeGraphviz(
 
         out <<
             graph[v0].edgeId << "->" <<
-            graph[v1].edgeId <<
-            " [tooltip=\"" <<
-            graph[v0].edgeId << "->" <<
-            graph[v1].edgeId << " " <<
-            edge.info.common << " " <<
-            std::fixed << std::setprecision(2) << edge.info.correctedJaccard() << " " <<
-            edge.info.offsetInBases << "\"";
+            graph[v1].edgeId;
+
+        if(labels or tooltips or colorEdges) {
+            out << " [";
+        }
+
+        if(tooltips) {
+            out <<
+                "tooltip=\"" <<
+                graph[v0].edgeId << "->" <<
+                graph[v1].edgeId << " " <<
+                edge.info.common << " " <<
+                std::fixed << std::setprecision(2) << edge.info.correctedJaccard() << " " <<
+                edge.info.offsetInBases << "\" ";
+        }
+
+        if(labels) {
+            out <<
+                "label=\"" <<
+                edge.info.common << "\\n" <<
+                std::fixed << std::setprecision(2) << edge.info.correctedJaccard() << "\\n" <<
+                edge.info.offsetInBases << "\" ";
+
+        }
 
         // Color.
-        const double correctedJaccard = edge.info.correctedJaccard();
-        if(correctedJaccard <= redJ) {
-            out << " color=red";
-        } else if(correctedJaccard >= greenJ) {
-            out << " color=green";
-        } else {
-            const double hue = (correctedJaccard - redJ) / (3. * (greenJ - redJ));
-            out << " color=\"" << hue << ",1,1\"";
+        if(colorEdges) {
+            const double correctedJaccard = edge.info.correctedJaccard();
+            if(correctedJaccard <= redJ) {
+                out << " color=red ";
+            } else if(correctedJaccard >= greenJ) {
+                out << " color=green ";
+            } else {
+                const double hue = (correctedJaccard - redJ) / (3. * (greenJ - redJ));
+                out << " color=\"" << hue << ",1,1\" ";
+            }
         }
-        out << "];\n";
+
+        if(labels or tooltips or colorEdges) {
+            out << "]";
+        }
+        out << ";\n";
     }
 
     out << "}\n";
@@ -1603,7 +1691,7 @@ void GlobalPathGraph1::stitchSeedChains(
     }
 
     ofstream out("StitchedSeedChains.dot");
-    graph.writeGraphviz(verticesVector, "StitchedSeedChains", 0.5, 1., out);
+    graph.writeGraphviz(verticesVector, "StitchedSeedChains", 0.5, 1., false, true, true, true, out);
 
     cout << "The stitched graph has " << num_vertices(graph) << " vertices and " <<
         num_edges(graph) << " edges." << endl;

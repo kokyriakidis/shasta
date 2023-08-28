@@ -96,6 +96,10 @@ public:
         const string& graphName,
         double redJ,
         double greenJ,
+        bool labels,
+        bool tooltips,
+        bool colorVertices,
+        bool colorEdges,
         ostream&) const;
 
     // For each vertex, only keep the best k outgoing and k incoming edges.
@@ -151,6 +155,8 @@ class shasta::mode3b::GlobalPathGraph1 {
 public:
     static void assemble(const Assembler&);
 private:
+    static void assemble0(const Assembler&);
+    static void assemble1(const Assembler&);
     GlobalPathGraph1(const Assembler&);
     const Assembler& assembler;
 
@@ -345,7 +351,11 @@ private:
     void writeComponentsGraphviz(
         const string& baseName,
         double redJ,
-        double greenJ) const;
+        double greenJ,
+        bool labels,
+        bool tooltips,
+        bool colorVertices,
+        bool colorEdges) const;
 };
 
 
