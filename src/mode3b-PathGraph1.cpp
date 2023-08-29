@@ -122,8 +122,8 @@ void GlobalPathGraph1::assemble0(const Assembler& assembler)
             // Compute connected components.
             const double minCorrectedJaccardForComponents = 0.;
             graph.createComponents(minCorrectedJaccardForComponents, minComponentSize);
-            graph.writeComponentsGraphviz("PathGraphB", minCorrectedJaccardForComponents, 1.,
-                false, true, true, true);
+            const GlobalPathGraph1DisplayOptions options(minCorrectedJaccardForComponents, 1.);
+            graph.writeComponentsGraphviz("PathGraphB", options);
 
             graph.connectSeedChains2(minEdgeCoverage, minCorrectedJaccard, connectors);
         }
@@ -167,8 +167,12 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
 
     graph.createComponents(minCorrectedJaccard, minComponentSize);
     graph.localTransitiveReduction(transitiveReductionDistance);
-    graph.writeComponentsGraphviz("PathGraph", 0., 1., true, true, true, true);
-    graph.writeComponentsGraphviz("PathGraph_Compact", 0., 1., false, false, false, false);
+
+    GlobalPathGraph1DisplayOptions options;
+    graph.writeComponentsGraphviz("PathGraph", options);
+
+    options.makeCompact();
+    graph.writeComponentsGraphviz("PathGraph_Compact", options);
 }
 
 
@@ -368,12 +372,7 @@ void GlobalPathGraph1::storeSeedChains(const vector<Chain>& seedChainsArgument)
 // Write each connected component in graphviz format.
 void GlobalPathGraph1::writeComponentsGraphviz(
     const string& baseName,
-    double redJ,
-    double greenJ,
-    bool labels,
-    bool tooltips,
-    bool colorVertices,
-    bool colorEdges) const
+    const GlobalPathGraph1DisplayOptions& options) const
 {
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         const PathGraph1& component = *components[componentRank];
@@ -384,10 +383,7 @@ void GlobalPathGraph1::writeComponentsGraphviz(
         const string graphName = baseName + "_Component_" + to_string(componentRank);
 
         ofstream out(fileName);
-        component.writeGraphviz(verticesVector, graphName,
-            redJ, greenJ,
-            labels, tooltips, colorVertices, colorEdges,
-            out);
+        component.writeGraphviz(verticesVector, graphName,options, out);
     }
 }
 
@@ -921,12 +917,7 @@ void PathGraph1::addEdge(
 void PathGraph1::writeGraphviz(
     const vector<GlobalPathGraph1Vertex>& globalVertices,
     const string& graphName,
-    double redJ,
-    double greenJ,
-    bool labels,
-    bool tooltips,
-    bool colorVertices,
-    bool colorEdges,
+    const GlobalPathGraph1DisplayOptions& options,
     ostream& out) const
 {
     const PathGraph1& graph = *this;
@@ -937,11 +928,11 @@ void PathGraph1::writeGraphviz(
         const GlobalPathGraph1Vertex& globalVertex = globalVertices[vertex.vertexId];
         out << vertex.edgeId;
 
-        if(labels or tooltips or colorVertices) {
+        if(options.labels or options.tooltips or options.colorVertices) {
             out << "[";
         }
 
-        if(labels) {
+        if(options.labels) {
             out << "label=\"";
             out << vertex.edgeId << "\\n" << globalVertex.journeyInfoItems.size();
             if(globalVertex.chainId != invalid<uint64_t>) {
@@ -956,7 +947,7 @@ void PathGraph1::writeGraphviz(
             out << "\" ";
         }
 
-        if(tooltips) {
+        if(options.tooltips) {
             out << "tooltip=\"";
             out << vertex.edgeId;
             if(globalVertex.chainId != invalid<uint64_t>) {
@@ -972,7 +963,7 @@ void PathGraph1::writeGraphviz(
         }
 
         // If it belongs to a chain, color it.
-        if(colorVertices) {
+        if(options.colorVertices) {
             if(globalVertex.chainId != invalid<uint64_t>) {
                 if(globalVertex.isFirstInChain) {
                     out << " style=filled fillcolor=blue ";
@@ -986,7 +977,7 @@ void PathGraph1::writeGraphviz(
             }
         }
 
-        if(labels or tooltips or colorVertices) {
+        if(options.labels or options.tooltips or options.colorVertices) {
             out << "]";
         }
         out << ";\n";
@@ -1003,7 +994,7 @@ void PathGraph1::writeGraphviz(
             graph[v0].edgeId << "->" <<
             graph[v1].edgeId;
 
-        if(edge.isNonTransitiveReductionEdge or labels or tooltips or colorEdges) {
+        if(edge.isNonTransitiveReductionEdge or options.labels or options.tooltips or options.colorEdges) {
             out << " [";
         }
 
@@ -1011,7 +1002,7 @@ void PathGraph1::writeGraphviz(
             out << "style=dashed ";
         }
 
-        if(tooltips) {
+        if(options.tooltips) {
             out <<
                 "tooltip=\"" <<
                 graph[v0].edgeId << "->" <<
@@ -1025,7 +1016,7 @@ void PathGraph1::writeGraphviz(
                 edge.info.offsetInBases << "\" ";
         }
 
-        if(labels) {
+        if(options.labels) {
             out <<
                 "label=\"";
             if(edge.coverage != invalid<uint64_t>) {
@@ -1039,19 +1030,19 @@ void PathGraph1::writeGraphviz(
         }
 
         // Color.
-        if(colorEdges) {
+        if(options.colorEdges) {
             const double correctedJaccard = edge.info.correctedJaccard();
-            if(correctedJaccard <= redJ) {
+            if(correctedJaccard <= options.redJ) {
                 out << " color=red ";
-            } else if(correctedJaccard >= greenJ) {
+            } else if(correctedJaccard >= options.greenJ) {
                 out << " color=green ";
             } else {
-                const double hue = (correctedJaccard - redJ) / (3. * (greenJ - redJ));
+                const double hue = (correctedJaccard - options.redJ) / (3. * (options.greenJ - options.redJ));
                 out << " color=\"" << hue << ",1,1\" ";
             }
         }
 
-        if(edge.isNonTransitiveReductionEdge or labels or tooltips or colorEdges) {
+        if(edge.isNonTransitiveReductionEdge or options.labels or options.tooltips or options.colorEdges) {
             out << "]";
         }
         out << ";\n";
@@ -1727,7 +1718,9 @@ void GlobalPathGraph1::stitchSeedChains(
     }
 
     ofstream out("StitchedSeedChains.dot");
-    graph.writeGraphviz(verticesVector, "StitchedSeedChains", 0.5, 1., false, true, true, true, out);
+    GlobalPathGraph1DisplayOptions options(0.5, 1.);
+    options.labels = false;
+    graph.writeGraphviz(verticesVector, "StitchedSeedChains", options, out);
 
     cout << "The stitched graph has " << num_vertices(graph) << " vertices and " <<
         num_edges(graph) << " edges." << endl;

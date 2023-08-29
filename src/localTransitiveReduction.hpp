@@ -46,13 +46,7 @@ template<class Graph> void shasta::localTransitiveReduction(
 
     // Loop over all edges v0->v1.
     nonTransitiveReductionEdges.clear();
-    const uint64_t edgeCount = num_edges(graph);
-    uint64_t doneCount = 0;
     BGL_FORALL_EDGES_T(e01, graph, Graph) {
-        if((doneCount % 1000) == 0) {
-            cout << doneCount << "/" << edgeCount << endl;
-        }
-        ++doneCount;
         const vertex_descriptor v0 = source(e01, graph);
         const vertex_descriptor v1 = target(e01, graph);
 

@@ -52,8 +52,39 @@ namespace shasta {
             boost::bidirectionalS,
             PathGraph1Vertex,
             PathGraph1Edge>;
+
+        class GlobalPathGraph1DisplayOptions;
     }
 }
+
+
+
+// Class to control Graphviz output of GlobalPathGraph1 and PathGraph1.
+class shasta::mode3b::GlobalPathGraph1DisplayOptions {
+public:
+    bool labels = true;
+    bool tooltips = true;
+    bool colorVertices = true;
+    bool colorEdges = true;
+
+    // Thresholds for coloring by corrected Jaccard similarity J'.
+    // If J' <= redJ, the edge is drawn red.
+    // If J' >= greenJ, the edge is drawn green.
+    // For values in between, the color is interpolated.
+    double redJ;
+    double greenJ;
+
+    GlobalPathGraph1DisplayOptions(double redJ = 0., double greenJ = 1.) :
+        redJ(redJ), greenJ(greenJ) {}
+
+    void makeCompact()
+    {
+        labels = false;
+        tooltips = false;
+        colorVertices = false;
+        colorEdges = false;
+    }
+};
 
 
 
@@ -97,12 +128,7 @@ public:
     void writeGraphviz(
         const vector<GlobalPathGraph1Vertex>& globalVertices,
         const string& graphName,
-        double redJ,
-        double greenJ,
-        bool labels,
-        bool tooltips,
-        bool colorVertices,
-        bool colorEdges,
+        const GlobalPathGraph1DisplayOptions&,
         ostream&) const;
 
     // For each vertex, only keep the best k outgoing and k incoming edges.
@@ -361,12 +387,7 @@ private:
     // Write each connected component in graphviz format.
     void writeComponentsGraphviz(
         const string& baseName,
-        double redJ,
-        double greenJ,
-        bool labels,
-        bool tooltips,
-        bool colorVertices,
-        bool colorEdges) const;
+        const GlobalPathGraph1DisplayOptions&) const;
 };
 
 
