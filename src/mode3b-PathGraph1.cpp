@@ -2,6 +2,7 @@
 #include "mode3b-PathGraph1.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
+#include "localTransitiveReduction.hpp"
 #include "longestPath.hpp"
 #include "mode3b-AssemblyPath.hpp"
 #include "MurmurHash2.hpp"
@@ -157,6 +158,7 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
     const uint64_t minEdgeCoverage = 2;
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
+    const uint64_t transitiveReductionDistance = 6;
 
     GlobalPathGraph1 graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
@@ -164,6 +166,7 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
     graph.createEdges0(1, minEdgeCoverage, minCorrectedJaccard);
 
     graph.createComponents(minCorrectedJaccard, minComponentSize);
+    graph.localTransitiveReduction(transitiveReductionDistance);
     graph.writeComponentsGraphviz("PathGraph", 0., 1., true, true, true, true);
     graph.writeComponentsGraphviz("PathGraph_Compact", 0., 1., false, false, false, false);
 }
@@ -861,13 +864,25 @@ void GlobalPathGraph1::knn(uint64_t k)
 
 
 
-// Transitive reduction of each connected component.
-// Ths can fail for connected components that contain cycles.
-void GlobalPathGraph1::transitiveReduction()
+// Local transitive reduction of each connected component.
+void GlobalPathGraph1::localTransitiveReduction(uint64_t distance)
 {
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         PathGraph1& component = *components[componentRank];
-        shasta::transitiveReduction(component);
+        component.localTransitiveReduction(distance);
+    }
+}
+
+
+
+void PathGraph1::localTransitiveReduction(uint64_t distance)
+{
+    PathGraph1& graph = *this;
+    vector<edge_descriptor> nonTransitiveReductionEdges;
+    shasta::localTransitiveReduction(graph, distance, nonTransitiveReductionEdges);
+
+    for(const edge_descriptor e: nonTransitiveReductionEdges) {
+        graph[e].isNonTransitiveReductionEdge = true;
     }
 }
 
@@ -988,8 +1003,12 @@ void PathGraph1::writeGraphviz(
             graph[v0].edgeId << "->" <<
             graph[v1].edgeId;
 
-        if(labels or tooltips or colorEdges) {
+        if(edge.isNonTransitiveReductionEdge or labels or tooltips or colorEdges) {
             out << " [";
+        }
+
+        if(edge.isNonTransitiveReductionEdge) {
+            out << "style=dashed ";
         }
 
         if(tooltips) {
@@ -1032,7 +1051,7 @@ void PathGraph1::writeGraphviz(
             }
         }
 
-        if(labels or tooltips or colorEdges) {
+        if(edge.isNonTransitiveReductionEdge or labels or tooltips or colorEdges) {
             out << "]";
         }
         out << ";\n";

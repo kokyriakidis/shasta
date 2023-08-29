@@ -73,6 +73,7 @@ class shasta::mode3b::PathGraph1Edge {
 public:
     MarkerGraphEdgePairInfo info;
     uint64_t coverage;
+    bool isNonTransitiveReductionEdge = false;
 };
 
 
@@ -111,6 +112,8 @@ public:
     // Create the connected components of this PathGraph1,
     // without changing the PathGraph1 itself.
     vector< shared_ptr<PathGraph1> > createConnectedComponents(uint64_t minComponentSize) const;
+
+    void localTransitiveReduction(uint64_t distance);
 
 };
 
@@ -247,8 +250,8 @@ private:
     // This can break contiguity of the connected component.
     void knn(uint64_t k);
 
-    // Transitive reduction of each connected component.
-    void transitiveReduction();
+    // Local transitive reduction of each connected component.
+    void localTransitiveReduction(uint64_t distance);
 
 
 
