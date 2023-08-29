@@ -13,6 +13,7 @@ using namespace shasta;
 using namespace mode3b;
 
 // Boost libraries.
+#include <boost/graph/filtered_graph.hpp>
 #include <boost/graph/iteration_macros.hpp>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -174,6 +175,12 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
 
     options.makeCompact();
     graph.writeComponentsGraphviz("PathGraph_Compact", options);
+
+    // Create a compressed version of each connected component.
+    for(const shared_ptr<const PathGraph1> componentPointer: graph.components) {
+        const PathGraph1& component = *componentPointer;
+        CompressedPathGraph1 cGraph(component);
+    }
 }
 
 
@@ -2131,4 +2138,127 @@ void GlobalPathGraph1::writeConnectors(const vector<ChainConnector>& connectors)
                 info.correctedJaccard() << "\n";
         }
     }
+}
+
+
+
+CompressedPathGraph1::CompressedPathGraph1(const PathGraph1& graph)
+{
+    CompressedPathGraph1& cGraph = *this;
+    using boost::out_degree;
+    using boost::in_degree;
+
+    // Create a filtered version of the PathGraph1, containing only the
+    // transitive reduction edges.
+    class EdgePredicate {
+    public:
+        bool operator()(const PathGraph1::edge_descriptor e) const
+        {
+            return not (*graph)[e].isNonTransitiveReductionEdge;
+        }
+        EdgePredicate(const PathGraph1& graph) : graph(&graph) {}
+        EdgePredicate() : graph(0) {}
+    private:
+        const PathGraph1* graph;
+    };
+    using FilteredPathGraph1 = boost::filtered_graph<PathGraph1, EdgePredicate>;
+    FilteredPathGraph1 filteredGraph(graph, EdgePredicate(graph));
+
+    vector<uint64_t> lengthHistogram(2, 0);
+
+    // Loop over vertices of the PathGraph1 to generate the CompressedPathGraph1 vertices.
+    std::set<PathGraph1::vertex_descriptor> visited;
+    vector<PathGraph1::vertex_descriptor> forwardVertices;
+    vector<PathGraph1::vertex_descriptor> backwardVertices;
+    BGL_FORALL_VERTICES(v, filteredGraph, FilteredPathGraph1) {
+
+        // If already visited, skip.
+        if(visited.contains(v)) {
+            continue;
+        }
+        visited.insert(v);
+
+        // cout << "Starting at " << filteredGraph[v].edgeId << endl;
+
+        // If in-degree or out-degree is more than 1, generate a single CompressedPathGraph1 vertex.
+        if(in_degree(v, filteredGraph) > 1 or out_degree(v, filteredGraph) > 1) {
+            const CompressedPathGraph1::vertex_descriptor cv = add_vertex(cGraph);
+            cGraph[cv].v.push_back(v);
+            // cout << "Done: is branch vertex." << endl;
+            ++lengthHistogram[1];
+            continue;
+        }
+
+        // Move forward until we find a branch vertex.
+        bool isCircular = false;
+        forwardVertices.clear();
+        PathGraph1::vertex_descriptor u = v;
+        while(true) {
+            if(out_degree(u, filteredGraph) == 0) {
+                break;
+            }
+            SHASTA_ASSERT(out_degree(u, filteredGraph) == 1);
+
+            // Move forward.
+            FilteredPathGraph1::out_edge_iterator it;
+            tie(it, ignore) = out_edges(u, filteredGraph);
+            u = target(*it, filteredGraph);
+
+            if(in_degree(u, filteredGraph) > 1 or out_degree(u, filteredGraph) > 1) {
+                break;
+            }
+
+            if(u == v) {
+                isCircular = true;
+            }
+
+            forwardVertices.push_back(u);
+            SHASTA_ASSERT(not visited.contains(u));
+            visited.insert(u);
+            // cout << "Moving forward found " << filteredGraph[u].edgeId << endl;
+        }
+
+        // For now, don't handle the circular case.
+        SHASTA_ASSERT(not isCircular);
+
+        // Move backward until we find a branch vertex.
+        backwardVertices.clear();
+        u = v;
+        while(true) {
+            if(in_degree(u, filteredGraph) == 0) {
+                break;
+            }
+            SHASTA_ASSERT(in_degree(u, filteredGraph) == 1);
+
+            // Move backward.
+            FilteredPathGraph1::in_edge_iterator it;
+            tie(it, ignore) = in_edges(u, filteredGraph);
+            u = source(*it, filteredGraph);
+
+            if(in_degree(u, filteredGraph) > 1 or out_degree(u, filteredGraph) > 1) {
+                break;
+            }
+
+            SHASTA_ASSERT(u != v);
+
+            backwardVertices.push_back(u);
+            SHASTA_ASSERT(not visited.contains(u));
+            visited.insert(u);
+            // cout << "Moving backward found " << filteredGraph[u].edgeId << endl;
+        }
+
+        // Create a new CompressedPathGraph1 vertex.
+        const CompressedPathGraph1::vertex_descriptor cv = add_vertex(cGraph);
+        CompressedPathGraph1Vertex& cVertex = cGraph[cv];
+        copy(backwardVertices.rbegin(), backwardVertices.rend(), back_inserter(cVertex.v));
+        cVertex.v.push_back(v);
+        copy(forwardVertices.begin(),forwardVertices.end(), back_inserter(cVertex.v));
+
+    }
+    SHASTA_ASSERT(visited.size() == num_vertices(graph));
+
+    cout << "The PathGraph1 has " << num_vertices(graph) << " vertices and " <<
+        num_edges(graph) << " edges." << endl;
+    cout << "The CompressedPathGraph1 has " << num_vertices(cGraph) << " vertices and " <<
+        num_edges(cGraph) << " edges.";
 }

@@ -54,6 +54,22 @@ namespace shasta {
             PathGraph1Edge>;
 
         class GlobalPathGraph1DisplayOptions;
+
+        // A compressed representation of a PathGraph1.
+        // A vertex of the CompressedPathGraph1 corresponds to one of the following:
+        // - A linear chain of PathGraph1 vertices with in-degree and out-degree 0 or 1.
+        // OR
+        // - A single PathGraph1 vertex with in-degree>1 and/or out-degree>1.
+        // An edge of the CompressedPathGraph1 always corresponds to an edge of the PathGraph1.
+        class CompressedPathGraph1;
+        class CompressedPathGraph1Vertex;
+        class CompressedPathGraph1Edge;
+        using CompressedPathGraph1GraphBaseClass = boost::adjacency_list<
+            boost::listS,
+            boost::vecS,
+            boost::bidirectionalS,
+            CompressedPathGraph1Vertex,
+            CompressedPathGraph1Edge>;
     }
 }
 
@@ -391,6 +407,26 @@ private:
         const GlobalPathGraph1DisplayOptions&) const;
 };
 
+
+
+// A compressed representation of a PathGraph1.
+// A vertex of the CompressedPathGraph1 corresponds to one of the following:
+// - A linear chain of PathGraph1 vertices with in-degree and out-degree 0 or 1.
+// OR
+// - A single PathGraph1 vertex with in-degree>1 and/or out-degree>1.
+// An edge of the CompressedPathGraph1 always corresponds to an edge of the PathGraph1.
+class shasta::mode3b::CompressedPathGraph1Vertex {
+public:
+    vector<PathGraph1::vertex_descriptor> v;
+};
+class shasta::mode3b::CompressedPathGraph1Edge {
+public:
+    PathGraph1::edge_descriptor e;
+};
+class shasta::mode3b::CompressedPathGraph1 : public CompressedPathGraph1GraphBaseClass {
+public:
+    CompressedPathGraph1(const PathGraph1&);
+};
 
 
 #endif
