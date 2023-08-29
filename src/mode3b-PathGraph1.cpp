@@ -169,6 +169,7 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
     graph.localTransitiveReduction(transitiveReductionDistance);
 
     GlobalPathGraph1DisplayOptions options;
+    options.showNonTransitiveReductionEdges = false;
     graph.writeComponentsGraphviz("PathGraph", options);
 
     options.makeCompact();
@@ -987,6 +988,9 @@ void PathGraph1::writeGraphviz(
 
     BGL_FORALL_EDGES(e, graph, PathGraph1) {
         const PathGraph1Edge& edge = graph[e];
+        if(not options.showNonTransitiveReductionEdges and edge.isNonTransitiveReductionEdge) {
+            continue;
+        }
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
 

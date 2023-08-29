@@ -66,6 +66,7 @@ public:
     bool tooltips = true;
     bool colorVertices = true;
     bool colorEdges = true;
+    bool showNonTransitiveReductionEdges = true;
 
     // Thresholds for coloring by corrected Jaccard similarity J'.
     // If J' <= redJ, the edge is drawn red.
