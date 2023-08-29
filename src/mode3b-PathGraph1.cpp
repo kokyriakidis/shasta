@@ -2257,8 +2257,34 @@ CompressedPathGraph1::CompressedPathGraph1(const PathGraph1& graph)
     }
     SHASTA_ASSERT(visited.size() == num_vertices(graph));
 
+
+
+    // To generate edges, create a map giving the compressed vertex descriptor
+    // that begins with a given vertex.
+    std::map<PathGraph1::vertex_descriptor, CompressedPathGraph1::vertex_descriptor> vertexMap;
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
+        vertexMap.insert({cGraph[cv].v.front(), cv});
+    }
+    BGL_FORALL_VERTICES(cv0, cGraph, CompressedPathGraph1) {
+        const PathGraph1::vertex_descriptor v0 = cGraph[cv0].v.back();
+        BGL_FORALL_OUTEDGES(v0, e, filteredGraph, FilteredPathGraph1) {
+            const PathGraph1::vertex_descriptor v1 = target(e, filteredGraph);
+            auto it1 = vertexMap.find(v1);
+            SHASTA_ASSERT(it1 != vertexMap.end());
+            const CompressedPathGraph1::vertex_descriptor cv1 = it1->second;
+            add_edge(cv0, cv1, {e}, cGraph);
+        }
+    }
+
+    uint64_t filteredGraphEdgeCount = 0;
+    BGL_FORALL_EDGES(e, filteredGraph, FilteredPathGraph1) {
+        ++filteredGraphEdgeCount;
+    }
     cout << "The PathGraph1 has " << num_vertices(graph) << " vertices and " <<
         num_edges(graph) << " edges." << endl;
+    cout << "The FilteredPathGraph1 has " << num_vertices(graph) << " vertices and " <<
+        filteredGraphEdgeCount << " edges." << endl;
     cout << "The CompressedPathGraph1 has " << num_vertices(cGraph) << " vertices and " <<
-        num_edges(cGraph) << " edges.";
+        num_edges(cGraph) << " edges." << endl;
+
 }
