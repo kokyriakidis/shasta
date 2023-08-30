@@ -144,9 +144,8 @@ public:
 
     void writeGraphviz(
         const vector<GlobalPathGraph1Vertex>& globalVertices,
-        const string& graphName,
-        const GlobalPathGraph1DisplayOptions&,
-        ostream&) const;
+        const string& name,
+        const GlobalPathGraph1DisplayOptions&) const;
 
     // For each vertex, only keep the best k outgoing and k incoming edges.
     // "Best" as defined by correctedJaccard of the edges.
@@ -209,8 +208,6 @@ class shasta::mode3b::GlobalPathGraph1 {
 public:
     static void assemble(const Assembler&);
 private:
-    static void assemble0(const Assembler&);
-    static void assemble1(const Assembler&);
     GlobalPathGraph1(const Assembler&);
     const Assembler& assembler;
 
@@ -405,6 +402,15 @@ private:
     void writeComponentsGraphviz(
         const string& baseName,
         const GlobalPathGraph1DisplayOptions&) const;
+
+    static void assemble0(const Assembler&);
+
+    static void assemble1(const Assembler&);
+    static void assemble1(
+        GlobalPathGraph1&,
+        uint64_t componentId,
+        uint64_t transitiveReductionDistance);
+
 };
 
 

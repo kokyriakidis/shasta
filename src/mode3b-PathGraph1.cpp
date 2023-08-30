@@ -167,20 +167,41 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
     graph.createEdges0(1, minEdgeCoverage, minCorrectedJaccard);
 
     graph.createComponents(minCorrectedJaccard, minComponentSize);
-    graph.localTransitiveReduction(transitiveReductionDistance);
 
+    // Assemble each connected component separately.
+    for(uint64_t componentId=0; componentId<graph.components.size(); componentId++) {
+        assemble1(graph, componentId, transitiveReductionDistance);
+    }
+}
+
+
+
+void GlobalPathGraph1::assemble1(
+    GlobalPathGraph1& globalGraph,
+    uint64_t componentId,
+    uint64_t transitiveReductionDistance)
+{
+    PathGraph1& component = *globalGraph.components[componentId];
+
+    // Local transitive reduction.
+    // This flags the non-transitive reduction edges.
+    // No edges are removed.
+    component.localTransitiveReduction(transitiveReductionDistance);
+
+    // Graphviz output.
     GlobalPathGraph1DisplayOptions options;
     options.showNonTransitiveReductionEdges = false;
-    graph.writeComponentsGraphviz("PathGraph", options);
-
+    component.writeGraphviz(globalGraph.verticesVector,
+        "PathGraph" + to_string(componentId), options);
     options.makeCompact();
-    graph.writeComponentsGraphviz("PathGraph_Compact", options);
+    component.writeGraphviz(globalGraph.verticesVector,
+        "PathGraphCompact" + to_string(componentId), options);
 
-    // Create a compressed version of each connected component.
-    for(const shared_ptr<const PathGraph1> componentPointer: graph.components) {
-        const PathGraph1& component = *componentPointer;
-        CompressedPathGraph1 cGraph(component);
-    }
+    // Create a compressed representation of this connected component.
+    // In this compressed representation, each linear sequence of
+    // transitive reduction non-branch vertices becomes a single vertex.
+    // Non-branch vertices are those with in-degree and out-degree not greater than 1.
+    CompressedPathGraph1 cGraph(component);
 }
 
 
@@ -384,14 +405,10 @@ void GlobalPathGraph1::writeComponentsGraphviz(
 {
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         const PathGraph1& component = *components[componentRank];
-
-        // Generate names for the file and the graph in the file.
-        // For the latter, use '_' instead of '-' is forced by Graphviz syntax rules.
-        const string fileName  = baseName + "-Component-" + to_string(componentRank) + ".dot";
-        const string graphName = baseName + "_Component_" + to_string(componentRank);
-
-        ofstream out(fileName);
-        component.writeGraphviz(verticesVector, graphName,options, out);
+        component.writeGraphviz(
+            verticesVector,
+            baseName + "_Component_" + to_string(componentRank),
+            options);
     }
 }
 
@@ -924,12 +941,13 @@ void PathGraph1::addEdge(
 // Write a PathGraph1 in graphviz format.
 void PathGraph1::writeGraphviz(
     const vector<GlobalPathGraph1Vertex>& globalVertices,
-    const string& graphName,
-    const GlobalPathGraph1DisplayOptions& options,
-    ostream& out) const
+    const string& name,
+    const GlobalPathGraph1DisplayOptions& options) const
 {
+    ofstream out(name + ".dot");
+
     const PathGraph1& graph = *this;
-    out << "digraph " << graphName << " {\n";
+    out << "digraph " << name << " {\n";
 
     BGL_FORALL_VERTICES(v, graph, PathGraph1) {
         const PathGraph1Vertex& vertex = graph[v];
@@ -1728,10 +1746,9 @@ void GlobalPathGraph1::stitchSeedChains(
 
     }
 
-    ofstream out("StitchedSeedChains.dot");
     GlobalPathGraph1DisplayOptions options(0.5, 1.);
     options.labels = false;
-    graph.writeGraphviz(verticesVector, "StitchedSeedChains", options, out);
+    graph.writeGraphviz(verticesVector, "StitchedSeedChains", options);
 
     cout << "The stitched graph has " << num_vertices(graph) << " vertices and " <<
         num_edges(graph) << " edges." << endl;
