@@ -203,6 +203,7 @@ void GlobalPathGraph1::assemble1(
     // Non-branch vertices are those with in-degree and out-degree not greater than 1.
     CompressedPathGraph1 cGraph(component);
     globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
+    globalGraph.writeCompressedGraphviz(componentId, cGraph);
 }
 
 
@@ -240,6 +241,44 @@ void GlobalPathGraph1::writeCompressedVerticesCsv(
         csv << totalBaseOffset << ",";
         csv << "\n";
     }
+}
+
+
+
+void GlobalPathGraph1::writeCompressedGraphviz(
+    uint64_t componentId,
+    const CompressedPathGraph1& cGraph)
+{
+    const PathGraph1& component = *components[componentId];
+
+    // Hide GlobalPathGraph1::edges. We should change its name instead.
+    using boost::edges;
+
+    const string name = "CompressedPathGraph" + to_string(componentId);
+    ofstream out(name + ".dot");
+    out << "digraph " << name << "{\n";
+
+    // Identify vertices by their first PathGraph1 edgeId.
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
+        const PathGraph1::vertex_descriptor v = cGraph[cv].v.front();
+        out << component[v].edgeId;
+        if(cGraph[cv].v.size() == 1) {
+            out << "[color=red fillcolor=red]";
+        }
+        out << ";\n";
+    }
+
+    CompressedPathGraph1::edge_iterator begin, end;
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
+        const auto cv0 = source(ce, cGraph);
+        const auto cv1 = target(ce, cGraph);
+        const PathGraph1::vertex_descriptor v0 = cGraph[cv0].v.front();
+        const PathGraph1::vertex_descriptor v1 = cGraph[cv1].v.front();
+        out <<
+            component[v0].edgeId << "->" <<
+            component[v1].edgeId << ";\n";
+    }
+    out << "}";
 }
 
 

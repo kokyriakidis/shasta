@@ -412,6 +412,7 @@ private:
         uint64_t transitiveReductionDistance);
 
     void writeCompressedVerticesCsv(uint64_t componentId, const CompressedPathGraph1&);
+    void writeCompressedGraphviz(uint64_t componentId, const CompressedPathGraph1&);
 
 
 };
