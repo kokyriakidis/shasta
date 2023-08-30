@@ -202,6 +202,44 @@ void GlobalPathGraph1::assemble1(
     // transitive reduction non-branch vertices becomes a single vertex.
     // Non-branch vertices are those with in-degree and out-degree not greater than 1.
     CompressedPathGraph1 cGraph(component);
+    globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
+}
+
+
+
+void GlobalPathGraph1::writeCompressedVerticesCsv(
+    uint64_t componentId,
+    const CompressedPathGraph1& cGraph)
+{
+    const PathGraph1& component = *components[componentId];
+
+    ofstream csv("CompressedPathGraphVertices" + to_string(componentId) + ".csv");
+    csv << "Begin,End,Vertex count,Estimated length\n";
+
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
+        const CompressedPathGraph1Vertex& cVertex = cGraph[cv];
+        SHASTA_ASSERT(not cVertex.v.empty());
+        const PathGraph1::vertex_descriptor v0 = cVertex.v.front();
+        const PathGraph1::vertex_descriptor v1 = cVertex.v.back();
+
+        // Compute the total base offset.
+        uint64_t totalBaseOffset = 0;
+        for(uint64_t i=1; i<cVertex.v.size(); i++) {
+            const PathGraph1::vertex_descriptor vA = cVertex.v[i-1];
+            const PathGraph1::vertex_descriptor vB = cVertex.v[i];
+            PathGraph1::edge_descriptor e;
+            bool edgeWasFound = false;
+            tie(e, edgeWasFound) = edge(vA, vB, component);
+            SHASTA_ASSERT(edgeWasFound);
+            totalBaseOffset += component[e].info.offsetInBases;
+        }
+
+        csv << component[v0].edgeId << ",";
+        csv << component[v1].edgeId << ",";
+        csv << cVertex.v.size() << ",";
+        csv << totalBaseOffset << ",";
+        csv << "\n";
+    }
 }
 
 
