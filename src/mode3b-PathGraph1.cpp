@@ -155,7 +155,7 @@ void GlobalPathGraph1::assemble0(const Assembler& assembler)
 void GlobalPathGraph1::assemble1(const Assembler& assembler)
 {
     const uint64_t minPrimaryCoverage = 8;
-    const uint64_t maxPrimaryCoverage = 35;
+    const uint64_t maxPrimaryCoverage = 25;
     const uint64_t minEdgeCoverage = 2;
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
@@ -215,7 +215,7 @@ void GlobalPathGraph1::writeCompressedVerticesCsv(
     const PathGraph1& component = *components[componentId];
 
     ofstream csv("CompressedPathGraphVertices" + to_string(componentId) + ".csv");
-    csv << "Begin,End,Vertex count,Estimated length\n";
+    csv << "Id,Begin,End,Vertex count,Estimated length\n";
 
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
         const CompressedPathGraph1Vertex& cVertex = cGraph[cv];
@@ -235,6 +235,7 @@ void GlobalPathGraph1::writeCompressedVerticesCsv(
             totalBaseOffset += component[e].info.offsetInBases;
         }
 
+        csv << componentId << "-" << cVertex.id << ",";
         csv << component[v0].edgeId << ",";
         csv << component[v1].edgeId << ",";
         csv << cVertex.v.size() << ",";
@@ -249,7 +250,7 @@ void GlobalPathGraph1::writeCompressedGraphviz(
     uint64_t componentId,
     const CompressedPathGraph1& cGraph)
 {
-    const PathGraph1& component = *components[componentId];
+    // const PathGraph1& component = *components[componentId];
 
     // Hide GlobalPathGraph1::edges. We should change its name instead.
     using boost::edges;
@@ -258,12 +259,10 @@ void GlobalPathGraph1::writeCompressedGraphviz(
     ofstream out(name + ".dot");
     out << "digraph " << name << "{\n";
 
-    // Identify vertices by their first PathGraph1 edgeId.
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
-        const PathGraph1::vertex_descriptor v = cGraph[cv].v.front();
-        out << component[v].edgeId;
+        out << "\"" << componentId << "-" << cGraph[cv].id << "\"";
         if(cGraph[cv].v.size() == 1) {
-            out << "[color=red fillcolor=red]";
+            out << " [color=red fillcolor=red]";
         }
         out << ";\n";
     }
@@ -272,11 +271,9 @@ void GlobalPathGraph1::writeCompressedGraphviz(
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
         const auto cv0 = source(ce, cGraph);
         const auto cv1 = target(ce, cGraph);
-        const PathGraph1::vertex_descriptor v0 = cGraph[cv0].v.front();
-        const PathGraph1::vertex_descriptor v1 = cGraph[cv1].v.front();
         out <<
-            component[v0].edgeId << "->" <<
-            component[v1].edgeId << ";\n";
+            "\"" << componentId << "-" << cGraph[cv0].id << "\"->" <<
+            "\"" << componentId << "-" << cGraph[cv1].id << "\";\n";
     }
     out << "}";
 }
@@ -2264,6 +2261,7 @@ CompressedPathGraph1::CompressedPathGraph1(const PathGraph1& graph)
     std::set<PathGraph1::vertex_descriptor> visited;
     vector<PathGraph1::vertex_descriptor> forwardVertices;
     vector<PathGraph1::vertex_descriptor> backwardVertices;
+    uint64_t nextVertexId = 0;
     BGL_FORALL_VERTICES(v, filteredGraph, FilteredPathGraph1) {
 
         // If already visited, skip.
@@ -2277,7 +2275,9 @@ CompressedPathGraph1::CompressedPathGraph1(const PathGraph1& graph)
         // If in-degree or out-degree is more than 1, generate a single CompressedPathGraph1 vertex.
         if(in_degree(v, filteredGraph) > 1 or out_degree(v, filteredGraph) > 1) {
             const CompressedPathGraph1::vertex_descriptor cv = add_vertex(cGraph);
-            cGraph[cv].v.push_back(v);
+            CompressedPathGraph1Vertex& cVertex = cGraph[cv];
+            cVertex.id = nextVertexId++;
+            cVertex.v.push_back(v);
             // cout << "Done: is branch vertex." << endl;
             ++lengthHistogram[1];
             continue;
@@ -2344,6 +2344,7 @@ CompressedPathGraph1::CompressedPathGraph1(const PathGraph1& graph)
         // Create a new CompressedPathGraph1 vertex.
         const CompressedPathGraph1::vertex_descriptor cv = add_vertex(cGraph);
         CompressedPathGraph1Vertex& cVertex = cGraph[cv];
+        cVertex.id = nextVertexId++;
         copy(backwardVertices.rbegin(), backwardVertices.rend(), back_inserter(cVertex.v));
         cVertex.v.push_back(v);
         copy(forwardVertices.begin(),forwardVertices.end(), back_inserter(cVertex.v));

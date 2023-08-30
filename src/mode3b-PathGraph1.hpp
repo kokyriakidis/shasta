@@ -427,6 +427,7 @@ private:
 // An edge of the CompressedPathGraph1 always corresponds to an edge of the PathGraph1.
 class shasta::mode3b::CompressedPathGraph1Vertex {
 public:
+    uint64_t id;
     vector<PathGraph1::vertex_descriptor> v;
 };
 class shasta::mode3b::CompressedPathGraph1Edge {
