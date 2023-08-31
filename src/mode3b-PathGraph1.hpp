@@ -66,7 +66,7 @@ namespace shasta {
         class CompressedPathGraph1Edge;
         using CompressedPathGraph1BaseClass = boost::adjacency_list<
             boost::listS,
-            boost::vecS,
+            boost::listS,
             boost::bidirectionalS,
             CompressedPathGraph1Vertex,
             CompressedPathGraph1Edge>;
@@ -412,12 +412,17 @@ private:
         uint64_t transitiveReductionDistance);
 
     // Functions that work on CompressedPathGraph1.
-    void writeCompressedVerticesCsv(uint64_t componentId, const CompressedPathGraph1&);
-    void writeCompressedGraphviz(uint64_t componentId, const CompressedPathGraph1&, bool labels);
+    void writeCompressedVerticesCsv(uint64_t componentId, const CompressedPathGraph1&) const;
+    void writeCompressedGraphviz(uint64_t componentId, const CompressedPathGraph1&, bool labels) const;
     uint64_t compressedVertexBaseOffset(
         uint64_t componentId,
         const CompressedPathGraph1&,
-        CompressedPathGraph1BaseClass::vertex_descriptor);
+        CompressedPathGraph1BaseClass::vertex_descriptor) const;
+    uint64_t detangleCompressedGraphVertices(uint64_t componentId, CompressedPathGraph1&) const;
+    bool detangleCompressedGraphVertex(
+        uint64_t componentId,
+        CompressedPathGraph1&,
+        CompressedPathGraph1BaseClass::vertex_descriptor) const;
 
 };
 
@@ -436,8 +441,12 @@ public:
 };
 class shasta::mode3b::CompressedPathGraph1Edge {
 public:
-    PathGraph1::edge_descriptor e;
+    PathGraph1::edge_descriptor e;  // Only valid if wasAddedDuringDetangling is false;
+    MarkerGraphEdgePairInfo info;   // Only valid if wasAddedDuringDetangling is true.
+    bool wasAddedDuringDetangling = false;
 };
+
+
 class shasta::mode3b::CompressedPathGraph1 : public CompressedPathGraph1BaseClass {
 public:
     CompressedPathGraph1(const PathGraph1&);
