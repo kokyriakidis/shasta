@@ -93,6 +93,11 @@ template<class Graph> void shasta::localTransitiveReduction(
                     break;
                 }
 
+                // If we already reached this vertex, do nothing.
+                if(m.contains(vB)) {
+                    continue;
+                }
+
                 // If not at maximum distance, enqueue vB.
                 if(distanceB < maxPathLength) {
                     q.push(vB);
