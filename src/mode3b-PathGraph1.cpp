@@ -159,7 +159,7 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
     const uint64_t minEdgeCoverage = 2;
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
-    const uint64_t transitiveReductionDistance = 6;
+    const uint64_t transitiveReductionDistance = 20;
 
     GlobalPathGraph1 graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
