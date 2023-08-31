@@ -64,7 +64,7 @@ namespace shasta {
         class CompressedPathGraph1;
         class CompressedPathGraph1Vertex;
         class CompressedPathGraph1Edge;
-        using CompressedPathGraph1GraphBaseClass = boost::adjacency_list<
+        using CompressedPathGraph1BaseClass = boost::adjacency_list<
             boost::listS,
             boost::vecS,
             boost::bidirectionalS,
@@ -411,9 +411,13 @@ private:
         uint64_t componentId,
         uint64_t transitiveReductionDistance);
 
+    // Functions that work on CompressedPathGraph1.
     void writeCompressedVerticesCsv(uint64_t componentId, const CompressedPathGraph1&);
-    void writeCompressedGraphviz(uint64_t componentId, const CompressedPathGraph1&);
-
+    void writeCompressedGraphviz(uint64_t componentId, const CompressedPathGraph1&, bool labels);
+    uint64_t compressedVertexBaseOffset(
+        uint64_t componentId,
+        const CompressedPathGraph1&,
+        CompressedPathGraph1BaseClass::vertex_descriptor);
 
 };
 
@@ -434,7 +438,7 @@ class shasta::mode3b::CompressedPathGraph1Edge {
 public:
     PathGraph1::edge_descriptor e;
 };
-class shasta::mode3b::CompressedPathGraph1 : public CompressedPathGraph1GraphBaseClass {
+class shasta::mode3b::CompressedPathGraph1 : public CompressedPathGraph1BaseClass {
 public:
     CompressedPathGraph1(const PathGraph1&);
 };

@@ -155,7 +155,7 @@ void GlobalPathGraph1::assemble0(const Assembler& assembler)
 void GlobalPathGraph1::assemble1(const Assembler& assembler)
 {
     const uint64_t minPrimaryCoverage = 8;
-    const uint64_t maxPrimaryCoverage = 25;
+    const uint64_t maxPrimaryCoverage = 35;
     const uint64_t minEdgeCoverage = 2;
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
@@ -203,7 +203,10 @@ void GlobalPathGraph1::assemble1(
     // Non-branch vertices are those with in-degree and out-degree not greater than 1.
     CompressedPathGraph1 cGraph(component);
     globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
-    globalGraph.writeCompressedGraphviz(componentId, cGraph);
+    bool labels = true;
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels);
+    labels = false;
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels);
 }
 
 
@@ -223,17 +226,7 @@ void GlobalPathGraph1::writeCompressedVerticesCsv(
         const PathGraph1::vertex_descriptor v0 = cVertex.v.front();
         const PathGraph1::vertex_descriptor v1 = cVertex.v.back();
 
-        // Compute the total base offset.
-        uint64_t totalBaseOffset = 0;
-        for(uint64_t i=1; i<cVertex.v.size(); i++) {
-            const PathGraph1::vertex_descriptor vA = cVertex.v[i-1];
-            const PathGraph1::vertex_descriptor vB = cVertex.v[i];
-            PathGraph1::edge_descriptor e;
-            bool edgeWasFound = false;
-            tie(e, edgeWasFound) = edge(vA, vB, component);
-            SHASTA_ASSERT(edgeWasFound);
-            totalBaseOffset += component[e].info.offsetInBases;
-        }
+        uint64_t totalBaseOffset = compressedVertexBaseOffset(componentId, cGraph, cv);
 
         csv << componentId << "-" << cVertex.id << ",";
         csv << component[v0].edgeId << ",";
@@ -246,34 +239,104 @@ void GlobalPathGraph1::writeCompressedVerticesCsv(
 
 
 
+uint64_t GlobalPathGraph1::compressedVertexBaseOffset(
+    uint64_t componentId,
+    const CompressedPathGraph1& cGraph,
+    CompressedPathGraph1BaseClass::vertex_descriptor cv)
+{
+    const PathGraph1& component = *components[componentId];
+    const CompressedPathGraph1Vertex& cVertex = cGraph[cv];
+    SHASTA_ASSERT(not cVertex.v.empty());
+
+    uint64_t totalBaseOffset = 0;
+
+    for(uint64_t i=1; i<cVertex.v.size(); i++) {
+        const PathGraph1::vertex_descriptor vA = cVertex.v[i-1];
+        const PathGraph1::vertex_descriptor vB = cVertex.v[i];
+
+        PathGraph1::edge_descriptor e;
+        bool edgeWasFound = false;
+        tie(e, edgeWasFound) = edge(vA, vB, component);
+        SHASTA_ASSERT(edgeWasFound);
+
+        totalBaseOffset += component[e].info.offsetInBases;
+    }
+    return totalBaseOffset;
+}
+
+
+
 void GlobalPathGraph1::writeCompressedGraphviz(
     uint64_t componentId,
-    const CompressedPathGraph1& cGraph)
+    const CompressedPathGraph1& cGraph,
+    bool labels)
 {
-    // const PathGraph1& component = *components[componentId];
+    const PathGraph1& component = *components[componentId];
 
     // Hide GlobalPathGraph1::edges. We should change its name instead.
     using boost::edges;
 
     const string name = "CompressedPathGraph" + to_string(componentId);
-    ofstream out(name + ".dot");
+    ofstream out(name + (labels ? ".dot" : "-NoLabels.dot"));
     out << "digraph " << name << "{\n";
 
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
-        out << "\"" << componentId << "-" << cGraph[cv].id << "\"";
-        if(cGraph[cv].v.size() == 1) {
-            out << " [color=red fillcolor=red]";
+        out << "\"" << componentId << "-" << cGraph[cv].id << "\" [";
+
+        if(cGraph[cv].v.size() > 1) {
+
+            const PathGraph1::vertex_descriptor v0 = cGraph[cv].v.front();
+            const PathGraph1::vertex_descriptor v1 = cGraph[cv].v.back();
+            out <<
+                "style=filled color=pink ";
+            if(labels) {
+                out <<
+                    "label=\""
+                    << componentId << "-" << cGraph[cv].id << "\\n" <<
+                    cGraph[cv].v.size() << " vertices\\n" <<
+                    "First " << component[v0].edgeId << "\\n" <<
+                    "Last " << component[v1].edgeId << "\\n" <<
+                    "Length " << compressedVertexBaseOffset(componentId, cGraph, cv) <<
+                    "\"";
+            }
+
+        } else {
+
+            SHASTA_ASSERT(cGraph[cv].v.size() == 1);
+            if(labels) {
+                const PathGraph1::vertex_descriptor v = cGraph[cv].v.front();
+                // const PathGraph1Vertex& vertex = component[v];
+                // const GlobalPathGraph1Vertex& globalVertex = verticesVector[vertex.vertexId];
+                out <<
+                    "label=\"" <<
+                    componentId << "-" << cGraph[cv].id << "\\n" <<
+                    component[v].edgeId << "\\n" <<
+                    // "Coverage " << globalVertex.journeyInfoItems.size() <<
+                    "\"";
+            }
+
         }
-        out << ";\n";
+
+        out << "];\n";
     }
 
     CompressedPathGraph1::edge_iterator begin, end;
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
         const auto cv0 = source(ce, cGraph);
         const auto cv1 = target(ce, cGraph);
+        const PathGraph1::edge_descriptor e = cGraph[ce].e;
         out <<
             "\"" << componentId << "-" << cGraph[cv0].id << "\"->" <<
-            "\"" << componentId << "-" << cGraph[cv1].id << "\";\n";
+            "\"" << componentId << "-" << cGraph[cv1].id << "\"";
+        if(labels) {
+            out <<
+                " ["
+                " label=\"" <<
+                component[e].info.offsetInBases <<
+                "\""
+                "]";
+        }
+        out << ";\n";
     }
     out << "}";
 }
