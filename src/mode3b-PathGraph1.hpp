@@ -413,7 +413,11 @@ private:
 
     // Functions that work on CompressedPathGraph1.
     void writeCompressedVerticesCsv(uint64_t componentId, const CompressedPathGraph1&) const;
-    void writeCompressedGraphviz(uint64_t componentId, const CompressedPathGraph1&, bool labels) const;
+    void writeCompressedGraphviz(
+        uint64_t componentId,
+        const CompressedPathGraph1&,
+        bool labels,
+        const string& fileNamePrefix) const;
     uint64_t compressedVertexBaseOffset(
         uint64_t componentId,
         const CompressedPathGraph1&,

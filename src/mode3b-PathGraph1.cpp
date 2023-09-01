@@ -157,7 +157,7 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
 {
     const uint64_t minPrimaryCoverage = 8;
     const uint64_t maxPrimaryCoverage = 35;
-    const uint64_t minEdgeCoverage = 2;
+    const uint64_t minEdgeCoverage = 1;
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
     const uint64_t transitiveReductionDistance = 20;
@@ -205,16 +205,29 @@ void GlobalPathGraph1::assemble1(
     // Non-branch vertices are those with in-degree and out-degree not greater than 1.
     CompressedPathGraph1 cGraph(component);
 
+    // Graphviz output.
+    bool labels = true;
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "A");
+    labels = false;
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "A");
+
     // Detangle vertices.
     globalGraph.detangleCompressedGraphVertices(componentId, cGraph);
+
+    // Graphviz output.
+    labels = true;
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "B");
+    labels = false;
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "B");
+
+    // Detangle linear chains.
     globalGraph.detangleCompressedGraphLinearChains(componentId, cGraph);
 
     // Graphviz output.
-    globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
-    bool labels = true;
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels);
+    labels = true;
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "C");
     labels = false;
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels);
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "C");
 }
 
 
@@ -277,7 +290,8 @@ uint64_t GlobalPathGraph1::compressedVertexBaseOffset(
 void GlobalPathGraph1::writeCompressedGraphviz(
     uint64_t componentId,
     const CompressedPathGraph1& cGraph,
-    bool labels) const
+    bool labels,
+    const string& fileNamePrefix) const
 {
     const PathGraph1& component = *components[componentId];
 
@@ -285,7 +299,7 @@ void GlobalPathGraph1::writeCompressedGraphviz(
     using boost::edges;
 
     const string name = "CompressedPathGraph" + to_string(componentId);
-    ofstream out(name + (labels ? ".dot" : "-NoLabels.dot"));
+    ofstream out(name + fileNamePrefix + (labels ? ".dot" : "-NoLabels.dot"));
     out << "digraph " << name << "{\n";
 
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
