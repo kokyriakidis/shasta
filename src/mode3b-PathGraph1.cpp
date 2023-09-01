@@ -235,6 +235,15 @@ void GlobalPathGraph1::assemble1(
     labels = false;
     globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "C");
 
+    // Merge linear chains.
+    cGraph.mergeLinearChains(componentId);
+
+    // Graphviz output.
+    labels = true;
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "D");
+    labels = false;
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "D");
+
     // Csv output for the final graph.
     globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
 }
@@ -287,9 +296,14 @@ uint64_t GlobalPathGraph1::compressedVertexBaseOffset(
         PathGraph1::edge_descriptor e;
         bool edgeWasFound = false;
         tie(e, edgeWasFound) = edge(vA, vB, component);
-        SHASTA_ASSERT(edgeWasFound);
-
-        totalBaseOffset += component[e].info.offsetInBases;
+        if(edgeWasFound) {
+            totalBaseOffset += component[e].info.offsetInBases;
+        } else {
+            MarkerGraphEdgePairInfo info;
+            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
+                component[vA].edgeId, component[vB].edgeId, info));
+            totalBaseOffset += info.offsetInBases;
+        }
     }
     return totalBaseOffset;
 }
@@ -2371,7 +2385,6 @@ CompressedPathGraph1::CompressedPathGraph1(const PathGraph1& graph)
     std::set<PathGraph1::vertex_descriptor> visited;
     vector<PathGraph1::vertex_descriptor> forwardVertices;
     vector<PathGraph1::vertex_descriptor> backwardVertices;
-    uint64_t nextVertexId = 0;
     BGL_FORALL_VERTICES(v, filteredGraph, FilteredPathGraph1) {
 
         // If already visited, skip.
@@ -2908,4 +2921,78 @@ uint64_t GlobalPathGraph1::detangleCompressedGraphLinearChains(
         num_edges(cGraph) << " edges." << endl;
 
     return 0;
+}
+
+
+
+void CompressedPathGraph1::mergeLinearChains(uint64_t componentId)
+{
+    CompressedPathGraph1& cGraph = *this;
+    const bool debug = false;
+
+    vector< vector<vertex_descriptor> > linearChains;
+    findLinearVertexChains(cGraph, linearChains);
+
+    for(const auto& linearChain: linearChains) {
+        if(linearChain.size() == 1) {
+            continue;
+        }
+
+        // The first and last vertex can have in/out degrees greater than one
+        // and will not be merged.
+        vector<vertex_descriptor> verticesToBeMerged;
+        for(uint64_t i=0; i<linearChain.size(); i++) {
+            const vertex_descriptor cv = linearChain[i];
+            if(i==0 or i==linearChain.size()-1) {
+                if(in_degree(cv, cGraph)>1 or out_degree(cv, cGraph)>1) {
+                    continue;
+                }
+            }
+            verticesToBeMerged.push_back(cv);
+        }
+        if(verticesToBeMerged.size() < 2) {
+            continue;
+        }
+
+
+        // Create the new vertex.
+        const vertex_descriptor cvNew = add_vertex(cGraph);
+        auto& cVertexNew = cGraph[cvNew];
+        cVertexNew.id = nextVertexId++;
+        for(const vertex_descriptor cv: verticesToBeMerged) {
+            const auto& cVertex = cGraph[cv];
+            copy(cVertex.v.begin(), cVertex.v.end(), back_inserter(cVertexNew.v));
+        }
+
+        if(debug) {
+            cout << componentId << "-" << cVertexNew.id << " created by merging";
+            for(const auto cv: verticesToBeMerged) {
+                cout << " " << componentId << "-" << cGraph[cv].id;
+            }
+            cout << endl;
+        }
+
+        // Reroute in-edges.
+        BGL_FORALL_INEDGES(verticesToBeMerged.front(), ce, cGraph, CompressedPathGraph1) {
+            const auto& oldEdge = cGraph[ce];
+            add_edge(source(ce, cGraph), cvNew, oldEdge, cGraph);
+        }
+
+        // Reroute out-edges.
+        BGL_FORALL_OUTEDGES(verticesToBeMerged.back(), ce, cGraph, CompressedPathGraph1) {
+            const auto& oldEdge = cGraph[ce];
+            add_edge(cvNew, target(ce, cGraph), oldEdge, cGraph);
+        }
+
+        // Now we can remove the vertices we merged.
+        for(const vertex_descriptor cv: verticesToBeMerged) {
+            clear_vertex(cv, cGraph);
+            remove_vertex(cv, cGraph);
+        }
+
+    }
+
+    cout << "After merging linear chains, the CompressedPathGraph1 has " <<
+        num_vertices(cGraph) << " vertices  and " <<
+        num_edges(cGraph) << " edges." << endl;
 }

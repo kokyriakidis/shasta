@@ -457,6 +457,8 @@ class shasta::mode3b::CompressedPathGraph1 : public CompressedPathGraph1BaseClas
 public:
     CompressedPathGraph1(const PathGraph1&);
     void localTransitiveReduction(uint64_t distance);
+    void mergeLinearChains(uint64_t componentId);
+    uint64_t nextVertexId = 0;
 };
 
 
