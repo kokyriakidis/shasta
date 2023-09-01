@@ -161,6 +161,7 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
     const uint64_t transitiveReductionDistance = 20;
+    const uint64_t compressedTransitiveReductionDistance = 100;
 
     GlobalPathGraph1 graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
@@ -171,7 +172,8 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
 
     // Assemble each connected component separately.
     for(uint64_t componentId=0; componentId<graph.components.size(); componentId++) {
-        assemble1(graph, componentId, transitiveReductionDistance);
+        assemble1(graph, componentId,
+            transitiveReductionDistance, compressedTransitiveReductionDistance);
     }
 }
 
@@ -180,7 +182,8 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
 void GlobalPathGraph1::assemble1(
     GlobalPathGraph1& globalGraph,
     uint64_t componentId,
-    uint64_t transitiveReductionDistance)
+    uint64_t transitiveReductionDistance,
+    uint64_t compressedTransitiveReductionDistance)
 {
     cout << "Assembly begins for connected component " << componentId << endl;
     PathGraph1& component = *globalGraph.components[componentId];
@@ -204,6 +207,9 @@ void GlobalPathGraph1::assemble1(
     // transitive reduction non-branch vertices becomes a single vertex.
     // Non-branch vertices are those with in-degree and out-degree not greater than 1.
     CompressedPathGraph1 cGraph(component);
+
+    // Local transitive reduction.
+    cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
 
     // Graphviz output.
     bool labels = true;
@@ -1068,6 +1074,20 @@ void PathGraph1::localTransitiveReduction(uint64_t distance)
 
     for(const edge_descriptor e: nonTransitiveReductionEdges) {
         graph[e].isNonTransitiveReductionEdge = true;
+    }
+}
+
+
+
+void CompressedPathGraph1::localTransitiveReduction(uint64_t distance)
+{
+    CompressedPathGraph1& cGraph = *this;
+
+    vector<edge_descriptor> nonTransitiveReductionEdges;
+    shasta::localTransitiveReduction(cGraph, distance, nonTransitiveReductionEdges);
+
+    for(const edge_descriptor e: nonTransitiveReductionEdges) {
+        boost::remove_edge(e, cGraph);
     }
 }
 

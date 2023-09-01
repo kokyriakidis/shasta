@@ -409,7 +409,8 @@ private:
     static void assemble1(
         GlobalPathGraph1&,
         uint64_t componentId,
-        uint64_t transitiveReductionDistance);
+        uint64_t transitiveReductionDistance,
+        uint64_t compressedTransitiveReductionDistance);
 
     // Functions that work on CompressedPathGraph1.
     void writeCompressedVerticesCsv(uint64_t componentId, const CompressedPathGraph1&) const;
@@ -455,6 +456,7 @@ public:
 class shasta::mode3b::CompressedPathGraph1 : public CompressedPathGraph1BaseClass {
 public:
     CompressedPathGraph1(const PathGraph1&);
+    void localTransitiveReduction(uint64_t distance);
 };
 
 
