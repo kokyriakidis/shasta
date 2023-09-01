@@ -228,6 +228,9 @@ void GlobalPathGraph1::assemble1(
     globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "C");
     labels = false;
     globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "C");
+
+    // Csv output for the final graph.
+    globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
 }
 
 
@@ -2632,6 +2635,14 @@ bool GlobalPathGraph1::detangleCompressedGraphVertex(
     // Add the edges.
     for(const auto& newEdge: newEdges) {
         CompressedPathGraph1::edge_descriptor ce;
+
+        // Check that the edge does not already exists.
+        bool edgeExists = false;
+        tie(ce, edgeExists) = boost::edge(newEdge.cv0, newEdge.cv1, cGraph);
+        if(edgeExists) {
+            continue;
+        }
+
         bool edgeWasAdded = false;
         tie(ce, edgeWasAdded) = boost::add_edge(newEdge.cv0, newEdge.cv1, cGraph);
         SHASTA_ASSERT(edgeWasAdded);
@@ -2660,7 +2671,7 @@ uint64_t GlobalPathGraph1::detangleCompressedGraphLinearChains(
     uint64_t componentId,
     CompressedPathGraph1& cGraph) const
 {
-    const bool debug = true;
+    const bool debug = false;
     const PathGraph1& component = *components[componentId];
 
     cout << "Before linear chains detangling, the CompressedPathGraph1 has " <<
@@ -2839,6 +2850,14 @@ uint64_t GlobalPathGraph1::detangleCompressedGraphLinearChains(
         // Add the edges.
         for(const auto& newEdge: newEdges) {
             CompressedPathGraph1::edge_descriptor ce;
+
+            // Check that the edge does not already exists.
+            bool edgeExists = false;
+            tie(ce, edgeExists) = boost::edge(newEdge.cv0, newEdge.cv1, cGraph);
+            if(edgeExists) {
+                continue;
+            }
+
             bool edgeWasAdded = false;
             tie(ce, edgeWasAdded) = boost::add_edge(newEdge.cv0, newEdge.cv1, cGraph);
             SHASTA_ASSERT(edgeWasAdded);
