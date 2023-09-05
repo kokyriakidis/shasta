@@ -410,7 +410,8 @@ private:
         GlobalPathGraph1&,
         uint64_t componentId,
         uint64_t transitiveReductionDistance,
-        uint64_t compressedTransitiveReductionDistance);
+        uint64_t compressedTransitiveReductionDistance,
+        uint64_t minReliableLength);
 
     // Functions that work on CompressedPathGraph1.
     void writeCompressedVerticesCsv(uint64_t componentId, const CompressedPathGraph1&) const;
@@ -418,10 +419,12 @@ private:
         uint64_t componentId,
         const CompressedPathGraph1&,
         bool labels,
+        uint64_t minGreenLength,
         const string& fileNamePrefix) const;
     void writeCompressedGraphviz(
         uint64_t componentId,
         const CompressedPathGraph1&,
+        uint64_t minGreenLength,
         const string& fileNamePrefix) const;
     uint64_t compressedVertexBaseOffset(
         uint64_t componentId,

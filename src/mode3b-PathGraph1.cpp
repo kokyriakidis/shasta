@@ -162,6 +162,7 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
     const uint64_t minComponentSize = 3;
     const uint64_t transitiveReductionDistance = 20;
     const uint64_t compressedTransitiveReductionDistance = 100;
+    const uint64_t minReliableLength = 200;
 
     GlobalPathGraph1 graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
@@ -173,7 +174,9 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
     // Assemble each connected component separately.
     for(uint64_t componentId=0; componentId<graph.components.size(); componentId++) {
         assemble1(graph, componentId,
-            transitiveReductionDistance, compressedTransitiveReductionDistance);
+            transitiveReductionDistance,
+            compressedTransitiveReductionDistance,
+            minReliableLength);
     }
 }
 
@@ -183,7 +186,8 @@ void GlobalPathGraph1::assemble1(
     GlobalPathGraph1& globalGraph,
     uint64_t componentId,
     uint64_t transitiveReductionDistance,
-    uint64_t compressedTransitiveReductionDistance)
+    uint64_t compressedTransitiveReductionDistance,
+    uint64_t minReliableLength)
 {
     cout << "Assembly begins for connected component " << componentId << endl;
     PathGraph1& component = *globalGraph.components[componentId];
@@ -210,19 +214,19 @@ void GlobalPathGraph1::assemble1(
 
     // Local transitive reduction.
     cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, "A");
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "A");
 
     // Detangle vertices.
     globalGraph.detangleCompressedGraphVertices(componentId, cGraph);
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, "B");
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "B");
 
     // Detangle linear chains.
     globalGraph.detangleCompressedGraphLinearChains(componentId, cGraph);
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, "C");
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "C");
 
     // Merge linear chains.
     cGraph.mergeLinearChains(componentId);
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, "D");
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "D");
 
     // Csv output of the final graph.
     globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
@@ -294,12 +298,13 @@ uint64_t GlobalPathGraph1::compressedVertexBaseOffset(
 void GlobalPathGraph1::writeCompressedGraphviz(
     uint64_t componentId,
     const CompressedPathGraph1& cGraph,
+    uint64_t minGreenLength,
     const string& fileNamePrefix) const
 {
     bool labels = true;
-    writeCompressedGraphviz(componentId, cGraph, labels, fileNamePrefix);
+    writeCompressedGraphviz(componentId, cGraph, labels, minGreenLength, fileNamePrefix);
     labels = false;
-    writeCompressedGraphviz(componentId, cGraph, labels, fileNamePrefix);
+    writeCompressedGraphviz(componentId, cGraph, labels, minGreenLength, fileNamePrefix);
 }
 
 
@@ -308,6 +313,7 @@ void GlobalPathGraph1::writeCompressedGraphviz(
     uint64_t componentId,
     const CompressedPathGraph1& cGraph,
     bool labels,
+    uint64_t minGreenLength,
     const string& fileNamePrefix) const
 {
     const PathGraph1& component = *components[componentId];
@@ -326,8 +332,13 @@ void GlobalPathGraph1::writeCompressedGraphviz(
 
             const PathGraph1::vertex_descriptor v0 = cGraph[cv].v.front();
             const PathGraph1::vertex_descriptor v1 = cGraph[cv].v.back();
-            out <<
-                "style=filled color=pink ";
+            const uint64_t baseOffset = compressedVertexBaseOffset(componentId, cGraph, cv);
+
+            if(baseOffset >= minGreenLength) {
+                out <<
+                    "style=filled color=green ";
+            }
+
             if(labels) {
                 out <<
                     "label=\""
@@ -335,13 +346,14 @@ void GlobalPathGraph1::writeCompressedGraphviz(
                     cGraph[cv].v.size() << " vertices\\n" <<
                     "First " << component[v0].edgeId << "\\n" <<
                     "Last " << component[v1].edgeId << "\\n" <<
-                    "Length " << compressedVertexBaseOffset(componentId, cGraph, cv) <<
+                    "Length " << baseOffset <<
                     "\"";
             }
 
         } else {
 
             SHASTA_ASSERT(cGraph[cv].v.size() == 1);
+
             if(labels) {
                 const PathGraph1::vertex_descriptor v = cGraph[cv].v.front();
                 // const PathGraph1Vertex& vertex = component[v];
