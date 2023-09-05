@@ -430,13 +430,13 @@ private:
         uint64_t componentId,
         const CompressedPathGraph1&,
         CompressedPathGraph1BaseClass::vertex_descriptor) const;
-    uint64_t detangleCompressedGraphVertices(uint64_t componentId, CompressedPathGraph1&) const;
+    bool detangleCompressedGraphVertices(uint64_t componentId, CompressedPathGraph1&) const;
     bool detangleCompressedGraphVertex(
         uint64_t componentId,
         CompressedPathGraph1&,
         CompressedPathGraph1BaseClass::vertex_descriptor) const;
-    uint64_t detangleCompressedGraphLinearChains(uint64_t componentId, CompressedPathGraph1&) const;
-    void detangleSuperbubbles(
+    bool detangleCompressedGraphLinearChains(uint64_t componentId, CompressedPathGraph1&) const;
+    bool detangleSuperbubbles(
         uint64_t componentId,
         CompressedPathGraph1&,
         uint64_t minReliableLength) const;
@@ -466,8 +466,8 @@ public:
 class shasta::mode3b::CompressedPathGraph1 : public CompressedPathGraph1BaseClass {
 public:
     CompressedPathGraph1(const PathGraph1&);
-    void localTransitiveReduction(uint64_t distance);
-    void mergeLinearChains(uint64_t componentId);
+    bool localTransitiveReduction(uint64_t distance);
+    bool mergeLinearChains(uint64_t componentId);
     uint64_t nextVertexId = 0;
 };
 

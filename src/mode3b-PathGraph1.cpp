@@ -212,29 +212,26 @@ void GlobalPathGraph1::assemble1(
     // Non-branch vertices are those with in-degree and out-degree not greater than 1.
     CompressedPathGraph1 cGraph(component);
 
-    // Local transitive reduction.
-    cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "A");
+    // Detangle iterations.
+    for(uint64_t iteration=0; ; iteration++) {
+        cout << "Detangle iteration " << iteration << " begins." << endl;
+        const bool transitiveReduction = cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
+        const bool detangleVertices = globalGraph.detangleCompressedGraphVertices(componentId, cGraph);
+        const bool detangleLinearChains = globalGraph.detangleCompressedGraphLinearChains(componentId, cGraph);
+        const bool mergeLinearChains = cGraph.mergeLinearChains(componentId);
+        const bool detangleSuperBubbles = globalGraph.detangleSuperbubbles(componentId, cGraph, minReliableLength);
+        if(not (
+            transitiveReduction or
+            detangleVertices or
+            detangleLinearChains or
+            mergeLinearChains or
+            detangleSuperBubbles
+            )) {
+            break;
+        }
+    }
 
-    // Detangle vertices.
-    globalGraph.detangleCompressedGraphVertices(componentId, cGraph);
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "B");
-
-    // Detangle linear chains.
-    globalGraph.detangleCompressedGraphLinearChains(componentId, cGraph);
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "C");
-
-    // Merge linear chains.
-    cGraph.mergeLinearChains(componentId);
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "D");
-
-    // Detangle superbubbles.
-    globalGraph.detangleSuperbubbles(componentId, cGraph, minReliableLength);
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "E");
-
-    // One more pass of local transitive reduction.
-    cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "F");
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "");
 
     // Csv output of the final graph.
     globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
@@ -1105,7 +1102,7 @@ void PathGraph1::localTransitiveReduction(uint64_t distance)
 
 
 
-void CompressedPathGraph1::localTransitiveReduction(uint64_t distance)
+bool CompressedPathGraph1::localTransitiveReduction(uint64_t distance)
 {
     CompressedPathGraph1& cGraph = *this;
 
@@ -1115,6 +1112,8 @@ void CompressedPathGraph1::localTransitiveReduction(uint64_t distance)
     for(const edge_descriptor e: nonTransitiveReductionEdges) {
         boost::remove_edge(e, cGraph);
     }
+
+    return not nonTransitiveReductionEdges.empty();
 }
 
 
@@ -2521,7 +2520,7 @@ CompressedPathGraph1::CompressedPathGraph1(const PathGraph1& graph)
 
 
 
-uint64_t GlobalPathGraph1::detangleCompressedGraphVertices(
+bool GlobalPathGraph1::detangleCompressedGraphVertices(
     uint64_t componentId,
     CompressedPathGraph1& cGraph) const
 {
@@ -2553,7 +2552,7 @@ uint64_t GlobalPathGraph1::detangleCompressedGraphVertices(
         num_vertices(cGraph) << " vertices  and " <<
         num_edges(cGraph) << " edges." << endl;
 
-    return detangledCount;
+    return detangledCount > 0;
 }
 
 
@@ -2710,7 +2709,7 @@ bool GlobalPathGraph1::detangleCompressedGraphVertex(
 
 
 
-uint64_t GlobalPathGraph1::detangleCompressedGraphLinearChains(
+bool GlobalPathGraph1::detangleCompressedGraphLinearChains(
     uint64_t componentId,
     CompressedPathGraph1& cGraph) const
 {
@@ -2928,12 +2927,12 @@ uint64_t GlobalPathGraph1::detangleCompressedGraphLinearChains(
         num_vertices(cGraph) << " vertices  and " <<
         num_edges(cGraph) << " edges." << endl;
 
-    return 0;
+    return detangleCount > 0;
 }
 
 
 
-void CompressedPathGraph1::mergeLinearChains(uint64_t componentId)
+bool CompressedPathGraph1::mergeLinearChains(uint64_t componentId)
 {
     CompressedPathGraph1& cGraph = *this;
     const bool debug = false;
@@ -2941,6 +2940,7 @@ void CompressedPathGraph1::mergeLinearChains(uint64_t componentId)
     vector< vector<vertex_descriptor> > linearChains;
     findLinearVertexChains(cGraph, linearChains);
 
+    bool changesWereMade = false;
     for(const auto& linearChain: linearChains) {
         if(linearChain.size() == 1) {
             continue;
@@ -2961,6 +2961,7 @@ void CompressedPathGraph1::mergeLinearChains(uint64_t componentId)
         if(verticesToBeMerged.size() < 2) {
             continue;
         }
+        changesWereMade = true;
 
 
         // Create the new vertex.
@@ -3003,11 +3004,13 @@ void CompressedPathGraph1::mergeLinearChains(uint64_t componentId)
     cout << "After merging linear chains, the CompressedPathGraph1 has " <<
         num_vertices(cGraph) << " vertices  and " <<
         num_edges(cGraph) << " edges." << endl;
+
+    return changesWereMade;
 }
 
 
 
-void GlobalPathGraph1::detangleSuperbubbles(
+bool GlobalPathGraph1::detangleSuperbubbles(
     uint64_t componentId,
     CompressedPathGraph1& cGraph,
     uint64_t minReliableLength) const
@@ -3113,4 +3116,6 @@ void GlobalPathGraph1::detangleSuperbubbles(
     cout << "After superbubble detangling, the CompressedPathGraph1 has " <<
         num_vertices(cGraph) << " vertices  and " <<
         num_edges(cGraph) << " edges." << endl;
+
+    return not verticesToBeRemoved.empty(); // Questionable.
 }
