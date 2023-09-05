@@ -436,6 +436,10 @@ private:
         CompressedPathGraph1&,
         CompressedPathGraph1BaseClass::vertex_descriptor) const;
     uint64_t detangleCompressedGraphLinearChains(uint64_t componentId, CompressedPathGraph1&) const;
+    void detangleSuperbubbles(
+        uint64_t componentId,
+        CompressedPathGraph1&,
+        uint64_t minReliableLength) const;
 
 };
 

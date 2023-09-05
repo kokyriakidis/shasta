@@ -228,6 +228,14 @@ void GlobalPathGraph1::assemble1(
     cGraph.mergeLinearChains(componentId);
     globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "D");
 
+    // Detangle superbubbles.
+    globalGraph.detangleSuperbubbles(componentId, cGraph, minReliableLength);
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "E");
+
+    // One more pass of local transitive reduction.
+    cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "F");
+
     // Csv output of the final graph.
     globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
 }
@@ -2993,6 +3001,116 @@ void CompressedPathGraph1::mergeLinearChains(uint64_t componentId)
     }
 
     cout << "After merging linear chains, the CompressedPathGraph1 has " <<
+        num_vertices(cGraph) << " vertices  and " <<
+        num_edges(cGraph) << " edges." << endl;
+}
+
+
+
+void GlobalPathGraph1::detangleSuperbubbles(
+    uint64_t componentId,
+    CompressedPathGraph1& cGraph,
+    uint64_t minReliableLength) const
+{
+    const bool debug = false;
+    const PathGraph1& component = *components[componentId];
+
+    // The edges to be added.
+    class NewEdge {
+    public:
+        CompressedPathGraph1::vertex_descriptor cv0;
+        CompressedPathGraph1::vertex_descriptor cv1;
+        CompressedPathGraph1Edge edge;
+    };
+    vector<NewEdge> newEdges;
+
+    // Loop over long vertices of the CompressedPathGraph1.
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
+        const uint64_t baseOffset = compressedVertexBaseOffset(componentId, cGraph, cv);
+        if(baseOffset < minReliableLength) {
+            continue;
+        }
+        if(debug) {
+            cout << "Starting BFS at " << componentId << "-" << cGraph[cv].id << endl;
+        }
+
+        // Do a BFS starting here, stopping when we encounter a long vertices.
+        std::queue<CompressedPathGraph1::vertex_descriptor> q;
+        q.push(cv);
+        std::set<CompressedPathGraph1::vertex_descriptor> visited;
+        visited.insert(cv);
+        while(not q.empty()) {
+            const auto cv0 = q.front();
+            q.pop();
+            if(false) {
+                cout << "Dequeued " << componentId << "-" << cGraph[cv0].id << endl;
+            }
+
+            BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1) {
+                const auto cv1 = target(ce, cGraph);
+                if(visited.contains(cv1)) {
+                    continue;
+                }
+                const uint64_t baseOffset = compressedVertexBaseOffset(componentId, cGraph, cv1);
+                if(baseOffset >= minReliableLength) {
+                    CompressedPathGraph1Edge newEdge;
+                    assembler.analyzeMarkerGraphEdgePair(
+                        component[cGraph[cv].v.back()].edgeId,
+                        component[cGraph[cv1].v.front()].edgeId,
+                        newEdge.info);
+                    if(newEdge.info.common) {
+                        newEdges.push_back({cv, cv1, newEdge});
+                    }
+                    if(debug) {
+                        cout << "Found " << componentId << "-" << cGraph[cv1].id <<
+                            ", common count " << newEdge.info.common << endl;
+                    }
+                }   else {
+                    q.push(cv1);
+                    visited.insert(cv1);
+                    if(false) {
+                        cout << "Enqueued " << componentId << "-" << cGraph[cv1].id << endl;
+                    }
+                }
+            }
+        }
+    }
+
+
+
+    // Now we can:
+    // - Remove all short vertices.
+    // - Remove all edges.
+    // - Replace them with the new edges we found.
+
+    // Remove all short vertices.
+    vector<CompressedPathGraph1::vertex_descriptor> verticesToBeRemoved;
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
+        const uint64_t baseOffset = compressedVertexBaseOffset(componentId, cGraph, cv);
+        if(baseOffset < minReliableLength) {
+            verticesToBeRemoved.push_back(cv);
+        }
+    }
+    for(const auto cv: verticesToBeRemoved) {
+        clear_vertex(cv, cGraph);
+        remove_vertex(cv, cGraph);
+    }
+
+    // Remove all edges.
+    vector<CompressedPathGraph1::edge_descriptor> edgesToBeRemoved;
+    using boost::edges;
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
+        edgesToBeRemoved.push_back(ce);
+    }
+    for(const auto ce: edgesToBeRemoved) {
+        remove_edge(ce, cGraph);
+    }
+
+    // Replace them with the new edges we found.
+    for(const auto& newEdge: newEdges) {
+        add_edge(newEdge.cv0, newEdge.cv1, {newEdge.edge}, cGraph);
+    }
+    cout << "After superbubble detangling, the CompressedPathGraph1 has " <<
         num_vertices(cGraph) << " vertices  and " <<
         num_edges(cGraph) << " edges." << endl;
 }
