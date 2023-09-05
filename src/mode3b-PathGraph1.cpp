@@ -363,13 +363,11 @@ void GlobalPathGraph1::writeCompressedGraphviz(
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
         const auto cv0 = source(ce, cGraph);
         const auto cv1 = target(ce, cGraph);
-        const PathGraph1::edge_descriptor e = cGraph[ce].e;
         out <<
             "\"" << componentId << "-" << cGraph[cv0].id << "\"->" <<
             "\"" << componentId << "-" << cGraph[cv1].id << "\"";
         if(labels) {
-            const uint64_t offset = (cGraph[ce].wasAddedDuringDetangling ?
-                cGraph[ce].info.offsetInBases : component[e].info.offsetInBases);
+            const uint64_t offset = cGraph[ce].info.offsetInBases;
             out <<
                 " ["
                 " label=\"" <<
@@ -2484,7 +2482,7 @@ CompressedPathGraph1::CompressedPathGraph1(const PathGraph1& graph)
             auto it1 = vertexMap.find(v1);
             SHASTA_ASSERT(it1 != vertexMap.end());
             const CompressedPathGraph1::vertex_descriptor cv1 = it1->second;
-            add_edge(cv0, cv1, {e}, cGraph);
+            add_edge(cv0, cv1, {graph[e].info}, cGraph);
         }
     }
 
@@ -2671,12 +2669,10 @@ bool GlobalPathGraph1::detangleCompressedGraphVertex(
         }
 
         bool edgeWasAdded = false;
-        tie(ce, edgeWasAdded) = boost::add_edge(newEdge.cv0, newEdge.cv1, cGraph);
+        tie(ce, edgeWasAdded) = boost::add_edge(newEdge.cv0, newEdge.cv1, {newEdge.info}, cGraph);
         SHASTA_ASSERT(edgeWasAdded);
-        auto& cEdge = cGraph[ce];
-        cEdge.wasAddedDuringDetangling = true;
-        cEdge.info = newEdge.info;
         if(debug) {
+            const auto& cEdge = cGraph[ce];
             cout << "Added compressed edge " <<
                 componentId << "-" << cGraph[newEdge.cv0].id << "->" <<
                 componentId << "-" << cGraph[newEdge.cv1].id << ", common count " <<
@@ -2886,12 +2882,10 @@ uint64_t GlobalPathGraph1::detangleCompressedGraphLinearChains(
             }
 
             bool edgeWasAdded = false;
-            tie(ce, edgeWasAdded) = boost::add_edge(newEdge.cv0, newEdge.cv1, cGraph);
+            tie(ce, edgeWasAdded) = boost::add_edge(newEdge.cv0, newEdge.cv1, {newEdge.info}, cGraph);
             SHASTA_ASSERT(edgeWasAdded);
-            auto& cEdge = cGraph[ce];
-            cEdge.wasAddedDuringDetangling = true;
-            cEdge.info = newEdge.info;
             if(debug) {
+                const auto& cEdge = cGraph[ce];
                 cout << "Added compressed edge " <<
                     componentId << "-" << cGraph[newEdge.cv0].id << "->" <<
                     componentId << "-" << cGraph[newEdge.cv1].id << ", common count " <<

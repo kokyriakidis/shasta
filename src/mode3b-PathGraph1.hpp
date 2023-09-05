@@ -443,7 +443,6 @@ private:
 // - A linear chain of PathGraph1 vertices with in-degree and out-degree 0 or 1.
 // OR
 // - A single PathGraph1 vertex with in-degree>1 and/or out-degree>1.
-// An edge of the CompressedPathGraph1 always corresponds to an edge of the PathGraph1.
 class shasta::mode3b::CompressedPathGraph1Vertex {
 public:
     uint64_t id;
@@ -451,9 +450,9 @@ public:
 };
 class shasta::mode3b::CompressedPathGraph1Edge {
 public:
-    PathGraph1::edge_descriptor e;  // Only valid if wasAddedDuringDetangling is false;
-    MarkerGraphEdgePairInfo info;   // Only valid if wasAddedDuringDetangling is true.
-    bool wasAddedDuringDetangling = false;
+    // MarkerGraphEdgePairInfo computed between the last marker graph
+    // edge of the source vertex and the first marker graph edge of the target vertex.
+    MarkerGraphEdgePairInfo info;
 };
 
 
