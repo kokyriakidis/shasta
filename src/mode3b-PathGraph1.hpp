@@ -419,6 +419,10 @@ private:
         const CompressedPathGraph1&,
         bool labels,
         const string& fileNamePrefix) const;
+    void writeCompressedGraphviz(
+        uint64_t componentId,
+        const CompressedPathGraph1&,
+        const string& fileNamePrefix) const;
     uint64_t compressedVertexBaseOffset(
         uint64_t componentId,
         const CompressedPathGraph1&,

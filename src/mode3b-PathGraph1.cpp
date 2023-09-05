@@ -210,41 +210,21 @@ void GlobalPathGraph1::assemble1(
 
     // Local transitive reduction.
     cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
-
-    // Graphviz output.
-    bool labels = true;
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "A");
-    labels = false;
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "A");
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, "A");
 
     // Detangle vertices.
     globalGraph.detangleCompressedGraphVertices(componentId, cGraph);
-
-    // Graphviz output.
-    labels = true;
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "B");
-    labels = false;
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "B");
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, "B");
 
     // Detangle linear chains.
     globalGraph.detangleCompressedGraphLinearChains(componentId, cGraph);
-
-    // Graphviz output.
-    labels = true;
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "C");
-    labels = false;
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "C");
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, "C");
 
     // Merge linear chains.
     cGraph.mergeLinearChains(componentId);
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, "D");
 
-    // Graphviz output.
-    labels = true;
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "D");
-    labels = false;
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, labels, "D");
-
-    // Csv output for the final graph.
+    // Csv output of the final graph.
     globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
 }
 
@@ -306,6 +286,20 @@ uint64_t GlobalPathGraph1::compressedVertexBaseOffset(
         }
     }
     return totalBaseOffset;
+}
+
+
+
+// This calls the lower level function twice, with and without labels.
+void GlobalPathGraph1::writeCompressedGraphviz(
+    uint64_t componentId,
+    const CompressedPathGraph1& cGraph,
+    const string& fileNamePrefix) const
+{
+    bool labels = true;
+    writeCompressedGraphviz(componentId, cGraph, labels, fileNamePrefix);
+    labels = false;
+    writeCompressedGraphviz(componentId, cGraph, labels, fileNamePrefix);
 }
 
 
