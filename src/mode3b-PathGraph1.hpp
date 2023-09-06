@@ -469,6 +469,9 @@ public:
     bool detangleLinearChains();
     bool detangleVertex(vertex_descriptor);
     bool detangleSuperbubbles(uint64_t minReliableLength);
+    void detangleIteration(
+        uint64_t compressedTransitiveReductionDistance,
+        uint64_t minReliableLength);
     bool removeCrossEdges(uint64_t threshold1, uint64_t threshold2);
 
     // The id of the next vertex to be created.

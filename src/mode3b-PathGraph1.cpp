@@ -218,44 +218,16 @@ void GlobalPathGraph1::assemble1(
     // Non-branch vertices are those with in-degree and out-degree not greater than 1.
     CompressedPathGraph1 cGraph(component, componentId, globalGraph.assembler);
 
-    // Detangle iterations.
-    for(uint64_t iteration=0; ; iteration++) {
-        cout << "Detangle iteration " << iteration << " begins." << endl;
-        const bool transitiveReduction = cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
-        const bool detangleVertices = cGraph.detangleVertices();
-        const bool detangleLinearChains = cGraph.detangleLinearChains();
-        const bool mergeLinearChains = cGraph.mergeLinearChains();
-        const bool detangleSuperBubbles = cGraph.detangleSuperbubbles(minReliableLength);
-        if(not (
-            transitiveReduction or
-            detangleVertices or
-            detangleLinearChains or
-            mergeLinearChains or
-            detangleSuperBubbles
-            )) {
-            break;
-        }
-    }
+    // Detangle.
+    cGraph.detangleIteration(
+        compressedTransitiveReductionDistance,
+        minReliableLength);
 
     // Remove cross-edges, then detangle again.
     cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
-    for(uint64_t iteration=0; ; iteration++) {
-        cout << "Detangle iteration " << iteration << " begins." << endl;
-        const bool transitiveReduction = cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
-        const bool detangleVertices = cGraph.detangleVertices();
-        const bool detangleLinearChains = cGraph.detangleLinearChains();
-        const bool mergeLinearChains = cGraph.mergeLinearChains();
-        const bool detangleSuperBubbles = cGraph.detangleSuperbubbles(minReliableLength);
-        if(not (
-            transitiveReduction or
-            detangleVertices or
-            detangleLinearChains or
-            mergeLinearChains or
-            detangleSuperBubbles
-            )) {
-            break;
-        }
-    }
+    cGraph.detangleIteration(
+        compressedTransitiveReductionDistance,
+        minReliableLength);
 
     // Final output.
     globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "");
@@ -3206,5 +3178,35 @@ uint64_t CompressedPathGraph1::totalBaseOffset(vertex_descriptor cv) const
         }
     }
     return totalBaseOffset;
+
+}
+
+
+
+void CompressedPathGraph1::detangleIteration(
+    uint64_t compressedTransitiveReductionDistance,
+    uint64_t minReliableLength)
+{
+
+    while(true) {
+
+        // Try everything.
+        const bool transitiveReductionChanges = localTransitiveReduction(compressedTransitiveReductionDistance);
+        const bool detangleVerticesChanges = detangleVertices();
+        const bool detangleLinearChainsChanges = detangleLinearChains();
+        const bool mergeLinearChainsChanges = mergeLinearChains();
+        const bool detangleSuperBubblesChanges = detangleSuperbubbles(minReliableLength);
+
+        // If nothing changed, stop the iteration.
+        if(not (
+            transitiveReductionChanges or
+            detangleVerticesChanges or
+            detangleLinearChainsChanges or
+            mergeLinearChainsChanges or
+            detangleSuperBubblesChanges
+            )) {
+            break;
+        }
+    }
 
 }
