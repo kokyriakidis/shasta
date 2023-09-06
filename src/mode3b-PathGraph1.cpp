@@ -225,7 +225,7 @@ void GlobalPathGraph1::assemble1(
         const bool detangleVertices = cGraph.detangleVertices();
         const bool detangleLinearChains = cGraph.detangleLinearChains();
         const bool mergeLinearChains = cGraph.mergeLinearChains();
-        const bool detangleSuperBubbles = globalGraph.detangleSuperbubbles(componentId, cGraph, minReliableLength);
+        const bool detangleSuperBubbles = cGraph.detangleSuperbubbles(minReliableLength);
         if(not (
             transitiveReduction or
             detangleVertices or
@@ -245,7 +245,7 @@ void GlobalPathGraph1::assemble1(
         const bool detangleVertices = cGraph.detangleVertices();
         const bool detangleLinearChains = cGraph.detangleLinearChains();
         const bool mergeLinearChains = cGraph.mergeLinearChains();
-        const bool detangleSuperBubbles = globalGraph.detangleSuperbubbles(componentId, cGraph, minReliableLength);
+        const bool detangleSuperBubbles = cGraph.detangleSuperbubbles(minReliableLength);
         if(not (
             transitiveReduction or
             detangleVertices or
@@ -279,7 +279,7 @@ void GlobalPathGraph1::writeCompressedVerticesCsv(
         const PathGraph1::vertex_descriptor v0 = cVertex.v.front();
         const PathGraph1::vertex_descriptor v1 = cVertex.v.back();
 
-        uint64_t totalBaseOffset = compressedVertexBaseOffset(componentId, cGraph, cv);
+        uint64_t totalBaseOffset = cGraph.totalBaseOffset(cv);
 
         csv << componentId << "-" << cVertex.id << ",";
         csv << component[v0].edgeId << ",";
@@ -288,38 +288,6 @@ void GlobalPathGraph1::writeCompressedVerticesCsv(
         csv << totalBaseOffset << ",";
         csv << "\n";
     }
-}
-
-
-
-uint64_t GlobalPathGraph1::compressedVertexBaseOffset(
-    uint64_t componentId,
-    const CompressedPathGraph1& cGraph,
-    CompressedPathGraph1BaseClass::vertex_descriptor cv) const
-{
-    const PathGraph1& component = *components[componentId];
-    const CompressedPathGraph1Vertex& cVertex = cGraph[cv];
-    SHASTA_ASSERT(not cVertex.v.empty());
-
-    uint64_t totalBaseOffset = 0;
-
-    for(uint64_t i=1; i<cVertex.v.size(); i++) {
-        const PathGraph1::vertex_descriptor vA = cVertex.v[i-1];
-        const PathGraph1::vertex_descriptor vB = cVertex.v[i];
-
-        PathGraph1::edge_descriptor e;
-        bool edgeWasFound = false;
-        tie(e, edgeWasFound) = edge(vA, vB, component);
-        if(edgeWasFound) {
-            totalBaseOffset += component[e].info.offsetInBases;
-        } else {
-            MarkerGraphEdgePairInfo info;
-            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
-                component[vA].edgeId, component[vB].edgeId, info));
-            totalBaseOffset += info.offsetInBases;
-        }
-    }
-    return totalBaseOffset;
 }
 
 
@@ -362,7 +330,7 @@ void GlobalPathGraph1::writeCompressedGraphviz(
 
             const PathGraph1::vertex_descriptor v0 = cGraph[cv].v.front();
             const PathGraph1::vertex_descriptor v1 = cGraph[cv].v.back();
-            const uint64_t baseOffset = compressedVertexBaseOffset(componentId, cGraph, cv);
+            const uint64_t baseOffset = cGraph.totalBaseOffset(cv);
 
             if(baseOffset >= minGreenLength) {
                 out <<
@@ -2629,118 +2597,6 @@ bool CompressedPathGraph1::mergeLinearChains()
 
 
 
-bool GlobalPathGraph1::detangleSuperbubbles(
-    uint64_t componentId,
-    CompressedPathGraph1& cGraph,
-    uint64_t minReliableLength) const
-{
-    const bool debug = false;
-    const PathGraph1& component = *components[componentId];
-
-    // The edges to be added.
-    class NewEdge {
-    public:
-        CompressedPathGraph1::vertex_descriptor cv0;
-        CompressedPathGraph1::vertex_descriptor cv1;
-        CompressedPathGraph1Edge edge;
-    };
-    vector<NewEdge> newEdges;
-
-    // Loop over long vertices of the CompressedPathGraph1.
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
-        const uint64_t baseOffset = compressedVertexBaseOffset(componentId, cGraph, cv);
-        if(baseOffset < minReliableLength) {
-            continue;
-        }
-        if(debug) {
-            cout << "Starting BFS at " << componentId << "-" << cGraph[cv].id << endl;
-        }
-
-        // Do a BFS starting here, stopping when we encounter a long vertices.
-        std::queue<CompressedPathGraph1::vertex_descriptor> q;
-        q.push(cv);
-        std::set<CompressedPathGraph1::vertex_descriptor> visited;
-        visited.insert(cv);
-        while(not q.empty()) {
-            const auto cv0 = q.front();
-            q.pop();
-            if(false) {
-                cout << "Dequeued " << componentId << "-" << cGraph[cv0].id << endl;
-            }
-
-            BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1) {
-                const auto cv1 = target(ce, cGraph);
-                if(visited.contains(cv1)) {
-                    continue;
-                }
-                const uint64_t baseOffset = compressedVertexBaseOffset(componentId, cGraph, cv1);
-                if(baseOffset >= minReliableLength) {
-                    CompressedPathGraph1Edge newEdge;
-                    assembler.analyzeMarkerGraphEdgePair(
-                        component[cGraph[cv].v.back()].edgeId,
-                        component[cGraph[cv1].v.front()].edgeId,
-                        newEdge.info);
-                    if(newEdge.info.common) {
-                        newEdges.push_back({cv, cv1, newEdge});
-                    }
-                    if(debug) {
-                        cout << "Found " << componentId << "-" << cGraph[cv1].id <<
-                            ", common count " << newEdge.info.common << endl;
-                    }
-                }   else {
-                    q.push(cv1);
-                    visited.insert(cv1);
-                    if(false) {
-                        cout << "Enqueued " << componentId << "-" << cGraph[cv1].id << endl;
-                    }
-                }
-            }
-        }
-    }
-
-
-
-    // Now we can:
-    // - Remove all short vertices.
-    // - Remove all edges.
-    // - Replace them with the new edges we found.
-
-    // Remove all short vertices.
-    vector<CompressedPathGraph1::vertex_descriptor> verticesToBeRemoved;
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
-        const uint64_t baseOffset = compressedVertexBaseOffset(componentId, cGraph, cv);
-        if(baseOffset < minReliableLength) {
-            verticesToBeRemoved.push_back(cv);
-        }
-    }
-    for(const auto cv: verticesToBeRemoved) {
-        clear_vertex(cv, cGraph);
-        remove_vertex(cv, cGraph);
-    }
-
-    // Remove all edges.
-    vector<CompressedPathGraph1::edge_descriptor> edgesToBeRemoved;
-    using boost::edges;
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
-        edgesToBeRemoved.push_back(ce);
-    }
-    for(const auto ce: edgesToBeRemoved) {
-        remove_edge(ce, cGraph);
-    }
-
-    // Replace them with the new edges we found.
-    for(const auto& newEdge: newEdges) {
-        add_edge(newEdge.cv0, newEdge.cv1, {newEdge.edge}, cGraph);
-    }
-    cout << "After superbubble detangling, the CompressedPathGraph1 has " <<
-        num_vertices(cGraph) << " vertices  and " <<
-        num_edges(cGraph) << " edges." << endl;
-
-    return not verticesToBeRemoved.empty(); // Questionable.
-}
-
-
-
 // An edge cv0->cv1 is a cross edge if:
 // - Has coverage <= threshold1
 // - cv0 has out-degree > 1 and at least one out-edge with coverage >= threshold2.
@@ -3211,4 +3067,144 @@ bool CompressedPathGraph1::detangleLinearChains()
     }
 
     return detangleCount > 0;
+}
+
+
+
+
+bool CompressedPathGraph1::detangleSuperbubbles(uint64_t minReliableLength)
+{
+    CompressedPathGraph1& cGraph = *this;
+    const bool debug = false;
+
+    // The edges to be added.
+    class NewEdge {
+    public:
+        vertex_descriptor cv0;
+        vertex_descriptor cv1;
+        CompressedPathGraph1Edge edge;
+    };
+    vector<NewEdge> newEdges;
+
+    // Loop over long vertices of the CompressedPathGraph1.
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
+        const uint64_t baseOffset = totalBaseOffset(cv);
+        if(baseOffset < minReliableLength) {
+            continue;
+        }
+        if(debug) {
+            cout << "Starting BFS at " << componentId << "-" << cGraph[cv].id << endl;
+        }
+
+        // Do a BFS starting here, stopping when we encounter a long vertices.
+        std::queue<vertex_descriptor> q;
+        q.push(cv);
+        std::set<vertex_descriptor> visited;
+        visited.insert(cv);
+        while(not q.empty()) {
+            const auto cv0 = q.front();
+            q.pop();
+            if(false) {
+                cout << "Dequeued " << componentId << "-" << cGraph[cv0].id << endl;
+            }
+
+            BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1) {
+                const auto cv1 = target(ce, cGraph);
+                if(visited.contains(cv1)) {
+                    continue;
+                }
+                const uint64_t baseOffset = totalBaseOffset(cv1);
+                if(baseOffset >= minReliableLength) {
+                    CompressedPathGraph1Edge newEdge;
+                    assembler.analyzeMarkerGraphEdgePair(
+                        graph[cGraph[cv].v.back()].edgeId,
+                        graph[cGraph[cv1].v.front()].edgeId,
+                        newEdge.info);
+                    if(newEdge.info.common) {
+                        newEdges.push_back({cv, cv1, newEdge});
+                    }
+                    if(debug) {
+                        cout << "Found " << componentId << "-" << cGraph[cv1].id <<
+                            ", common count " << newEdge.info.common << endl;
+                    }
+                }   else {
+                    q.push(cv1);
+                    visited.insert(cv1);
+                    if(false) {
+                        cout << "Enqueued " << componentId << "-" << cGraph[cv1].id << endl;
+                    }
+                }
+            }
+        }
+    }
+
+
+
+    // Now we can:
+    // - Remove all short vertices.
+    // - Remove all edges.
+    // - Replace them with the new edges we found.
+
+    // Remove all short vertices.
+    vector<vertex_descriptor> verticesToBeRemoved;
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
+        const uint64_t baseOffset = totalBaseOffset(cv);
+        if(baseOffset < minReliableLength) {
+            verticesToBeRemoved.push_back(cv);
+        }
+    }
+    for(const auto cv: verticesToBeRemoved) {
+        clear_vertex(cv, cGraph);
+        remove_vertex(cv, cGraph);
+    }
+
+    // Remove all edges.
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
+        edgesToBeRemoved.push_back(ce);
+    }
+    for(const auto ce: edgesToBeRemoved) {
+        boost::remove_edge(ce, cGraph);
+    }
+
+    // Replace them with the new edges we found.
+    for(const auto& newEdge: newEdges) {
+        add_edge(newEdge.cv0, newEdge.cv1, {newEdge.edge}, cGraph);
+    }
+    cout << "After superbubble detangling, the CompressedPathGraph1 has " <<
+        num_vertices(cGraph) << " vertices  and " <<
+        num_edges(cGraph) << " edges." << endl;
+
+    return not verticesToBeRemoved.empty(); // Questionable.
+}
+
+
+
+uint64_t CompressedPathGraph1::totalBaseOffset(vertex_descriptor cv) const
+{
+    const CompressedPathGraph1& cGraph = *this;
+    const CompressedPathGraph1Vertex& cVertex = cGraph[cv];
+
+    SHASTA_ASSERT(not cVertex.v.empty());
+
+    uint64_t totalBaseOffset = 0;
+
+    for(uint64_t i=1; i<cVertex.v.size(); i++) {
+        const PathGraph1::vertex_descriptor vA = cVertex.v[i-1];
+        const PathGraph1::vertex_descriptor vB = cVertex.v[i];
+
+        PathGraph1::edge_descriptor e;
+        bool edgeWasFound = false;
+        tie(e, edgeWasFound) = edge(vA, vB, graph);
+        if(edgeWasFound) {
+            totalBaseOffset += graph[e].info.offsetInBases;
+        } else {
+            MarkerGraphEdgePairInfo info;
+            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
+                graph[vA].edgeId, graph[vB].edgeId, info));
+            totalBaseOffset += info.offsetInBases;
+        }
+    }
+    return totalBaseOffset;
+
 }

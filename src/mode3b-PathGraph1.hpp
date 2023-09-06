@@ -428,14 +428,6 @@ private:
         const CompressedPathGraph1&,
         uint64_t minGreenLength,
         const string& fileNamePrefix) const;
-    uint64_t compressedVertexBaseOffset(
-        uint64_t componentId,
-        const CompressedPathGraph1&,
-        CompressedPathGraph1BaseClass::vertex_descriptor) const;
-    bool detangleSuperbubbles(
-        uint64_t componentId,
-        CompressedPathGraph1&,
-        uint64_t minReliableLength) const;
 
 };
 
@@ -476,6 +468,7 @@ public:
     bool detangleVertices();
     bool detangleLinearChains();
     bool detangleVertex(vertex_descriptor);
+    bool detangleSuperbubbles(uint64_t minReliableLength);
     bool removeCrossEdges(uint64_t threshold1, uint64_t threshold2);
 
     // The id of the next vertex to be created.
@@ -483,6 +476,8 @@ public:
 
     // Return a string to uniquely identify this vertex as componentId-id.
     string vertexIdString(vertex_descriptor) const;
+
+    uint64_t totalBaseOffset(vertex_descriptor) const;
 };
 
 
