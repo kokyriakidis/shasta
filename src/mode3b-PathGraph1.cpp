@@ -232,6 +232,8 @@ void GlobalPathGraph1::assemble1(
     // Final output.
     cGraph.writeGraphviz(minReliableLength, "");
     cGraph.writeVerticesCsv();
+    cout << "The CompressedPathGraph1 has " << num_vertices(cGraph) << " vertices and " <<
+        num_edges(cGraph) << " edges." << endl;
 }
 
 
@@ -2469,10 +2471,12 @@ CompressedPathGraph1::CompressedPathGraph1(
     }
     cout << "The PathGraph1 has " << num_vertices(graph) << " vertices and " <<
         num_edges(graph) << " edges." << endl;
-    cout << "The FilteredPathGraph1 has " << num_vertices(graph) << " vertices and " <<
-        filteredGraphEdgeCount << " edges." << endl;
-    cout << "The CompressedPathGraph1 has " << num_vertices(cGraph) << " vertices and " <<
-        num_edges(cGraph) << " edges." << endl;
+    if(false) {
+        cout << "The FilteredPathGraph1 has " << num_vertices(graph) << " vertices and " <<
+            filteredGraphEdgeCount << " edges." << endl;
+        cout << "The CompressedPathGraph1 has " << num_vertices(cGraph) << " vertices and " <<
+            num_edges(cGraph) << " edges." << endl;
+    }
 
 }
 
@@ -2547,9 +2551,11 @@ bool CompressedPathGraph1::mergeLinearChains()
 
     }
 
-    cout << "After merging linear chains, the CompressedPathGraph1 has " <<
-        num_vertices(cGraph) << " vertices  and " <<
-        num_edges(cGraph) << " edges." << endl;
+    if(debug) {
+        cout << "After merging linear chains, the CompressedPathGraph1 has " <<
+            num_vertices(cGraph) << " vertices  and " <<
+            num_edges(cGraph) << " edges." << endl;
+    }
 
     return changesWereMade;
 }
@@ -2827,7 +2833,9 @@ bool CompressedPathGraph1::detangleLinearChains()
     // Find the linear chains.
     vector< vector<CompressedPathGraph1::edge_descriptor> > linearChains;
     findLinearChains(cGraph, 1, linearChains);
-    cout << "Found " << linearChains.size() << " linear chains." << endl;
+    if(debug) {
+        cout << "Found " << linearChains.size() << " linear chains." << endl;
+    }
 
 
 
@@ -3130,9 +3138,11 @@ bool CompressedPathGraph1::detangleSuperbubbles(uint64_t minReliableLength)
     for(const auto& newEdge: newEdges) {
         add_edge(newEdge.cv0, newEdge.cv1, {newEdge.edge}, cGraph);
     }
-    cout << "After superbubble detangling, the CompressedPathGraph1 has " <<
-        num_vertices(cGraph) << " vertices  and " <<
-        num_edges(cGraph) << " edges." << endl;
+    if(debug) {
+        cout << "After superbubble detangling, the CompressedPathGraph1 has " <<
+            num_vertices(cGraph) << " vertices  and " <<
+            num_edges(cGraph) << " edges." << endl;
+    }
 
     return not verticesToBeRemoved.empty(); // Questionable.
 }
