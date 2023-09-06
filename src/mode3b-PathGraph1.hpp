@@ -464,17 +464,28 @@ public:
     MarkerGraphEdgePairInfo info;
 };
 
-
 class shasta::mode3b::CompressedPathGraph1 : public CompressedPathGraph1BaseClass {
 public:
-    CompressedPathGraph1(const PathGraph1&);
-    bool localTransitiveReduction(uint64_t distance);
-    bool mergeLinearChains(uint64_t componentId);
-    bool removeCrossEdges(
+    CompressedPathGraph1(
+        const PathGraph1&,
         uint64_t componentId,
-        uint64_t threshold1,
-        uint64_t threshold2);
+        const Assembler&);
+
+    // Information stored by the constructor.
+    const PathGraph1& graph;
+    uint64_t componentId;
+    const Assembler& assembler;
+
+    // Operations to simplify the CompressedPathGraph1.
+    bool mergeLinearChains();
+    bool localTransitiveReduction(uint64_t distance);
+    bool removeCrossEdges(uint64_t threshold1, uint64_t threshold2);
+
+    // The id of the next vertex to be created.
     uint64_t nextVertexId = 0;
+
+    // Return a string to uniquely identify this vertex as componentId-id.
+    string vertexIdString(vertex_descriptor) const;
 };
 
 

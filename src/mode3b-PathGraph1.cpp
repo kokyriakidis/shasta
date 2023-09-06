@@ -156,7 +156,7 @@ void GlobalPathGraph1::assemble0(const Assembler& assembler)
 void GlobalPathGraph1::assemble1(const Assembler& assembler)
 {
     const uint64_t minPrimaryCoverage = 8;
-    const uint64_t maxPrimaryCoverage = 35;
+    const uint64_t maxPrimaryCoverage = 40;
     const uint64_t minEdgeCoverage = 1;
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
@@ -216,7 +216,7 @@ void GlobalPathGraph1::assemble1(
     // In this compressed representation, each linear sequence of
     // transitive reduction non-branch vertices becomes a single vertex.
     // Non-branch vertices are those with in-degree and out-degree not greater than 1.
-    CompressedPathGraph1 cGraph(component);
+    CompressedPathGraph1 cGraph(component, componentId, globalGraph.assembler);
 
     // Detangle iterations.
     for(uint64_t iteration=0; ; iteration++) {
@@ -224,7 +224,7 @@ void GlobalPathGraph1::assemble1(
         const bool transitiveReduction = cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
         const bool detangleVertices = globalGraph.detangleCompressedGraphVertices(componentId, cGraph);
         const bool detangleLinearChains = globalGraph.detangleCompressedGraphLinearChains(componentId, cGraph);
-        const bool mergeLinearChains = cGraph.mergeLinearChains(componentId);
+        const bool mergeLinearChains = cGraph.mergeLinearChains();
         const bool detangleSuperBubbles = globalGraph.detangleSuperbubbles(componentId, cGraph, minReliableLength);
         if(not (
             transitiveReduction or
@@ -238,14 +238,13 @@ void GlobalPathGraph1::assemble1(
     }
 
     // Remove cross-edges, then detangle again.
-    cGraph.removeCrossEdges(
-        componentId, crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
     for(uint64_t iteration=0; ; iteration++) {
         cout << "Detangle iteration " << iteration << " begins." << endl;
         const bool transitiveReduction = cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
         const bool detangleVertices = globalGraph.detangleCompressedGraphVertices(componentId, cGraph);
         const bool detangleLinearChains = globalGraph.detangleCompressedGraphLinearChains(componentId, cGraph);
-        const bool mergeLinearChains = cGraph.mergeLinearChains(componentId);
+        const bool mergeLinearChains = cGraph.mergeLinearChains();
         const bool detangleSuperBubbles = globalGraph.detangleSuperbubbles(componentId, cGraph, minReliableLength);
         if(not (
             transitiveReduction or
@@ -2394,7 +2393,13 @@ void GlobalPathGraph1::writeConnectors(const vector<ChainConnector>& connectors)
 
 
 
-CompressedPathGraph1::CompressedPathGraph1(const PathGraph1& graph)
+CompressedPathGraph1::CompressedPathGraph1(
+    const PathGraph1& graph,
+    uint64_t componentId,
+    const Assembler& assembler) :
+    graph(graph),
+    componentId(componentId),
+    assembler(assembler)
 {
     CompressedPathGraph1& cGraph = *this;
     using boost::out_degree;
@@ -2958,7 +2963,7 @@ bool GlobalPathGraph1::detangleCompressedGraphLinearChains(
 
 
 
-bool CompressedPathGraph1::mergeLinearChains(uint64_t componentId)
+bool CompressedPathGraph1::mergeLinearChains()
 {
     CompressedPathGraph1& cGraph = *this;
     const bool debug = false;
@@ -3153,7 +3158,6 @@ bool GlobalPathGraph1::detangleSuperbubbles(
 // - cv0 has out-degree > 1 and at least one out-edge with coverage >= threshold2.
 // - cv1 has in-degree  > 1 and at least one in-edge  with coverage >= threshold2.
 bool CompressedPathGraph1::removeCrossEdges(
-    uint64_t componentId,
     uint64_t threshold1,
     uint64_t threshold2)
 {
@@ -3223,4 +3227,13 @@ bool CompressedPathGraph1::removeCrossEdges(
     }
 
     return not edgesToBeRemoved.empty();
+}
+
+
+
+string CompressedPathGraph1::vertexIdString(vertex_descriptor cv) const
+{
+    const CompressedPathGraph1& cGraph = *this;
+
+    return to_string(componentId) + "-" + to_string(cGraph[cv].id);
 }
