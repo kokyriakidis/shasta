@@ -415,9 +415,6 @@ private:
         uint64_t crossEdgeCoverageThreshold1,
         uint64_t crossEdgeCoverageThreshold2);
 
-    // Functions that work on CompressedPathGraph1.
-    void writeCompressedVerticesCsv(uint64_t componentId, const CompressedPathGraph1&) const;
-
 };
 
 
@@ -479,6 +476,9 @@ public:
     void writeGraphviz(
         uint64_t minGreenLength,
         const string& fileNamePrefix) const;
+
+    void writeVerticesCsv() const;
+
 };
 
 

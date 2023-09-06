@@ -231,16 +231,14 @@ void GlobalPathGraph1::assemble1(
 
     // Final output.
     cGraph.writeGraphviz(minReliableLength, "");
-    globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
+    cGraph.writeVerticesCsv();
 }
 
 
 
-void GlobalPathGraph1::writeCompressedVerticesCsv(
-    uint64_t componentId,
-    const CompressedPathGraph1& cGraph) const
+void CompressedPathGraph1::writeVerticesCsv() const
 {
-    const PathGraph1& component = *components[componentId];
+    const CompressedPathGraph1& cGraph = *this;
 
     ofstream csv("CompressedPathGraphVertices" + to_string(componentId) + ".csv");
     csv << "Id,Begin,End,Vertex count,Estimated length\n";
@@ -251,13 +249,13 @@ void GlobalPathGraph1::writeCompressedVerticesCsv(
         const PathGraph1::vertex_descriptor v0 = cVertex.v.front();
         const PathGraph1::vertex_descriptor v1 = cVertex.v.back();
 
-        uint64_t totalBaseOffset = cGraph.totalBaseOffset(cv);
+        uint64_t baseOffset = totalBaseOffset(cv);
 
         csv << componentId << "-" << cVertex.id << ",";
-        csv << component[v0].edgeId << ",";
-        csv << component[v1].edgeId << ",";
+        csv << graph[v0].edgeId << ",";
+        csv << graph[v1].edgeId << ",";
         csv << cVertex.v.size() << ",";
-        csv << totalBaseOffset << ",";
+        csv << baseOffset << ",";
         csv << "\n";
     }
 }
