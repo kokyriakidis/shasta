@@ -163,8 +163,8 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
     const uint64_t transitiveReductionDistance = 20;
     const uint64_t compressedTransitiveReductionDistance = 100;
     const uint64_t minReliableLength = 200;
-    const uint64_t crossEdgeCoverageThreshold1 = 1;
-    const uint64_t crossEdgeCoverageThreshold2 = 3;
+    const uint64_t crossEdgeCoverageThreshold1 = 3;
+    const uint64_t crossEdgeCoverageThreshold2 = 6;
     const uint64_t detangleTolerance = 1;
 
 
