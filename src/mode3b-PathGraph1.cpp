@@ -222,7 +222,7 @@ void GlobalPathGraph1::assemble1(
     for(uint64_t iteration=0; ; iteration++) {
         cout << "Detangle iteration " << iteration << " begins." << endl;
         const bool transitiveReduction = cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
-        const bool detangleVertices = globalGraph.detangleCompressedGraphVertices(componentId, cGraph);
+        const bool detangleVertices = cGraph.detangleVertices();
         const bool detangleLinearChains = globalGraph.detangleCompressedGraphLinearChains(componentId, cGraph);
         const bool mergeLinearChains = cGraph.mergeLinearChains();
         const bool detangleSuperBubbles = globalGraph.detangleSuperbubbles(componentId, cGraph, minReliableLength);
@@ -242,7 +242,7 @@ void GlobalPathGraph1::assemble1(
     for(uint64_t iteration=0; ; iteration++) {
         cout << "Detangle iteration " << iteration << " begins." << endl;
         const bool transitiveReduction = cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
-        const bool detangleVertices = globalGraph.detangleCompressedGraphVertices(componentId, cGraph);
+        const bool detangleVertices = cGraph.detangleVertices();
         const bool detangleLinearChains = globalGraph.detangleCompressedGraphLinearChains(componentId, cGraph);
         const bool mergeLinearChains = cGraph.mergeLinearChains();
         const bool detangleSuperBubbles = globalGraph.detangleSuperbubbles(componentId, cGraph, minReliableLength);
@@ -2551,195 +2551,6 @@ CompressedPathGraph1::CompressedPathGraph1(
 
 
 
-bool GlobalPathGraph1::detangleCompressedGraphVertices(
-    uint64_t componentId,
-    CompressedPathGraph1& cGraph) const
-{
-
-    cout << "Before vertex detangling, the CompressedPathGraph1 has " <<
-        num_vertices(cGraph) << " vertices  and " <<
-        num_edges(cGraph) << " edges." << endl;
-
-    // Find the vertices that can potentially be detangled.
-    vector<CompressedPathGraph1::vertex_descriptor> detangleCandidates;
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
-        if(in_degree(cv, cGraph) > 1 and out_degree(cv, cGraph) > 1) {
-            detangleCandidates.push_back(cv);
-        }
-    }
-    cout << detangleCandidates.size() << " compressed vertices are candidates for detangling." << endl;
-
-    // Do the detangling.
-    uint64_t detangledCount = 0;
-    for(const auto cv: detangleCandidates) {
-        bool wasDetangled = detangleCompressedGraphVertex(componentId, cGraph, cv);
-        if(wasDetangled) {
-            ++detangledCount;
-        }
-    }
-    cout << detangledCount << " compressed vertices were detangled." << endl;
-
-    cout << "After vertex detangling, the CompressedPathGraph1 has " <<
-        num_vertices(cGraph) << " vertices  and " <<
-        num_edges(cGraph) << " edges." << endl;
-
-    return detangledCount > 0;
-}
-
-
-
-// Attempt to detangle a compressed vertex.
-// The detangle operation leaves all in-degree and out-degrees
-// of all other vertices unchanged.
-bool GlobalPathGraph1::detangleCompressedGraphVertex(
-    uint64_t componentId,
-    CompressedPathGraph1& cGraph,
-    CompressedPathGraph1BaseClass::vertex_descriptor cv) const
-{
-    const PathGraph1& component = *components[componentId];
-
-    const bool debug = false; // (componentId == 0) and (cGraph[cv].id == 28134);
-    if(debug) {
-        cout << "Attempting to detangle " << componentId << "-" << cGraph[cv].id << endl;
-    }
-
-    // Gather the source vertices of incoming edges.
-    vector<CompressedPathGraph1BaseClass::vertex_descriptor> incoming;
-    BGL_FORALL_INEDGES(cv, e, cGraph, CompressedPathGraph1) {
-        incoming.push_back(source(e, cGraph));
-    }
-
-    // Gather the target vertices of outgoing edges.
-    vector<CompressedPathGraph1BaseClass::vertex_descriptor> outgoing;
-    BGL_FORALL_OUTEDGES(cv, e, cGraph, CompressedPathGraph1) {
-        outgoing.push_back(target(e, cGraph));
-    }
-
-    if(debug) {
-        cout << "Incoming:";
-        for(const auto cv1: incoming) {
-            const auto& cVertex = cGraph[cv1];
-            const PathGraph1::vertex_descriptor v1 = cVertex.v.back();
-            cout << " " << component[v1].edgeId;
-        }
-        cout << endl;
-
-        cout << "Outgoing:";
-        for(const auto cv1: outgoing) {
-            const auto& cVertex = cGraph[cv1];
-            const PathGraph1::vertex_descriptor v1 = cVertex.v.front();
-            cout << " " << component[v1].edgeId;
-        }
-        cout << endl;
-    }
-
-    // We can only detangle if the number of incoming edges
-    // equals the number of outgoing edges.
-    if(incoming.size() != outgoing.size()) {
-        return false;
-    }
-
-    // For each incoming edge, count the number of
-    // outgoing edges it has common oriented reads with.
-    vector<uint64_t> inCount(incoming.size(), 0);
-
-    // For each outgoing edge, count the number of
-    // incoming edges it has common oriented reads with.
-    vector<uint64_t> outCount(outgoing.size(), 0);
-
-    // Loop over pairs of incoming/outgoing edges.
-    MarkerGraphEdgePairInfo info;
-    class NewEdge {
-    public:
-        CompressedPathGraph1::vertex_descriptor cv0;
-        CompressedPathGraph1::vertex_descriptor cv1;
-        MarkerGraphEdgePairInfo info;
-    };
-    vector<NewEdge> newEdges;
-    for(uint64_t i0=0; i0<incoming.size(); i0++) {
-        const auto cv0 = incoming[i0];
-        const auto& cVertex0 = cGraph[cv0];
-        const PathGraph1::vertex_descriptor v0 = cVertex0.v.back();
-        const MarkerGraphEdgeId edgeId0 = component[v0].edgeId;
-        for(uint64_t i1=0; i1<outgoing.size(); i1++) {
-            const auto cv1 = outgoing[i1];
-            const auto& cVertex1 = cGraph[cv1];
-            const PathGraph1::vertex_descriptor v1 = cVertex1.v.front();
-            const MarkerGraphEdgeId edgeId1 = component[v1].edgeId;
-            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
-            if(debug) {
-                cout << edgeId0 << " " << edgeId1 << ": " << info.common << endl;
-            }
-            if(info.common > 0) {
-                ++inCount[i0];
-                ++outCount[i1];
-                newEdges.push_back({cv0, cv1, info});
-            }
-        }
-    }
-
-    if(debug) {
-        cout << "inCount ";
-        copy(inCount.begin(), inCount.end(), ostream_iterator<uint64_t>(cout, " "));
-        cout << endl;
-        cout << "outCount ";
-        copy(outCount.begin(), outCount.end(), ostream_iterator<uint64_t>(cout, " "));
-        cout << endl;
-    }
-
-    // We can only detangle if all the inCount and outCount entries are 1.
-    // This means that for each incoming edge there is only one outgoing edge
-    // with common oriented reads, and vice versa.
-    for(const uint64_t c: inCount) {
-        if(c != 1) {
-            if(debug) {
-                cout << "Cannot detangle." << endl;
-            }
-            return false;
-        }
-    }
-    for(const uint64_t c: outCount) {
-        if(c != 1) {
-            if(debug) {
-                cout << "Cannot detangle." << endl;
-            }
-            return false;
-        }
-    }
-
-    // Add the edges.
-    for(const auto& newEdge: newEdges) {
-        CompressedPathGraph1::edge_descriptor ce;
-
-        // Check that the edge does not already exists.
-        bool edgeExists = false;
-        tie(ce, edgeExists) = boost::edge(newEdge.cv0, newEdge.cv1, cGraph);
-        if(edgeExists) {
-            continue;
-        }
-
-        bool edgeWasAdded = false;
-        tie(ce, edgeWasAdded) = boost::add_edge(newEdge.cv0, newEdge.cv1, {newEdge.info}, cGraph);
-        SHASTA_ASSERT(edgeWasAdded);
-        if(debug) {
-            const auto& cEdge = cGraph[ce];
-            cout << "Added compressed edge " <<
-                componentId << "-" << cGraph[newEdge.cv0].id << "->" <<
-                componentId << "-" << cGraph[newEdge.cv1].id << ", common count " <<
-                cEdge.info.common << ", offset " <<
-                cEdge.info.offsetInBases << endl;
-        }
-    }
-
-    // Now we can remove the vertex we detangled.
-    clear_vertex(cv, cGraph);
-    remove_vertex(cv, cGraph);
-
-    return true;
-}
-
-
-
 bool GlobalPathGraph1::detangleCompressedGraphLinearChains(
     uint64_t componentId,
     CompressedPathGraph1& cGraph) const
@@ -3236,4 +3047,180 @@ string CompressedPathGraph1::vertexIdString(vertex_descriptor cv) const
     const CompressedPathGraph1& cGraph = *this;
 
     return to_string(componentId) + "-" + to_string(cGraph[cv].id);
+}
+
+
+
+bool CompressedPathGraph1::detangleVertices()
+{
+    CompressedPathGraph1& cGraph = *this;
+
+    // Find the vertices that can potentially be detangled.
+    vector<vertex_descriptor> detangleCandidates;
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
+        if(in_degree(cv, cGraph) > 1 and out_degree(cv, cGraph) > 1) {
+            detangleCandidates.push_back(cv);
+        }
+    }
+
+    // Do the detangling.
+    uint64_t detangledCount = 0;
+    for(const auto cv: detangleCandidates) {
+        bool wasDetangled = detangleVertex(cv);
+        if(wasDetangled) {
+            ++detangledCount;
+        }
+    }
+
+    return detangledCount > 0;
+}
+
+
+
+// Attempt to detangle a compressed vertex.
+// The detangle operation leaves all in-degree and out-degrees
+// of all other vertices unchanged.
+bool CompressedPathGraph1::detangleVertex(
+    vertex_descriptor cv)
+{
+    CompressedPathGraph1& cGraph = *this;
+
+    const bool debug = false;
+    if(debug) {
+        cout << "Attempting to detangle " << componentId << "-" << cGraph[cv].id << endl;
+    }
+
+    // Gather the source vertices of incoming edges.
+    vector<vertex_descriptor> incoming;
+    BGL_FORALL_INEDGES(cv, e, cGraph, CompressedPathGraph1) {
+        incoming.push_back(source(e, cGraph));
+    }
+
+    // Gather the target vertices of outgoing edges.
+    vector<vertex_descriptor> outgoing;
+    BGL_FORALL_OUTEDGES(cv, e, cGraph, CompressedPathGraph1) {
+        outgoing.push_back(target(e, cGraph));
+    }
+
+    if(debug) {
+        cout << "Incoming:";
+        for(const auto cv1: incoming) {
+            const auto& cVertex = cGraph[cv1];
+            const PathGraph1::vertex_descriptor v1 = cVertex.v.back();
+            cout << " " << graph[v1].edgeId;
+        }
+        cout << endl;
+
+        cout << "Outgoing:";
+        for(const auto cv1: outgoing) {
+            const auto& cVertex = cGraph[cv1];
+            const PathGraph1::vertex_descriptor v1 = cVertex.v.front();
+            cout << " " << graph[v1].edgeId;
+        }
+        cout << endl;
+    }
+
+    // We can only detangle if the number of incoming edges
+    // equals the number of outgoing edges.
+    if(incoming.size() != outgoing.size()) {
+        return false;
+    }
+
+    // For each incoming edge, count the number of
+    // outgoing edges it has common oriented reads with.
+    vector<uint64_t> inCount(incoming.size(), 0);
+
+    // For each outgoing edge, count the number of
+    // incoming edges it has common oriented reads with.
+    vector<uint64_t> outCount(outgoing.size(), 0);
+
+    // Loop over pairs of incoming/outgoing edges.
+    MarkerGraphEdgePairInfo info;
+    class NewEdge {
+    public:
+        vertex_descriptor cv0;
+        vertex_descriptor cv1;
+        MarkerGraphEdgePairInfo info;
+    };
+    vector<NewEdge> newEdges;
+    for(uint64_t i0=0; i0<incoming.size(); i0++) {
+        const auto cv0 = incoming[i0];
+        const auto& cVertex0 = cGraph[cv0];
+        const PathGraph1::vertex_descriptor v0 = cVertex0.v.back();
+        const MarkerGraphEdgeId edgeId0 = graph[v0].edgeId;
+        for(uint64_t i1=0; i1<outgoing.size(); i1++) {
+            const auto cv1 = outgoing[i1];
+            const auto& cVertex1 = cGraph[cv1];
+            const PathGraph1::vertex_descriptor v1 = cVertex1.v.front();
+            const MarkerGraphEdgeId edgeId1 = graph[v1].edgeId;
+            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+            if(debug) {
+                cout << edgeId0 << " " << edgeId1 << ": " << info.common << endl;
+            }
+            if(info.common > 0) {
+                ++inCount[i0];
+                ++outCount[i1];
+                newEdges.push_back({cv0, cv1, info});
+            }
+        }
+    }
+
+    if(debug) {
+        cout << "inCount ";
+        copy(inCount.begin(), inCount.end(), ostream_iterator<uint64_t>(cout, " "));
+        cout << endl;
+        cout << "outCount ";
+        copy(outCount.begin(), outCount.end(), ostream_iterator<uint64_t>(cout, " "));
+        cout << endl;
+    }
+
+    // We can only detangle if all the inCount and outCount entries are 1.
+    // This means that for each incoming edge there is only one outgoing edge
+    // with common oriented reads, and vice versa.
+    for(const uint64_t c: inCount) {
+        if(c != 1) {
+            if(debug) {
+                cout << "Cannot detangle." << endl;
+            }
+            return false;
+        }
+    }
+    for(const uint64_t c: outCount) {
+        if(c != 1) {
+            if(debug) {
+                cout << "Cannot detangle." << endl;
+            }
+            return false;
+        }
+    }
+
+    // Add the edges.
+    for(const auto& newEdge: newEdges) {
+        edge_descriptor ce;
+
+        // Check that the edge does not already exists.
+        bool edgeExists = false;
+        tie(ce, edgeExists) = boost::edge(newEdge.cv0, newEdge.cv1, cGraph);
+        if(edgeExists) {
+            continue;
+        }
+
+        bool edgeWasAdded = false;
+        tie(ce, edgeWasAdded) = boost::add_edge(newEdge.cv0, newEdge.cv1, {newEdge.info}, cGraph);
+        SHASTA_ASSERT(edgeWasAdded);
+        if(debug) {
+            const auto& cEdge = cGraph[ce];
+            cout << "Added compressed edge " <<
+                componentId << "-" << cGraph[newEdge.cv0].id << "->" <<
+                componentId << "-" << cGraph[newEdge.cv1].id << ", common count " <<
+                cEdge.info.common << ", offset " <<
+                cEdge.info.offsetInBases << endl;
+        }
+    }
+
+    // Now we can remove the vertex we detangled.
+    clear_vertex(cv, cGraph);
+    remove_vertex(cv, cGraph);
+
+    return true;
 }

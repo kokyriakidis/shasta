@@ -432,11 +432,6 @@ private:
         uint64_t componentId,
         const CompressedPathGraph1&,
         CompressedPathGraph1BaseClass::vertex_descriptor) const;
-    bool detangleCompressedGraphVertices(uint64_t componentId, CompressedPathGraph1&) const;
-    bool detangleCompressedGraphVertex(
-        uint64_t componentId,
-        CompressedPathGraph1&,
-        CompressedPathGraph1BaseClass::vertex_descriptor) const;
     bool detangleCompressedGraphLinearChains(uint64_t componentId, CompressedPathGraph1&) const;
     bool detangleSuperbubbles(
         uint64_t componentId,
@@ -479,6 +474,8 @@ public:
     // Operations to simplify the CompressedPathGraph1.
     bool mergeLinearChains();
     bool localTransitiveReduction(uint64_t distance);
+    bool detangleVertices();
+    bool detangleVertex(vertex_descriptor);
     bool removeCrossEdges(uint64_t threshold1, uint64_t threshold2);
 
     // The id of the next vertex to be created.
