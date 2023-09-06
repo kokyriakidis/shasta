@@ -413,7 +413,8 @@ private:
         uint64_t compressedTransitiveReductionDistance,
         uint64_t minReliableLength,
         uint64_t crossEdgeCoverageThreshold1,
-        uint64_t crossEdgeCoverageThreshold2);
+        uint64_t crossEdgeCoverageThreshold2,
+        uint64_t detangleTolerance);
 
 };
 
@@ -451,13 +452,14 @@ public:
     // Operations to simplify the CompressedPathGraph1.
     bool mergeLinearChains();
     bool localTransitiveReduction(uint64_t distance);
-    bool detangleVertices();
+    bool detangleVertices(uint64_t detangleTolerance);
     bool detangleLinearChains();
-    bool detangleVertex(vertex_descriptor);
+    bool detangleVertex(vertex_descriptor, uint64_t detangleTolerance);
     bool detangleSuperbubbles(uint64_t minReliableLength);
     void detangleIteration(
         uint64_t compressedTransitiveReductionDistance,
-        uint64_t minReliableLength);
+        uint64_t minReliableLength,
+        uint64_t detangleTolerance);
     bool removeCrossEdges(uint64_t threshold1, uint64_t threshold2);
 
     // The id of the next vertex to be created.

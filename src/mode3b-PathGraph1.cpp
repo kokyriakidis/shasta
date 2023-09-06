@@ -156,7 +156,7 @@ void GlobalPathGraph1::assemble0(const Assembler& assembler)
 void GlobalPathGraph1::assemble1(const Assembler& assembler)
 {
     const uint64_t minPrimaryCoverage = 8;
-    const uint64_t maxPrimaryCoverage = 40;
+    const uint64_t maxPrimaryCoverage = 45;
     const uint64_t minEdgeCoverage = 1;
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
@@ -165,6 +165,7 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
     const uint64_t minReliableLength = 200;
     const uint64_t crossEdgeCoverageThreshold1 = 1;
     const uint64_t crossEdgeCoverageThreshold2 = 3;
+    const uint64_t detangleTolerance = 1;
 
 
     GlobalPathGraph1 graph(assembler);
@@ -180,7 +181,8 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
             transitiveReductionDistance,
             compressedTransitiveReductionDistance,
             minReliableLength,
-            crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+            crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2,
+            detangleTolerance);
     }
 }
 
@@ -193,7 +195,8 @@ void GlobalPathGraph1::assemble1(
     uint64_t compressedTransitiveReductionDistance,
     uint64_t minReliableLength,
     uint64_t crossEdgeCoverageThreshold1,
-    uint64_t crossEdgeCoverageThreshold2)
+    uint64_t crossEdgeCoverageThreshold2,
+    uint64_t detangleTolerance)
 {
     cout << "Assembly begins for connected component " << componentId << endl;
     PathGraph1& component = *globalGraph.components[componentId];
@@ -218,16 +221,18 @@ void GlobalPathGraph1::assemble1(
     // Non-branch vertices are those with in-degree and out-degree not greater than 1.
     CompressedPathGraph1 cGraph(component, componentId, globalGraph.assembler);
 
-    // Detangle.
+    // Strict detangling, with zero detangle tolerance.
     cGraph.detangleIteration(
         compressedTransitiveReductionDistance,
-        minReliableLength);
+        minReliableLength,
+        0);
 
-    // Remove cross-edges, then detangle again.
+    // Remove cross-edges, then detangle again, this time with a looser detangle tolerance.
     cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
     cGraph.detangleIteration(
         compressedTransitiveReductionDistance,
-        minReliableLength);
+        minReliableLength,
+        detangleTolerance);
 
     // Final output.
     cGraph.writeGraphviz(minReliableLength, "");
@@ -2649,7 +2654,7 @@ string CompressedPathGraph1::vertexIdString(vertex_descriptor cv) const
 
 
 
-bool CompressedPathGraph1::detangleVertices()
+bool CompressedPathGraph1::detangleVertices(uint64_t detangleTolerance)
 {
     CompressedPathGraph1& cGraph = *this;
 
@@ -2664,7 +2669,7 @@ bool CompressedPathGraph1::detangleVertices()
     // Do the detangling.
     uint64_t detangledCount = 0;
     for(const auto cv: detangleCandidates) {
-        bool wasDetangled = detangleVertex(cv);
+        bool wasDetangled = detangleVertex(cv, detangleTolerance);
         if(wasDetangled) {
             ++detangledCount;
         }
@@ -2679,7 +2684,8 @@ bool CompressedPathGraph1::detangleVertices()
 // The detangle operation leaves all in-degree and out-degrees
 // of all other vertices unchanged.
 bool CompressedPathGraph1::detangleVertex(
-    vertex_descriptor cv)
+    vertex_descriptor cv,
+    uint64_t detangleTolerance)
 {
     CompressedPathGraph1& cGraph = *this;
 
@@ -2725,11 +2731,11 @@ bool CompressedPathGraph1::detangleVertex(
     }
 
     // For each incoming edge, count the number of
-    // outgoing edges it has common oriented reads with.
+    // outgoing edges it has more than detangleTolerance common oriented reads with.
     vector<uint64_t> inCount(incoming.size(), 0);
 
     // For each outgoing edge, count the number of
-    // incoming edges it has common oriented reads with.
+    // incoming edges it has  more than detangleTolerance common oriented reads with.
     vector<uint64_t> outCount(outgoing.size(), 0);
 
     // Loop over pairs of incoming/outgoing edges.
@@ -2755,7 +2761,7 @@ bool CompressedPathGraph1::detangleVertex(
             if(debug) {
                 cout << edgeId0 << " " << edgeId1 << ": " << info.common << endl;
             }
-            if(info.common > 0) {
+            if(info.common > detangleTolerance) {
                 ++inCount[i0];
                 ++outCount[i1];
                 newEdges.push_back({cv0, cv1, info});
@@ -3182,14 +3188,15 @@ uint64_t CompressedPathGraph1::totalBaseOffset(vertex_descriptor cv) const
 
 void CompressedPathGraph1::detangleIteration(
     uint64_t compressedTransitiveReductionDistance,
-    uint64_t minReliableLength)
+    uint64_t minReliableLength,
+    uint64_t detangleTolerance)
 {
 
     while(true) {
 
         // Try everything.
         const bool transitiveReductionChanges = localTransitiveReduction(compressedTransitiveReductionDistance);
-        const bool detangleVerticesChanges = detangleVertices();
+        const bool detangleVerticesChanges = detangleVertices(detangleTolerance);
         const bool detangleLinearChainsChanges = detangleLinearChains();
         const bool mergeLinearChainsChanges = mergeLinearChains();
         const bool detangleSuperBubblesChanges = detangleSuperbubbles(minReliableLength);
