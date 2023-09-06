@@ -163,6 +163,9 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
     const uint64_t transitiveReductionDistance = 20;
     const uint64_t compressedTransitiveReductionDistance = 100;
     const uint64_t minReliableLength = 200;
+    const uint64_t crossEdgeCoverageThreshold1 = 1;
+    const uint64_t crossEdgeCoverageThreshold2 = 3;
+
 
     GlobalPathGraph1 graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
@@ -176,7 +179,8 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
         assemble1(graph, componentId,
             transitiveReductionDistance,
             compressedTransitiveReductionDistance,
-            minReliableLength);
+            minReliableLength,
+            crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
     }
 }
 
@@ -187,7 +191,9 @@ void GlobalPathGraph1::assemble1(
     uint64_t componentId,
     uint64_t transitiveReductionDistance,
     uint64_t compressedTransitiveReductionDistance,
-    uint64_t minReliableLength)
+    uint64_t minReliableLength,
+    uint64_t crossEdgeCoverageThreshold1,
+    uint64_t crossEdgeCoverageThreshold2)
 {
     cout << "Assembly begins for connected component " << componentId << endl;
     PathGraph1& component = *globalGraph.components[componentId];
@@ -231,9 +237,29 @@ void GlobalPathGraph1::assemble1(
         }
     }
 
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "");
+    // Remove cross-edges, then detangle again.
+    cGraph.removeCrossEdges(
+        componentId, crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    for(uint64_t iteration=0; ; iteration++) {
+        cout << "Detangle iteration " << iteration << " begins." << endl;
+        const bool transitiveReduction = cGraph.localTransitiveReduction(compressedTransitiveReductionDistance);
+        const bool detangleVertices = globalGraph.detangleCompressedGraphVertices(componentId, cGraph);
+        const bool detangleLinearChains = globalGraph.detangleCompressedGraphLinearChains(componentId, cGraph);
+        const bool mergeLinearChains = cGraph.mergeLinearChains(componentId);
+        const bool detangleSuperBubbles = globalGraph.detangleSuperbubbles(componentId, cGraph, minReliableLength);
+        if(not (
+            transitiveReduction or
+            detangleVertices or
+            detangleLinearChains or
+            mergeLinearChains or
+            detangleSuperBubbles
+            )) {
+            break;
+        }
+    }
 
-    // Csv output of the final graph.
+    // Final output.
+    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "");
     globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
 }
 
@@ -3118,4 +3144,83 @@ bool GlobalPathGraph1::detangleSuperbubbles(
         num_edges(cGraph) << " edges." << endl;
 
     return not verticesToBeRemoved.empty(); // Questionable.
+}
+
+
+
+// An edge cv0->cv1 is a cross edge if:
+// - Has coverage <= threshold1
+// - cv0 has out-degree > 1 and at least one out-edge with coverage >= threshold2.
+// - cv1 has in-degree  > 1 and at least one in-edge  with coverage >= threshold2.
+bool CompressedPathGraph1::removeCrossEdges(
+    uint64_t componentId,
+    uint64_t threshold1,
+    uint64_t threshold2)
+{
+    CompressedPathGraph1& cGraph = *this;
+    const bool debug = false;
+    SHASTA_ASSERT(threshold2 > threshold1);
+
+
+
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
+
+        // Check coverage.
+        if(cGraph[ce].info.common > threshold1) {
+            continue;
+        }
+
+        // Check degrees.
+        const vertex_descriptor cv0 = source(ce, cGraph);
+        const vertex_descriptor cv1 = target(ce, cGraph);
+        if(out_degree(cv0, cGraph) < 2) {
+            continue;
+        }
+        if(in_degree(cv1, cGraph) < 2) {
+            continue;
+        }
+
+        // Check that v0 has at least one out-edge with coverage >= threshold2.
+        bool found0 = false;
+        BGL_FORALL_OUTEDGES(cv0, ce02, cGraph, CompressedPathGraph1) {
+            if(cGraph[ce02].info.common >= threshold2) {
+                found0 = true;
+                break;
+            }
+        }
+        if(not found0) {
+            continue;
+        }
+
+        // Check that v1 has at least one in-edge with coverage >= threshold2.
+        bool found1 = false;
+        BGL_FORALL_INEDGES(cv1, ce21, cGraph, CompressedPathGraph1) {
+            if(cGraph[ce21].info.common >= threshold2) {
+                found1 = true;
+                break;
+            }
+        }
+        if(not found1) {
+            continue;
+        }
+
+        edgesToBeRemoved.push_back(ce);
+
+        if(debug) {
+            cout << "Cross-edge " <<
+                componentId << "-" << cGraph[cv0].id << "->" <<
+                componentId << "-" << cGraph[cv1].id <<
+                " will be removed." << endl;
+        }
+
+    }
+
+
+
+    for(const edge_descriptor ce: edgesToBeRemoved) {
+        boost::remove_edge(ce, cGraph);
+    }
+
+    return not edgesToBeRemoved.empty();
 }
