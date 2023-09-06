@@ -230,7 +230,7 @@ void GlobalPathGraph1::assemble1(
         minReliableLength);
 
     // Final output.
-    globalGraph.writeCompressedGraphviz(componentId, cGraph, minReliableLength, "");
+    cGraph.writeGraphviz(minReliableLength, "");
     globalGraph.writeCompressedVerticesCsv(componentId, cGraph);
 }
 
@@ -265,31 +265,24 @@ void GlobalPathGraph1::writeCompressedVerticesCsv(
 
 
 // This calls the lower level function twice, with and without labels.
-void GlobalPathGraph1::writeCompressedGraphviz(
-    uint64_t componentId,
-    const CompressedPathGraph1& cGraph,
+void CompressedPathGraph1::writeGraphviz(
     uint64_t minGreenLength,
     const string& fileNamePrefix) const
 {
     bool labels = true;
-    writeCompressedGraphviz(componentId, cGraph, labels, minGreenLength, fileNamePrefix);
+    writeGraphviz(labels, minGreenLength, fileNamePrefix);
     labels = false;
-    writeCompressedGraphviz(componentId, cGraph, labels, minGreenLength, fileNamePrefix);
+    writeGraphviz(labels, minGreenLength, fileNamePrefix);
 }
 
 
 
-void GlobalPathGraph1::writeCompressedGraphviz(
-    uint64_t componentId,
-    const CompressedPathGraph1& cGraph,
+void CompressedPathGraph1::writeGraphviz(
     bool labels,
     uint64_t minGreenLength,
     const string& fileNamePrefix) const
 {
-    const PathGraph1& component = *components[componentId];
-
-    // Hide GlobalPathGraph1::edges. We should change its name instead.
-    using boost::edges;
+    const CompressedPathGraph1& cGraph = *this;
 
     const string name = "CompressedPathGraph" + to_string(componentId);
     ofstream out(name + fileNamePrefix + (labels ? ".dot" : "-NoLabels.dot"));
@@ -302,7 +295,7 @@ void GlobalPathGraph1::writeCompressedGraphviz(
 
             const PathGraph1::vertex_descriptor v0 = cGraph[cv].v.front();
             const PathGraph1::vertex_descriptor v1 = cGraph[cv].v.back();
-            const uint64_t baseOffset = cGraph.totalBaseOffset(cv);
+            const uint64_t baseOffset = totalBaseOffset(cv);
 
             if(baseOffset >= minGreenLength) {
                 out <<
@@ -314,8 +307,8 @@ void GlobalPathGraph1::writeCompressedGraphviz(
                     "label=\""
                     << componentId << "-" << cGraph[cv].id << "\\n" <<
                     cGraph[cv].v.size() << " vertices\\n" <<
-                    "First " << component[v0].edgeId << "\\n" <<
-                    "Last " << component[v1].edgeId << "\\n" <<
+                    "First " << graph[v0].edgeId << "\\n" <<
+                    "Last " << graph[v1].edgeId << "\\n" <<
                     "Length " << baseOffset <<
                     "\"";
             }
@@ -326,13 +319,10 @@ void GlobalPathGraph1::writeCompressedGraphviz(
 
             if(labels) {
                 const PathGraph1::vertex_descriptor v = cGraph[cv].v.front();
-                // const PathGraph1Vertex& vertex = component[v];
-                // const GlobalPathGraph1Vertex& globalVertex = verticesVector[vertex.vertexId];
                 out <<
                     "label=\"" <<
                     componentId << "-" << cGraph[cv].id << "\\n" <<
-                    component[v].edgeId << "\\n" <<
-                    // "Coverage " << globalVertex.journeyInfoItems.size() <<
+                    graph[v].edgeId << "\\n" <<
                     "\"";
             }
 
@@ -341,7 +331,6 @@ void GlobalPathGraph1::writeCompressedGraphviz(
         out << "];\n";
     }
 
-    CompressedPathGraph1::edge_iterator begin, end;
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
         const auto cv0 = source(ce, cGraph);
         const auto cv1 = target(ce, cGraph);

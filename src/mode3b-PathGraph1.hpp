@@ -417,17 +417,6 @@ private:
 
     // Functions that work on CompressedPathGraph1.
     void writeCompressedVerticesCsv(uint64_t componentId, const CompressedPathGraph1&) const;
-    void writeCompressedGraphviz(
-        uint64_t componentId,
-        const CompressedPathGraph1&,
-        bool labels,
-        uint64_t minGreenLength,
-        const string& fileNamePrefix) const;
-    void writeCompressedGraphviz(
-        uint64_t componentId,
-        const CompressedPathGraph1&,
-        uint64_t minGreenLength,
-        const string& fileNamePrefix) const;
 
 };
 
@@ -481,6 +470,15 @@ public:
     string vertexIdString(vertex_descriptor) const;
 
     uint64_t totalBaseOffset(vertex_descriptor) const;
+
+    // Graphviz output.
+    void writeGraphviz(
+        bool labels,
+        uint64_t minGreenLength,
+        const string& fileNamePrefix) const;
+    void writeGraphviz(
+        uint64_t minGreenLength,
+        const string& fileNamePrefix) const;
 };
 
 
