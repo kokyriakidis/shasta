@@ -239,6 +239,7 @@ void GlobalPathGraph1::assemble1(
     cGraph.writeVerticesCsv();
     cout << "The CompressedPathGraph1 has " << num_vertices(cGraph) << " vertices and " <<
         num_edges(cGraph) << " edges." << endl;
+    cGraph.assembleVertices();
 }
 
 
@@ -3213,4 +3214,44 @@ void CompressedPathGraph1::detangleIteration(
         }
     }
 
+}
+
+
+
+void CompressedPathGraph1::assembleVertices() const
+{
+    const CompressedPathGraph1& cGraph = *this;
+
+    ofstream fasta("Component" + to_string(componentId) + ".fasta");
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
+        assembleVertex(cv, fasta);
+    }
+}
+
+
+
+void CompressedPathGraph1::assembleVertex(
+    vertex_descriptor cv,
+    ostream& fasta) const
+{
+    const CompressedPathGraph1& cGraph = *this;
+    const CompressedPathGraph1Vertex& cVertex = cGraph[cv];
+
+    // Construct the MarkerGraphEdgeIds of the assembly path.
+    vector<MarkerGraphEdgeId> edgeIds;
+    for(const PathGraph1::vertex_descriptor v: cVertex.v) {
+        edgeIds.push_back(graph[v].edgeId);
+    }
+
+    // Construct the MarkerGraphEdgePairInfo.
+    vector<MarkerGraphEdgePairInfo> infos(edgeIds.size() - 1);
+    for(uint64_t i=1; i<edgeIds.size(); i++) {
+        const MarkerGraphEdgeId edgeId0 = edgeIds[i-1];
+        const MarkerGraphEdgeId edgeId1 = edgeIds[i];
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, infos[i-1]));
+    }
+
+    // Create the AssemblyPath.
+    AssemblyPath assemblyPath(assembler, edgeIds, infos);
+    assemblyPath.writeFasta(fasta, vertexIdString(cv));
 }

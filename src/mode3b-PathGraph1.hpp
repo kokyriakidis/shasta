@@ -470,6 +470,10 @@ public:
 
     uint64_t totalBaseOffset(vertex_descriptor) const;
 
+    // Sequence assembly.
+    void assembleVertices() const;
+    void assembleVertex(vertex_descriptor, ostream& fasta) const;
+
     // Graphviz output.
     void writeGraphviz(
         bool labels,
