@@ -304,7 +304,7 @@ void CompressedPathGraph1::writeGraphviz(
 
             if(baseOffset >= minGreenLength) {
                 out <<
-                    "style=filled color=green ";
+                    "style=filled color=LightGreen ";
             }
 
             if(labels) {
@@ -2831,7 +2831,7 @@ bool CompressedPathGraph1::detangleVertex(
 
 
 
-bool CompressedPathGraph1::detangleLinearChains()
+bool CompressedPathGraph1::detangleLinearChains(uint64_t detangleTolerance)
 {
     CompressedPathGraph1& cGraph = *this;
     const bool debug = false;
@@ -2933,11 +2933,11 @@ bool CompressedPathGraph1::detangleLinearChains()
             cout << endl;
         }
         // For each incoming edge, count the number of
-        // outgoing edges it has common oriented reads with.
+        // outgoing edges it has more than detangleTolerance common oriented reads with.
         vector<uint64_t> inCount(incoming.size(), 0);
 
         // For each outgoing edge, count the number of
-        // incoming edges it has common oriented reads with.
+        // incoming edges it has more than detangleTolerance common oriented reads with.
         vector<uint64_t> outCount(outgoing.size(), 0);
 
         // Loop over pairs of incoming/outgoing edges.
@@ -2964,7 +2964,7 @@ bool CompressedPathGraph1::detangleLinearChains()
                 if(debug) {
                     cout << edgeId0 << " " << edgeId1 << ": " << info.common << endl;
                 }
-                if(info.common > 0) {
+                if(info.common > detangleTolerance) {
                     ++inCount[i0];
                     ++outCount[i1];
                     newEdges.push_back({cv0, cv1, info});
@@ -3197,7 +3197,7 @@ void CompressedPathGraph1::detangleIteration(
         // Try everything.
         const bool transitiveReductionChanges = localTransitiveReduction(compressedTransitiveReductionDistance);
         const bool detangleVerticesChanges = detangleVertices(detangleTolerance);
-        const bool detangleLinearChainsChanges = detangleLinearChains();
+        const bool detangleLinearChainsChanges = detangleLinearChains(detangleTolerance);
         const bool mergeLinearChainsChanges = mergeLinearChains();
         const bool detangleSuperBubblesChanges = detangleSuperbubbles(minReliableLength);
 

@@ -453,7 +453,7 @@ public:
     bool mergeLinearChains();
     bool localTransitiveReduction(uint64_t distance);
     bool detangleVertices(uint64_t detangleTolerance);
-    bool detangleLinearChains();
+    bool detangleLinearChains(uint64_t detangleTolerance);
     bool detangleVertex(vertex_descriptor, uint64_t detangleTolerance);
     bool detangleSuperbubbles(uint64_t minReliableLength);
     void detangleIteration(
