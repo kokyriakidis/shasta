@@ -162,10 +162,10 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
     const uint64_t minComponentSize = 3;
     const uint64_t transitiveReductionDistance = 20;
     const uint64_t compressedTransitiveReductionDistance = 100;
-    const uint64_t minReliableLength = 200;
-    const uint64_t crossEdgeCoverageThreshold1 = 3;
-    const uint64_t crossEdgeCoverageThreshold2 = 6;
-    const uint64_t detangleTolerance = 1;
+    const uint64_t minReliableLength = 1000;
+    const uint64_t crossEdgeCoverageThreshold1 = 1;
+    const uint64_t crossEdgeCoverageThreshold2 = 3;
+    const uint64_t detangleTolerance = 0;
 
 
     GlobalPathGraph1 graph(assembler);
@@ -229,15 +229,41 @@ void GlobalPathGraph1::assemble1(
         0);
 
     // Remove cross-edges, then detangle again, this time with a looser detangle tolerance.
-    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    // cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
     cGraph.detangleIteration(
         compressedTransitiveReductionDistance,
         minReliableLength,
         detangleTolerance);
 
+    // EXPERIMENT
+    cGraph.detangleSuperbubbles(2000);
+    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    cGraph.detangleIteration(
+        compressedTransitiveReductionDistance,
+        minReliableLength,
+        detangleTolerance);
+    cGraph.detangleSuperbubbles(5000);
+    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    cGraph.detangleIteration(
+        compressedTransitiveReductionDistance,
+        minReliableLength,
+        detangleTolerance);
+    cGraph.detangleSuperbubbles(10000);
+    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    cGraph.detangleIteration(
+        compressedTransitiveReductionDistance,
+        minReliableLength,
+        detangleTolerance);
+    cGraph.detangleSuperbubbles(20000);
+    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    cGraph.detangleIteration(
+        compressedTransitiveReductionDistance,
+        minReliableLength,
+        detangleTolerance);
+    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
 
     // Final output.
-    cGraph.writeGraphviz(100000, "");
+    cGraph.writeGraphviz(50000, "");
     cGraph.writeVerticesCsv();
     cout << "The CompressedPathGraph1 has " << num_vertices(cGraph) << " vertices and " <<
         num_edges(cGraph) << " edges." << endl;
