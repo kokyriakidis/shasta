@@ -235,6 +235,7 @@ void GlobalPathGraph1::assemble1(
         minReliableLength,
         detangleTolerance);
 
+
     // Final output.
     cGraph.writeGraphviz(100000, "");
     cGraph.writeVerticesCsv();
@@ -1055,12 +1056,81 @@ void GlobalPathGraph1::localTransitiveReduction(uint64_t distance)
 void PathGraph1::localTransitiveReduction(uint64_t distance)
 {
     PathGraph1& graph = *this;
-    vector<edge_descriptor> nonTransitiveReductionEdges;
-    shasta::localTransitiveReduction(graph, distance, nonTransitiveReductionEdges);
 
-    for(const edge_descriptor e: nonTransitiveReductionEdges) {
-        graph[e].isNonTransitiveReductionEdge = true;
+    // We want to process edges in order of increasing coverage.
+    vector<pair<edge_descriptor, uint64_t> > edgeTable;
+    BGL_FORALL_EDGES(e, graph, PathGraph1) {
+        edgeTable.push_back({e, graph[e].coverage});
     }
+    sort(edgeTable.begin(), edgeTable.end(), OrderPairsBySecondOnly<edge_descriptor, uint64_t>());
+
+    // Loop over all edges v0->v1 in order of increasing coverage.
+    for(const auto& p: edgeTable) {
+        edge_descriptor e01 = p.first;
+        const vertex_descriptor v0 = source(e01, graph);
+        const vertex_descriptor v1 = target(e01, graph);
+
+        // Do a BFS starting at v0, up to a distance maxPathLength.
+        // Stop if we encounter v1.
+
+        // The BFS queue.
+        std::queue<vertex_descriptor> q;
+        q.push(v0);
+
+        // The vertices we encountered so far, with their distance from v0.
+        std::map<vertex_descriptor, uint64_t> m;
+        m.insert({v0, 0});
+
+        // BFS loop.
+        // cout << "BFS loop begins for " << v0 << "->" << v1 << endl;
+        while(not q.empty()) {
+
+            // Dequeue a vertex.
+            const vertex_descriptor vA = q.front();
+            q.pop();
+            const auto itA = m.find(vA);
+            SHASTA_ASSERT(itA != m.end());
+            const uint64_t distanceA = itA->second;
+            const uint64_t distanceB = distanceA + 1;
+            // cout << "Dequeued " << vA << " at distance " << distanceA << endl;
+
+            // Loop over the out-edges of vA.
+            bool endBfs = false;
+            BGL_FORALL_OUTEDGES_T(vA, eAB, graph, PathGraph1) {
+
+                // Dont's use e01 in the BFS.
+                if(eAB == e01) {
+                    continue;
+                }
+
+                // If we reached v1, mark e01 as a nonTransitiveReduction edge
+                // and stop the BFS.
+                const vertex_descriptor vB = target(eAB, graph);
+                if(vB == v1) {
+                    boost::remove_edge(e01, graph);
+                    endBfs = true;
+                    // cout << "Reached " << v1 << endl;
+                    break;
+                }
+
+                // If we already reached this vertex, do nothing.
+                if(m.contains(vB)) {
+                    continue;
+                }
+
+                // If not at maximum distance, enqueue vB.
+                if(distanceB < distance) {
+                    q.push(vB);
+                    m.insert({vB, distanceB});
+                    // cout << "Enqueued " << vB << " at distance " << distanceB << endl;
+                }
+            }
+            if(endBfs) {
+                break;
+            }
+        }
+    }
+
 }
 
 
@@ -3266,7 +3336,6 @@ void CompressedPathGraph1::detangleIteration(
 {
 
     for(uint64_t iteration=0; ; ++iteration) {
-        cout << "Detangle iteration " << iteration << " begins." << endl;
 
         // Try everything.
         const bool transitiveReductionChanges = localTransitiveReduction(compressedTransitiveReductionDistance);
