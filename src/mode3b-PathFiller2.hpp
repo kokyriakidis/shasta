@@ -289,6 +289,7 @@ private:
     void writeGraphviz(ostream&) const;
     void vertexCoverageHistogram() const;
     void edgeCoverageHistogram() const;
+    void writeVerticesCsv() const;
 
 };
 

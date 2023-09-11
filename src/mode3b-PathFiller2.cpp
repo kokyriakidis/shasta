@@ -109,6 +109,8 @@ PathFiller2::PathFiller2(
         ofstream fasta("PathFiller2.fasta");
         fasta << ">PathFiller2 " << sequence.size() << endl;
         copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(fasta));
+
+        writeVerticesCsv();
     }
 
 }
@@ -1391,4 +1393,32 @@ uint64_t PathFiller2::removeInaccessibleVertices()
     }
 
     return verticesToBeRemoved.size();
+}
+
+
+
+void PathFiller2::writeVerticesCsv() const
+{
+    const PathFiller2& graph = *this;
+
+    ofstream csv("PathFiller2-Vertices.csv");
+    csv << "Vertex,OrientedRead,Ordinal\n";
+
+    BGL_FORALL_VERTICES(v, graph, PathFiller2) {
+        const PathFiller2Vertex& vertex = graph[v];
+        const string vertexStringId = vertex.stringId();
+
+        SHASTA_ASSERT(vertex.ordinals.size() == orientedReadInfos.size());
+        for(uint64_t i=0; i<vertex.ordinals.size(); i++) {
+            const OrientedReadId orientedReadId = orientedReadInfos[i].orientedReadId;
+            const vector<int64_t>& orientedReadOrdinals = vertex.ordinals[i];
+
+            for(const int64_t ordinal: orientedReadOrdinals) {
+                csv << vertexStringId << ",";
+                csv << orientedReadId << ",";
+                csv << ordinal << "\n";
+            }
+        }
+
+    }
 }
