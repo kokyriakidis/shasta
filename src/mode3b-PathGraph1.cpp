@@ -1588,7 +1588,7 @@ void GlobalPathGraph1::assembleChains(
         assemblyPath.writeFasta(fasta, to_string(chainId));
 
         ofstream csv(csvPrefix + to_string(chainId) + ".csv");
-        assemblyPath.writeCsv(csv);
+        assemblyPath.writeCsv(csv, to_string(chainId));
     }
 }
 
@@ -3396,8 +3396,9 @@ void CompressedPathGraph1::assembleVertices() const
     const CompressedPathGraph1& cGraph = *this;
 
     ofstream fasta("Component" + to_string(componentId) + ".fasta");
+    ofstream csv("Component" + to_string(componentId) + ".csv");
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
-        assembleVertex(cv, fasta);
+        assembleVertex(cv, fasta, csv);
     }
 }
 
@@ -3405,7 +3406,8 @@ void CompressedPathGraph1::assembleVertices() const
 
 void CompressedPathGraph1::assembleVertex(
     vertex_descriptor cv,
-    ostream& fasta) const
+    ostream& fasta,
+    ostream& csv) const
 {
     const CompressedPathGraph1& cGraph = *this;
     const CompressedPathGraph1Vertex& cVertex = cGraph[cv];
@@ -3427,4 +3429,5 @@ void CompressedPathGraph1::assembleVertex(
     // Create the AssemblyPath.
     AssemblyPath assemblyPath(assembler, edgeIds, infos);
     assemblyPath.writeFasta(fasta, vertexIdString(cv));
+    assemblyPath.writeCsv(csv, vertexIdString(cv));
 }

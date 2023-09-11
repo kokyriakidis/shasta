@@ -472,7 +472,7 @@ public:
 
     // Sequence assembly.
     void assembleVertices() const;
-    void assembleVertex(vertex_descriptor, ostream& fasta) const;
+    void assembleVertex(vertex_descriptor, ostream& fasta, ostream& csv) const;
 
     // Graphviz output.
     void writeGraphviz(

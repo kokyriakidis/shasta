@@ -724,7 +724,7 @@ PathFinder::PathFinder(
         assemblyPath.writeFasta(fasta, "Path-" + to_string(componentRank));
         {
             ofstream csv("AssemblyPath.csv");
-            assemblyPath.writeCsv(csv);
+            assemblyPath.writeCsv(csv, "Path-" + to_string(componentRank));
         }
         cout << "Component " << componentRank << " has " << num_vertices(component) <<
             " vertices (primary marker graph edges)." << endl;

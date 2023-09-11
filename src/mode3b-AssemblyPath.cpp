@@ -190,9 +190,9 @@ void AssemblyPath::writeFasta(ostream& fasta, const string& name) const
 
 
 
-void AssemblyPath::writeCsv(ostream& csv) const
+void AssemblyPath::writeCsv(ostream& csv, const string& name) const
 {
-    csv << "Step,EdgeId,Begin,End,Length,Sequence\n";
+    csv << "Name,Step,EdgeId,Begin,End,Length,\n";
 
     uint64_t positionBegin = 0;
 
@@ -205,12 +205,13 @@ void AssemblyPath::writeCsv(ostream& csv) const
             const uint64_t length = edgeSequence.size();
             const uint64_t positionEnd = positionBegin + length;
 
+            csv << name << ",";
             csv << i << ",";
             csv << edgeId << ",";
             csv << positionBegin << ",";
             csv << positionEnd << ",";
             csv << length << ",";
-            copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(csv));
+            // copy(edgeSequence.begin(), edgeSequence.end(), ostream_iterator<Base>(csv));
             csv << "\n";
 
             positionBegin = positionEnd;
@@ -229,6 +230,7 @@ void AssemblyPath::writeCsv(ostream& csv) const
             const uint64_t length = step.sequence.size();
             const uint64_t positionEnd = positionBegin + length;
 
+            csv << name << ",";
             csv << i << ",";
             csv << ",";
             csv << positionBegin << ",";
@@ -237,6 +239,7 @@ void AssemblyPath::writeCsv(ostream& csv) const
 
             // The sequence can be long, so for convenience we write it on multiple lines.
             // To keep all lines in the same cell, we must quote the entire sequence.
+#if 0
             csv << "\"";
             const uint64_t basesPerLine = 100;
             for(uint64_t i=0; i<step.sequence.size(); i++) {
@@ -245,7 +248,9 @@ void AssemblyPath::writeCsv(ostream& csv) const
                 }
                 csv << step.sequence[i];
             }
-            csv << "\"\n";
+            csv << "\""
+#endif
+            csv << "\n";
 
             positionBegin = positionEnd;
         }
