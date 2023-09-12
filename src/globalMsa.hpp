@@ -40,6 +40,11 @@ namespace shasta {
         const vector< pair<vector<Base>, uint64_t> >& sequences,
         vector<Base>& consensus
         );
+    bool globalMsaSpoa(
+        const vector< pair<vector<Base>, uint64_t> >& sequences,
+        vector<Base>& consensus,
+        uint64_t maximumMsaLength
+        );
 
     // Python-callable version.
     string globalMsaPython(

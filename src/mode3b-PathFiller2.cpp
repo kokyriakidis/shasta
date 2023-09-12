@@ -42,10 +42,58 @@ PathFiller2::PathFiller2(
     double estimatedOffsetRatio = 1.1;
 
     // The minimum coverage for a vertex to be created.
-    const uint64_t minVertexCoverage = 12;
+    // This gets reduced if necessary to enforce the maximum MSA length.
+    uint64_t minVertexCoverage = 20;
 
     // Control vertex splitting.
     const int64_t maxBaseSkip = 300;
+
+    // The maximum allowed length for a single MSA.
+    const uint64_t maxMsaLength = 10000;
+
+    // Reduce minVertexCoverage until we succeed.
+    while(true) {
+        if(html) {
+            html << "<br>Using minVertexCoverage = " << minVertexCoverage;
+        }
+        const bool success = run(
+            estimatedOffsetRatio,
+            minVertexCoverage,
+            maxBaseSkip,
+            maxMsaLength);
+        if(success) {
+            break;
+        } else {
+            clearAll();
+            --minVertexCoverage;
+            if(minVertexCoverage == 0) {
+                cout << "Assertion occurred while assembling between marker graph edges " <<
+                    edgeIdA << " " << edgeIdB << endl;
+                SHASTA_ASSERT(0);
+            }
+        }
+    }
+}
+
+
+
+void PathFiller2::clearAll()
+{
+    PathFiller2BaseClass::clear();
+    SHASTA_ASSERT(num_vertices(*this) == 0);
+    SHASTA_ASSERT(num_edges(*this) == 0);
+    orientedReadInfos.clear();
+    assemblyPath.clear();
+}
+
+
+
+bool PathFiller2::run(
+    double estimatedOffsetRatio,
+    uint64_t minVertexCoverage,
+    int64_t maxBaseSkip,
+    uint64_t maxMsaLength)
+{
 
     // Store the source target of edgeIdA and the source vertex of edgeIdB.
     const MarkerGraph::Edge& edgeA = assembler.markerGraph.edges[edgeIdA];
@@ -90,7 +138,9 @@ PathFiller2::PathFiller2(
 
     // Assemble.
     findAssemblyPath();
-    assembleAssemblyPathEdges();
+    if(not assembleAssemblyPathEdges(maxMsaLength)) {
+        return false;
+    }
     writeGraph("Assembly graph after assembly");
 
     // Write assembled sequence.
@@ -113,6 +163,7 @@ PathFiller2::PathFiller2(
         writeVerticesCsv();
     }
 
+    return true;
 }
 
 
@@ -1207,7 +1258,7 @@ void PathFiller2::findAssemblyPath()
 
 
 
-void PathFiller2::assembleAssemblyPathEdges()
+bool PathFiller2::assembleAssemblyPathEdges(uint64_t maxMsaLength)
 {
     PathFiller2& graph = *this;
 
@@ -1220,7 +1271,9 @@ void PathFiller2::assembleAssemblyPathEdges()
                 graph[v0].stringId() << " to " << graph[v1].stringId() << "</h2>";
         }
 
-        assembleEdge(e);
+        if(not assembleEdge(e, maxMsaLength)) {
+            return false;
+        }
 
     }
 
@@ -1255,11 +1308,13 @@ void PathFiller2::assembleAssemblyPathEdges()
 
         html << "</table>";
     }
+
+    return true;
 }
 
 
 
-void PathFiller2::assembleEdge(edge_descriptor e)
+bool PathFiller2::assembleEdge(edge_descriptor e, uint64_t maxMsaLength)
 {
     const bool debug = false;
     PathFiller2& graph = *this;
@@ -1332,7 +1387,15 @@ void PathFiller2::assembleEdge(edge_descriptor e)
 
     // Do the MSA.
     vector<Base> consensus;
-    globalMsaSpoa(orientedReadSequences, consensus);
+    if(not globalMsaSpoa(orientedReadSequences, consensus, maxMsaLength)) {
+        if(html) {
+            const vertex_descriptor v0 = source(e, graph);
+            const vertex_descriptor v1 = target(e, graph);
+            html << "<br>MSA is too long for edge " <<
+                graph[v0].stringId() << " to " << graph[v1].stringId() << endl;
+        }
+        return false;
+    }
     if(debug) {
         copy(consensus.begin(), consensus.end(), ostream_iterator<Base>(cout));
         cout << " Consensus" << endl;
@@ -1348,6 +1411,7 @@ void PathFiller2::assembleEdge(edge_descriptor e)
             graph[v0].stringId() << " " << graph[v1].stringId() << endl;
     }
 
+    return true;
 }
 
 

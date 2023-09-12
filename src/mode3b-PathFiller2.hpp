@@ -141,6 +141,13 @@ private:
     const PathFiller2DisplayOptions& options;
     ostream& html;
 
+    bool run(
+        double estimatedOffsetRatio,
+        uint64_t minVertexCoverage,
+        int64_t maxBaseSkip,
+        uint64_t maxMsaLength);
+    void clearAll();
+
     // The assembly path will start at the target vertex of edgeIdA and
     // end at the source vertex of edgeIdB. Store their vertex ids.
     MarkerGraphVertexId vertexIdA;      // Target vertex of edgeIdA
@@ -279,8 +286,8 @@ private:
 
     // Assemble edges using MSA.
     // Sequences stored in the marker graph are not used.
-    void assembleAssemblyPathEdges();
-    void assembleEdge(edge_descriptor);
+    bool assembleAssemblyPathEdges(uint64_t maxMsaLength);
+    bool assembleEdge(edge_descriptor, uint64_t maxMsaLength);
 
     // Output.
     void approximateTopologicalSort();

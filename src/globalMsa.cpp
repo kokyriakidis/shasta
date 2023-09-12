@@ -351,6 +351,31 @@ void shasta::globalMsaSpoa(
 
 
 
+// Version that enforces a maximum MSA length and returns false if it is exceeded.
+bool shasta::globalMsaSpoa(
+    const vector< pair<vector<Base>, uint64_t> >& sequences,
+    vector<Base>& consensus,
+    uint64_t maximumMsaLength
+    )
+{
+    if(sequences.size() > 1) {
+        uint64_t maxLength = 0;
+        for(const auto& sequence: sequences) {
+            maxLength = max(maxLength, sequence.first.size());
+        }
+        if(maxLength > maximumMsaLength) {
+            return false;
+        }
+    }
+
+    // If getting here, the MSA is no longer than the specified maximum length
+    // (or it is trivial, consisting of just one sequence).
+    globalMsaSpoa(sequences, consensus);
+    return true;
+}
+
+
+
 // Python-callable version.
 std::string shasta::globalMsaPython(
     const vector< pair<string, uint64_t> >& sequenceStrings,
