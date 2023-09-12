@@ -147,6 +147,7 @@ void PathFiller2::checkAssumptions() const
 
 
 
+#if 0
 // Gather oriented reads and fill in the orientedReadInfos.
 // We have already checked that no reads appears twice on edgeIdA or edgeIdB.
 void PathFiller2::gatherOrientedReads()
@@ -187,6 +188,92 @@ void PathFiller2::gatherOrientedReads()
         const uint32_t ordinal = markerInterval.ordinals[0];    // Because vertexIdB is the source of edgeIdB
         const MarkerId markerId = assembler.getMarkerId(orientedReadId, ordinal);
         info.ordinalAndPositionB = {ordinal, assembler.markers.begin()[markerId].position};
+    }
+}
+#endif
+
+
+
+// Gather oriented reads and fill in the orientedReadInfos.
+// We have already checked that no reads appears twice on edgeIdA or edgeIdB.
+void PathFiller2::gatherOrientedReads()
+{
+    // Joint loop over marker intervals that appear in edgeIdA and/or edgeIdB.
+    const auto markerIntervalsA = assembler.markerGraph.edgeMarkerIntervals[edgeIdA];
+    const auto markerIntervalsB = assembler.markerGraph.edgeMarkerIntervals[edgeIdB];
+    const auto beginA = markerIntervalsA.begin();
+    const auto beginB = markerIntervalsB.begin();
+    const auto endA = markerIntervalsA.end();
+    const auto endB = markerIntervalsB.end();
+    auto itA = beginA;
+    auto itB = beginB;
+    while(true) {
+        if((itA == endA) and (itB == endB)) {
+            break;
+        }
+
+        // Oriented reads that appear only in edgeIdA.
+        if((itB == endB) or (itA != endA and itA->orientedReadId < itB->orientedReadId)) {
+            const MarkerInterval& markerIntervalA = *itA;
+            const OrientedReadId orientedReadIdA = markerIntervalA.orientedReadId;
+            const uint32_t ordinalA = markerIntervalA.ordinals[1];    // Because vertexIdA is the target of edgeIdA
+            const MarkerId markerIdA = assembler.getMarkerId(orientedReadIdA, ordinalA);
+
+            OrientedReadInfo info(orientedReadIdA);
+            info.ordinalAndPositionA = {ordinalA, assembler.markers.begin()[markerIdA].position};
+            orientedReadInfos.push_back(info);
+
+            ++itA;
+        }
+
+
+
+        // Oriented reads that appear only in edgeIdB.
+        else if((itA == endA) or (itB != endB and itB->orientedReadId < itA->orientedReadId)) {
+            const MarkerInterval& markerIntervalB = *itB;
+            const OrientedReadId orientedReadIdB = markerIntervalB.orientedReadId;
+            const uint32_t ordinalB = markerIntervalB.ordinals[0];    // Because vertexIdB is the source of edgeIdB
+            const MarkerId markerIdB = assembler.getMarkerId(orientedReadIdB, ordinalB);
+
+            OrientedReadInfo info(orientedReadIdB);
+            info.ordinalAndPositionB = {ordinalB, assembler.markers.begin()[markerIdB].position};
+            orientedReadInfos.push_back(info);
+
+            ++itB;
+        }
+
+        // Oriented reads that appear in both edgeIdA and edgeIdB.
+        else {
+            SHASTA_ASSERT(itA != endA);
+            SHASTA_ASSERT(itB != endB);
+
+            const MarkerInterval& markerIntervalA = *itA;
+            const OrientedReadId orientedReadIdA = markerIntervalA.orientedReadId;
+
+            const MarkerInterval& markerIntervalB = *itB;
+            const OrientedReadId orientedReadIdB = markerIntervalB.orientedReadId;
+
+            SHASTA_ASSERT(orientedReadIdA == orientedReadIdB);
+            const OrientedReadId orientedReadId = orientedReadIdA;
+
+            const uint32_t ordinalA = markerIntervalA.ordinals[1];    // Because vertexIdA is the target of edgeIdA
+            const uint32_t ordinalB = markerIntervalB.ordinals[0];    // Because vertexIdB is the source of edgeIdB
+
+            // Only use it if the ordinal offset is not negative.
+            if(ordinalB >= ordinalA) {
+                const MarkerId markerIdA = assembler.getMarkerId(orientedReadIdA, ordinalA);
+                const MarkerId markerIdB = assembler.getMarkerId(orientedReadIdB, ordinalB);
+
+                OrientedReadInfo info(orientedReadId);
+                info.ordinalAndPositionA = {ordinalA, assembler.markers.begin()[markerIdA].position};
+                info.ordinalAndPositionB = {ordinalB, assembler.markers.begin()[markerIdB].position};
+                orientedReadInfos.push_back(info);
+            }
+
+            ++itA;
+            ++itB;
+        }
+
     }
 }
 
