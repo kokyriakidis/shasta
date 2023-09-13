@@ -2362,6 +2362,7 @@ public:
     void fillMode3bAssemblyPathStep(const vector<string>&, ostream&);
     void fillMode3bAssemblyPathStep1(const vector<string>&, ostream&); // Uses class mode3b::PathFiller1
     void fillMode3bAssemblyPathStep2(const vector<string>&, ostream&); // Uses class mode3b::PathFiller2
+    void fillMode3bAssemblyPathStep3(const vector<string>&, ostream&); // Uses class mode3b::PathFiller3
 
     void exploreMode3bPathGraph(const vector<string>& request, ostream& html);
     void findMode3bPaths() const;
