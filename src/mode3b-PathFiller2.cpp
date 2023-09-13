@@ -1385,6 +1385,15 @@ bool PathFiller2::assembleEdge(edge_descriptor e, uint64_t maxMsaLength)
         }
     }
 
+    // If there is only one read and the sequence is too long, declare failure to avoid
+    // assembling a long region at low coverage. This will cause the assembly to restart
+    // with a lower value of minVertexCoverage.
+    if( orientedReadSequences.size() == 1 and
+        orientedReadSequences.front().second == 1 and
+        orientedReadSequences.front().first.size() > maxMsaLength) {
+        return false;
+    }
+
     // Do the MSA.
     vector<Base> consensus;
     if(not globalMsaSpoa(orientedReadSequences, consensus, maxMsaLength)) {
