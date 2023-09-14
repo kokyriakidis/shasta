@@ -245,12 +245,21 @@ private:
     // generates a vertex.
     void createVertices(uint64_t minVertexCoverage);
 
+    // The disjoint sets corresponding to vertexIdA and vertexIdB.
+    // Those will always generate a vertex regardless of coverage.
+    uint64_t disjointSetIdA = invalid<uint64_t>;
+    uint64_t disjointSetIdB = invalid<uint64_t>;
+
     // Map that gives the vertex descriptor corresponding to a disjoint set id, if any.
     std::map<uint64_t, vertex_descriptor> vertexMap;
 
     // Create edges by following the reads.
     void createEdges();
     void removeAllEdges();
+
+    // Graphviz output.
+    void writeGraphviz(const string& fileName) const;
+    void writeGraphviz(ostream&) const;
 };
 
 #endif

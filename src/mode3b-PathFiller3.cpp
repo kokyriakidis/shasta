@@ -14,6 +14,9 @@ using namespace mode3b;
 #include <boost/graph/iteration_macros.hpp>
 #include <boost/pending/disjoint_sets.hpp>
 
+// Standard library.
+#include "fstream.hpp"
+
 
 
 PathFiller3::PathFiller3(
@@ -67,6 +70,7 @@ PathFiller3::PathFiller3(
     alignAndDisjointSets(matchScore, mismatchScore, gapScore);
     createVertices(minVertexCoverage);
     createEdges();
+    writeGraphviz("PathFiller3.dot");
 }
 
 
@@ -618,6 +622,29 @@ void PathFiller3::createVertices(uint64_t minVertexCoverage)
     PathFiller3BaseClass::clear();
     vertexMap.clear();
 
+    // Find the disjoint sets corresponding to vertexIdA and vertexIdB.
+    // Those will always generate a vertex regardless of coverage.
+    disjointSetIdA = invalid<uint64_t>;
+    disjointSetIdB = invalid<uint64_t>;
+    for(const OrientedReadInfo& info: orientedReadInfos) {
+        if(info.isOnA()) {
+            const MarkerInfo& markerInfoA = info.markerInfos.front();
+            if(disjointSetIdA == invalid<uint64_t>) {
+                disjointSetIdA = markerInfoA.disjointSetId;
+            } else {
+                SHASTA_ASSERT(disjointSetIdA = markerInfoA.disjointSetId);
+            }
+        }
+        if(info.isOnB()) {
+            const MarkerInfo& markerInfoB = info.markerInfos.back();
+            if(disjointSetIdB == invalid<uint64_t>) {
+                disjointSetIdB = markerInfoB.disjointSetId;
+            } else {
+                SHASTA_ASSERT(disjointSetIdB = markerInfoB.disjointSetId);
+            }
+        }
+    }
+
     // Loop over disjoint sets that are large enough.
     for(const auto& p: disjointSetsMap) {
         const auto& disjointSet = p.second;
@@ -695,4 +722,54 @@ void PathFiller3::removeAllEdges()
     BGL_FORALL_VERTICES(v, graph, PathFiller3) {
         clear_vertex(v, graph);
     }
+}
+
+
+
+void PathFiller3::writeGraphviz(const string& fileName) const
+{
+    ofstream file(fileName);
+    writeGraphviz(file);
+}
+
+
+
+void PathFiller3::writeGraphviz(ostream& s) const
+{
+    const PathFiller3& graph = *this;
+
+    s << "digraph PathFiller3 {\n";
+
+    // Vertices.
+    BGL_FORALL_VERTICES(v, graph, PathFiller3) {
+        const uint64_t disjointSetId = graph[v].disjointSetId;
+        auto it = disjointSetsMap.find(disjointSetId);
+        SHASTA_ASSERT(it != disjointSetsMap.end());
+        const uint64_t coverage = it->second.size();
+        s << disjointSetId << "[";
+        s << "label=\"" << coverage << "\" ";
+        if(disjointSetId == disjointSetIdA) {
+            s << "style=filled color=lightgreen";
+        } else {
+            if(disjointSetId == disjointSetIdB) {
+                s << "style=filled color=pink";
+            }
+        }
+        s << "];\n";
+    }
+
+    // Edges.
+    BGL_FORALL_EDGES(e, graph, PathFiller3) {
+        const PathFiller3Edge& edge = graph[e];
+        const vertex_descriptor v0 = source(e, graph);
+        const vertex_descriptor v1 = target(e, graph);
+        const uint64_t coverage = edge.markerIntervals.size();
+        s <<
+            graph[v0].disjointSetId << "->" <<
+            graph[v1].disjointSetId <<
+            "[label=\"" << coverage << "\"]"
+            ";\n";
+    }
+
+    s << "}\n";
 }
