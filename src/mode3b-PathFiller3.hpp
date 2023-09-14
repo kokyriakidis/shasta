@@ -32,6 +32,7 @@ namespace shasta {
             PathFiller3Edge
             >;
         class PathFiller3DisplayOptions;
+        class PathFiller3MarkerIndexes;
     }
     class Assembler;
 };
@@ -56,14 +57,18 @@ public:
 
 
 
+// A way to identify a marker in PathFiller3, besides its id.
+class shasta::mode3b::PathFiller3MarkerIndexes {
+public:
+    uint64_t i; // Index in orientedReadInfos
+    uint64_t j; // Index in OrientedReadInfo::markerInfos;
+};
+
+
+
 class shasta::mode3b::PathFiller3Vertex {
 public:
-
-    // The ordinals in this vertex for each of the oriented reads used in this assembly.
-    // This has one entry corresponding to each entry of the
-    // PathFiller3::orientedInfos vector.
-    vector< vector<int64_t> > ordinals;
-
+    uint64_t disjointSetId;
 };
 
 
@@ -71,12 +76,8 @@ public:
 class shasta::mode3b::PathFiller3Edge {
 public:
 
-    // The MarkerIntervals in this edge for each of the oriented reads used in this assembly.
-    // This has one entry corresponding to each entry of the
-    // PathFiller3::orientedInfos vector.
-    // Each pair contains ordinals for the source and target vertex.
-    vector< vector< pair<int64_t, int64_t> > > markerIntervals;
-
+    // Each marker interval is identified by the two markers.
+    vector< pair<PathFiller3MarkerIndexes, PathFiller3MarkerIndexes> > markerIntervals;
 };
 
 
@@ -134,6 +135,7 @@ private:
 
         // The id of the disjoint set this MarkerInfo belongs to.
         uint64_t disjointSetId;
+
     };
 
 
@@ -237,7 +239,18 @@ private:
     // where i is the index of the OrientedReadInfo in orientedReadInfos
     // and j is the index of the MarkerInfo in orientedReadInfo.markerInfos.
     // Keyed by the disjoint set id (the same also stored in each marker).
-    std::map<uint64_t, vector<pair<uint64_t, uint64_t> > > disjointSetsMap;
+    std::map<uint64_t, vector<PathFiller3MarkerIndexes> > disjointSetsMap;
+
+    // Create vertices. Each disjoint set with at least minVertexCoverage markers
+    // generates a vertex.
+    void createVertices(uint64_t minVertexCoverage);
+
+    // Map that gives the vertex descriptor corresponding to a disjoint set id, if any.
+    std::map<uint64_t, vertex_descriptor> vertexMap;
+
+    // Create edges by following the reads.
+    void createEdges();
+    void removeAllEdges();
 };
 
 #endif

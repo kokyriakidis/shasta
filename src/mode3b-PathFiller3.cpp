@@ -11,6 +11,7 @@ using namespace mode3b;
 #include <seqan/align.h>
 
 // Boost libraries.
+#include <boost/graph/iteration_macros.hpp>
 #include <boost/pending/disjoint_sets.hpp>
 
 
@@ -38,6 +39,8 @@ PathFiller3::PathFiller3(
     int64_t mismatchScore = -1;
     int64_t gapScore = -1;
 
+    const uint64_t minVertexCoverage = 12;
+
 
     // Store the source target of edgeIdA and the source vertex of edgeIdB.
     const MarkerGraph::Edge& edgeA = assembler.markerGraph.edges[edgeIdA];
@@ -62,6 +65,8 @@ PathFiller3::PathFiller3(
 
     // Marker graph.
     alignAndDisjointSets(matchScore, mismatchScore, gapScore);
+    createVertices(minVertexCoverage);
+    createEdges();
 }
 
 
@@ -599,4 +604,95 @@ void PathFiller3::alignAndDisjointSets(
         html << "</table>";
     }
 
+}
+
+
+
+// Create vertices. Each disjoint set with at least minVertexCoverage markers
+// generates a vertex.
+void PathFiller3::createVertices(uint64_t minVertexCoverage)
+{
+    PathFiller3& graph = *this;
+
+    // Remove all vertices and edges, just in case.
+    PathFiller3BaseClass::clear();
+    vertexMap.clear();
+
+    // Loop over disjoint sets that are large enough.
+    for(const auto& p: disjointSetsMap) {
+        const auto& disjointSet = p.second;
+        if(disjointSet.size() < minVertexCoverage) {
+            continue;
+        }
+
+        const uint64_t disjointSetId = p.first;
+        const vertex_descriptor v = add_vertex({disjointSetId}, graph);
+        vertexMap.insert(make_pair(disjointSetId, v));
+    }
+
+    if(html and options.showDebugInformation) {
+        html << "<br>The assembly graph has " << num_vertices(graph) << " vertices.";
+    }
+}
+
+
+
+// Create edges by following the reads.
+void PathFiller3::createEdges()
+{
+    PathFiller3& graph = *this;
+
+    removeAllEdges();
+
+    // Loop over all reads.
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        const OrientedReadInfo& info = orientedReadInfos[i];
+
+        // Follow this read, finding the vertices it reaches.
+        vertex_descriptor v0 = null_vertex();
+        PathFiller3MarkerIndexes indexes0;
+        for(uint64_t j=0; j<info.markerInfos.size(); j++) {
+            const MarkerInfo& markerInfo = info.markerInfos[j];
+            const uint64_t disjointSetId = markerInfo.disjointSetId;
+            const auto it = vertexMap.find(disjointSetId);
+
+            if(it != vertexMap.end()) {
+                const vertex_descriptor v1 = it->second;
+                const PathFiller3MarkerIndexes indexes1 = {i, j};
+                if(v0 != null_vertex()) {
+
+                    // Get the edge v0->v1, creating it if necessary.
+                    edge_descriptor e;
+                    bool edgeExists = false;
+                    tie(e, edgeExists) = edge(v0, v1, graph);
+                    if(not edgeExists) {
+                        bool edgeWasAdded = false;
+                        tie(e, edgeWasAdded) = add_edge(v0, v1, graph);
+                        SHASTA_ASSERT(edgeWasAdded);
+                    }
+                    PathFiller3Edge& edge = graph[e];
+
+                    edge.markerIntervals.push_back({indexes0, indexes1});
+                }
+
+                // v1 becomes the previous vertex.
+                v0 = v1;
+                indexes0 = indexes1;
+
+            }
+        }
+    }
+    if(html and options.showDebugInformation) {
+        html << "<br>The assembly graph has " << num_edges(graph) << " edges.";
+    }
+}
+
+
+
+void PathFiller3::removeAllEdges()
+{
+    PathFiller3& graph = *this;
+    BGL_FORALL_VERTICES(v, graph, PathFiller3) {
+        clear_vertex(v, graph);
+    }
 }
