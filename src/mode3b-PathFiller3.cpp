@@ -7,6 +7,12 @@
 using namespace shasta;
 using namespace mode3b;
 
+// Seqan.
+#include <seqan/align.h>
+
+// Boost libraries.
+#include <boost/pending/disjoint_sets.hpp>
+
 
 
 PathFiller3::PathFiller3(
@@ -27,6 +33,10 @@ PathFiller3::PathFiller3(
     // decide how much to extend reads that only appear in edgeIdA or edgeIdB.
     double estimatedOffsetRatio = 1.1;
 
+    // Alignment parameters.
+    int64_t matchScore = 6;
+    int64_t mismatchScore = -1;
+    int64_t gapScore = -1;
 
 
     // Store the source target of edgeIdA and the source vertex of edgeIdB.
@@ -50,6 +60,8 @@ PathFiller3::PathFiller3(
     gatherMarkers(estimatedOffsetRatio);
     writeMarkers();
 
+    // Marker graph.
+    alignAndDisjointSets(matchScore, mismatchScore, gapScore);
 }
 
 
@@ -393,3 +405,198 @@ void PathFiller3::writeMarkers()
 
 
 
+// Compute alignments and use them to create the disjoint set data structure,
+// from which the marker graph will be created.
+void PathFiller3::alignAndDisjointSets(
+    uint64_t matchScore,
+    uint64_t mismatchScore,
+    uint64_t gapScore
+    )
+{
+
+    // SeqAn types we need.
+    using TSequence = seqan::String<KmerId>;
+    using TStringSet = seqan::StringSet<TSequence>;
+    using TDepStringSet = seqan::StringSet< TSequence, seqan::Dependent<> >;
+    using TAlignGraph = seqan::Graph< seqan::Alignment<TDepStringSet> >;
+
+    // Assign ids to markers.
+    uint64_t markerId = 0;
+    for(OrientedReadInfo& info: orientedReadInfos) {
+        for(MarkerInfo& markerInfo: info.markerInfos) {
+            markerInfo.id = markerId++;
+        }
+    }
+
+    // Initialize the disjoint sets data structure.
+    const uint64_t markerCount = markerId;
+    vector<uint64_t> rank(markerCount);
+    vector<uint64_t> parent(markerCount);
+    boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
+    for(uint64_t markerId=0; markerId<markerCount; markerId++) {
+        disjointSets.make_set(markerId);
+    }
+
+    // Construct a Seqan sequence containing the KmerIds for each oriented read.
+    // Add 100 to each KmerId because Seqan uses 45 to represent a gap.
+    vector<TSequence> seqanSequences(orientedReadInfos.size());
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        const OrientedReadInfo& info = orientedReadInfos[i];
+        TSequence& seqanSequence = seqanSequences[i];
+        for(const MarkerInfo& markerInfo: info.markerInfos) {
+            seqan::appendValue(seqanSequence, markerInfo.kmerId + 100);
+        }
+    }
+
+
+
+    // Loop over pairs of reads.
+    for(uint64_t i0=0; i0<orientedReadInfos.size()-1; i0++) {
+        const OrientedReadInfo& info0 = orientedReadInfos[i0];
+        const uint64_t length0 = info0.markerInfos.size();
+        const TSequence& seqanSequence0 = seqanSequences[i0];
+        for(uint64_t i1=i0+1; i1<orientedReadInfos.size(); i1++) {
+            const OrientedReadInfo& info1 = orientedReadInfos[i1];
+            const uint64_t length1 = info1.markerInfos.size();
+            const TSequence& seqanSequence1 = seqanSequences[i1];
+
+            // Figure the constraints for this alignment.
+            const bool constrainedA = info0.isOnA() and info1.isOnA();
+            const bool constrainedB = info0.isOnB() and info1.isOnB();
+
+            // Only do alignments that are constrained on at least one side.
+            if(not (constrainedA or constrainedB)) {
+                continue;
+            }
+
+            // Align the KmerIds of these oriented reads.
+            // For now we do a full blown alignment, but later
+            // we should use banded alignments instead.
+            // Store them in a SeqAn string set.
+            TStringSet sequences;
+            appendValue(sequences, seqanSequence0);
+            appendValue(sequences, seqanSequence1);
+
+            // Compute the alignment.
+            using namespace seqan;
+            TAlignGraph graph(sequences);
+            if(constrainedA and constrainedB) {
+                globalAlignment(
+                    graph,
+                    Score<int, Simple>(int(matchScore), int(mismatchScore), int(gapScore)),
+                    AlignConfig<false, false, false, false>(),
+                    LinearGaps());
+            } else  if(constrainedA and not constrainedB) {
+                globalAlignment(
+                    graph,
+                    Score<int, Simple>(int(matchScore), int(mismatchScore), int(gapScore)),
+                    AlignConfig<false, false, true, true>(),
+                    LinearGaps());
+            } else  if(constrainedB and not constrainedA) {
+                globalAlignment(
+                    graph,
+                    Score<int, Simple>(int(matchScore), int(mismatchScore), int(gapScore)),
+                    AlignConfig<true, true, false, false>(),
+                    LinearGaps());
+            } else {
+                SHASTA_ASSERT(0);
+            }
+
+            // Extract the alignment from the graph.
+            // This creates a single sequence consisting of the two rows
+            // of the alignment, concatenated.
+            TSequence align;
+            convertAlignment(graph, align);
+            const uint64_t totalAlignmentLength = seqan::length(align);
+            SHASTA_ASSERT((totalAlignmentLength % 2) == 0);    // Because we are aligning two sequences.
+            const uint64_t alignmentLength = totalAlignmentLength / 2;
+
+            // Use the alignment to update the disjoint sets data structure.
+            uint64_t j0 = 0;
+            uint64_t j1 = 0;
+            const uint64_t seqanGapValue = 45;
+            for(uint64_t positionInAlignment=0; positionInAlignment<alignmentLength; positionInAlignment++) {
+                const KmerId kmerId0 = align[positionInAlignment];
+                const KmerId kmerId1 = align[positionInAlignment + alignmentLength];
+
+                if(kmerId0 == seqanGapValue) {
+                    if(kmerId1 == seqanGapValue) {
+                        // Both 0 and 1 are gaps.
+                        SHASTA_ASSERT(0);
+                    } else {
+                        // 0 is gap, 1 is not gap.
+                        ++j1;
+                    }
+                } else {
+                    if(kmerId1 == seqanGapValue) {
+                        // 0 is not gap, 1 is gap.
+                        ++j0;
+                    } else {
+                        // Neither 0 nor 1 is a gap.
+                        if(kmerId0 == kmerId1) {
+                            // If a match, merge the disjoint sets containing these two markers.
+                            disjointSets.union_set(info0.markerInfos[j0].id, info1.markerInfos[j1].id);
+                        }
+                        ++j0;
+                        ++j1;
+                    }
+
+                }
+            }
+            SHASTA_ASSERT(j0 == length0);
+            SHASTA_ASSERT(j1 == length1);
+       }
+    }
+
+    // Store in each MarkerInfo the id of the disjoint set it belongs to.
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        OrientedReadInfo& info = orientedReadInfos[i];
+        for(MarkerInfo& markerInfo: info.markerInfos) {
+            markerInfo.disjointSetId = disjointSets.find_set(markerInfo.id);
+        }
+    }
+
+    // Fill in the disjoint sets map.
+    disjointSetsMap.clear();
+    for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+        const OrientedReadInfo& info = orientedReadInfos[i];
+        for(uint64_t j=0; j<info.markerInfos.size(); j++) {
+            const MarkerInfo& markerInfo = info.markerInfos[j];
+            disjointSetsMap[markerInfo.disjointSetId].push_back({i, j});
+        }
+    }
+
+    // Write a histogram of disjoint sets sizes.
+    if(html and options.showDebugInformation) {
+        vector<uint64_t> histogram;
+        for(const auto& p: disjointSetsMap) {
+            const uint64_t disjointSetSize = p.second.size();
+            if(disjointSetSize >= histogram.size()) {
+                histogram.resize(disjointSetSize + 1, 0);
+            }
+            ++histogram[disjointSetSize];
+        }
+
+        html <<
+            "<h2>Disjoint sets size histogram</h2>"
+            "<table>"
+            "<tr>"
+            "<th>Size"
+            "<th>Frequency"
+            "<th>Markers";
+
+        for(uint64_t disjointSetSize=0; disjointSetSize<histogram.size(); disjointSetSize++) {
+            const uint64_t frequency = histogram[disjointSetSize];
+            if(frequency) {
+                html <<
+                    "<tr>"
+                    "<td class=centered>" << disjointSetSize <<
+                    "<td class=centered>" << frequency <<
+                    "<td class=centered>" << frequency * disjointSetSize;
+            }
+        }
+
+        html << "</table>";
+    }
+
+}

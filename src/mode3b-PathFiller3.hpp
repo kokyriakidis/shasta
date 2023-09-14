@@ -127,6 +127,13 @@ private:
         int64_t ordinal;
         int64_t position;
         KmerId kmerId;
+
+        // An id for this marker, global to the PathFiller3.
+        // This is the index of this marker in the disjoint sets data structure.
+        uint64_t id;
+
+        // The id of the disjoint set this MarkerInfo belongs to.
+        uint64_t disjointSetId;
     };
 
 
@@ -190,6 +197,7 @@ private:
             SHASTA_ASSERT(not markerInfos.empty());
             return markerInfos.back().ordinal;
         }
+
     };
 
     // Get the base position of a marker in an oriented read
@@ -215,6 +223,21 @@ private:
 
     // Add the marker at given ordinal to the i-th oriented read.
     void addMarkerInfo(uint64_t i, int64_t ordinal);
+
+    // Compute alignments and use them to create the disjoint set data structure,
+    // from which the marker graph will be created.
+    void alignAndDisjointSets(
+        uint64_t matchScore,
+        uint64_t mismatchScore,
+        uint64_t gapScore
+        );
+
+    // This stores the markers in each disjoint set.
+    // Each marker is stored as pair(i, j)
+    // where i is the index of the OrientedReadInfo in orientedReadInfos
+    // and j is the index of the MarkerInfo in orientedReadInfo.markerInfos.
+    // Keyed by the disjoint set id (the same also stored in each marker).
+    std::map<uint64_t, vector<pair<uint64_t, uint64_t> > > disjointSetsMap;
 };
 
 #endif
