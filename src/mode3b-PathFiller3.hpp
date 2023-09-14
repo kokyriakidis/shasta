@@ -164,11 +164,6 @@ private:
             return orientedReadId < that.orientedReadId;
         }
 
-        // The first and last ordinals of this oriented read used for this assembly.
-        // For reads on edgeIdA, firstOrdinal equals ordinalA.
-        // For reads on edgeIdB, lastOrdinal  equals ordinalB.
-        int64_t firstOrdinal = invalid<int64_t>;
-        int64_t lastOrdinal = invalid<int64_t>;
 
         // The ordinal offset between vertexIdA and vertexIdB.
         int64_t ordinalOffset() const
@@ -182,6 +177,19 @@ private:
         // The last one is a ordinal lastOrdinal.
         vector<MarkerInfo> markerInfos;
 
+        // The first and last ordinals of this oriented read used for this assembly.
+        // For reads on edgeIdA, firstOrdinal equals ordinalA.
+        // For reads on edgeIdB, lastOrdinal  equals ordinalB.
+        int64_t firstOrdinal()
+        {
+            SHASTA_ASSERT(not markerInfos.empty());
+            return markerInfos.front().ordinal;
+        }
+        int64_t lastOrdinal()
+        {
+            SHASTA_ASSERT(not markerInfos.empty());
+            return markerInfos.back().ordinal;
+        }
     };
 
     // Get the base position of a marker in an oriented read
@@ -200,6 +208,13 @@ private:
     // both in edgeIdA and edgeIdB.
     int64_t estimatedABOffset;
     void estimateOffset();
+
+    // Fill in the markerInfos vector of each read.
+    void gatherMarkers(double estimatedOffsetRatio);
+    void writeMarkers();
+
+    // Add the marker at given ordinal to the i-th oriented read.
+    void addMarkerInfo(uint64_t i, int64_t ordinal);
 };
 
 #endif
