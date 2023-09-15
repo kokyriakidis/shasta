@@ -47,8 +47,9 @@ PathFiller3::PathFiller3(
     int64_t matchScore = 6;
     int64_t mismatchScore = -1;
     int64_t gapScore = -1;
+    const uint64_t maxSkipBases = 500;
 
-    const uint64_t minVertexCoverage = 12;
+    const uint64_t minVertexCoverage = 6;
 
 
     // Store the source target of edgeIdA and the source vertex of edgeIdB.
@@ -72,7 +73,7 @@ PathFiller3::PathFiller3(
     gatherMarkers(estimatedOffsetRatio);
 
     // Assembly graph.
-    alignAndDisjointSets(matchScore, mismatchScore, gapScore);
+    alignAndDisjointSets(matchScore, mismatchScore, gapScore, maxSkipBases);
     writeMarkers();
     createVertices(minVertexCoverage);
     createEdges();
@@ -456,7 +457,8 @@ void PathFiller3::writeMarkers()
 void PathFiller3::alignAndDisjointSets(
     uint64_t matchScore,
     uint64_t mismatchScore,
-    uint64_t gapScore
+    uint64_t gapScore,
+    uint64_t maxSkipBases
     )
 {
 
@@ -513,6 +515,7 @@ void PathFiller3::alignAndDisjointSets(
         const TSequence& seqanSequence0 = seqanSequences[i0];
         for(uint64_t i1=i0+1; i1<orientedReadInfos.size(); i1++) {
             const OrientedReadInfo& info1 = orientedReadInfos[i1];
+            // cout << "*** " << info0.orientedReadId << " " << info1.orientedReadId << endl;
             const uint64_t length1 = info1.markerInfos.size();
             const TSequence& seqanSequence1 = seqanSequences[i1];
 
@@ -566,11 +569,64 @@ void PathFiller3::alignAndDisjointSets(
             const uint64_t totalAlignmentLength = seqan::length(align);
             SHASTA_ASSERT((totalAlignmentLength % 2) == 0);    // Because we are aligning two sequences.
             const uint64_t alignmentLength = totalAlignmentLength / 2;
+            const uint64_t seqanGapValue = 45;
 
-            // Use the alignment to update the disjoint sets data structure.
+
+            // If the alignment has large base skips, don't use it.
+            bool hasLargeSkip = false;
             uint64_t j0 = 0;
             uint64_t j1 = 0;
-            const uint64_t seqanGapValue = 45;
+            uint64_t previousPosition0 = invalid<uint64_t>;
+            uint64_t previousPosition1 = invalid<uint64_t>;
+            for(uint64_t positionInAlignment=0; positionInAlignment<alignmentLength; positionInAlignment++) {
+                const KmerId kmerId0 = align[positionInAlignment];
+                const KmerId kmerId1 = align[positionInAlignment + alignmentLength];
+
+                if(kmerId0 == seqanGapValue) {
+                    if(kmerId1 == seqanGapValue) {
+                        // Both 0 and 1 are gaps.
+                        SHASTA_ASSERT(0);
+                    } else {
+                        // 0 is gap, 1 is not gap.
+                        ++j1;
+                    }
+                } else {
+                    if(kmerId1 == seqanGapValue) {
+                        // 0 is not gap, 1 is gap.
+                        ++j0;
+                    } else {
+                        // Neither 0 nor 1 is a gap.
+                        if(kmerId0 == kmerId1) {
+                            // Check for large base skips.
+                            const uint64_t position0 = info0.markerInfos[j0].position;
+                            const uint64_t position1 = info1.markerInfos[j1].position;
+                            // cout << "***A " << position0 << " " << position1 << endl;
+                            if(previousPosition0 != invalid<uint64_t>) {
+                                if( position0 > previousPosition0 + maxSkipBases or
+                                    position1 > previousPosition1 + maxSkipBases) {
+                                    hasLargeSkip = true;
+                                    // cout << "Skip" << endl;
+                                    break;
+                                }
+                            }
+                            previousPosition0 = position0;
+                            previousPosition1 = position1;
+                        }
+                        ++j0;
+                        ++j1;
+                    }
+
+                }
+            }
+            if(hasLargeSkip) {
+                continue;
+            }
+
+
+
+            // Use the alignment to update the disjoint sets data structure.
+            j0 = 0;
+            j1 = 0;
             for(uint64_t positionInAlignment=0; positionInAlignment<alignmentLength; positionInAlignment++) {
                 const KmerId kmerId0 = align[positionInAlignment];
                 const KmerId kmerId1 = align[positionInAlignment + alignmentLength];
@@ -612,7 +668,7 @@ void PathFiller3::alignAndDisjointSets(
             }
             SHASTA_ASSERT(j0 == length0);
             SHASTA_ASSERT(j1 == length1);
-       }
+        }
     }
 
     // Store in each MarkerInfo the id of the disjoint set it belongs to.

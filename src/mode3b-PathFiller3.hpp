@@ -233,7 +233,8 @@ private:
     void alignAndDisjointSets(
         uint64_t matchScore,
         uint64_t mismatchScore,
-        uint64_t gapScore
+        uint64_t gapScore,
+        uint64_t maxSkipBases
         );
 
     // This stores the markers in each disjoint set.
