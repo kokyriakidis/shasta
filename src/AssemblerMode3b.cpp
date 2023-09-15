@@ -372,6 +372,12 @@ void Assembler::fillMode3bAssemblyPathStep3(const vector<string>& request, ostre
     uint64_t edgeIdB = invalid<uint64_t>;
     getParameterValue(request, "edgeIdB", edgeIdB);
 
+    string showOrientedReadsString;
+    options.showOrientedReads = getParameterValue(request, "showOrientedReads", showOrientedReadsString);
+
+    string showMarkersString;
+    options.showMarkers = getParameterValue(request, "showMarkers", showMarkersString);
+
     string showGraphString;
     options.showGraph = getParameterValue(request, "showGraph", showGraphString);
 
@@ -404,6 +410,16 @@ void Assembler::fillMode3bAssemblyPathStep3(const vector<string>& request, ostre
         "<tr><th class=left>Edge B<td class=centered>"
         "<input type=text required name=edgeIdB size=8 style='text-align:center' " <<
         ((edgeIdB == invalid<uint64_t>) ? "" : ("value='" + to_string(edgeIdB) + "'")) << ">"
+
+        "<tr>"
+        "<th class=left>Display the oriented reads"
+        "<td class=centered><input type=checkbox name=showOrientedReads" <<
+        (options.showOrientedReads ? " checked" : "") << ">"
+
+        "<tr>"
+        "<th class=left>Display the markers"
+        "<td class=centered><input type=checkbox name=showMarkers" <<
+        (options.showMarkers ? " checked" : "") << ">"
 
         "<tr>"
         "<th class=left>Display the graph"

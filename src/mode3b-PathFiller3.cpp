@@ -70,13 +70,20 @@ PathFiller3::PathFiller3(
 
     // Markers.
     gatherMarkers(estimatedOffsetRatio);
-    writeMarkers();
 
-    // Marker graph.
+    // Assembly graph.
     alignAndDisjointSets(matchScore, mismatchScore, gapScore);
+    writeMarkers();
     createVertices(minVertexCoverage);
     createEdges();
     writeGraph("Initial assembly graph");
+
+    // Remove strongly connected components, then regenerate
+    // edges from scratch with the remaining vertices.
+    removeStrongComponents();
+    removeAllEdges();
+    createEdges();
+    writeGraph("Assembly graph after removal of strong connected components");
 }
 
 
@@ -197,6 +204,9 @@ void PathFiller3::gatherOrientedReads()
 void PathFiller3::writeOrientedReads() const
 {
     if(not html) {
+        return;
+    }
+    if(not options.showOrientedReads) {
         return;
     }
 
@@ -381,7 +391,7 @@ void PathFiller3::addMarkerInfo(uint64_t i, int64_t ordinal)
 
 void PathFiller3::writeMarkers()
 {
-    if(not (html and options.showDebugInformation)) {
+    if(not (html and options.showMarkers)) {
         return;
     }
 
@@ -394,9 +404,13 @@ void PathFiller3::writeMarkers()
         "<th>Oriented<br>read<br>index"
         "<th>Oriented<br>read"
         "<th>Ordinal"
+        "<th>Ordinal<br>offset<br>from A"
+        "<th>Ordinal<br>offset<br>to B"
         "<th>Position"
         "<th>KmerId"
-        "<th>Kmer";
+        "<th>Kmer"
+        "<th>Vertex"
+        "<th>Coverage";
 
     for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
         const OrientedReadInfo& info = orientedReadInfos[i];
@@ -407,11 +421,28 @@ void PathFiller3::writeMarkers()
                 "<tr>"
                 "<td class=centered>" << i <<
                 "<td class=centered>" << info.orientedReadId <<
-                "<td class=centered>" << markerInfo.ordinal <<
+                "<td class=centered>" << markerInfo.ordinal;
+
+            // Ordinal offset from A.
+            html << "<td class=centered>";
+            if(info.isOnA()) {
+                html << markerInfo.ordinal - info.markerInfos.front().ordinal;
+            }
+
+            // Ordinal offset to B.
+            html << "<td class=centered>";
+            if(info.isOnB()) {
+                html << info.markerInfos.back().ordinal - markerInfo.ordinal;
+            }
+
+            html <<
                 "<td class=centered>" << markerInfo.position <<
                 "<td class=centered>" << markerInfo.kmerId <<
                 "<td class=centered style='font-family:monospace'>";
             kmer.write(html, k);
+            html <<
+                "<td class=centered>" << markerInfo.disjointSetId <<
+                "<td class=centered>" << disjointSetsMap[markerInfo.disjointSetId].size();
         }
     }
 
@@ -434,6 +465,16 @@ void PathFiller3::alignAndDisjointSets(
     using TStringSet = seqan::StringSet<TSequence>;
     using TDepStringSet = seqan::StringSet< TSequence, seqan::Dependent<> >;
     using TAlignGraph = seqan::Graph< seqan::Alignment<TDepStringSet> >;
+
+    const bool detailedDebugOutput = false;
+    ofstream dot;
+    ofstream csv;
+    if(detailedDebugOutput) {
+        dot.open("PathFiller3-AlignmentDetails.dot");
+        dot << "graph PathFiler3lignments {\n";
+        csv.open("PathFiller3-AlignmentDetails.csv");
+        csv << "OrientedReadId0,Ordinal0,OrientedReadId1,Ordinal1\n";
+    }
 
     // Assign ids to markers.
     uint64_t markerId = 0;
@@ -551,6 +592,17 @@ void PathFiller3::alignAndDisjointSets(
                         if(kmerId0 == kmerId1) {
                             // If a match, merge the disjoint sets containing these two markers.
                             disjointSets.union_set(info0.markerInfos[j0].id, info1.markerInfos[j1].id);
+                            if(detailedDebugOutput) {
+                                dot << "\"" << info0.orientedReadId << "-";
+                                dot << info0.markerInfos[j0].ordinal << "\"--\"";
+                                dot << info1.orientedReadId << "-";
+                                dot << info1.markerInfos[j1].ordinal << "\";\n";
+                                csv <<
+                                    info0.orientedReadId << "," <<
+                                    info0.markerInfos[j0].ordinal << "," <<
+                                    info1.orientedReadId << "," <<
+                                    info1.markerInfos[j1].ordinal << "\n";
+                            }
                         }
                         ++j0;
                         ++j1;
@@ -614,6 +666,9 @@ void PathFiller3::alignAndDisjointSets(
         html << "</table>";
     }
 
+    if(detailedDebugOutput) {
+        dot << "}\n";
+    }
 }
 
 
@@ -651,16 +706,22 @@ void PathFiller3::createVertices(uint64_t minVertexCoverage)
         }
     }
 
-    // Loop over disjoint sets that are large enough.
-    for(const auto& p: disjointSetsMap) {
-        const auto& disjointSet = p.second;
-        if(disjointSet.size() < minVertexCoverage) {
-            continue;
-        }
+    if(html) {
+        html << "<br>Begin " << disjointSetIdA << ", end " << disjointSetIdB;
+    }
 
+    // Loop over disjoint sets that are large enough.
+    // Also always include disjointSetIdA and disjointSetIdB.
+    for(const auto& p: disjointSetsMap) {
         const uint64_t disjointSetId = p.first;
-        const vertex_descriptor v = add_vertex({disjointSetId}, graph);
-        vertexMap.insert(make_pair(disjointSetId, v));
+        const auto& disjointSet = p.second;
+        if(disjointSet.size() >= minVertexCoverage or
+            disjointSetId==disjointSetIdA or
+            disjointSetId==disjointSetIdB) {
+
+            const vertex_descriptor v = add_vertex({disjointSetId}, graph);
+            vertexMap.insert(make_pair(disjointSetId, v));
+        }
     }
 
     if(html and options.showDebugInformation) {
@@ -886,3 +947,93 @@ void PathFiller3::writeGraph() const
     std::filesystem::remove(svgFileName);
 }
 
+
+
+void PathFiller3::removeStrongComponents()
+{
+    PathFiller3& graph = *this;
+    uint64_t removedCount = 0;
+
+    // Map the vertices to integers.
+    uint64_t vertexIndex = 0;
+    std::map<vertex_descriptor, uint64_t> vertexMap;
+    BGL_FORALL_VERTICES(v, graph, PathFiller3) {
+        vertexMap.insert({v, vertexIndex++});
+    }
+
+    // Compute strong components.
+    std::map<vertex_descriptor, uint64_t> componentMap;
+    boost::strong_components(
+        graph,
+        boost::make_assoc_property_map(componentMap),
+        boost::vertex_index_map(boost::make_assoc_property_map(vertexMap)));
+
+    // Gather the vertices in each strong component.
+    std::map<uint64_t, vector<vertex_descriptor> > componentVertices;
+    for(const auto& p: componentMap) {
+        componentVertices[p.second].push_back(p.first);
+    }
+
+
+
+    // Keep the non-trivial ones.
+    // A non-trivial strong component has at least one internal edge.
+    // This means that it either has more than one vertex,
+    // or it consists of a single vertex with a self-edge.
+    for(const auto& p: componentVertices) {
+
+        // Figure out if it is non-trivial.
+        bool isNonTrivial;
+        if(p.second.size() > 1) {
+
+            // More than one vertex. Certainly non-trivial.
+            isNonTrivial = true;
+        } else if (p.second.size() == 1) {
+
+            // Only one vertex. Non-trivial if self-edge present.
+            const vertex_descriptor v = p.second.front();
+            bool selfEdgeExists = false;
+            tie(ignore, selfEdgeExists) = edge(v, v, graph);
+            isNonTrivial = selfEdgeExists;
+        } else {
+
+            // Empty. This should never happen.
+            SHASTA_ASSERT(0);
+        }
+
+        // If non-trivial, remove all of its vertices.
+        // But don't remove vertexIdA or vertexIdB.
+        if(isNonTrivial) {
+            for(const vertex_descriptor v: p.second) {
+                const PathFiller3Vertex& vertex = graph[v];
+                if(vertex.disjointSetId == disjointSetIdA or vertex.disjointSetId == disjointSetIdB) {
+                    continue;
+                }
+                removeVertex(v);
+                ++removedCount;
+            }
+        }
+    }
+
+    if(html and options.showDebugInformation) {
+        html <<
+            "<br>Removed " << removedCount <<
+            " vertices in non-trivial strongly connected components."
+            "<br>The graph has now " << num_vertices(graph) <<
+            " vertices.";
+
+    }
+}
+
+
+
+void PathFiller3::removeVertex(vertex_descriptor v)
+{
+    PathFiller3& graph = *this;
+
+    vertexMap.erase(graph[v].disjointSetId);
+
+    clear_vertex(v, graph);
+    remove_vertex(v, graph);
+
+}

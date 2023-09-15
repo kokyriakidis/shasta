@@ -46,6 +46,8 @@ public:
     ostream& html;
 
     bool showGraph = false;
+    bool showOrientedReads = false;
+    bool showMarkers = false;
     bool showVertices = false;
     bool showVertexLabels = false;
     bool showEdgeLabels = false;
@@ -244,6 +246,7 @@ private:
     // Create vertices. Each disjoint set with at least minVertexCoverage markers
     // generates a vertex.
     void createVertices(uint64_t minVertexCoverage);
+    void removeVertex(vertex_descriptor);
 
     // The disjoint sets corresponding to vertexIdA and vertexIdB.
     // Those will always generate a vertex regardless of coverage.
@@ -256,6 +259,8 @@ private:
     // Create edges by following the reads.
     void createEdges();
     void removeAllEdges();
+
+    void removeStrongComponents();
 
     // Graphviz output.
     void writeGraph() const;
