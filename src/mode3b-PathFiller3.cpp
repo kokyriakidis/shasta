@@ -3,6 +3,8 @@
 #include "Assembler.hpp"
 #include "markerAccessFunctions.hpp"
 #include "MarkerGraph.hpp"
+#include "platformDependent.hpp"
+#include "runCommandWithTimeout.hpp"
 #include "Reads.hpp"
 using namespace shasta;
 using namespace mode3b;
@@ -11,8 +13,12 @@ using namespace mode3b;
 #include <seqan/align.h>
 
 // Boost libraries.
-#include <boost/graph/iteration_macros.hpp>
 #include <boost/pending/disjoint_sets.hpp>
+#include <boost/graph/iteration_macros.hpp>
+#include <boost/graph/strong_components.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 // Standard library.
 #include "fstream.hpp"
@@ -70,7 +76,7 @@ PathFiller3::PathFiller3(
     alignAndDisjointSets(matchScore, mismatchScore, gapScore);
     createVertices(minVertexCoverage);
     createEdges();
-    writeGraphviz("PathFiller3.dot");
+    writeGraph("Initial assembly graph");
 }
 
 
@@ -738,7 +744,26 @@ void PathFiller3::writeGraphviz(ostream& s) const
 {
     const PathFiller3& graph = *this;
 
-    s << "digraph PathFiller3 {\n";
+    // S and V for edges HSV.
+    const double S = 0.7;
+    const double V = 1.;
+
+    s <<
+        "digraph PathFiller3 {\n"
+        "mclimit=0.01;\n"       // For layout speed
+        "edge [penwidth=6];\n"
+        "node [fontname=\"Courier New\"];\n"
+        "edge [fontname=\"Courier New\"];\n";
+
+    if(options.showVertices) {
+        if(options.showVertexLabels) {
+            s << "node [shape=rectangle style=filled color=black fillcolor=gray80];\n";
+        } else {
+            s << "node [shape=point width=0.2];\n";
+        }
+    } else {
+        s << "node [shape=point style=invis];\n";
+    }
 
     // Vertices.
     BGL_FORALL_VERTICES(v, graph, PathFiller3) {
@@ -746,15 +771,28 @@ void PathFiller3::writeGraphviz(ostream& s) const
         auto it = disjointSetsMap.find(disjointSetId);
         SHASTA_ASSERT(it != disjointSetsMap.end());
         const uint64_t coverage = it->second.size();
+
+        const bool isA = (graph[v].disjointSetId == disjointSetIdA);
+        const bool isB = (graph[v].disjointSetId == disjointSetIdB);
+
         s << disjointSetId << "[";
-        s << "label=\"" << coverage << "\" ";
-        if(disjointSetId == disjointSetIdA) {
-            s << "style=filled color=lightgreen";
-        } else {
-            if(disjointSetId == disjointSetIdB) {
-                s << "style=filled color=pink";
-            }
+
+        // Label.
+        s << "label=\"";
+        if(isA) {
+            s << "A\\n";
         }
+        if(isB) {
+            s << "B\\n";
+        }
+        s << graph[v].disjointSetId << "\\n" << coverage;
+        s << "\" ";
+
+        // Special drawing of the begin/end vertices.
+        if(isA or isB) {
+            s << "shape=rectangle style=filled color=black fillcolor=cyan";
+        }
+
         s << "];\n";
     }
 
@@ -764,12 +802,87 @@ void PathFiller3::writeGraphviz(ostream& s) const
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
         const uint64_t coverage = edge.markerIntervals.size();
+
+        // Compute the hue based on coverage.
+        double H;
+        if(coverage >= orientedReadInfos.size()) {
+            H = 1./3.;
+        } else {
+            H = (double(coverage - 1) / (3. * double(orientedReadInfos.size() - 1)));
+        }
+        const string colorString = "\"" + to_string(H) + " " + to_string(S) + " " + to_string(V) + "\"";
+
         s <<
             graph[v0].disjointSetId << "->" <<
-            graph[v1].disjointSetId <<
-            "[label=\"" << coverage << "\"]"
-            ";\n";
+            graph[v1].disjointSetId << " [";
+
+        if(options.showEdgeLabels) {
+            s << "label=\"" << coverage << "\"";
+        }
+        s << " color=" << colorString;
+
+        // Tooltip.
+        s << " tooltip=\"";
+        s << "Coverage " << coverage << "\\n";
+        s << "\"";
+
+        s << "];\n";
     }
 
     s << "}\n";
 }
+
+
+
+void PathFiller3::writeGraph(const string& title)
+{
+    PathFiller3& graph = *this;
+
+    if(html and options.showGraph) {
+        html << "<h2>" << title << "</h2>";
+        html << "<p>The assembly graph has " << num_vertices(graph) <<
+            " vertices and " << num_edges(graph) << " edges.";
+        writeGraph();
+    }
+}
+
+
+
+void PathFiller3::writeGraph() const
+{
+    // Write out the graph in graphviz format.
+    const string uuid = to_string(boost::uuids::random_generator()());
+    const string dotFileName = tmpDirectory() + uuid + ".dot";
+    {
+        ofstream dotFile(dotFileName);
+        writeGraphviz(dotFile);
+    }
+
+    // Compute layout in svg format.
+    const string command = "dot -O -T svg " + dotFileName;
+    bool timeoutTriggered = false;
+    bool signalOccurred = false;
+    int returnCode = 0;
+    const double timeout = 600;
+    runCommandWithTimeout(command, timeout, timeoutTriggered, signalOccurred, returnCode);
+    if(returnCode!=0 or signalOccurred) {
+        throw runtime_error("An error occurred while running the following command: " + command);
+    }
+    if(timeoutTriggered) {
+        std::filesystem::remove(dotFileName);
+        throw runtime_error("Timeout during graph layout computation.");
+    }
+
+    // Remove the .dot file.
+    std::filesystem::remove(dotFileName);
+
+    // Copy the svg file to html.
+    const string svgFileName = dotFileName + ".svg";
+    ifstream svgFile(svgFileName);
+    html << "<p>" << svgFile.rdbuf();
+    svgFile.close();
+
+    // Remove the .svg file.
+    std::filesystem::remove(svgFileName);
+}
+

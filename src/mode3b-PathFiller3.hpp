@@ -258,6 +258,8 @@ private:
     void removeAllEdges();
 
     // Graphviz output.
+    void writeGraph() const;
+    void writeGraph(const string& title);
     void writeGraphviz(const string& fileName) const;
     void writeGraphviz(ostream&) const;
 };
