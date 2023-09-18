@@ -4,6 +4,7 @@
 #include "globalMsa.hpp"
 #include "markerAccessFunctions.hpp"
 #include "MarkerGraph.hpp"
+#include "orderPairs.hpp"
 #include "platformDependent.hpp"
 #include "runCommandWithTimeout.hpp"
 #include "Reads.hpp"
@@ -93,6 +94,26 @@ PathFiller3::PathFiller3(
     findAssemblyPath();
     SHASTA_ASSERT(assembleAssemblyPathEdges(maxMsaLength));
     writeGraph("Assembly graph after assembly");
+
+    // Write assembled sequence.
+    if(html) {
+        vector<Base> sequence;
+        getSecondarySequence(sequence);
+
+        html <<
+            "<h2>Assembled sequence</h2>"
+            "Assembled sequence not including the first and last edge is " <<
+            sequence.size() << " bases long."
+            "<pre style='font-family:monospace'>\n";
+        copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(html));
+        html << "</pre>";
+
+        ofstream fasta("PathFiller3.fasta");
+        fasta << ">PathFiller3 " << sequence.size() << endl;
+        copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(fasta));
+
+    }
+
 }
 
 
@@ -1264,6 +1285,10 @@ bool PathFiller3::assembleEdge(uint64_t maxMsaLength, edge_descriptor e)
 
     }
 
+    // Sort the sequences by decreasing number of supporting reads.
+    sort(orientedReadSequences.begin(), orientedReadSequences.end(),
+        OrderPairsBySecondOnlyGreater<vector<Base>, uint64_t>());
+
     if(html and options.showAssemblyDetails) {
         html << "</table>";
 
@@ -1449,3 +1474,43 @@ void PathFiller3::writeCoverageCharacterToHtml(uint64_t coverage) const
 
 }
 
+
+// Get the sequence between edgeIdA and edgeIdB.
+// This does not include the sequences of edgeIdA and edgeIdB themselves.
+void PathFiller3::getSecondarySequence(
+    vector<Base>& sequence) const
+{
+    const PathFiller3& graph = *this;
+
+    sequence.clear();
+    for(const edge_descriptor e: assemblyPath) {
+        const vector<Base>& edgeSequence = graph[e].consensusSequence;
+        copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
+    }
+
+}
+
+
+
+// Get the complete sequence, including the sequences of edgeIdA and edgeIdB.
+void PathFiller3::getCompleteSequence(
+    vector<Base>& sequence) const
+{
+    SHASTA_ASSERT(assemblyPath.size() >= 2);
+    const PathFiller3& graph = *this;
+
+    sequence.clear();
+
+    const auto edgeASequence = assembler.markerGraph.edgeSequence[edgeIdA];
+    copy(edgeASequence.begin(), edgeASequence.end(), back_inserter(sequence));
+
+    for(const edge_descriptor e: assemblyPath) {
+        const vector<Base>& edgeSequence = graph[e].consensusSequence;
+        copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
+    }
+
+    const auto edgeBSequence = assembler.markerGraph.edgeSequence[edgeIdB];
+    copy(edgeBSequence.begin(), edgeBSequence.end(), back_inserter(sequence));
+
+
+}

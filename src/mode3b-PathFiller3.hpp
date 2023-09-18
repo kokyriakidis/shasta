@@ -106,7 +106,7 @@ public:
         const PathFiller3DisplayOptions&);
 
     // Get the sequence between edgeIdA and edgeIdB.
-    // This does not include the sequences od edgeIdA and edgeIdB themselves.
+    // This does not include the sequences of edgeIdA and edgeIdB themselves.
     void getSecondarySequence(
         vector<Base>&) const;
 
