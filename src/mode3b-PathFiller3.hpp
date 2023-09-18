@@ -80,6 +80,11 @@ public:
 
     // Each marker interval is identified by the two markers.
     vector< pair<PathFiller3MarkerIndexes, PathFiller3MarkerIndexes> > markerIntervals;
+
+    uint64_t coverage() const
+    {
+        return markerIntervals.size();
+    }
 };
 
 
@@ -262,6 +267,11 @@ private:
     void removeAllEdges();
 
     void removeStrongComponents();
+
+    // The assembly path, beginning at vertexIdA and ending at vertexIdB.
+    // This means that the sequences of edgeIdA and edgeIdB are not included.
+    vector<edge_descriptor> assemblyPath;
+    void findAssemblyPath();
 
     // Graphviz output.
     void writeGraph() const;

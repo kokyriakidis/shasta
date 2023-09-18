@@ -85,6 +85,10 @@ PathFiller3::PathFiller3(
     removeAllEdges();
     createEdges();
     writeGraph("Assembly graph after removal of strong connected components");
+
+    // Assemble.
+    findAssemblyPath();
+    writeGraph("Assembly graph after assembly");
 }
 
 
@@ -865,6 +869,10 @@ void PathFiller3::writeGraphviz(ostream& s) const
     const double S = 0.7;
     const double V = 1.;
 
+    // Gather assembly path edges.
+    vector<edge_descriptor> sortedAssemblyPathEdges = assemblyPath;
+    sort(sortedAssemblyPathEdges.begin(), sortedAssemblyPathEdges.end());
+
     s <<
         "digraph PathFiller3 {\n"
         "mclimit=0.01;\n"       // For layout speed
@@ -918,7 +926,7 @@ void PathFiller3::writeGraphviz(ostream& s) const
         const PathFiller3Edge& edge = graph[e];
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
-        const uint64_t coverage = edge.markerIntervals.size();
+        const uint64_t coverage = edge.coverage();
 
         // Compute the hue based on coverage.
         double H;
@@ -942,6 +950,14 @@ void PathFiller3::writeGraphviz(ostream& s) const
         s << " tooltip=\"";
         s << "Coverage " << coverage << "\\n";
         s << "\"";
+
+        // If we have an assembly path and this edge is not on the assembly path,
+        // draw it dashed.
+        if(not assemblyPath.empty()) {
+            if(not std::binary_search(sortedAssemblyPathEdges.begin(), sortedAssemblyPathEdges.end(), e)) {
+                s << " style=dashed";
+            }
+        }
 
         s << "];\n";
     }
@@ -1092,4 +1108,61 @@ void PathFiller3::removeVertex(vertex_descriptor v)
     clear_vertex(v, graph);
     remove_vertex(v, graph);
 
+}
+
+
+
+void PathFiller3::findAssemblyPath()
+{
+    const PathFiller3& graph = *this;
+    assemblyPath.clear();
+
+
+    // Find the first and last vertex of the path we are looking for.
+    vertex_descriptor vA = null_vertex();
+    vertex_descriptor vB = null_vertex();
+    BGL_FORALL_VERTICES(v, graph, PathFiller3) {
+        const PathFiller3Vertex& vertex = graph[v];
+        if(vertex.disjointSetId == disjointSetIdA) {
+            SHASTA_ASSERT(vA == null_vertex());
+            vA = v;
+        }
+        if(vertex.disjointSetId == disjointSetIdB) {
+            SHASTA_ASSERT(vB == null_vertex());
+            vB = v;
+        }
+    }
+    SHASTA_ASSERT(vA != null_vertex());
+    SHASTA_ASSERT(vB != null_vertex());
+
+
+    // Main iteration loop.
+    vertex_descriptor v = vA;
+    while(v != vB) {
+
+        // Find the edge with the most coverage.
+        edge_descriptor eNext;
+        uint64_t bestCoverage = 0;
+        BGL_FORALL_OUTEDGES(v, e, graph, PathFiller3) {
+            const uint64_t coverage = graph[e].coverage();
+            if(coverage > bestCoverage) {
+                eNext = e;
+                bestCoverage = coverage;
+            }
+        }
+        if(bestCoverage == 0) {
+            cout << "PathFiller3: at " << graph[v].disjointSetId <<
+                ": no out-edge found when filling path from " <<
+                edgeIdA << " to " << edgeIdB << endl;
+        }
+        SHASTA_ASSERT(bestCoverage > 0);
+
+        // Store this edge.
+        assemblyPath.push_back(eNext);
+        v = target(eNext, graph);
+    }
+
+    if(html and options.showDebugInformation) {
+        html << "<br>The assembly path has " << assemblyPath.size() << " edges.";
+    }
 }
