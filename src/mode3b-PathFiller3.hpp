@@ -85,6 +85,10 @@ public:
     {
         return markerIntervals.size();
     }
+
+    // Consensus of the sequences contributes by each marker interval.
+    vector<Base> consensusSequence;
+    vector<uint64_t> consensusCoverage;
 };
 
 
@@ -272,12 +276,16 @@ private:
     // This means that the sequences of edgeIdA and edgeIdB are not included.
     vector<edge_descriptor> assemblyPath;
     void findAssemblyPath();
+    bool assembleAssemblyPathEdges(uint64_t maxMsaLength);
+    bool assembleEdge(uint64_t maxMsaLength, edge_descriptor);
 
     // Graphviz output.
     void writeGraph() const;
     void writeGraph(const string& title);
     void writeGraphviz(const string& fileName) const;
     void writeGraphviz(ostream&) const;
+
+    void writeCoverageCharacterToHtml(uint64_t coverage) const;
 };
 
 #endif

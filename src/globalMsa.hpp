@@ -28,6 +28,7 @@ The second member of the pair is the "weight" of the sequence
 namespace shasta {
 
     class Base;
+    class AlignedBase;
 
     void globalMsa(
         const vector< pair<vector<Base>, uint64_t> >& sequences,
@@ -44,6 +45,10 @@ namespace shasta {
         const vector< pair<vector<Base>, uint64_t> >& sequences,
         vector<Base>& consensus,
         uint64_t maximumMsaLength
+        );
+    void globalMsaSpoa(
+        const vector< pair<vector<Base>, uint64_t> >& sequences,
+        vector< vector<AlignedBase> >& alignment
         );
 
     // Python-callable version.

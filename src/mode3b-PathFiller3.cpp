@@ -1,6 +1,7 @@
 // Shasta.
 #include "mode3b-PathFiller3.hpp"
 #include "Assembler.hpp"
+#include "globalMsa.hpp"
 #include "markerAccessFunctions.hpp"
 #include "MarkerGraph.hpp"
 #include "platformDependent.hpp"
@@ -51,6 +52,8 @@ PathFiller3::PathFiller3(
 
     const uint64_t minVertexCoverage = 6;
 
+    const uint64_t maxMsaLength = 3000;
+
 
     // Store the source target of edgeIdA and the source vertex of edgeIdB.
     const MarkerGraph::Edge& edgeA = assembler.markerGraph.edges[edgeIdA];
@@ -88,6 +91,7 @@ PathFiller3::PathFiller3(
 
     // Assemble.
     findAssemblyPath();
+    SHASTA_ASSERT(assembleAssemblyPathEdges(maxMsaLength));
     writeGraph("Assembly graph after assembly");
 }
 
@@ -1166,3 +1170,282 @@ void PathFiller3::findAssemblyPath()
         html << "<br>The assembly path has " << assemblyPath.size() << " edges.";
     }
 }
+
+
+
+
+bool PathFiller3::assembleAssemblyPathEdges(uint64_t maxMsaLength)
+{
+    for(const edge_descriptor e: assemblyPath) {
+        if(not assembleEdge(maxMsaLength, e)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
+
+bool PathFiller3::assembleEdge(uint64_t maxMsaLength, edge_descriptor e)
+{
+    PathFiller3& graph = *this;
+    PathFiller3Edge& edge = graph[e];
+
+    if(html and options.showAssemblyDetails) {
+        html << "<h2>Assembly details for edge " <<
+            graph[source(e, graph)].disjointSetId << "->" <<
+            graph[target(e, graph)].disjointSetId << "</h2>"
+            "<table>"
+            "<tr><th>Oriented<br>read<th>Sequence<br>length<th>Sequence";
+    }
+
+    const uint64_t k = assembler.assemblerInfo->k;
+    SHASTA_ASSERT((k % 2) == 0);
+    const uint64_t kHalf = k / 2;
+
+    // Gather the sequences of the contributing oriented reads.
+    // Each sequence is stored with the number of distinct oriented reads that
+    // have that sequence.
+    vector< pair<vector<Base>, uint64_t> > orientedReadSequences;
+
+    // Loop over marker intervals of this edge.
+    vector<Base> orientedReadSequence;
+    for(const auto& p: edge.markerIntervals) {
+
+        // Locate the two markers of this marker interval.
+        const PathFiller3MarkerIndexes indexes0 = p.first;
+        const PathFiller3MarkerIndexes indexes1 = p.second;
+        const uint64_t i0 = indexes0.i;
+        const uint64_t i1 = indexes1.i;
+        const uint64_t j0 = indexes0.j;
+        const uint64_t j1 = indexes1.j;
+
+        // They must belong to the same oriented read.
+        SHASTA_ASSERT(i0 == i1);
+        const uint64_t i = i0;
+        const OrientedReadInfo& info = orientedReadInfos[i];
+        const OrientedReadId orientedReadId = info.orientedReadId;
+
+        const MarkerInfo& markerInfo0 = info.markerInfos[j0];
+        const MarkerInfo& markerInfo1 = info.markerInfos[j1];
+
+        // Now we can get the contributing sequence.
+        const uint64_t position0 = markerInfo0.position + kHalf;
+        const uint64_t position1 = markerInfo1.position + kHalf;
+
+        // Now we can get the sequence contributed by this oriented read.
+        orientedReadSequence.clear();
+        for(uint64_t position=position0; position!=position1; position++) {
+            const Base base = assembler.getReads().getOrientedReadBase(orientedReadId, uint32_t(position));
+            orientedReadSequence.push_back(base);
+        }
+
+        if(html and options.showAssemblyDetails) {
+            html <<
+                "<tr><td class=centered>" << orientedReadId <<
+                "<td class=centered>" << orientedReadSequence.size() <<
+                "<td class=centered style='font-family:monospace'>";
+            copy(orientedReadSequence.begin(), orientedReadSequence.end(),
+                ostream_iterator<Base>(html));
+        }
+
+        // Store it.
+        bool found = false;
+        for(auto& p: orientedReadSequences) {
+            if(p.first == orientedReadSequence) {
+                ++p.second;
+                found = true;
+                break;
+            }
+        }
+        if(not found) {
+            orientedReadSequences.push_back(make_pair(orientedReadSequence, 1));
+        }
+
+    }
+
+    if(html and options.showAssemblyDetails) {
+        html << "</table>";
+
+        html << "<p><table>"
+            "<tr><th>Coverage<th>Sequence<br>length<th>Sequence";
+        for(const auto& p: orientedReadSequences) {
+            const vector<Base>& sequence = p.first;
+            const uint64_t coverage = p.second;
+            html <<
+                "<tr>"
+                "<td class=centered>" << coverage <<
+                "<td class=centered>" << sequence.size() <<
+                "<td class=centered style='font-family:monospace'>";
+            copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(html));
+
+        }
+        html << "</table>";
+    }
+
+    // If there is only one distinct sequence (all reads agree),
+    // store that one sequence as the consensus.
+    // This is the most common case.
+    if(orientedReadSequences.size() == 1) {
+        const auto& p = orientedReadSequences.front();
+        const vector<Base>& sequence = p.first;
+        const uint64_t coverage = p.second;
+        edge.consensusSequence = sequence;
+        edge.consensusCoverage.clear();
+        edge.consensusCoverage.resize(sequence.size(), coverage);
+        return true;
+    }
+
+
+    // If getting here, we have more than one sequence, and we must
+    // compute a consensus via multiple sequence alignment (MSA).
+
+    // Check that the sequences are not too long.
+    for(const auto& p: orientedReadSequences) {
+        const vector<Base>& sequence = p.first;
+        if(sequence.size() > maxMsaLength) {
+            return false;
+        }
+    }
+
+    // Compute the MSA.
+    vector< vector<AlignedBase> > alignment;
+    globalMsaSpoa(orientedReadSequences, alignment);
+    SHASTA_ASSERT(alignment.size() == orientedReadSequences.size());
+
+    // Compute coverage at each alignment position for each of the 5 AlignedBases.
+    const uint64_t alignmentLength = alignment.front().size();
+    vector< array<uint64_t, 5> > coverage(alignmentLength, {0, 0, 0, 0, 0});
+    for(uint64_t i=0; i<orientedReadSequences.size(); i++) {
+        const vector<AlignedBase>& alignmentRow = alignment[i];
+        SHASTA_ASSERT(alignmentRow.size() == alignmentLength);
+        for(uint64_t position=0; position<alignmentLength; position++) {
+            const AlignedBase b = alignmentRow[position];
+            coverage[position][b.value] += orientedReadSequences[i].second;
+        }
+    }
+
+    // Compute coverage-based consensus at each alignment position.
+    vector<AlignedBase> alignedConsensus;
+    vector<uint64_t> alignmentConsensusCoverage;
+    for(const auto& c: coverage) {
+        const uint64_t iBase = std::max_element(c.begin(), c.end()) - c.begin();
+        alignedConsensus.push_back(AlignedBase::fromInteger(iBase));
+        alignmentConsensusCoverage.push_back(c[iBase]);
+    }
+    SHASTA_ASSERT(alignedConsensus.size() == alignmentLength);
+
+    // Store in the edge the consensus and its coverage, excluding the gaps.
+    edge.consensusSequence.clear();
+    edge.consensusCoverage.clear();
+    for(uint64_t position=0; position<alignedConsensus.size(); position++) {
+        const AlignedBase b = alignedConsensus[position];
+        if(not b.isGap()) {
+            edge.consensusSequence.push_back(Base(b));
+            edge.consensusCoverage.push_back(alignmentConsensusCoverage[position]);
+        }
+    }
+
+    if(html and options.showAssemblyDetails) {
+
+        html << "<p><table>"
+            "<tr><th>Coverage<th>Sequence<br>length<th>Aligned<br>sequence";
+
+        // Write one row for each distinct sequence.
+        for(uint64_t i=0; i<orientedReadSequences.size(); i++) {
+            const auto& p = orientedReadSequences[i];
+            const vector<Base>& sequence = p.first;
+            const uint64_t coverage = p.second;
+            const vector<AlignedBase>& alignedSequence = alignment[i];
+            html <<
+                "<tr>"
+                "<td class=centered>" << coverage <<
+                "<td class=centered>" << sequence.size() <<
+                "<td class=centered style='font-family:monospace'>";
+            for(uint64_t position=0; position<alignedSequence.size(); position++) {
+                const AlignedBase b = alignedSequence[position];
+                const bool isDiscordant = (b != alignedConsensus[position]);
+                if(isDiscordant) {
+                    html << "<span style='background-color:LightCoral'>";
+                }
+                html << alignedSequence[position];
+                if(isDiscordant) {
+                    html << "</span>";
+                }
+            }
+        }
+
+        // Write one row with aligned consensus.
+        html <<
+            "<tr>"
+            "<td class=centered colspan=2>Consensus"
+            "<td class=centered style='font-family:monospace'>";
+        copy(alignedConsensus.begin(), alignedConsensus.end(),
+            ostream_iterator<AlignedBase>(html));
+
+        // Write one row with aligned consensus coverage.
+        html <<
+            "<tr>"
+            "<td class=centered colspan=2>Consensus coverage"
+            "<td class=centered style='font-family:monospace'>";
+        for(uint64_t position=0; position<coverage.size(); position++) {
+            writeCoverageCharacterToHtml(alignmentConsensusCoverage[position]);
+        }
+
+        // Write one row with aligned discordant coverage.
+        html <<
+            "<tr>"
+            "<td class=centered colspan=2>Discordant coverage"
+            "<td class=centered style='font-family:monospace'>";
+        for(uint64_t position=0; position<coverage.size(); position++) {
+            writeCoverageCharacterToHtml(edge.coverage() - alignmentConsensusCoverage[position]);
+        }
+
+        // Write one row with coverage for each of the 5 AlignedBases.
+        for(uint64_t b=0; b<5; b++) {
+            html <<
+                "<tr><td colspan=2 class=centered>" << AlignedBase::fromInteger(b) << " coverage"
+                "<td class=centered style='font-family:monospace'>";
+            for(uint64_t position=0; position<coverage.size(); position++) {
+                writeCoverageCharacterToHtml(coverage[position][b]);
+            }
+        }
+        html << "</table>";
+
+        // Write another table with the final, ungapped consensus and its coverage.
+        html <<
+            "<p>Consensus length is " << edge.consensusSequence.size() <<
+            "<br><table>"
+            "<tr><th>Consensus<td class=centered style='font-family:monospace'>";
+        copy(edge.consensusSequence.begin(), edge.consensusSequence.end(),
+            ostream_iterator<Base>(html));
+        html << "<tr><th>Consensus coverage<td class=centered style='font-family:monospace'>";
+        for(const uint64_t coverage: edge.consensusCoverage) {
+            writeCoverageCharacterToHtml(coverage);
+        }
+        html << "<tr><th>Discordant coverage<td class=centered style='font-family:monospace'>";
+        for(const uint64_t coverage: edge.consensusCoverage) {
+            writeCoverageCharacterToHtml(edge.coverage() - coverage);
+        }
+        html << "</table>";
+    }
+
+    return true;
+}
+
+
+
+void PathFiller3::writeCoverageCharacterToHtml(uint64_t coverage) const
+{
+    if(coverage == 0) {
+        html << "&nbsp;";
+    } else if(coverage < 10) {
+        html << coverage;
+    } else if(coverage < 36) {
+        html << char((coverage - 10) + 'A');
+    } else {
+        html << "*";
+    }
+
+}
+

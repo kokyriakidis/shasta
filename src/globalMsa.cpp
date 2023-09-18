@@ -351,6 +351,78 @@ void shasta::globalMsaSpoa(
 
 
 
+// This just uses spoa.
+// It cannot be used for very long sequences due to quadratic
+// memory and time. Practical limit is a few thousand bases.
+// Version that returns the alignment.
+void shasta::globalMsaSpoa(
+    const vector< pair<vector<Base>, uint64_t> >& sequences,
+    vector< vector<AlignedBase> >& alignmentArgument
+    )
+{
+    // Sanity check.
+    SHASTA_ASSERT(not sequences.empty());
+
+    // We want to enter the sequences in order of decreasing weight.
+    // Create a table of pairs (sequenceIndex, weight)
+    // where sequenceIndex is the index in the sequences vector.
+    // Then sort by decreasing weight.
+    vector< pair<uint64_t, uint64_t> > sequencesTable;
+    for(uint64_t sequenceIndex=0; sequenceIndex<sequences.size(); sequenceIndex++) {
+        const auto& p = sequences[sequenceIndex];
+        const uint64_t weight = p.second;
+        sequencesTable.push_back(make_pair(sequenceIndex, weight));
+    }
+    sort(sequencesTable.begin(), sequencesTable.end(),
+        OrderPairsBySecondOnlyGreater<uint64_t, uint64_t>());
+
+    // Create the spoa alignment engine and alignment graph.
+    const spoa::AlignmentType alignmentType = spoa::AlignmentType::kNW;
+    const int8_t match = 1;
+    const int8_t mismatch = -1;
+    const int8_t gap = -1;
+    auto spoaAlignmentEngine = spoa::AlignmentEngine::Create(alignmentType, match, mismatch, gap);
+    spoa::Graph spoaAlignmentGraph;
+
+    // Add the sequences to the MSA in order of decreasing weight.
+    string sequenceString;
+    for(uint64_t indexByWeight=0; indexByWeight<sequencesTable.size(); indexByWeight++) {
+        const auto& p = sequencesTable[indexByWeight];
+        const uint64_t sequenceIndex = p.first;
+        const uint64_t weight = p.second;
+        const auto& q = sequences[sequenceIndex];
+        SHASTA_ASSERT(q.second == weight);
+        const vector<Base>& sequence = q.first;
+
+        sequenceString.clear();
+        for(const Base base: sequence) {
+            sequenceString += base.character();
+        }
+        auto alignment = spoaAlignmentEngine->Align(sequenceString, spoaAlignmentGraph);
+        spoaAlignmentGraph.AddAlignment(alignment, sequenceString, uint32_t(weight));
+    }
+
+    // Get the MSA alignment.
+    // The true argument causes a final alignment entry equal to the consensus.
+    vector<string> alignment = spoaAlignmentGraph.GenerateMultipleSequenceAlignment(false);
+    SHASTA_ASSERT(alignment.size() == sequencesTable.size());
+
+    // Copy it to alignmentArgument.
+    alignmentArgument.clear();
+    alignmentArgument.resize(alignment.size());
+    for(uint64_t i=0 ; i<alignment.size(); i++) {
+        const string& alignmentRow = alignment[i];
+        vector<AlignedBase>& alignmentArgumentRow = alignmentArgument[i];
+        alignmentArgumentRow.resize(alignmentRow.size());
+        for(uint64_t j=0; j<alignmentRow.size(); j++) {
+            alignmentArgumentRow[j] = AlignedBase::fromCharacter(alignmentRow[j]);
+        }
+    }
+
+}
+
+
+
 // Version that enforces a maximum MSA length and returns false if it is exceeded.
 bool shasta::globalMsaSpoa(
     const vector< pair<vector<Base>, uint64_t> >& sequences,
