@@ -1,6 +1,7 @@
 #include "mode3b-AssemblyPath.hpp"
 // #include "mode3b-PathFiller1.hpp"
-#include "mode3b-PathFiller2.hpp"
+// #include "mode3b-PathFiller2.hpp"
+#include "mode3b-PathFiller3.hpp"
 #include "mode3b-PathFinder.hpp"
 #include "Assembler.hpp"
 #include "MarkerInterval.hpp"
@@ -140,11 +141,20 @@ void AssemblyPath::assemble()
 #if 0
         PathFiller1 pathFiller(assembler, edgeIdA, edgeIdB, html, false, false, false, false, false);
         pathFiller.getSecondarySequence(step.sequence);
-#else
+#endif
+#if 0
         PathFiller2 pathFiller(assembler, edgeIdA, edgeIdB, html);
         pathFiller.getSecondarySequence(step.sequence);
 #endif
-        // cout << "Coverage " << pathFiller.coverage() << " , assembled length " << step.sequence.size() << endl;
+
+        try {
+            PathFiller3 pathFiller(assembler, edgeIdA, edgeIdB, 0, html);
+            pathFiller.getSecondarySequence(step.sequence);
+        } catch (...) {
+            cout << "Error occurred when assembling between marker graph edges " <<
+                edgeIdA << " and " << edgeIdB << endl;
+            throw;
+        }
     }
 }
 

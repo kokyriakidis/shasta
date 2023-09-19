@@ -820,13 +820,13 @@ void PathFiller3::createVertices(
 
         // Use the disjointSetsSizeHistogram to choose a value of minVertexCoverage
         // that will give us approximately this number of vertices.
+        // Never reduce minVertexCoverage below 2.
         uint64_t cumulativeDisjointSetsCount = 0;
-        for(minVertexCoverage = disjointSetsSizeHistogram.size()-1; /* Check later */; --minVertexCoverage) {
+        for(minVertexCoverage = disjointSetsSizeHistogram.size()-1; minVertexCoverage>=2; --minVertexCoverage) {
             cumulativeDisjointSetsCount += disjointSetsSizeHistogram[minVertexCoverage];
             if(cumulativeDisjointSetsCount >= desiredVertexCount) {
                 break;
             }
-            SHASTA_ASSERT(minVertexCoverage > 0);
         }
 
         if(html and options.showDebugInformation) {
