@@ -13,5 +13,6 @@ a.accessMarkers()
 a.accessMarkerGraphVertices()
 a.accessMarkerGraphEdges()
 a.accessMarkerGraphConsensus()
+shasta.openPerformanceLog('FindMode3Paths.log')
 a.findMode3bPaths()
  

@@ -5,9 +5,11 @@
 #include "markerAccessFunctions.hpp"
 #include "MarkerGraph.hpp"
 #include "orderPairs.hpp"
+#include "performanceLog.hpp"
 #include "platformDependent.hpp"
 #include "runCommandWithTimeout.hpp"
 #include "Reads.hpp"
+#include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3b;
 
@@ -58,6 +60,8 @@ PathFiller3::PathFiller3(
 
 
     const uint64_t maxMsaLength = 5000;
+
+    performanceLog << timestamp << "PathFiller3 " << edgeIdA << " " << edgeIdB << "\n";
 
 
     // Store the source target of edgeIdA and the source vertex of edgeIdB.
