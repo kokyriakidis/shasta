@@ -372,6 +372,9 @@ void Assembler::fillMode3bAssemblyPathStep3(const vector<string>& request, ostre
     uint64_t edgeIdB = invalid<uint64_t>;
     getParameterValue(request, "edgeIdB", edgeIdB);
 
+    uint64_t minVertexCoverage = 0;
+    getParameterValue(request, "minVertexCoverage", minVertexCoverage);
+
     string showOrientedReadsString;
     options.showOrientedReads = getParameterValue(request, "showOrientedReads", showOrientedReadsString);
 
@@ -410,6 +413,10 @@ void Assembler::fillMode3bAssemblyPathStep3(const vector<string>& request, ostre
         "<tr><th class=left>Edge B<td class=centered>"
         "<input type=text required name=edgeIdB size=8 style='text-align:center' " <<
         ((edgeIdB == invalid<uint64_t>) ? "" : ("value='" + to_string(edgeIdB) + "'")) << ">"
+
+        "<tr><th class=left>Minimum vertex coverage<br>(0 = automatic)<td class=centered>"
+        "<input type=text required name=minVertexCoverage size=8 style='text-align:center' "
+        "value='" << minVertexCoverage << "'>"
 
         "<tr>"
         "<th class=left>Display the oriented reads"
@@ -498,5 +505,5 @@ void Assembler::fillMode3bAssemblyPathStep3(const vector<string>& request, ostre
     }
 
     // Fill this assembly step.
-    mode3b::PathFiller3 filler(*this, edgeIdA, edgeIdB, options);
+    mode3b::PathFiller3 filler(*this, edgeIdA, edgeIdB, minVertexCoverage, options);
 }

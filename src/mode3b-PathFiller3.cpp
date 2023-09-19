@@ -31,6 +31,7 @@ PathFiller3::PathFiller3(
     const Assembler& assembler,
     MarkerGraphEdgeId edgeIdA,
     MarkerGraphEdgeId edgeIdB,
+    uint64_t minVertexCoverage, // 0 = automatic
     const PathFiller3DisplayOptions& options) :
     assembler(assembler),
     edgeIdA(edgeIdA),
@@ -45,15 +46,18 @@ PathFiller3::PathFiller3(
     // decide how much to extend reads that only appear in edgeIdA or edgeIdB.
     double estimatedOffsetRatio = 1.1;
 
+    // Vertex sampling rate, used to set minVertexCoverage.
+    // Only used if minVertexCoverage is 0 on input.
+    const double vertexSamplingRate = 0.8;
+
     // Alignment parameters.
     int64_t matchScore = 6;
     int64_t mismatchScore = -1;
     int64_t gapScore = -1;
     const uint64_t maxSkipBases = 500;
 
-    const uint64_t minVertexCoverage = 6;
 
-    const uint64_t maxMsaLength = 3000;
+    const uint64_t maxMsaLength = 5000;
 
 
     // Store the source target of edgeIdA and the source vertex of edgeIdB.
@@ -79,7 +83,7 @@ PathFiller3::PathFiller3(
     // Assembly graph.
     alignAndDisjointSets(matchScore, mismatchScore, gapScore, maxSkipBases);
     writeMarkers();
-    createVertices(minVertexCoverage);
+    createVertices(minVertexCoverage, vertexSamplingRate);
     createEdges();
     writeGraph("Initial assembly graph");
 
@@ -718,16 +722,19 @@ void PathFiller3::alignAndDisjointSets(
         }
     }
 
-    // Write a histogram of disjoint sets sizes.
-    if(html and options.showDebugInformation) {
-        vector<uint64_t> histogram;
-        for(const auto& p: disjointSetsMap) {
-            const uint64_t disjointSetSize = p.second.size();
-            if(disjointSetSize >= histogram.size()) {
-                histogram.resize(disjointSetSize + 1, 0);
-            }
-            ++histogram[disjointSetSize];
+    // Histogram disjoint sets sizes.
+    disjointSetsSizeHistogram.clear();
+    for(const auto& p: disjointSetsMap) {
+        const uint64_t disjointSetSize = p.second.size();
+        if(disjointSetSize >= disjointSetsSizeHistogram.size()) {
+            disjointSetsSizeHistogram.resize(disjointSetSize + 1, 0);
         }
+        ++disjointSetsSizeHistogram[disjointSetSize];
+    }
+
+
+    // Write the histogram of disjoint sets sizes.
+    if(html and options.showDebugInformation) {
 
         html <<
             "<h2>Disjoint sets size histogram</h2>"
@@ -737,8 +744,8 @@ void PathFiller3::alignAndDisjointSets(
             "<th>Frequency"
             "<th>Markers";
 
-        for(uint64_t disjointSetSize=0; disjointSetSize<histogram.size(); disjointSetSize++) {
-            const uint64_t frequency = histogram[disjointSetSize];
+        for(uint64_t disjointSetSize=0; disjointSetSize<disjointSetsSizeHistogram.size(); disjointSetSize++) {
+            const uint64_t frequency = disjointSetsSizeHistogram[disjointSetSize];
             if(frequency) {
                 html <<
                     "<tr>"
@@ -760,7 +767,9 @@ void PathFiller3::alignAndDisjointSets(
 
 // Create vertices. Each disjoint set with at least minVertexCoverage markers
 // generates a vertex.
-void PathFiller3::createVertices(uint64_t minVertexCoverage)
+void PathFiller3::createVertices(
+    uint64_t minVertexCoverage,
+    double vertexSamplingRate)  // Only used if minVertexCoverage is 0
 {
     PathFiller3& graph = *this;
 
@@ -792,8 +801,43 @@ void PathFiller3::createVertices(uint64_t minVertexCoverage)
     }
 
     if(html) {
-        html << "<br>Begin " << disjointSetIdA << ", end " << disjointSetIdB;
+        html << "<br>Start vertex " << disjointSetIdA << ", end vertex " << disjointSetIdB;
     }
+
+
+
+    // If minVertexCoverage is 0, select a value automatically.
+    // Select a value that gives a number of vertices approximately correct given
+    // the estimated offset.
+    if(minVertexCoverage == 0) {
+
+        // Estimate the desired number of vertices given the estimated offset.
+        const uint64_t totalBaseCount = assembler.assemblerInfo->baseCount * 2; // Both strands.
+        const uint64_t totalMarkerCount = assembler.markers.totalSize();
+        const double markerDensity = double(totalMarkerCount) / double(totalBaseCount);
+        const uint64_t desiredVertexCount = uint64_t(
+            vertexSamplingRate *  markerDensity * double(estimatedABOffset));
+
+        // Use the disjointSetsSizeHistogram to choose a value of minVertexCoverage
+        // that will give us approximately this number of vertices.
+        uint64_t cumulativeDisjointSetsCount = 0;
+        for(minVertexCoverage = disjointSetsSizeHistogram.size()-1; /* Check later */; --minVertexCoverage) {
+            cumulativeDisjointSetsCount += disjointSetsSizeHistogram[minVertexCoverage];
+            if(cumulativeDisjointSetsCount >= desiredVertexCount) {
+                break;
+            }
+            SHASTA_ASSERT(minVertexCoverage > 0);
+        }
+
+        if(html and options.showDebugInformation) {
+            html << "<br>Set minVertexCoverage to " << minVertexCoverage <<
+                " based on marker density " << markerDensity <<
+                ", vertex sampling rate " << vertexSamplingRate <<
+                ", desired number of vertices " << desiredVertexCount;
+        }
+    }
+
+
 
     // Loop over disjoint sets that are large enough.
     // Also always include disjointSetIdA and disjointSetIdB.
@@ -1329,6 +1373,7 @@ bool PathFiller3::assembleEdge(uint64_t maxMsaLength, edge_descriptor e)
     for(const auto& p: orientedReadSequences) {
         const vector<Base>& sequence = p.first;
         if(sequence.size() > maxMsaLength) {
+            cout << "MSA length " << sequence.size() << endl;
             return false;
         }
     }

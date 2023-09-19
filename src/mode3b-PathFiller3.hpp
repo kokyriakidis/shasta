@@ -103,6 +103,7 @@ public:
         const Assembler&,
         MarkerGraphEdgeId edgeIdA,
         MarkerGraphEdgeId edgeIdB,
+        uint64_t minVertexCoverage, // 0 = automatic
         const PathFiller3DisplayOptions&);
 
     // Get the sequence between edgeIdA and edgeIdB.
@@ -253,9 +254,13 @@ private:
     // Keyed by the disjoint set id (the same also stored in each marker).
     std::map<uint64_t, vector<PathFiller3MarkerIndexes> > disjointSetsMap;
 
+    vector<uint64_t> disjointSetsSizeHistogram;
+
     // Create vertices. Each disjoint set with at least minVertexCoverage markers
     // generates a vertex.
-    void createVertices(uint64_t minVertexCoverage);
+    void createVertices(
+        uint64_t minVertexCoverage,
+        double vertexSamplingRate);  // Only used if minVertexCoverage is 0;
     void removeVertex(vertex_descriptor);
 
     // The disjoint sets corresponding to vertexIdA and vertexIdB.
