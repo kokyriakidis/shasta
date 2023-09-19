@@ -71,6 +71,8 @@ public:
 class shasta::mode3b::PathFiller3Vertex {
 public:
     uint64_t disjointSetId;
+    bool isAccessibleA = false;
+    bool isAccessibleB = false;
 };
 
 
@@ -276,6 +278,11 @@ private:
     void removeAllEdges();
 
     void removeStrongComponents();
+
+    // Remove vertices that are not accessible from vertexIdA
+    // or from which vertexIdB is not accessible.
+    // Returns the number of vertices that were removed.
+    void removeInaccessibleVertices();
 
     // The assembly path, beginning at vertexIdA and ending at vertexIdB.
     // This means that the sequences of edgeIdA and edgeIdB are not included.

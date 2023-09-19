@@ -85,6 +85,7 @@ PathFiller3::PathFiller3(
     writeMarkers();
     createVertices(minVertexCoverage, vertexSamplingRate);
     createEdges();
+    removeInaccessibleVertices();
     writeGraph("Initial assembly graph");
 
     // Remove strongly connected components, then regenerate
@@ -1557,5 +1558,96 @@ void PathFiller3::getCompleteSequence(
     const auto edgeBSequence = assembler.markerGraph.edgeSequence[edgeIdB];
     copy(edgeBSequence.begin(), edgeBSequence.end(), back_inserter(sequence));
 
+
+}
+
+
+
+// Remove vertices that are not accessible from vertexIdA
+// or from which vertexIdB is not accessible.
+// Returns the number of vertices that were removed.
+void PathFiller3::removeInaccessibleVertices()
+{
+    PathFiller3& graph = *this;
+
+    // Find the vertices corresponding to vertexIdA and vertexIdB.
+    vertex_descriptor vA = null_vertex();
+    vertex_descriptor vB = null_vertex();
+    BGL_FORALL_VERTICES(v, graph, PathFiller3) {
+        const PathFiller3Vertex& vertex = graph[v];
+        if(vertex.disjointSetId == disjointSetIdA) {
+            SHASTA_ASSERT(vA == null_vertex());
+            vA = v;
+        }
+        if(vertex.disjointSetId == disjointSetIdB) {
+            SHASTA_ASSERT(vB == null_vertex());
+            vB = v;
+        }
+    }
+    SHASTA_ASSERT(vA != null_vertex());
+    SHASTA_ASSERT(vB != null_vertex());
+
+
+
+    // Use a forward BFS to find the vertices that are accessible from vertexIdA,
+    // moving forward. Those vertices get their isAccessibleA flag set.
+    {
+        std::queue<vertex_descriptor> q;
+        q.push(vA);
+        graph[vA].isAccessibleA = true;
+        while(not q.empty()) {
+            const vertex_descriptor v0 = q.front();
+            q.pop();
+
+            BGL_FORALL_OUTEDGES(v0, e, graph, PathFiller3) {
+                const vertex_descriptor v1 = target(e, graph);
+                auto& vertex1 = graph[v1];
+                if(not vertex1.isAccessibleA) {
+                    vertex1.isAccessibleA = true;
+                    q.push(v1);
+                }
+            }
+        }
+        SHASTA_ASSERT(graph[vB].isAccessibleA);
+    }
+
+
+
+    // Use a backward BFS to find the vertices that are accessible from vertexIdB,
+    // moving backward. Those vertices get their isAccessibleB flag set.
+    {
+        std::queue<vertex_descriptor> q;
+        q.push(vB);
+        graph[vB].isAccessibleB = true;
+        while(not q.empty()) {
+            const vertex_descriptor v0 = q.front();
+            q.pop();
+
+            BGL_FORALL_INEDGES(v0, e, graph, PathFiller3) {
+                const vertex_descriptor v1 = source(e, graph);
+                auto& vertex1 = graph[v1];
+                if(not vertex1.isAccessibleB) {
+                    vertex1.isAccessibleB = true;
+                    q.push(v1);
+                }
+            }
+        }
+        SHASTA_ASSERT(graph[vA].isAccessibleB);
+    }
+
+
+    // Gather the vertices to be removed.
+    vector<vertex_descriptor> verticesToBeRemoved;
+    BGL_FORALL_VERTICES(v, graph, PathFiller3) {
+        const auto& vertex = graph[v];
+        if(not (vertex.isAccessibleA and vertex.isAccessibleB)) {
+            verticesToBeRemoved.push_back(v);
+        }
+    }
+
+    // Remove them.
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        removeVertex(v);
+    }
 
 }
