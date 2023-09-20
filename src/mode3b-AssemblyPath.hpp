@@ -2,6 +2,7 @@
 #define SHASTA_MODE3B_ASSEMBLY_PATH_HPP
 
 #include "MarkerGraphEdgePairInfo.hpp"
+#include "MultithreadedObject.hpp"
 #include "shastaTypes.hpp"
 
 #include "iosfwd.hpp"
@@ -31,7 +32,7 @@ namespace shasta {
 // created by mode3b::PathFiller.
 // The primary and secondary vertices are a path in the marker graph and
 // can be used to assemble sequence.
-class shasta::mode3b::AssemblyPath {
+class shasta::mode3b::AssemblyPath : public MultithreadedObject<AssemblyPath> {
 public:
 
     // Create the assembly path starting from a given primary edge.
@@ -46,7 +47,8 @@ public:
     AssemblyPath(
         const Assembler&,
         const vector<MarkerGraphEdgeId>&,
-        const vector<MarkerGraphEdgePairInfo>);
+        const vector<MarkerGraphEdgePairInfo>&,
+        uint64_t threadCount = 0);
 
     void getSequence(vector<Base>&) const;
     void writeFasta(ostream&, const string& name) const;
@@ -77,7 +79,10 @@ private:
         );
 
     // Assemble the sequence of each Step.
-    void assemble();
+    void assembleSequential();
+    void assembleStep(uint64_t i);
+    void assembleParallel(uint64_t threadCount);
+    void assembleThreadFunction(uint64_t threadId);
 };
 
 #endif

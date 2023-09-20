@@ -11,7 +11,8 @@ using namespace mode3b;
 
 #include <iostream.hpp>
 
-
+#include "MultithreadedObject.tpp"
+template class MultithreadedObject<AssemblyPath>;
 
 // Create the assembly path starting from a given primary edge.
 AssemblyPath::AssemblyPath(
@@ -19,10 +20,11 @@ AssemblyPath::AssemblyPath(
     MarkerGraphEdgeId startEdgeId,
     uint64_t direction  // 0 = forward, 1 = backward, 2=bidirectional
     ) :
+    MultithreadedObject<AssemblyPath>(*this),
     assembler(assembler)
 {
     create(startEdgeId, direction);
-    assemble();
+    assembleSequential();
 }
 
 
@@ -111,7 +113,9 @@ void AssemblyPath::create(
 AssemblyPath::AssemblyPath(
     const Assembler& assembler,
     const vector<MarkerGraphEdgeId>& primaryEdges,
-    const vector<MarkerGraphEdgePairInfo> infos) :
+    const vector<MarkerGraphEdgePairInfo>& infos,
+    uint64_t threadCount) :
+    MultithreadedObject<AssemblyPath>(*this),
     assembler(assembler),
     primaryEdges(primaryEdges)
 {
@@ -124,36 +128,71 @@ AssemblyPath::AssemblyPath(
         steps.push_back(Step(info));
     }
 
-    assemble();
+    // Adjust the numbers of threads, if necessary.
+    if(threadCount == 0) {
+        threadCount = std::thread::hardware_concurrency();
+    }
+
+    // Assemble in parallel.
+    assembleParallel(threadCount);
 }
 
 
 
 // Assemble the sequence of each Step.
-void AssemblyPath::assemble()
+void AssemblyPath::assembleSequential()
 {
     for(uint64_t i=0; i<steps.size(); i++) {
-        const MarkerGraphEdgeId edgeIdA = primaryEdges[i];
-        const MarkerGraphEdgeId edgeIdB = primaryEdges[i+1];
-        // cout << "Assembling between primary edges " << edgeIdA << " " << edgeIdB << endl;
-        Step& step = steps[i];
-        ostream html(0);
+        assembleStep(i);
+    }
+}
+
+
+
+void AssemblyPath::assembleStep(uint64_t i)
+{
+    const MarkerGraphEdgeId edgeIdA = primaryEdges[i];
+    const MarkerGraphEdgeId edgeIdB = primaryEdges[i+1];
+    // cout << "Assembling between primary edges " << edgeIdA << " " << edgeIdB << endl;
+    Step& step = steps[i];
+    ostream html(0);
+
 #if 0
-        PathFiller1 pathFiller(assembler, edgeIdA, edgeIdB, html, false, false, false, false, false);
-        pathFiller.getSecondarySequence(step.sequence);
+    PathFiller1 pathFiller(assembler, edgeIdA, edgeIdB, html, false, false, false, false, false);
+    pathFiller.getSecondarySequence(step.sequence);
 #endif
 #if 0
-        PathFiller2 pathFiller(assembler, edgeIdA, edgeIdB, html);
-        pathFiller.getSecondarySequence(step.sequence);
+    PathFiller2 pathFiller(assembler, edgeIdA, edgeIdB, html);
+    pathFiller.getSecondarySequence(step.sequence);
 #endif
 
-        try {
-            PathFiller3 pathFiller(assembler, edgeIdA, edgeIdB, 0, html);
-            pathFiller.getSecondarySequence(step.sequence);
-        } catch (...) {
-            cout << "Error occurred when assembling between marker graph edges " <<
-                edgeIdA << " and " << edgeIdB << endl;
-            throw;
+    try {
+        PathFiller3 pathFiller(assembler, edgeIdA, edgeIdB, 0, html);
+        pathFiller.getSecondarySequence(step.sequence);
+    } catch (...) {
+        cout << "Error occurred when assembling between marker graph edges " <<
+            edgeIdA << " and " << edgeIdB << endl;
+        throw;
+    }
+
+}
+
+
+
+void AssemblyPath::assembleParallel(uint64_t threadCount)
+{
+    setupLoadBalancing(steps.size(), 1);
+    runThreads(&AssemblyPath::assembleThreadFunction, threadCount);
+}
+
+
+
+void AssemblyPath::assembleThreadFunction(uint64_t threadId)
+{
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+        for(uint64_t i=begin; i<end; ++i) {
+            assembleStep(i);
         }
     }
 }
