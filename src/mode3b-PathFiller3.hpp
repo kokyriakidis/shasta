@@ -282,7 +282,7 @@ private:
     // Remove vertices that are not accessible from vertexIdA
     // or from which vertexIdB is not accessible.
     // Returns the number of vertices that were removed.
-    void removeInaccessibleVertices();
+    uint64_t removeInaccessibleVertices();
 
     // The assembly path, beginning at vertexIdA and ending at vertexIdB.
     // This means that the sequences of edgeIdA and edgeIdB are not included.

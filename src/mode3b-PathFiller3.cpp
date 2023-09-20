@@ -89,8 +89,10 @@ PathFiller3::PathFiller3(
     writeMarkers();
     createVertices(minVertexCoverage, vertexSamplingRate);
     createEdges();
-    removeInaccessibleVertices();
     writeGraph("Initial assembly graph");
+    if(removeInaccessibleVertices()) {
+        writeGraph("Assembly graph after removal of inaccessible vertices.");
+    }
 
     // Remove strongly connected components, then regenerate
     // edges from scratch with the remaining vertices.
@@ -792,7 +794,7 @@ void PathFiller3::createVertices(
             if(disjointSetIdA == invalid<uint64_t>) {
                 disjointSetIdA = markerInfoA.disjointSetId;
             } else {
-                SHASTA_ASSERT(disjointSetIdA = markerInfoA.disjointSetId);
+                SHASTA_ASSERT(disjointSetIdA == markerInfoA.disjointSetId);
             }
         }
         if(info.isOnB()) {
@@ -800,7 +802,7 @@ void PathFiller3::createVertices(
             if(disjointSetIdB == invalid<uint64_t>) {
                 disjointSetIdB = markerInfoB.disjointSetId;
             } else {
-                SHASTA_ASSERT(disjointSetIdB = markerInfoB.disjointSetId);
+                SHASTA_ASSERT(disjointSetIdB == markerInfoB.disjointSetId);
             }
         }
     }
@@ -827,8 +829,15 @@ void PathFiller3::createVertices(
         // that will give us approximately this number of vertices.
         // Never reduce minVertexCoverage below 2.
         uint64_t cumulativeDisjointSetsCount = 0;
-        for(minVertexCoverage = disjointSetsSizeHistogram.size()-1; minVertexCoverage>=2; --minVertexCoverage) {
+        for(minVertexCoverage = disjointSetsSizeHistogram.size()-1; minVertexCoverage>2; --minVertexCoverage) {
             cumulativeDisjointSetsCount += disjointSetsSizeHistogram[minVertexCoverage];
+#if 0
+            if(html and options.showDebugInformation) {
+                html << "<br>minVertexCoverage " << minVertexCoverage <<
+                    " would generate " << cumulativeDisjointSetsCount <<
+                    " vertices and we want " << desiredVertexCount;
+            }
+#endif
             if(cumulativeDisjointSetsCount >= desiredVertexCount) {
                 break;
             }
@@ -1374,12 +1383,19 @@ bool PathFiller3::assembleEdge(uint64_t maxMsaLength, edge_descriptor e)
     // If getting here, we have more than one sequence, and we must
     // compute a consensus via multiple sequence alignment (MSA).
 
-    // Check that the sequences are not too long.
-    for(const auto& p: orientedReadSequences) {
-        const vector<Base>& sequence = p.first;
-        if(sequence.size() > maxMsaLength) {
-            cout << "MSA length " << sequence.size() << endl;
-            return false;
+    // If any of the sequences are too long, only use the first one,
+    // which is the one with highest coverage.
+    // This can be problematic.
+    if(orientedReadSequences.size() > 1) {
+        for(const auto& p: orientedReadSequences) {
+            const vector<Base>& sequence = p.first;
+            if(sequence.size() > maxMsaLength) {
+                cout << "MSA length " << sequence.size() << " at " << edgeIdA << " " << edgeIdB << endl;
+                if(html and options.showDebugInformation) {
+                    html << "<br>MSA length " << sequence.size() << " at " << edgeIdA << " " << edgeIdB << endl;
+                }
+                orientedReadSequences.resize(1);
+            }
         }
     }
 
@@ -1570,7 +1586,7 @@ void PathFiller3::getCompleteSequence(
 // Remove vertices that are not accessible from vertexIdA
 // or from which vertexIdB is not accessible.
 // Returns the number of vertices that were removed.
-void PathFiller3::removeInaccessibleVertices()
+uint64_t PathFiller3::removeInaccessibleVertices()
 {
     PathFiller3& graph = *this;
 
@@ -1654,4 +1670,5 @@ void PathFiller3::removeInaccessibleVertices()
         removeVertex(v);
     }
 
+    return verticesToBeRemoved.size();
 }
