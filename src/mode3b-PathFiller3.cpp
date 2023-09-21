@@ -81,6 +81,7 @@ PathFiller3::PathFiller3(
 
     // Markers.
     gatherMarkers(estimatedOffsetRatio);
+    writeOrientedReadsSequences();
 
     // Assembly graph.
     alignAndDisjointSets(matchScore, mismatchScore, gapScore, maxSkipBases);
@@ -1759,4 +1760,39 @@ void PathFiller3::clear()
     PathFiller3BaseClass::clear();
     vertexMap.clear();
     assemblyPath.clear();
+}
+
+
+
+void PathFiller3::writeOrientedReadsSequences() const
+{
+    if(not html) {
+        return;
+    }
+    if(not options.showOrientedReads) {
+        return;
+    }
+
+    const uint64_t k = assembler.assemblerInfo->k;
+    SHASTA_ASSERT((k % 2) == 0);
+    const uint64_t kHalf = k / 2;
+
+    ofstream fasta("PathFiller3-OrientedReadSequences.fasta");
+
+    for(const OrientedReadInfo& info: orientedReadInfos) {
+
+        SHASTA_ASSERT(not info.markerInfos.empty());
+        const uint64_t position0 = uint64_t(info.markerInfos.front().position) + kHalf;
+        const uint64_t position1 = uint64_t(info.markerInfos.back().position) + kHalf;
+
+        fasta <<
+            ">" << info.orientedReadId << " " <<
+            position0 << ":" << position1 <<
+            " length " << position1-position0 << "\n";
+        for(uint64_t position=position0; position!=position1; position++) {
+            const Base base = assembler.getReads().getOrientedReadBase(info.orientedReadId, uint32_t(position));
+            fasta << base;
+        }
+        fasta << "\n";
+    }
 }

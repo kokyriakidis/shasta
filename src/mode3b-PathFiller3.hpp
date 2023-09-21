@@ -226,6 +226,7 @@ private:
     vector<OrientedReadInfo> orientedReadInfos;
     void gatherOrientedReads();
     void writeOrientedReads() const;
+    void writeOrientedReadsSequences() const;
 
     // Estimated offset in bases between vertexIdA and vertexIdB.
     // The estimate is done using the oriented reads that appear
