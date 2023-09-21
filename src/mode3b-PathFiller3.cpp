@@ -87,42 +87,63 @@ PathFiller3::PathFiller3(
     // Assembly graph.
     alignAndDisjointSets(matchScore, mismatchScore, gapScore, maxSkipBases);
     writeMarkers();
-    createVertices(minVertexCoverage, vertexSamplingRate);
-    createEdges();
-    writeGraph("Initial assembly graph");
-    if(removeInaccessibleVertices()) {
-        writeGraph("Assembly graph after removal of inaccessible vertices.");
-    }
 
-    // Remove strongly connected components, then regenerate
-    // edges from scratch with the remaining vertices.
-    removeStrongComponents();
-    removeAllEdges();
-    createEdges();
-    writeGraph("Assembly graph after removal of strong connected components");
+    // Iteration to reduce minVertexCoverage if a long MSA is encountered.
+    while(true) {
 
-    // Assemble.
-    findAssemblyPath();
-    SHASTA_ASSERT(assembleAssemblyPathEdges(maxMsaLength));
-    writeGraph("Assembly graph after assembly");
+        minVertexCoverage = createVertices(minVertexCoverage, vertexSamplingRate);
+        createEdges();
+        writeGraph("Initial assembly graph");
+        if(removeInaccessibleVertices()) {
+            writeGraph("Assembly graph after removal of inaccessible vertices.");
+        }
 
-    // Write assembled sequence.
-    if(html) {
-        vector<Base> sequence;
-        getSecondarySequence(sequence);
+        // Remove strongly connected components, then regenerate
+        // edges from scratch with the remaining vertices.
+        removeStrongComponents();
+        removeAllEdges();
+        createEdges();
+        writeGraph("Assembly graph after removal of strong connected components");
 
-        html <<
-            "<h2>Assembled sequence</h2>"
-            "Assembled sequence not including the first and last edge is " <<
-            sequence.size() << " bases long."
-            "<pre style='font-family:monospace'>\n";
-        copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(html));
-        html << "</pre>";
+        // Assemble.
+        findAssemblyPath();
+        if(minVertexCoverage > 2) {
+            try {
+                assembleAssemblyPathEdges(maxMsaLength, LongMsaPolicy::throwException);
+            } catch(...) {
+                --minVertexCoverage;
+                clear();
+                if(html and options.showDebugInformation) {
+                    html << "<br>minVertexCoverage reduced to " << minVertexCoverage;
+                }
+                continue;
+            }
 
-        ofstream fasta("PathFiller3.fasta");
-        fasta << ">PathFiller3 " << sequence.size() << endl;
-        copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(fasta));
+        } else {
+            assembleAssemblyPathEdges(maxMsaLength, LongMsaPolicy::assembleAtLowCoverage);
+        }
+        writeGraph("Assembly graph after assembly");
 
+        // Write assembled sequence.
+        if(html) {
+            vector<Base> sequence;
+            getSecondarySequence(sequence);
+
+            html <<
+                "<h2>Assembled sequence</h2>"
+                "Assembled sequence not including the first and last edge is " <<
+                sequence.size() << " bases long."
+                "<pre style='font-family:monospace'>\n";
+            copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(html));
+            html << "</pre>";
+
+            ofstream fasta("PathFiller3.fasta");
+            fasta << ">PathFiller3 " << sequence.size() << endl;
+            copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(fasta));
+
+        }
+
+        break;
     }
 
 }
@@ -785,7 +806,7 @@ void PathFiller3::alignAndDisjointSets(
 
 // Create vertices. Each disjoint set with at least minVertexCoverage markers
 // generates a vertex.
-void PathFiller3::createVertices(
+uint64_t PathFiller3::createVertices(
     uint64_t minVertexCoverage,
     double vertexSamplingRate)  // Only used if minVertexCoverage is 0
 {
@@ -881,6 +902,8 @@ void PathFiller3::createVertices(
     if(html and options.showDebugInformation) {
         html << "<br>The assembly graph has " << num_vertices(graph) << " vertices.";
     }
+
+    return minVertexCoverage;
 }
 
 
@@ -1264,19 +1287,21 @@ void PathFiller3::findAssemblyPath()
 
 
 
-bool PathFiller3::assembleAssemblyPathEdges(uint64_t maxMsaLength)
+void PathFiller3::assembleAssemblyPathEdges(
+    uint64_t maxMsaLength,
+    LongMsaPolicy longMsaPolicy)
 {
     for(const edge_descriptor e: assemblyPath) {
-        if(not assembleEdge(maxMsaLength, e)) {
-            return false;
-        }
+        assembleEdge(maxMsaLength, longMsaPolicy, e);
     }
-    return true;
 }
 
 
 
-bool PathFiller3::assembleEdge(uint64_t maxMsaLength, edge_descriptor e)
+void PathFiller3::assembleEdge(
+    uint64_t maxMsaLength,
+    LongMsaPolicy longMsaPolicy,
+    edge_descriptor e)
 {
     PathFiller3& graph = *this;
     PathFiller3Edge& edge = graph[e];
@@ -1387,15 +1412,14 @@ bool PathFiller3::assembleEdge(uint64_t maxMsaLength, edge_descriptor e)
         edge.consensusSequence = sequence;
         edge.consensusCoverage.clear();
         edge.consensusCoverage.resize(sequence.size(), coverage);
-        return true;
+        return;
     }
 
 
     // If getting here, we have more than one sequence, and we must
     // compute a consensus via multiple sequence alignment (MSA).
 
-    // If any of the sequences are too long, only use the first one,
-    // which is the one with highest coverage.
+    // If any of the sequences are too long, react according to longMsaPolicy.
     // This can be problematic.
     if(orientedReadSequences.size() > 1) {
 
@@ -1407,17 +1431,18 @@ bool PathFiller3::assembleEdge(uint64_t maxMsaLength, edge_descriptor e)
         }
 
         if(maxLength > maxMsaLength) {
-            orientedReadSequences.resize(1);
-            cout << "Long MSA length " << maxLength << " at assembly graph edge " <<
-                graph[source(e, graph)].disjointSetId << "->" <<
-                graph[target(e, graph)].disjointSetId <<
-                " when assembling between primary marker graph edges " << edgeIdA << " " << edgeIdB <<
-                ". Assembling this edge at coverage " << orientedReadSequences.front().second << endl;
             if(html and options.showDebugInformation) {
                 html << "<br>MSA length " << maxLength << " at " <<
                     graph[source(e, graph)].disjointSetId << "->" <<
-                    graph[target(e, graph)].disjointSetId <<
-                    ". Assembling this edge at coverage " << orientedReadSequences.front().second;
+                    graph[target(e, graph)].disjointSetId;
+            }
+            if(longMsaPolicy == LongMsaPolicy::throwException) {
+                throw runtime_error("Long MSA.");
+            } else {
+                orientedReadSequences.resize(1);
+                if(html and options.showDebugInformation) {
+                    html << "<br>Assembling this edge at coverage " << orientedReadSequences.front().second;
+                }
             }
         }
     }
@@ -1544,7 +1569,6 @@ bool PathFiller3::assembleEdge(uint64_t maxMsaLength, edge_descriptor e)
         html << "</table>";
     }
 
-    return true;
 }
 
 
@@ -1694,4 +1718,15 @@ uint64_t PathFiller3::removeInaccessibleVertices()
     }
 
     return verticesToBeRemoved.size();
+}
+
+
+
+// Remove all vertices and edges and clear the vertexMap and assemblyPath.
+// All other data are left alone.
+void PathFiller3::clear()
+{
+    PathFiller3BaseClass::clear();
+    vertexMap.clear();
+    assemblyPath.clear();
 }

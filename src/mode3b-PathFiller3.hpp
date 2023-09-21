@@ -260,7 +260,9 @@ private:
 
     // Create vertices. Each disjoint set with at least minVertexCoverage markers
     // generates a vertex.
-    void createVertices(
+    // If minVertexCoverage is 0, a suitable value is computed.
+    // This returns the value of minVertexCoverage actually used.
+    uint64_t createVertices(
         uint64_t minVertexCoverage,
         double vertexSamplingRate);  // Only used if minVertexCoverage is 0;
     void removeVertex(vertex_descriptor);
@@ -284,12 +286,21 @@ private:
     // Returns the number of vertices that were removed.
     uint64_t removeInaccessibleVertices();
 
+    // Possible courses of action when a long MSA is encountered.
+    enum class LongMsaPolicy {
+        throwException,
+        assembleAtLowCoverage
+    };
+
     // The assembly path, beginning at vertexIdA and ending at vertexIdB.
     // This means that the sequences of edgeIdA and edgeIdB are not included.
     vector<edge_descriptor> assemblyPath;
     void findAssemblyPath();
-    bool assembleAssemblyPathEdges(uint64_t maxMsaLength);
-    bool assembleEdge(uint64_t maxMsaLength, edge_descriptor);
+    void assembleAssemblyPathEdges(uint64_t maxMsaLength, LongMsaPolicy);
+    void assembleEdge(
+        uint64_t maxMsaLength,
+        LongMsaPolicy,
+        edge_descriptor);
 
     // Graphviz output.
     void writeGraph() const;
@@ -298,6 +309,10 @@ private:
     void writeGraphviz(ostream&) const;
 
     void writeCoverageCharacterToHtml(uint64_t coverage) const;
+
+    // Remove all vertices and edges and clear the vertexMap and assemblyPath.
+    // All other data are left alone.
+    void clear();
 };
 
 #endif
