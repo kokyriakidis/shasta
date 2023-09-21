@@ -58,10 +58,8 @@ PathFiller3::PathFiller3(
     int64_t gapScore = -1;
     const uint64_t maxSkipBases = 500;
 
-
     const uint64_t maxMsaLength = 5000;
 
-    performanceLog << timestamp << "PathFiller3 " << edgeIdA << " " << edgeIdB << "\n";
 
 
     // Store the source target of edgeIdA and the source vertex of edgeIdB.
@@ -283,7 +281,7 @@ void PathFiller3::writeOrientedReads() const
         "<th>Ordinal<br>offset"
         "<th>PositionA"
         "<th>PositionB"
-        "<th>Ordinal<br>offset"
+        "<th>Position<br>offset"
         ;
 
     for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
@@ -330,6 +328,38 @@ void PathFiller3::writeOrientedReads() const
      }
 
     html << "</table>";
+
+
+    // Count reads.
+    uint64_t commonCount = 0;
+    uint64_t onlyACount = 0;
+    uint64_t onlyBCount = 0;
+    for(const OrientedReadInfo& info: orientedReadInfos) {
+        const bool isOnA = info.isOnA();
+        const bool isOnB = info.isOnB();
+        if(isOnA) {
+            if(isOnB) {
+                ++commonCount;
+            } else {
+                ++onlyACount;
+            }
+        } else {
+            if(isOnB) {
+                ++onlyBCount;
+            } else {
+                SHASTA_ASSERT(0);
+            }
+
+        }
+    }
+    html <<
+        "<p><table>"
+        "<tr><th class=left>Common<td class=centered>" << commonCount <<
+        "<tr><th class=left>On A only<td class=centered>" << onlyACount <<
+        "<tr><th class=left>On B only<td class=centered>" << onlyBCount <<
+        "<tr><th class=left>Total<td class=centered>" << orientedReadInfos.size() <<
+        "</table>";
+
 }
 
 
@@ -365,7 +395,7 @@ void PathFiller3::estimateOffset()
     estimatedABOffset = int64_t(std::round(double(sum) / double(n)));
 
     if(html) {
-        html << "<br>Estimated offset is " << estimatedABOffset << " bases.";
+        html << "<br>Estimated position offset is " << estimatedABOffset << " bases.";
     }
 }
 
