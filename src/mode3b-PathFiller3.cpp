@@ -563,6 +563,17 @@ void PathFiller3::alignAndDisjointSets(
             const bool constrainedA = info0.isOnA() and info1.isOnA();
             const bool constrainedB = info0.isOnB() and info1.isOnB();
 
+            // If constrained on A, merge the first markers of the two reads,
+            // as the alignment does not guarantee that.
+            // If constrained on B, merge the last markers of the two reads,
+            // as the alignment does not guarantee that.
+            if(constrainedA) {
+                disjointSets.union_set(info0.markerInfos.front().id, info1.markerInfos.front().id);
+            }
+            if(constrainedB) {
+                disjointSets.union_set(info0.markerInfos.back().id, info1.markerInfos.back().id);
+            }
+
             // Only do alignments that are constrained on at least one side.
             if(not (constrainedA or constrainedB)) {
                 continue;
@@ -1387,14 +1398,26 @@ bool PathFiller3::assembleEdge(uint64_t maxMsaLength, edge_descriptor e)
     // which is the one with highest coverage.
     // This can be problematic.
     if(orientedReadSequences.size() > 1) {
+
+        // Find the length of the longest sequence.
+        uint64_t maxLength = 0;
         for(const auto& p: orientedReadSequences) {
             const vector<Base>& sequence = p.first;
-            if(sequence.size() > maxMsaLength) {
-                cout << "MSA length " << sequence.size() << " at " << edgeIdA << " " << edgeIdB << endl;
-                if(html and options.showDebugInformation) {
-                    html << "<br>MSA length " << sequence.size() << " at " << edgeIdA << " " << edgeIdB << endl;
-                }
-                orientedReadSequences.resize(1);
+            maxLength = max(sequence.size(), maxMsaLength);
+        }
+
+        if(maxLength > maxMsaLength) {
+            orientedReadSequences.resize(1);
+            cout << "Long MSA length " << maxLength << " at assembly graph edge " <<
+                graph[source(e, graph)].disjointSetId << "->" <<
+                graph[target(e, graph)].disjointSetId <<
+                " when assembling between primary marker graph edges " << edgeIdA << " " << edgeIdB <<
+                ". Assembling this edge at coverage " << orientedReadSequences.front().second << endl;
+            if(html and options.showDebugInformation) {
+                html << "<br>MSA length " << maxLength << " at " <<
+                    graph[source(e, graph)].disjointSetId << "->" <<
+                    graph[target(e, graph)].disjointSetId <<
+                    ". Assembling this edge at coverage " << orientedReadSequences.front().second;
             }
         }
     }
