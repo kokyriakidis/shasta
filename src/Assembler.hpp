@@ -2365,7 +2365,10 @@ public:
     void fillMode3bAssemblyPathStep3(const vector<string>&, ostream&); // Uses class mode3b::PathFiller3
 
     void exploreMode3bPathGraph(const vector<string>& request, ostream& html);
-    void findMode3bPaths() const;
+    void findMode3bPaths(
+        uint64_t threadCount0,  // High level parallelization
+        uint64_t threadCount1   // Low level parallelization
+    ) const;
 
 public:
     void test();

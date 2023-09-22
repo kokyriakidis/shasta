@@ -17,7 +17,9 @@ A directed edge v0->v1 is generated if:
 *******************************************************************************/
 
 // Shasta.
+#include "Base.hpp"
 #include "MarkerGraphEdgePairInfo.hpp"
+#include "MultithreadedObject.hpp"
 #include "ReadId.hpp"
 #include "shastaTypes.hpp"
 
@@ -70,6 +72,8 @@ namespace shasta {
             boost::bidirectionalS,
             CompressedPathGraph1Vertex,
             CompressedPathGraph1Edge>;
+
+        class AssemblyPath;
     }
 }
 
@@ -206,7 +210,10 @@ public:
 
 class shasta::mode3b::GlobalPathGraph1 {
 public:
-    static void assemble(const Assembler&);
+    static void assemble(
+        const Assembler&,
+        uint64_t threadCount0,
+        uint64_t threadCount1);
 private:
     GlobalPathGraph1(const Assembler&);
     const Assembler& assembler;
@@ -405,9 +412,14 @@ private:
 
     static void assemble0(const Assembler&);
 
-    static void assemble1(const Assembler&);
+    static void assemble1(
+        const Assembler&,
+        uint64_t threadCount0,
+        uint64_t threadCount1);
     static void assemble1(
         GlobalPathGraph1&,
+        uint64_t threadCount0,
+        uint64_t threadCount1,
         uint64_t componentId,
         uint64_t transitiveReductionDistance,
         uint64_t compressedTransitiveReductionDistance,
@@ -429,6 +441,7 @@ class shasta::mode3b::CompressedPathGraph1Vertex {
 public:
     uint64_t id;
     vector<PathGraph1::vertex_descriptor> v;
+    shared_ptr<AssemblyPath> assemblyPath;
 };
 class shasta::mode3b::CompressedPathGraph1Edge {
 public:
@@ -437,7 +450,9 @@ public:
     MarkerGraphEdgePairInfo info;
 };
 
-class shasta::mode3b::CompressedPathGraph1 : public CompressedPathGraph1BaseClass {
+class shasta::mode3b::CompressedPathGraph1 :
+    public CompressedPathGraph1BaseClass,
+    public MultithreadedObject<CompressedPathGraph1> {
 public:
     CompressedPathGraph1(
         const PathGraph1&,
@@ -471,8 +486,20 @@ public:
     uint64_t totalBaseOffset(vertex_descriptor) const;
 
     // Sequence assembly.
-    void assembleVertices() const;
-    void assembleVertex(vertex_descriptor, ostream& fasta, ostream& csv) const;
+    void assembleVertices(
+        uint64_t threadCount0,
+        uint64_t threadCount1);
+    class AssembleVerticesData {
+    public:
+        uint64_t threadCount1;
+        vector<vertex_descriptor> allVertices;
+    };
+    void assembleVerticesThreadFunction(uint64_t threadId);
+    AssembleVerticesData assembleVerticesData;
+    void assembleVertex(
+        vertex_descriptor,
+        uint64_t threadCount1);
+
 
     // Graphviz output.
     void writeGraphviz(

@@ -59,10 +59,14 @@ void Assembler::findCompleteMarkerGraphPaths(uint64_t threadCount) const
 
 
 
-void Assembler::findMode3bPaths() const
+void Assembler::findMode3bPaths(
+    uint64_t threadCount0,  // High level parallelization
+    uint64_t threadCount1   // Low level parallelization
+    ) const
 {
-    mode3b::GlobalPathGraph1::assemble(*this);
+    mode3b::GlobalPathGraph1::assemble(*this, threadCount0, threadCount1);
 }
+
 
 
 // Given two consecutive primary edges in the marker graph,

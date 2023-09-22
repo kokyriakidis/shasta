@@ -8,6 +8,7 @@
 #include "mode3b-AssemblyPath.hpp"
 #include "MurmurHash2.hpp"
 #include "orderPairs.hpp"
+#include "performanceLog.hpp"
 #include "timestamp.hpp"
 #include "transitiveReduction.hpp"
 using namespace shasta;
@@ -26,11 +27,17 @@ using namespace mode3b;
 #include <iomanip>
 #include <numeric>
 
+// Explicit instantiation.
+#include "MultithreadedObject.tpp"
+template class MultithreadedObject<CompressedPathGraph1>;
 
 
-void GlobalPathGraph1::assemble(const Assembler& assembler)
+void GlobalPathGraph1::assemble(
+    const Assembler& assembler,
+    uint64_t threadCount0,
+    uint64_t threadCount1)
 {
-    assemble1(assembler);
+    assemble1(assembler, threadCount0, threadCount1);
 }
 
 
@@ -153,7 +160,10 @@ void GlobalPathGraph1::assemble0(const Assembler& assembler)
 
 
 
-void GlobalPathGraph1::assemble1(const Assembler& assembler)
+void GlobalPathGraph1::assemble1(
+    const Assembler& assembler,
+    uint64_t threadCount0,
+    uint64_t threadCount1)
 {
     const uint64_t minPrimaryCoverage = 8;
     const uint64_t maxPrimaryCoverage = 50;
@@ -177,7 +187,8 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
 
     // Assemble each connected component separately.
     for(uint64_t componentId=0; componentId<graph.components.size(); componentId++) {
-        assemble1(graph, componentId,
+        assemble1(graph, threadCount0, threadCount1,
+            componentId,
             transitiveReductionDistance,
             compressedTransitiveReductionDistance,
             minReliableLength,
@@ -190,6 +201,8 @@ void GlobalPathGraph1::assemble1(const Assembler& assembler)
 
 void GlobalPathGraph1::assemble1(
     GlobalPathGraph1& globalGraph,
+    uint64_t threadCount0,
+    uint64_t threadCount1,
     uint64_t componentId,
     uint64_t transitiveReductionDistance,
     uint64_t compressedTransitiveReductionDistance,
@@ -268,7 +281,7 @@ void GlobalPathGraph1::assemble1(
     cout << "The CompressedPathGraph1 has " << num_vertices(cGraph) << " vertices and " <<
         num_edges(cGraph) << " edges." << endl;
     cout << "Assembling sequence." << endl;
-    cGraph.assembleVertices();
+    cGraph.assembleVertices(threadCount0, threadCount1);
 
 }
 
@@ -2500,6 +2513,7 @@ CompressedPathGraph1::CompressedPathGraph1(
     const PathGraph1& graph,
     uint64_t componentId,
     const Assembler& assembler) :
+    MultithreadedObject<CompressedPathGraph1>(*this),
     graph(graph),
     componentId(componentId),
     assembler(assembler)
@@ -3391,14 +3405,52 @@ void CompressedPathGraph1::detangleIteration(
 
 
 
-void CompressedPathGraph1::assembleVertices() const
+void CompressedPathGraph1::assembleVertices(
+    uint64_t threadCount0,
+    uint64_t threadCount1)
 {
     const CompressedPathGraph1& cGraph = *this;
+
+    // Store the information needed by the threads.
+    assembleVerticesData.threadCount1 = threadCount1;
+    assembleVerticesData.allVertices.clear();
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
+        assembleVerticesData.allVertices.push_back(cv);
+    }
+
+    // High level parallelization uses threadCount0 threads.
+    // Low level parallelization uses threadCount1 threads.
+    setupLoadBalancing(assembleVerticesData.allVertices.size(), 1);
+    runThreads(&CompressedPathGraph1::assembleVerticesThreadFunction, threadCount0);
 
     ofstream fasta("Component" + to_string(componentId) + ".fasta");
     ofstream csv("Component" + to_string(componentId) + ".csv");
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
-        assembleVertex(cv, fasta, csv);
+        const CompressedPathGraph1Vertex& cVertex = cGraph[cv];
+        const string name = vertexIdString(cv);
+        cVertex.assemblyPath->writeFasta(fasta, name);
+        cVertex.assemblyPath->writeCsv(csv, name);
+    }
+}
+
+
+
+void CompressedPathGraph1::assembleVerticesThreadFunction(uint64_t threadId)
+{
+    // Number of threads for lower level parallelization.
+    const uint64_t threadCount1 = assembleVerticesData.threadCount1;
+
+    // High level parallel loop over all vertices.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+        for(uint64_t i=begin; i!=end; i++) {
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                performanceLog << timestamp << i << "/" << assembleVerticesData.allVertices.size() << endl;
+            }
+            const vertex_descriptor cv = assembleVerticesData.allVertices[i];
+            assembleVertex(cv, threadCount1);
+        }
     }
 }
 
@@ -3406,11 +3458,10 @@ void CompressedPathGraph1::assembleVertices() const
 
 void CompressedPathGraph1::assembleVertex(
     vertex_descriptor cv,
-    ostream& fasta,
-    ostream& csv) const
+    uint64_t threadCount1)
 {
-    const CompressedPathGraph1& cGraph = *this;
-    const CompressedPathGraph1Vertex& cVertex = cGraph[cv];
+    CompressedPathGraph1& cGraph = *this;
+    CompressedPathGraph1Vertex& cVertex = cGraph[cv];
 
     // Construct the MarkerGraphEdgeIds of the assembly path.
     vector<MarkerGraphEdgeId> edgeIds;
@@ -3427,7 +3478,6 @@ void CompressedPathGraph1::assembleVertex(
     }
 
     // Create the AssemblyPath.
-    AssemblyPath assemblyPath(assembler, edgeIds, infos);
-    assemblyPath.writeFasta(fasta, vertexIdString(cv));
-    assemblyPath.writeCsv(csv, vertexIdString(cv));
+    cVertex.assemblyPath = make_shared<AssemblyPath>(assembler, edgeIds, infos, threadCount1);
 }
+
