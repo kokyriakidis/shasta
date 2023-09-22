@@ -1295,6 +1295,12 @@ void PathFiller3::findAssemblyPath()
         edge_descriptor eNext;
         uint64_t bestCoverage = 0;
         BGL_FORALL_OUTEDGES(v, e, graph, PathFiller3) {
+            // Ignore a self-edge A->A.
+            // This can exist because we did not allow vertex A (and B)
+            // to be removed when removing strong components.
+            if(v == vA and target(e, graph) == vA) {
+                continue;
+            }
             const uint64_t coverage = graph[e].coverage();
             if(coverage > bestCoverage) {
                 eNext = e;
