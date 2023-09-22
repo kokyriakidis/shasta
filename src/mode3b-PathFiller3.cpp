@@ -99,10 +99,11 @@ PathFiller3::PathFiller3(
 
         // Remove strongly connected components, then regenerate
         // edges from scratch with the remaining vertices.
-        removeStrongComponents();
-        removeAllEdges();
-        createEdges();
-        writeGraph("Assembly graph after removal of strong connected components");
+        if(removeStrongComponents() > 0) {
+            removeAllEdges();
+            createEdges();
+            writeGraph("Assembly graph after removal of strong connected components");
+        }
 
         // Assemble.
         findAssemblyPath();
@@ -1169,7 +1170,7 @@ void PathFiller3::writeGraph() const
 
 
 
-void PathFiller3::removeStrongComponents()
+uint64_t PathFiller3::removeStrongComponents()
 {
     PathFiller3& graph = *this;
     uint64_t removedCount = 0;
@@ -1243,6 +1244,8 @@ void PathFiller3::removeStrongComponents()
             " vertices.";
 
     }
+
+    return removedCount;
 }
 
 

@@ -280,7 +280,9 @@ private:
     void createEdges();
     void removeAllEdges();
 
-    void removeStrongComponents();
+    // Remove strongly connected components.
+    // Returns the number of vertices removed.
+    uint64_t removeStrongComponents();
 
     // Remove vertices that are not accessible from vertexIdA
     // or from which vertexIdB is not accessible.
