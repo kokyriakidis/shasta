@@ -1331,8 +1331,53 @@ void PathFiller3::assembleAssemblyPathEdges(
     uint64_t maxMsaLength,
     LongMsaPolicy longMsaPolicy)
 {
+    const PathFiller3& graph = *this;
+
     for(const edge_descriptor e: assemblyPath) {
         assembleEdge(maxMsaLength, longMsaPolicy, e);
+    }
+
+
+
+    // Write a table containing a summary of edge sequences with coverage,
+    // and their position in assembled sequence.
+    if(html and options.showAssemblyDetails) {
+        html <<
+            "<br><table>"
+            "<tr>"
+            "<th>Source"
+            "<th>Target"
+            "<th>Begin"
+            "<th>End"
+            "<th>length"
+            "<th>Sequence"
+            ;
+
+        uint64_t position = 0;
+        for(const edge_descriptor e: assemblyPath) {
+            const PathFiller3Edge& edge = graph[e];
+            const vector<Base>& sequence = edge.consensusSequence;
+            const vector<uint64_t>& coverage = edge.consensusCoverage;
+            SHASTA_ASSERT(sequence.size() == coverage.size());
+
+            html <<
+                "<tr>"
+                "<td class=centered>" << graph[source(e, graph)].disjointSetId <<
+                "<td class=centered>" << graph[target(e, graph)].disjointSetId <<
+                "<td class=centered>" << position <<
+                "<td class=centered>" << position + sequence.size() <<
+                "<td class=centered>" << sequence.size() <<
+                "<td class=centered style='font-family:monospace'>";
+            copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(html));
+            html << "<br>";
+            for(const uint64_t c: coverage) {
+                writeCoverageCharacterToHtml(c);
+            }
+
+            position += sequence.size();
+        }
+
+        html << "</table>";
     }
 }
 
