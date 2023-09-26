@@ -706,8 +706,9 @@ void PathFiller3::alignAndDisjointSets(
                             const uint64_t position1 = info1.markerInfos[j1].position;
                             // cout << "***A " << position0 << " " << position1 << endl;
                             if(previousPosition0 != invalid<uint64_t>) {
-                                if( position0 > previousPosition0 + maxSkipBases or
-                                    position1 > previousPosition1 + maxSkipBases) {
+                                const int64_t offset = int64_t(position0) - int64_t(position1);
+                                const int64_t previousOffset = int64_t(previousPosition0) - int64_t(previousPosition1);
+                                if(abs(offset - previousOffset) > int64_t(maxSkipBases)) {
                                     hasLargeSkip = true;
                                     // cout << "Skip" << endl;
                                     break;
@@ -723,6 +724,11 @@ void PathFiller3::alignAndDisjointSets(
                 }
             }
             if(hasLargeSkip) {
+                if(html and options.showDebugInformation) {
+                    html << "<br>Alignment between " << info0.orientedReadId <<
+                        " and " << info1.orientedReadId <<
+                        " suppressed.";
+                }
                 continue;
             }
 
