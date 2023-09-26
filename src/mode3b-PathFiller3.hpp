@@ -243,11 +243,16 @@ private:
 
     // Compute alignments and use them to create the disjoint set data structure,
     // from which the marker graph will be created.
+    // maxDrift is the maximum tolerated length drift of each read.
+    // Used to compute the band for banded alignments.
     void alignAndDisjointSets(
         uint64_t matchScore,
         uint64_t mismatchScore,
         uint64_t gapScore,
-        uint64_t maxSkipBases
+        uint64_t maxSkipBases,
+        double maxDrift,
+        uint64_t minHalfBand,
+        double minScoreRatio
         );
 
     // This stores the markers in each disjoint set.

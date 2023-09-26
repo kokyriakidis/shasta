@@ -57,6 +57,11 @@ PathFiller3::PathFiller3(
     int64_t mismatchScore = -1;
     int64_t gapScore = -1;
     const uint64_t maxSkipBases = 500;
+    // maxDrift is the maximum tolerated length drift of each read.
+    // Used to compute the band for banded alignments.
+    const double maxDrift = 0.005;
+    const uint64_t minHalfBand = 100;   // In markers.
+    const double minScoreRatio = 0.7;
 
     const uint64_t maxMsaLength = 5000;
 
@@ -73,7 +78,6 @@ PathFiller3::PathFiller3(
 
     // Oriented reads.
     gatherOrientedReads();
-    writeOrientedReads();
 
     // Use the oriented reads that appear both on vertexIdA and vertexIdB
     // to estimate the base offset between vertexIdA and vertexIdB.
@@ -81,10 +85,14 @@ PathFiller3::PathFiller3(
 
     // Markers.
     gatherMarkers(estimatedOffsetRatio);
+    writeOrientedReads();
     writeOrientedReadsSequences();
 
     // Assembly graph.
-    alignAndDisjointSets(matchScore, mismatchScore, gapScore, maxSkipBases);
+    alignAndDisjointSets(
+        matchScore, mismatchScore, gapScore,
+        maxSkipBases,
+        maxDrift, minHalfBand, minScoreRatio);
     writeMarkers();
 
     // Iteration to reduce minVertexCoverage if a long MSA is encountered.
@@ -284,6 +292,10 @@ void PathFiller3::writeOrientedReads() const
         "<th>PositionA"
         "<th>PositionB"
         "<th>Position<br>offset"
+        "<th>First<br>ordinal"
+        "<th>Last<br>ordinal"
+        "<th>First<br>position"
+        "<th>Last<br>position"
         ;
 
     for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
@@ -327,6 +339,15 @@ void PathFiller3::writeOrientedReads() const
             SHASTA_ASSERT(baseOffset >= 0);
             html << baseOffset;
         }
+
+        SHASTA_ASSERT(not info.markerInfos.empty());
+        const MarkerInfo& firstMarkerInfo = info.markerInfos.front();
+        const MarkerInfo& lastMarkerInfo = info.markerInfos.back();
+        html <<
+            "<td class=centered>" << firstMarkerInfo.ordinal <<
+            "<td class=centered>" << lastMarkerInfo.ordinal <<
+            "<td class=centered>" << firstMarkerInfo.position <<
+            "<td class=centered>" << lastMarkerInfo.position;
      }
 
     html << "</table>";
@@ -547,11 +568,16 @@ void PathFiller3::writeMarkers()
 
 // Compute alignments and use them to create the disjoint set data structure,
 // from which the marker graph will be created.
+// maxDrift is the maximum tolerated length drift of each read.
+// Used to compute the band for banded alignments.
 void PathFiller3::alignAndDisjointSets(
     uint64_t matchScore,
     uint64_t mismatchScore,
     uint64_t gapScore,
-    uint64_t maxSkipBases
+    uint64_t maxSkipBases,
+    double maxDrift,
+    uint64_t minHalfBand,
+    double minScoreRatio
     )
 {
 
@@ -640,6 +666,9 @@ void PathFiller3::alignAndDisjointSets(
             appendValue(sequences, seqanSequence0);
             appendValue(sequences, seqanSequence1);
 
+
+#if 0
+            // Old code that used geneal alignment, not banded alignments.
             // Compute the alignment.
             using namespace seqan;
             TAlignGraph graph(sequences);
@@ -664,6 +693,81 @@ void PathFiller3::alignAndDisjointSets(
             } else {
                 SHASTA_ASSERT(0);
             }
+#endif
+
+
+            // Banded alignment, allowing for the specified maxDrift.
+            // This is necessary to prevent large cycles in the graph.
+            // It is also good for performance.
+            using namespace seqan;
+            TAlignGraph graph(sequences);
+            int score = 0;
+            if(constrainedA and constrainedB) {
+                const int64_t diagonalA = 0;
+                const int64_t diagonalB = int64_t(length0) - int64_t(length1);
+                const int64_t totalDrift = int64_t(maxDrift * 0.5 * double(min(length0, length1)));
+                const int64_t halfBand = totalDrift + int64_t(minHalfBand);
+                const int64_t minBand = min(diagonalA, diagonalB) - halfBand;
+                const int64_t maxBand = max(diagonalA, diagonalB) + halfBand;
+                score = globalAlignment(
+                    graph,
+                    Score<int, Simple>(int(matchScore), int(mismatchScore), int(gapScore)),
+                    AlignConfig<false, false, false, false>(),
+                    int(minBand), int(maxBand),
+                    LinearGaps());
+            } else  if(constrainedA and not constrainedB) {
+                const int64_t diagonalA = 0;
+                const int64_t totalDrift = int64_t(maxDrift * double(min(length0, length1)));
+                const int64_t halfBand = totalDrift + int64_t(minHalfBand);
+                const int64_t minBand = diagonalA - halfBand;
+                const int64_t maxBand = diagonalA + halfBand;
+                score = globalAlignment(
+                    graph,
+                    Score<int, Simple>(int(matchScore), int(mismatchScore), int(gapScore)),
+                    AlignConfig<false, false, true, true>(),
+                    int(minBand), int(maxBand),
+                    LinearGaps());
+            } else  if(constrainedB and not constrainedA) {
+                const int64_t diagonalB = int64_t(length0) - int64_t(length1);
+                const int64_t totalDrift = int64_t(maxDrift * double(min(length0, length1)));
+                const int64_t halfBand = totalDrift + int64_t(minHalfBand);
+                const int64_t minBand = diagonalB - halfBand;
+                const int64_t maxBand = diagonalB + halfBand;
+                score = globalAlignment(
+                    graph,
+                    Score<int, Simple>(int(matchScore), int(mismatchScore), int(gapScore)),
+                    AlignConfig<true, true, false, false>(),
+                    int(minBand), int(maxBand),
+                    LinearGaps());
+            } else {
+                SHASTA_ASSERT(0);
+            }
+
+            // If SeqAn was not able to compute the banded aignment, ignore it.
+            if(score == MinValue<int>::VALUE) {
+                if(html and options.showDebugInformation) {
+                    html << "<br>Alignment between " << info0.orientedReadId <<
+                        " and " << info1.orientedReadId <<
+                        " ignored.";
+                }
+                continue;
+            }
+
+            // Check that the score is sufficiently good.
+            const uint64_t bestPossibleScore = matchScore * min(length0, length1);
+            const double scoreRatio = double(score) / double(bestPossibleScore);
+            if(scoreRatio < minScoreRatio) {
+                if(html and options.showDebugInformation) {
+                    html << "<br>Alignment between " << info0.orientedReadId <<
+                        " and " << info1.orientedReadId << ": lengths " << length0 << " " << length1 <<
+                        ", score " << score << "/" << bestPossibleScore << " " <<
+                        double(score) / double(bestPossibleScore) <<
+                        " discarded due to low score.";
+                }
+                continue;
+            }
+
+
 
             // Extract the alignment from the graph.
             // This creates a single sequence consisting of the two rows
@@ -675,7 +779,8 @@ void PathFiller3::alignAndDisjointSets(
             const uint64_t alignmentLength = totalAlignmentLength / 2;
             const uint64_t seqanGapValue = 45;
 
-
+#if 0
+            // This is not needed when doing banded alignments.
             // If the alignment has large base skips, don't use it.
             bool hasLargeSkip = false;
             uint64_t j0 = 0;
@@ -731,12 +836,12 @@ void PathFiller3::alignAndDisjointSets(
                 }
                 continue;
             }
-
+#endif
 
 
             // Use the alignment to update the disjoint sets data structure.
-            j0 = 0;
-            j1 = 0;
+            uint64_t j0 = 0;
+            uint64_t j1 = 0;
             for(uint64_t positionInAlignment=0; positionInAlignment<alignmentLength; positionInAlignment++) {
                 const KmerId kmerId0 = align[positionInAlignment];
                 const KmerId kmerId1 = align[positionInAlignment + alignmentLength];
