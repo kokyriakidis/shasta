@@ -224,6 +224,7 @@ void GlobalPathGraph1::assemble1(
     cGraph.detangle();
 
     // Final output.
+    cGraph.writeGfa("Final");
     cGraph.writeGraphviz("Final");
     cGraph.writeVerticesCsv();
     cout << "The final CompressedPathGraph1 has " << num_vertices(cGraph) << " vertices and " <<
@@ -3301,12 +3302,16 @@ uint64_t CompressedPathGraph1::totalBaseOffset(vertex_descriptor cv) const
         bool edgeWasFound = false;
         tie(e, edgeWasFound) = edge(vA, vB, graph);
         if(edgeWasFound) {
-            totalBaseOffset += graph[e].info.offsetInBases;
+            if(graph[e].info.offsetInBases > 0) {
+                totalBaseOffset += graph[e].info.offsetInBases;
+            }
         } else {
             MarkerGraphEdgePairInfo info;
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
                 graph[vA].edgeId, graph[vB].edgeId, info));
-            totalBaseOffset += info.offsetInBases;
+            if(info.offsetInBases > 0) {
+                totalBaseOffset += info.offsetInBases;
+            }
         }
     }
     return totalBaseOffset;
@@ -3513,3 +3518,93 @@ void CompressedPathGraph1::assembleVertex(
     cVertex.assemblyPath = make_shared<AssemblyPath>(assembler, edgeIds, infos, threadCount1);
 }
 
+
+
+void CompressedPathGraph1::writeGfa(const string& fileNamePrefix) const
+{
+    const CompressedPathGraph1& cGraph = *this;
+
+    const string name = "CompressedPathGraph" + to_string(componentId);
+    ofstream gfa(name + "-" + fileNamePrefix + ".gfa");
+
+    // Write the header line.
+    gfa << "H\tVN:Z:1.0\n";
+
+    // Write a segment for each vertex.
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
+        const CompressedPathGraph1Vertex& cVertex = cGraph[cv];
+        const string id = to_string(componentId) + "-" + to_string(cVertex.id);
+
+        // Record type.
+        gfa << "S\t";
+
+        // Name.
+        gfa << id << "\t";
+
+        // Sequence.
+        gfa << "*\t";
+
+        // Sequence length in bases.
+        gfa << "LN:i:" << totalBaseOffset(cv) << "\n";
+
+    }
+
+
+
+    // Write a segment for each edge.
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
+        const CompressedPathGraph1Edge& cEdge = cGraph[ce];
+        const vertex_descriptor cv0 = source(ce, cGraph);
+        const vertex_descriptor cv1 = target(ce, cGraph);
+
+        const CompressedPathGraph1Vertex& cVertex0 = cGraph[cv0];
+        const CompressedPathGraph1Vertex& cVertex1 = cGraph[cv1];
+
+        const string id0 = to_string(componentId) + "-" + to_string(cVertex0.id);
+        const string id1 = to_string(componentId) + "-" + to_string(cVertex1.id);
+        const string id01 = id0 + "." + id1;
+
+        // Record type.
+        gfa << "S\t";
+
+        // Name.
+        gfa << id01 << "\t";
+
+        // Sequence.
+        gfa << "*\t";
+
+        // Sequence length in bases.
+        const int64_t length = max(cEdge.info.offsetInBases, int64_t(0));
+        gfa << "LN:i:" << length << "\n";
+
+    }
+
+
+
+    // Write link records.
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
+        const vertex_descriptor cv0 = source(ce, cGraph);
+        const vertex_descriptor cv1 = target(ce, cGraph);
+
+        const CompressedPathGraph1Vertex& cVertex0 = cGraph[cv0];
+        const CompressedPathGraph1Vertex& cVertex1 = cGraph[cv1];
+
+        const string id0 = to_string(componentId) + "-" + to_string(cVertex0.id);
+        const string id1 = to_string(componentId) + "-" + to_string(cVertex1.id);
+        const string id01 = id0 + "." + id1;
+
+        gfa <<
+            "L\t" << id0 <<
+            "\t+\t" <<
+            id01 <<
+            "\t+\t*\n";
+
+        gfa <<
+            "L\t" << id01 <<
+            "\t+\t" <<
+            id1 <<
+            "\t+\t*\n";
+
+    }
+
+}
