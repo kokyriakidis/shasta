@@ -171,12 +171,6 @@ void GlobalPathGraph1::assemble1(
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
     const uint64_t transitiveReductionDistance = 20;
-    const uint64_t compressedTransitiveReductionDistance = 100;
-    const uint64_t minReliableLength = 1000;
-    const uint64_t crossEdgeCoverageThreshold1 = 1;
-    const uint64_t crossEdgeCoverageThreshold2 = 2;
-    const uint64_t detangleTolerance = 0;
-
 
     GlobalPathGraph1 graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
@@ -189,11 +183,7 @@ void GlobalPathGraph1::assemble1(
     for(uint64_t componentId=0; componentId<graph.components.size(); componentId++) {
         assemble1(graph, threadCount0, threadCount1,
             componentId,
-            transitiveReductionDistance,
-            compressedTransitiveReductionDistance,
-            minReliableLength,
-            crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2,
-            detangleTolerance);
+            transitiveReductionDistance);
     }
 }
 
@@ -204,12 +194,7 @@ void GlobalPathGraph1::assemble1(
     uint64_t threadCount0,
     uint64_t threadCount1,
     uint64_t componentId,
-    uint64_t transitiveReductionDistance,
-    uint64_t compressedTransitiveReductionDistance,
-    uint64_t minReliableLength,
-    uint64_t crossEdgeCoverageThreshold1,
-    uint64_t crossEdgeCoverageThreshold2,
-    uint64_t detangleTolerance)
+    uint64_t transitiveReductionDistance)
 {
     cout << "Assembly begins for connected component " << componentId << endl;
     PathGraph1& component = *globalGraph.components[componentId];
@@ -233,55 +218,20 @@ void GlobalPathGraph1::assemble1(
     // transitive reduction non-branch vertices becomes a single vertex.
     // Non-branch vertices are those with in-degree and out-degree not greater than 1.
     CompressedPathGraph1 cGraph(component, componentId, globalGraph.assembler);
-    // cGraph.writeGraphviz(minReliableLength, "Initial");
+    cGraph.writeGraphviz("Initial");
 
-    // Strict detangling, with zero detangle tolerance.
-    cGraph.detangleIteration(
-        compressedTransitiveReductionDistance,
-        minReliableLength,
-        0);
-
-    // Remove cross-edges, then detangle again, this time with a looser detangle tolerance.
-    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
-    cGraph.detangleIteration(
-        compressedTransitiveReductionDistance,
-        minReliableLength,
-        detangleTolerance);
-
-    // EXPERIMENT
-    cGraph.detangleSuperbubbles(2000);
-    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
-    cGraph.detangleIteration(
-        compressedTransitiveReductionDistance,
-        minReliableLength,
-        detangleTolerance);
-    cGraph.detangleSuperbubbles(5000);
-    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
-    cGraph.detangleIteration(
-        compressedTransitiveReductionDistance,
-        minReliableLength,
-        detangleTolerance);
-    cGraph.detangleSuperbubbles(10000);
-    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
-    cGraph.detangleIteration(
-        compressedTransitiveReductionDistance,
-        minReliableLength,
-        detangleTolerance);
-    cGraph.detangleSuperbubbles(20000);
-    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
-    cGraph.detangleIteration(
-        compressedTransitiveReductionDistance,
-        minReliableLength,
-        detangleTolerance);
-    cGraph.removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    // Detangle the compressed graph.
+    cGraph.detangle();
 
     // Final output.
-    cGraph.writeGraphviz(1000000, "");
+    cGraph.writeGraphviz("Final");
     cGraph.writeVerticesCsv();
-    cout << "The CompressedPathGraph1 has " << num_vertices(cGraph) << " vertices and " <<
+    cout << "The final CompressedPathGraph1 has " << num_vertices(cGraph) << " vertices and " <<
         num_edges(cGraph) << " edges." << endl;
-    cout << "Assembling sequence." << endl;
-    cGraph.assembleVertices(threadCount0, threadCount1);
+
+    // Use the final CompressedPathGraph1 to assemble sequence.
+    // cout << "Assembling sequence." << endl;
+    // cGraph.assembleVertices(threadCount0, threadCount1); ******** SKIPPING SEQUENCE ASSEMBLY
 
 }
 
@@ -314,27 +264,28 @@ void CompressedPathGraph1::writeVerticesCsv() const
 
 
 // This calls the lower level function twice, with and without labels.
-void CompressedPathGraph1::writeGraphviz(
-    uint64_t minGreenLength,
-    const string& fileNamePrefix) const
+void CompressedPathGraph1::writeGraphviz(const string& fileNamePrefix) const
 {
+    cout << fileNamePrefix << ": " <<
+        num_vertices(*this) << " vertices, " <<
+        num_edges(*this) << " edges." << endl;
+
     bool labels = true;
-    writeGraphviz(labels, minGreenLength, fileNamePrefix);
+    writeGraphviz(labels, fileNamePrefix);
     labels = false;
-    writeGraphviz(labels, minGreenLength, fileNamePrefix);
+    writeGraphviz(labels, fileNamePrefix);
 }
 
 
 
 void CompressedPathGraph1::writeGraphviz(
     bool labels,
-    uint64_t minGreenLength,
     const string& fileNamePrefix) const
 {
     const CompressedPathGraph1& cGraph = *this;
 
     const string name = "CompressedPathGraph" + to_string(componentId);
-    ofstream out(name + fileNamePrefix + (labels ? ".dot" : "-NoLabels.dot"));
+    ofstream out(name + "-" + fileNamePrefix + (labels ? ".dot" : "-NoLabels.dot"));
     out << "digraph " << name << "{\n";
 
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
@@ -345,11 +296,6 @@ void CompressedPathGraph1::writeGraphviz(
             const PathGraph1::vertex_descriptor v0 = cGraph[cv].v.front();
             const PathGraph1::vertex_descriptor v1 = cGraph[cv].v.back();
             const uint64_t baseOffset = totalBaseOffset(cv);
-
-            if(baseOffset >= minGreenLength) {
-                out <<
-                    "style=filled color=LightGreen ";
-            }
 
             if(labels) {
                 out <<
@@ -3369,25 +3315,111 @@ uint64_t CompressedPathGraph1::totalBaseOffset(vertex_descriptor cv) const
 
 
 
+void CompressedPathGraph1::detangle()
+{
+#if 0
+    uint64_t compressedTransitiveReductionDistance = 100;
+    uint64_t detangleTolerance = 0;
+    uint64_t superbubbleThreshold = 0;
+    detangleIteration("A",
+        compressedTransitiveReductionDistance,
+        detangleTolerance,
+        superbubbleThreshold);
+
+    detangleTolerance = 1;
+    detangleIteration("B",
+        compressedTransitiveReductionDistance,
+        detangleTolerance,
+        superbubbleThreshold);
+    removeCrossEdges(1, 6);
+
+    detangleTolerance = 2;
+    detangleIteration("C",
+        compressedTransitiveReductionDistance,
+        detangleTolerance,
+        superbubbleThreshold);
+    removeCrossEdges(2, 6);
+#endif
+
+#if 1
+
+    // This is the original detangle code that works well for HG002-UL-R10-Dec2022-test1
+    const uint64_t compressedTransitiveReductionDistance = 100;
+    const uint64_t minReliableLength = 1000;
+    const uint64_t crossEdgeCoverageThreshold1 = 1;
+    const uint64_t crossEdgeCoverageThreshold2 = 2;
+    const uint64_t detangleTolerance = 0;
+
+    // Strict detangling, with zero detangle tolerance.
+    detangleIteration(
+        "A",
+        compressedTransitiveReductionDistance,
+        detangleTolerance,
+        minReliableLength);
+
+    // Remove cross-edges, then detangle again, this time with a looser detangle tolerance.
+    removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    detangleIteration(
+        "B",
+        compressedTransitiveReductionDistance,
+        detangleTolerance,
+        minReliableLength);
+
+    // EXPERIMENT
+    detangleSuperbubbles(2000);
+    removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    detangleIteration(
+        "C",
+        compressedTransitiveReductionDistance,
+        detangleTolerance,
+        minReliableLength);
+    detangleSuperbubbles(5000);
+    removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    detangleIteration(
+        "D",
+        compressedTransitiveReductionDistance,
+        detangleTolerance,
+        minReliableLength);
+    detangleSuperbubbles(10000);
+    removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    detangleIteration(
+        "E",
+        compressedTransitiveReductionDistance,
+        detangleTolerance,
+        minReliableLength);
+    detangleSuperbubbles(20000);
+    removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+    detangleIteration(
+        "F",
+        compressedTransitiveReductionDistance,
+        detangleTolerance,
+        minReliableLength);
+    removeCrossEdges(crossEdgeCoverageThreshold1, crossEdgeCoverageThreshold2);
+#endif
+}
+
+
+
 void CompressedPathGraph1::detangleIteration(
+    const string& name,     // For graphviz output
     uint64_t compressedTransitiveReductionDistance,
-    uint64_t minReliableLength,
-    uint64_t detangleTolerance)
+    uint64_t detangleTolerance,
+    uint64_t superbubbleThreshold)
 {
 
     for(uint64_t iteration=0; ; ++iteration) {
 
         // Try everything.
         const bool transitiveReductionChanges = localTransitiveReduction(compressedTransitiveReductionDistance);
-        // writeGraphviz(minReliableLength, "A" + to_string(iteration));
+        writeGraphviz(name + "-" + to_string(iteration) + "-0");
         const bool detangleVerticesChanges = detangleVertices(detangleTolerance);
-        // writeGraphviz(minReliableLength, "B" + to_string(iteration));
+        writeGraphviz(name + "-" + to_string(iteration) + "-1");
         const bool detangleLinearChainsChanges = detangleLinearChains(detangleTolerance);
-        // writeGraphviz(minReliableLength, "C" + to_string(iteration));
+        writeGraphviz(name + "-" + to_string(iteration) + "-2");
         const bool mergeLinearChainsChanges = mergeLinearChains();
-        // writeGraphviz(minReliableLength, "D" + to_string(iteration));
-        const bool detangleSuperBubblesChanges = detangleSuperbubbles(minReliableLength);
-        // writeGraphviz(minReliableLength, "E" + to_string(iteration));
+        writeGraphviz(name + "-" + to_string(iteration) + "-3");
+        const bool detangleSuperBubblesChanges = detangleSuperbubbles(superbubbleThreshold);
+        writeGraphviz(name + "-" + to_string(iteration) + "-4");
 
         // If nothing changed, stop the iteration.
         if(not (

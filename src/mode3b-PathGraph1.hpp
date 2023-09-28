@@ -421,12 +421,7 @@ private:
         uint64_t threadCount0,
         uint64_t threadCount1,
         uint64_t componentId,
-        uint64_t transitiveReductionDistance,
-        uint64_t compressedTransitiveReductionDistance,
-        uint64_t minReliableLength,
-        uint64_t crossEdgeCoverageThreshold1,
-        uint64_t crossEdgeCoverageThreshold2,
-        uint64_t detangleTolerance);
+        uint64_t transitiveReductionDistance);
 
 };
 
@@ -472,10 +467,12 @@ public:
     bool detangleVertex(vertex_descriptor, uint64_t detangleTolerance);
     bool detangleSuperbubbles(uint64_t minReliableLength);
     void detangleIteration(
+        const string& name,     // For graphviz output
         uint64_t compressedTransitiveReductionDistance,
-        uint64_t minReliableLength,
-        uint64_t detangleTolerance);
+        uint64_t detangleTolerance,
+        uint64_t superbubbleThreshold);
     bool removeCrossEdges(uint64_t threshold1, uint64_t threshold2);
+    void detangle();
 
     // The id of the next vertex to be created.
     uint64_t nextVertexId = 0;
@@ -504,10 +501,8 @@ public:
     // Graphviz output.
     void writeGraphviz(
         bool labels,
-        uint64_t minGreenLength,
         const string& fileNamePrefix) const;
     void writeGraphviz(
-        uint64_t minGreenLength,
         const string& fileNamePrefix) const;
 
     void writeVerticesCsv() const;
