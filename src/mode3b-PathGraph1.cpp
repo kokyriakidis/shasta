@@ -218,7 +218,7 @@ void GlobalPathGraph1::assemble1(
     // transitive reduction non-branch vertices becomes a single vertex.
     // Non-branch vertices are those with in-degree and out-degree not greater than 1.
     CompressedPathGraph1 cGraph(component, componentId, globalGraph.assembler);
-    cGraph.writeGraphviz("Initial");
+    cGraph.writeGfa("Initial");
 
     // Detangle the compressed graph.
     cGraph.detangle();
@@ -3322,7 +3322,7 @@ uint64_t CompressedPathGraph1::totalBaseOffset(vertex_descriptor cv) const
 
 void CompressedPathGraph1::detangle()
 {
-#if 0
+#if 1
     uint64_t compressedTransitiveReductionDistance = 100;
     uint64_t detangleTolerance = 0;
     uint64_t superbubbleThreshold = 0;
@@ -3330,6 +3330,7 @@ void CompressedPathGraph1::detangle()
         compressedTransitiveReductionDistance,
         detangleTolerance,
         superbubbleThreshold);
+    removeCrossEdges(1, 6);
 
     detangleTolerance = 1;
     detangleIteration("B",
@@ -3344,9 +3345,16 @@ void CompressedPathGraph1::detangle()
         detangleTolerance,
         superbubbleThreshold);
     removeCrossEdges(2, 6);
+
+    detangleIteration("D",
+        compressedTransitiveReductionDistance,
+        detangleTolerance,
+        superbubbleThreshold);
+
+    detangleKnots();
 #endif
 
-#if 1
+#if 0
 
     // This is the original detangle code that works well for HG002-UL-R10-Dec2022-test1
     const uint64_t compressedTransitiveReductionDistance = 100;
@@ -3416,15 +3424,15 @@ void CompressedPathGraph1::detangleIteration(
 
         // Try everything.
         const bool transitiveReductionChanges = localTransitiveReduction(compressedTransitiveReductionDistance);
-        writeGraphviz(name + "-" + to_string(iteration) + "-0");
+        writeGfa(name + "-" + to_string(iteration) + "-0");
         const bool detangleVerticesChanges = detangleVertices(detangleTolerance);
-        writeGraphviz(name + "-" + to_string(iteration) + "-1");
+        writeGfa(name + "-" + to_string(iteration) + "-1");
         const bool detangleLinearChainsChanges = detangleLinearChains(detangleTolerance);
-        writeGraphviz(name + "-" + to_string(iteration) + "-2");
+        writeGfa(name + "-" + to_string(iteration) + "-2");
         const bool mergeLinearChainsChanges = mergeLinearChains();
-        writeGraphviz(name + "-" + to_string(iteration) + "-3");
+        writeGfa(name + "-" + to_string(iteration) + "-3");
         const bool detangleSuperBubblesChanges = detangleSuperbubbles(superbubbleThreshold);
-        writeGraphviz(name + "-" + to_string(iteration) + "-4");
+        writeGfa(name + "-" + to_string(iteration) + "-4");
 
         // If nothing changed, stop the iteration.
         if(not (
@@ -3524,6 +3532,10 @@ void CompressedPathGraph1::writeGfa(const string& fileNamePrefix) const
 {
     const CompressedPathGraph1& cGraph = *this;
 
+    cout << fileNamePrefix << ": " <<
+        num_vertices(cGraph) << " vertices, " <<
+        num_edges(cGraph) << " edges." << endl;
+
     const string name = "CompressedPathGraph" + to_string(componentId);
     ofstream gfa(name + "-" + fileNamePrefix + ".gfa");
 
@@ -3607,4 +3619,157 @@ void CompressedPathGraph1::writeGfa(const string& fileNamePrefix) const
 
     }
 
+}
+
+
+
+bool CompressedPathGraph1::detangleKnots()
+{
+    vector<Knot> knots;
+    findKnots(knots);
+    return true;
+}
+
+
+
+void CompressedPathGraph1::findKnots(vector<Knot>& knots) const
+{
+    const CompressedPathGraph1& cGraph = *this;
+    const bool debug = true;
+    knots.clear();
+
+    BGL_FORALL_VERTICES(cv0, cGraph, CompressedPathGraph1) {
+
+        // If the in-degree is too small, skip this cv0.
+        const uint64_t m = in_degree(cv0, cGraph);
+        if(m < 2) {
+            continue;
+        }
+
+        if(false) {
+            cout << "Looking for knots starting at " << vertexIdString(cv0) << endl;
+        }
+
+        // Initialize a possible Knot starting at cv0.
+        Knot knot;
+        knot.cv0 = cv0;
+        BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph1) {
+            knot.sourceVertices.push_back(source(ce, cGraph));
+        }
+        knot.tangleMatrix.resize(m, vector<uint64_t>(m));
+
+        // To see if cv0 is the start of a Knot, we do a BFS starting at cv0.
+        // A possible cv1 is encountered if:
+        // - The queue is empty.
+        // - The in-degree of cv1 is m.
+        // - The tangle matrix between cv0 and cv1 is approximately diagonal.
+        // THIS ALGORITHM ONLY FINDS A SUBSET OF THE KNOTS.
+        // CHECKING FOR AN EMPTY QUEUE IS TOO STRINGENT.
+        // THIS MIGHT BE SUFFICIENT FOR DENTAGLING, BUT IF NOT
+        // USE AN ALGORITHM BASED ON LOCAL DOMINATOR TREES.
+
+        std::queue<vertex_descriptor> q;
+        q.push(cv0);
+        std::set<vertex_descriptor> verticesEncountered;
+        verticesEncountered.insert(cv0);
+        while(not q.empty()) {
+            const vertex_descriptor cv1 = q.front();
+            q.pop();
+
+            // See if cv1 is a valid cv1 for a Knot starting at cv0.
+            if(q.empty() and out_degree(cv1, cGraph) == m) {
+                knot.cv1 = cv1;
+                BGL_FORALL_OUTEDGES(cv1, ce, cGraph, CompressedPathGraph1) {
+                    knot.targetVertices.push_back(target(ce, cGraph));
+                }
+
+                // Compute the tangle matrix.
+                for(uint64_t i=0; i<m; i++) {
+                    const vertex_descriptor cvA = knot.sourceVertices[i];
+                    const auto& cVertexA = cGraph[cvA];
+                    const PathGraph1::vertex_descriptor vA = cVertexA.v.back();
+                    const MarkerGraphEdgeId edgeIdA = graph[vA].edgeId;
+                    for(uint64_t j=0; j<m; j++) {
+                        const vertex_descriptor cvB = knot.targetVertices[j];
+                        const auto& cVertexB = cGraph[cvB];
+                        const PathGraph1::vertex_descriptor vB = cVertexB.v.front();
+                        const MarkerGraphEdgeId edgeIdB = graph[vB].edgeId;
+                        MarkerGraphEdgePairInfo info;
+                        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeIdA, edgeIdB, info));
+                        knot.tangleMatrix[i][j] = info.common;
+                    }
+                }
+
+
+                // Count the number of non-zero tangle matrix elements in each row and column.
+                // If all of these are 1, we can detangle.
+                bool canDetangle = true;
+                for(uint64_t i=0; i<m; i++) {
+                    uint64_t nonZeroCount = 0;
+                    for(uint64_t j=0; j<m; j++) {
+                        if(knot.tangleMatrix[i][j] != 0) {
+                            ++nonZeroCount;
+                        }
+                    }
+                    if(nonZeroCount != 1) {
+                        canDetangle = false;
+                    }
+                }
+                if(canDetangle) {
+                    for(uint64_t j=0; j<m; j++) {
+                        uint64_t nonZeroCount = 0;
+                        for(uint64_t i=0; i<m; i++) {
+                            if(knot.tangleMatrix[i][j] != 0) {
+                                ++nonZeroCount;
+                            }
+                        }
+                        if(nonZeroCount != 1) {
+                            canDetangle = false;
+                        }
+                    }
+                }
+
+                if(canDetangle) {
+                    if(debug) {
+                        cout << "Knot at " <<
+                            vertexIdString(knot.cv0) << " " << vertexIdString(knot.cv1) << endl;
+                        for(uint64_t i=0; i<m; i++) {
+                            for(uint64_t j=0; j<m; j++) {
+                                cout << knot.tangleMatrix[i][j] << " ";
+                            }
+                            cout << endl;
+                        }
+                    }
+                }
+
+                knot.targetVertices.clear();
+
+                // If the tangle matrix is all zero, stop the BFS.
+                bool foundNonZero = false;
+                for(const auto& v: knot.tangleMatrix) {
+                    for(const uint64_t t: v) {
+                        if(t > 0) {
+                            foundNonZero = true;
+                            break;
+                        }
+                    }
+                    if(foundNonZero) {
+                        break;
+                    }
+                }
+                if(not foundNonZero) {
+                    break;
+                }
+            }
+
+            // Enqueue the children of cv1 we did to already encounter.
+            BGL_FORALL_OUTEDGES(cv1, e, cGraph, CompressedPathGraph1) {
+                const vertex_descriptor cv2 = target(e, cGraph);
+                if(not verticesEncountered.contains(cv2)) {
+                    verticesEncountered.insert(cv2);
+                    q.push(cv2);
+                }
+            }
+        }
+    }
 }

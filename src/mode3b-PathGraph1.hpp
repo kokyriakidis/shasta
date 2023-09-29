@@ -466,6 +466,7 @@ public:
     bool detangleLinearChains(uint64_t detangleTolerance);
     bool detangleVertex(vertex_descriptor, uint64_t detangleTolerance);
     bool detangleSuperbubbles(uint64_t minReliableLength);
+    bool detangleKnots();
     void detangleIteration(
         const string& name,     // For graphviz output
         uint64_t compressedTransitiveReductionDistance,
@@ -473,6 +474,47 @@ public:
         uint64_t superbubbleThreshold);
     bool removeCrossEdges(uint64_t threshold1, uint64_t threshold2);
     void detangle();
+
+
+
+    // A Knot of degree m>1 is a special kind of tangle in the CompressedPathGraph1,
+    // loosely defined as the portion of the graph "between" a pair of vertices v0 and v1.
+    // More precisely it is defined as follows:
+    // - v0 has in-degree m and v1 has out-degree m (usually m=2).
+    // - The m parents of v0 are called the sources of the Knot.
+    // - The m children  v1 are called the targets of the Knot.
+    // - All forward paths starting at v0 reach v1 before reaching any vertices outside the Knot.
+    // - All backward paths ending at v1 reach v1 before reaching any vertices outside the Knot.
+    // - The Knot internal vertices are the vertices forward accessible from v0
+    //   and backward accessible from v1.
+    // - There is a 1-1 mapping between the source vertices and the target vertices
+    //   such that most/all reads "move" along that mapping.
+    // These conditions imply that there are no edges to/from Knot vertices
+    // to/from vertices outside the Knot.
+    class Knot {
+    public:
+        vertex_descriptor cv0;
+        vertex_descriptor cv1;
+        vector<vertex_descriptor> sourceVertices;   // The parents of cv0
+        vector<vertex_descriptor> targetVertices;
+        vector<vertex_descriptor> internalVertices;
+
+        uint64_t degree() const
+        {
+            const uint64_t m = sourceVertices.size();
+            SHASTA_ASSERT(targetVertices.size() == m);
+            return m;
+        }
+
+        // The tangle matrix stores the number of common oriented reads
+        // between each pair of source/target vertices.
+        // Indexed by [i][j] where i is an index into soruceVertices
+        // and j is an index into targetVertices.
+        vector< vector<uint64_t> > tangleMatrix;
+    };
+    void findKnots(vector<Knot>&) const;
+
+
 
     // The id of the next vertex to be created.
     uint64_t nextVertexId = 0;
