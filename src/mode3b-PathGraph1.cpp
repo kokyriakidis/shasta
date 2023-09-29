@@ -3631,7 +3631,8 @@ bool CompressedPathGraph1::detangleKnots()
 }
 
 
-
+// NOTE THIS DOES NOT FIND ALL POSSIBLE KNOTS.
+// SEE BELOW FOR MORE INFORMATION.
 void CompressedPathGraph1::findKnots(vector<Knot>& knots) const
 {
     const CompressedPathGraph1& cGraph = *this;
