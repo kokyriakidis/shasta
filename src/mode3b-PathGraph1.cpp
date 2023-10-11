@@ -3424,15 +3424,15 @@ void CompressedPathGraph1::detangleIteration(
 
         // Try everything.
         const bool transitiveReductionChanges = localTransitiveReduction(compressedTransitiveReductionDistance);
-        writeGfa(name + "-" + to_string(iteration) + "-0");
+        writeGfaAndGraphviz(name + "-" + to_string(iteration) + "-0");
         const bool detangleVerticesChanges = detangleVertices(detangleTolerance);
-        writeGfa(name + "-" + to_string(iteration) + "-1");
+        writeGfaAndGraphviz(name + "-" + to_string(iteration) + "-1");
         const bool detangleLinearChainsChanges = detangleLinearChains(detangleTolerance);
-        writeGfa(name + "-" + to_string(iteration) + "-2");
+        writeGfaAndGraphviz(name + "-" + to_string(iteration) + "-2");
         const bool mergeLinearChainsChanges = mergeLinearChains();
-        writeGfa(name + "-" + to_string(iteration) + "-3");
+        writeGfaAndGraphviz(name + "-" + to_string(iteration) + "-3");
         const bool detangleSuperBubblesChanges = detangleSuperbubbles(superbubbleThreshold);
-        writeGfa(name + "-" + to_string(iteration) + "-4");
+        writeGfaAndGraphviz(name + "-" + to_string(iteration) + "-4");
 
         // If nothing changed, stop the iteration.
         if(not (
@@ -3544,14 +3544,12 @@ void CompressedPathGraph1::writeGfa(const string& fileNamePrefix) const
 
     // Write a segment for each vertex.
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
-        const CompressedPathGraph1Vertex& cVertex = cGraph[cv];
-        const string id = to_string(componentId) + "-" + to_string(cVertex.id);
 
         // Record type.
         gfa << "S\t";
 
         // Name.
-        gfa << id << "\t";
+        gfa << vertexIdString(cv) << "\t";
 
         // Sequence.
         gfa << "*\t";
@@ -3563,62 +3561,25 @@ void CompressedPathGraph1::writeGfa(const string& fileNamePrefix) const
 
 
 
-    // Write a segment for each edge.
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
-        const CompressedPathGraph1Edge& cEdge = cGraph[ce];
-        const vertex_descriptor cv0 = source(ce, cGraph);
-        const vertex_descriptor cv1 = target(ce, cGraph);
-
-        const CompressedPathGraph1Vertex& cVertex0 = cGraph[cv0];
-        const CompressedPathGraph1Vertex& cVertex1 = cGraph[cv1];
-
-        const string id0 = to_string(componentId) + "-" + to_string(cVertex0.id);
-        const string id1 = to_string(componentId) + "-" + to_string(cVertex1.id);
-        const string id01 = id0 + "." + id1;
-
-        // Record type.
-        gfa << "S\t";
-
-        // Name.
-        gfa << id01 << "\t";
-
-        // Sequence.
-        gfa << "*\t";
-
-        // Sequence length in bases.
-        const int64_t length = max(cEdge.info.offsetInBases, int64_t(0));
-        gfa << "LN:i:" << length << "\n";
-
-    }
-
-
-
-    // Write link records.
+    // Write a link for each edge.
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
         const vertex_descriptor cv0 = source(ce, cGraph);
         const vertex_descriptor cv1 = target(ce, cGraph);
 
-        const CompressedPathGraph1Vertex& cVertex0 = cGraph[cv0];
-        const CompressedPathGraph1Vertex& cVertex1 = cGraph[cv1];
-
-        const string id0 = to_string(componentId) + "-" + to_string(cVertex0.id);
-        const string id1 = to_string(componentId) + "-" + to_string(cVertex1.id);
-        const string id01 = id0 + "." + id1;
-
         gfa <<
-            "L\t" << id0 <<
-            "\t+\t" <<
-            id01 <<
-            "\t+\t*\n";
-
-        gfa <<
-            "L\t" << id01 <<
-            "\t+\t" <<
-            id1 <<
-            "\t+\t*\n";
+            "L\t" <<
+            vertexIdString(cv0) << "\t+\t" <<
+            vertexIdString(cv1) << "\t+\t*\n";
 
     }
+}
 
+
+
+void CompressedPathGraph1::writeGfaAndGraphviz(const string& fileNamePrefix) const
+{
+    writeGfa(fileNamePrefix);
+    writeGraphviz(fileNamePrefix);
 }
 
 

@@ -540,7 +540,7 @@ public:
         uint64_t threadCount1);
 
 
-    // Ooutput.
+    // Output.
     void writeGraphviz(
         bool labels,
         const string& fileNamePrefix) const;
@@ -549,6 +549,7 @@ public:
 
     void writeVerticesCsv() const;
     void writeGfa(const string& fileNamePrefix) const;
+    void writeGfaAndGraphviz(const string& fileNamePrefix) const;
 
 };
 
