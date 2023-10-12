@@ -75,10 +75,11 @@ namespace shasta {
 
         // A better compressed representation of a PathGraph1.
         // Each linear sequence of edges, without branches, of the PathGraph1
+        // after transitive reduction
         // is compressed to a single edge in the CompressedPathGraph1A.
         // Therefore:
         // - Each edge of the CompressedPathGraph1A corresponds to a linear sequence of edges,
-        //   without branches, of the PathGraph1.
+        //   without branches, of the PathGraph1  after transitive reduction.
         // - Each vertex of the CompressedPathGraph1A corresponds to a vertex of the PathGraph1.
         // - But not all vertices of the PathGraph1 have a corresponding vertex in the CompressedPathGraph1A.
         class CompressedPathGraph1A;
@@ -579,16 +580,23 @@ public:
 
 // A better compressed representation of a PathGraph1.
 // Each linear sequence of edges, without branches, of the PathGraph1
+// after transitive reduction
 // is compressed to a single edge in the CompressedPathGraph1A.
 // Therefore:
 // - Each edge of the CompressedPathGraph1A corresponds to a linear sequence of edges,
-//   without branches, of the PathGraph1.
+//   without branches, of the PathGraph1 after transitive reduction.
 // - Each vertex of the CompressedPathGraph1A corresponds to a vertex of the PathGraph1.
 // - But not all vertices of the PathGraph1 have a corresponding vertex in the CompressedPathGraph1A.
+
+
+
 class shasta::mode3b::CompressedPathGraph1AVertex {
 public:
     PathGraph1::vertex_descriptor v;
 };
+
+
+
 class shasta::mode3b::CompressedPathGraph1AEdge {
 public:
     vector<PathGraph1::edge_descriptor> chain;
@@ -605,10 +613,27 @@ public:
         uint64_t componentId,
         const Assembler&);
 
+private:
     // Information stored by the constructor.
     const PathGraph1& graph;
     uint64_t componentId;
     const Assembler& assembler;
+
+    // The CompressedPathGraph1A corresponding to a given PathGraph1 vertex.
+    // Not all PathGraph1 vertices have a corresponding CompressedPathGraph1A vertex.
+    std::map<PathGraph1::vertex_descriptor, vertex_descriptor> vertexMap;
+
+    // Get the vertex_descriptor corresponding to a PathGraph1::vertex_descriptor,
+    // adding a vertex if necessary.
+    vertex_descriptor getCompressedVertex(PathGraph1::vertex_descriptor);
+
+    // Get PathGraph1 vertices at the beginning and end of each edge.
+    PathGraph1::vertex_descriptor firstUncompressedVertex(edge_descriptor) const;
+    PathGraph1::vertex_descriptor lastUncompressedVertex(edge_descriptor) const;
+    PathGraph1::vertex_descriptor firstInternalUncompressedVertex(edge_descriptor) const;
+    PathGraph1::vertex_descriptor lastInternalUncompressedVertex(edge_descriptor) const;
+
+    void writeGraphviz(const string& fileNamePrefix) const;
 };
 
 

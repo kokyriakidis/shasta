@@ -205,6 +205,9 @@ void GlobalPathGraph1::assemble1(
     component.writeGraphviz(globalGraph.verticesVector,
         "PathGraphCompact" + to_string(componentId), options);
 
+    CompressedPathGraph1A cGraph(component, componentId, globalGraph.assembler);
+
+    #if 0
     // Create a compressed representation of this connected component.
     // In this compressed representation, each linear sequence of
     // transitive reduction non-branch vertices becomes a single vertex.
@@ -224,7 +227,7 @@ void GlobalPathGraph1::assemble1(
     // Use the final CompressedPathGraph1 to assemble sequence.
     // cout << "Assembling sequence." << endl;
     // cGraph.assembleVertices(threadCount0, threadCount1); ******** SKIPPING SEQUENCE ASSEMBLY
-
+#endif
 }
 
 GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
