@@ -465,13 +465,12 @@ public:
     bool detangleVertices(uint64_t detangleTolerance);
     bool detangleLinearChains(uint64_t detangleTolerance);
     bool detangleVertex(vertex_descriptor, uint64_t detangleTolerance);
-    bool detangleSuperbubbles(uint64_t minReliableLength);
+    // bool detangleSuperbubbles(uint64_t minReliableLength);
     bool detangleKnots();
     void detangleIteration(
         const string& name,     // For graphviz output
         uint64_t compressedTransitiveReductionDistance,
-        uint64_t detangleTolerance,
-        uint64_t superbubbleThreshold);
+        uint64_t detangleTolerance);
     bool removeCrossEdges(uint64_t threshold1, uint64_t threshold2);
     void detangle();
 
@@ -523,6 +522,9 @@ public:
     string vertexIdString(vertex_descriptor) const;
 
     uint64_t totalBaseOffset(vertex_descriptor) const;
+
+    uint64_t totalVertexBaseOffset() const;
+    uint64_t totalEdgeBaseOffset() const;
 
     // Sequence assembly.
     void assembleVertices(

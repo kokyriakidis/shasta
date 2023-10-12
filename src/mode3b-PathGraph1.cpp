@@ -218,14 +218,13 @@ void GlobalPathGraph1::assemble1(
     // transitive reduction non-branch vertices becomes a single vertex.
     // Non-branch vertices are those with in-degree and out-degree not greater than 1.
     CompressedPathGraph1 cGraph(component, componentId, globalGraph.assembler);
-    cGraph.writeGfa("Initial");
+    cGraph.writeGfaAndGraphviz("Initial");
 
     // Detangle the compressed graph.
     cGraph.detangle();
 
     // Final output.
-    cGraph.writeGfa("Final");
-    cGraph.writeGraphviz("Final");
+    cGraph.writeGfaAndGraphviz("Final");
     cGraph.writeVerticesCsv();
     cout << "The final CompressedPathGraph1 has " << num_vertices(cGraph) << " vertices and " <<
         num_edges(cGraph) << " edges." << endl;
@@ -267,10 +266,6 @@ void CompressedPathGraph1::writeVerticesCsv() const
 // This calls the lower level function twice, with and without labels.
 void CompressedPathGraph1::writeGraphviz(const string& fileNamePrefix) const
 {
-    cout << fileNamePrefix << ": " <<
-        num_vertices(*this) << " vertices, " <<
-        num_edges(*this) << " edges." << endl;
-
     bool labels = true;
     writeGraphviz(labels, fileNamePrefix);
     labels = false;
@@ -3174,7 +3169,7 @@ bool CompressedPathGraph1::detangleLinearChains(uint64_t detangleTolerance)
 
 
 
-
+#if 0
 bool CompressedPathGraph1::detangleSuperbubbles(uint64_t minReliableLength)
 {
     CompressedPathGraph1& cGraph = *this;
@@ -3282,6 +3277,7 @@ bool CompressedPathGraph1::detangleSuperbubbles(uint64_t minReliableLength)
 
     return not verticesToBeRemoved.empty(); // Questionable.
 }
+#endif
 
 
 
@@ -3320,39 +3316,52 @@ uint64_t CompressedPathGraph1::totalBaseOffset(vertex_descriptor cv) const
 
 
 
+uint64_t CompressedPathGraph1::totalVertexBaseOffset() const
+{
+    const CompressedPathGraph1& cGraph = *this;
+    uint64_t totalOffset = 0;
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1) {
+        totalOffset += totalBaseOffset(cv);
+    }
+    return totalOffset;
+}
+
+
+
+uint64_t CompressedPathGraph1::totalEdgeBaseOffset() const
+{
+    const CompressedPathGraph1& cGraph = *this;
+    uint64_t totalOffset = 0;
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1) {
+        totalOffset += cGraph[ce].info.offsetInBases;
+    }
+    return totalOffset;
+}
+
+
+
 void CompressedPathGraph1::detangle()
 {
+
 #if 1
-    uint64_t compressedTransitiveReductionDistance = 100;
+
+    const uint64_t compressedTransitiveReductionDistance = 100;
+
     uint64_t detangleTolerance = 0;
-    uint64_t superbubbleThreshold = 0;
-    detangleIteration("A",
+    detangleIteration(
+        "A",
         compressedTransitiveReductionDistance,
-        detangleTolerance,
-        superbubbleThreshold);
-    removeCrossEdges(1, 6);
+        detangleTolerance);
 
     detangleTolerance = 1;
-    detangleIteration("B",
+    detangleIteration(
+        "B",
         compressedTransitiveReductionDistance,
-        detangleTolerance,
-        superbubbleThreshold);
-    removeCrossEdges(1, 6);
+        detangleTolerance);
 
-    detangleTolerance = 2;
-    detangleIteration("C",
-        compressedTransitiveReductionDistance,
-        detangleTolerance,
-        superbubbleThreshold);
-    removeCrossEdges(2, 6);
 
-    detangleIteration("D",
-        compressedTransitiveReductionDistance,
-        detangleTolerance,
-        superbubbleThreshold);
-
-    detangleKnots();
 #endif
+
 
 #if 0
 
@@ -3416,8 +3425,7 @@ void CompressedPathGraph1::detangle()
 void CompressedPathGraph1::detangleIteration(
     const string& name,     // For graphviz output
     uint64_t compressedTransitiveReductionDistance,
-    uint64_t detangleTolerance,
-    uint64_t superbubbleThreshold)
+    uint64_t detangleTolerance)
 {
 
     for(uint64_t iteration=0; ; ++iteration) {
@@ -3431,16 +3439,13 @@ void CompressedPathGraph1::detangleIteration(
         writeGfaAndGraphviz(name + "-" + to_string(iteration) + "-2");
         const bool mergeLinearChainsChanges = mergeLinearChains();
         writeGfaAndGraphviz(name + "-" + to_string(iteration) + "-3");
-        const bool detangleSuperBubblesChanges = detangleSuperbubbles(superbubbleThreshold);
-        writeGfaAndGraphviz(name + "-" + to_string(iteration) + "-4");
 
         // If nothing changed, stop the iteration.
         if(not (
             transitiveReductionChanges or
             detangleVerticesChanges or
             detangleLinearChainsChanges or
-            mergeLinearChainsChanges or
-            detangleSuperBubblesChanges
+            mergeLinearChainsChanges
             )) {
             break;
         }
@@ -3532,9 +3537,13 @@ void CompressedPathGraph1::writeGfa(const string& fileNamePrefix) const
 {
     const CompressedPathGraph1& cGraph = *this;
 
+    const uint64_t vertexBases = totalVertexBaseOffset();
+    const uint64_t edgeBases = totalEdgeBaseOffset();
+    const uint64_t totalBases = vertexBases + edgeBases;
+
     cout << fileNamePrefix << ": " <<
-        num_vertices(cGraph) << " vertices, " <<
-        num_edges(cGraph) << " edges." << endl;
+        num_vertices(cGraph) << " vertices (" << vertexBases << " bases), " <<
+        num_edges(cGraph) << " edges (" << edgeBases << " bases), " << totalBases << " bases total." << endl;
 
     const string name = "CompressedPathGraph" + to_string(componentId);
     ofstream gfa(name + "-" + fileNamePrefix + ".gfa");
