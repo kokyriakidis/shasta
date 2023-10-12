@@ -73,6 +73,24 @@ namespace shasta {
             CompressedPathGraph1Vertex,
             CompressedPathGraph1Edge>;
 
+        // A better compressed representation of a PathGraph1.
+        // Each linear sequence of edges, without branches, of the PathGraph1
+        // is compressed to a single edge in the CompressedPathGraph1A.
+        // Therefore:
+        // - Each edge of the CompressedPathGraph1A corresponds to a linear sequence of edges,
+        //   without branches, of the PathGraph1.
+        // - Each vertex of the CompressedPathGraph1A corresponds to a vertex of the PathGraph1.
+        // - But not all vertices of the PathGraph1 have a corresponding vertex in the CompressedPathGraph1A.
+        class CompressedPathGraph1A;
+        class CompressedPathGraph1AVertex;
+        class CompressedPathGraph1AEdge;
+        using CompressedPathGraph1ABaseClass = boost::adjacency_list<
+            boost::listS,
+            boost::listS,
+            boost::bidirectionalS,
+            CompressedPathGraph1AVertex,
+            CompressedPathGraph1AEdge>;
+
         class AssemblyPath;
     }
 }
@@ -445,6 +463,8 @@ public:
     MarkerGraphEdgePairInfo info;
 };
 
+
+
 class shasta::mode3b::CompressedPathGraph1 :
     public CompressedPathGraph1BaseClass,
     public MultithreadedObject<CompressedPathGraph1> {
@@ -553,6 +573,42 @@ public:
     void writeGfa(const string& fileNamePrefix) const;
     void writeGfaAndGraphviz(const string& fileNamePrefix) const;
 
+};
+
+
+
+// A better compressed representation of a PathGraph1.
+// Each linear sequence of edges, without branches, of the PathGraph1
+// is compressed to a single edge in the CompressedPathGraph1A.
+// Therefore:
+// - Each edge of the CompressedPathGraph1A corresponds to a linear sequence of edges,
+//   without branches, of the PathGraph1.
+// - Each vertex of the CompressedPathGraph1A corresponds to a vertex of the PathGraph1.
+// - But not all vertices of the PathGraph1 have a corresponding vertex in the CompressedPathGraph1A.
+class shasta::mode3b::CompressedPathGraph1AVertex {
+public:
+    PathGraph1::vertex_descriptor v;
+};
+class shasta::mode3b::CompressedPathGraph1AEdge {
+public:
+    vector<PathGraph1::edge_descriptor> chain;
+};
+
+
+
+class shasta::mode3b::CompressedPathGraph1A :
+    public CompressedPathGraph1ABaseClass,
+    public MultithreadedObject<CompressedPathGraph1A> {
+public:
+    CompressedPathGraph1A(
+        const PathGraph1&,
+        uint64_t componentId,
+        const Assembler&);
+
+    // Information stored by the constructor.
+    const PathGraph1& graph;
+    uint64_t componentId;
+    const Assembler& assembler;
 };
 
 
