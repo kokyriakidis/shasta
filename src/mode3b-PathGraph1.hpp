@@ -73,15 +73,6 @@ namespace shasta {
             CompressedPathGraph1Vertex,
             CompressedPathGraph1Edge>;
 
-        // A better compressed representation of a PathGraph1.
-        // Each linear sequence of edges, without branches, of the PathGraph1
-        // after transitive reduction
-        // is compressed to a single edge in the CompressedPathGraph1A.
-        // Therefore:
-        // - Each edge of the CompressedPathGraph1A corresponds to a linear sequence of edges,
-        //   without branches, of the PathGraph1  after transitive reduction.
-        // - Each vertex of the CompressedPathGraph1A corresponds to a vertex of the PathGraph1.
-        // - But not all vertices of the PathGraph1 have a corresponding vertex in the CompressedPathGraph1A.
         class CompressedPathGraph1A;
         class CompressedPathGraph1AVertex;
         class CompressedPathGraph1AEdge;
@@ -582,12 +573,14 @@ public:
 // Each linear sequence of edges, without branches, of the PathGraph1
 // after transitive reduction
 // is compressed to a single edge in the CompressedPathGraph1A.
-// Therefore:
+// Therefore, initially:
 // - Each edge of the CompressedPathGraph1A corresponds to a linear sequence of edges,
 //   without branches, of the PathGraph1 after transitive reduction.
 // - Each vertex of the CompressedPathGraph1A corresponds to a vertex of the PathGraph1.
 // - But not all vertices of the PathGraph1 have a corresponding vertex in the CompressedPathGraph1A.
-
+// Later, during detangling, edges can be merged, so an edge in the CompressedPathGraph1A
+// no longer corresponds to a linear sequence of edges in the PathGraph1.
+// For this reason a CompressedPathGraph1AEdge stores a sequence of MarkerGraphedgeIds.
 
 
 class shasta::mode3b::CompressedPathGraph1AVertex {
@@ -599,7 +592,8 @@ public:
 
 class shasta::mode3b::CompressedPathGraph1AEdge {
 public:
-    vector<PathGraph1::edge_descriptor> chain;
+    uint64_t id;
+    vector<MarkerGraphEdgeId> chain;
 };
 
 
@@ -623,16 +617,72 @@ private:
     // Not all PathGraph1 vertices have a corresponding CompressedPathGraph1A vertex.
     std::map<PathGraph1::vertex_descriptor, vertex_descriptor> vertexMap;
 
+    uint64_t nextEdgeId = 0;
+    string edgeStringId(edge_descriptor) const;
+
+    // Initial creation from the PathGraph1.
+    void create();
+
+    // Detangling.
+    void detangle(
+        uint64_t detangleThresholdLow,
+        uint64_t detangleThresholdHigh
+        );
+    uint64_t detangleEdges(
+        uint64_t detangleThresholdLow,
+        uint64_t detangleThresholdHigh
+        );
+    bool detangleEdge(
+        edge_descriptor,
+        uint64_t detangleThresholdLow,
+        uint64_t detangleThresholdHigh,
+        vector<edge_descriptor>& removedEdges);
+
+
+
+    // The tangle matrix defined by two vertices.
+    class TangleMatrix {
+    public:
+        vertex_descriptor cv0;
+        vertex_descriptor cv1;
+
+        // The in-edges of cv0.
+        vector<edge_descriptor> inEdges;
+
+        // The out-edges of cv1.
+        vector<edge_descriptor> outEdges;
+
+        // m[i][j] contains the number of common oriented reads
+        // between the i-th in-edge and the j-th out-edge,
+        // computed using the second to last PathGraph1 vertex of each in-edge
+        // and the second PathGraph1 vertex of each out-edge.
+        vector< vector<uint64_t> > m;
+
+        uint64_t inDegree() const;
+        uint64_t outDegree() const;
+    };
+    void computeTangleMatrix(
+        vertex_descriptor,
+        vertex_descriptor,
+        TangleMatrix&
+        ) const;
+
+
+    // Accessors.
+
     // Get the vertex_descriptor corresponding to a PathGraph1::vertex_descriptor,
     // adding a vertex if necessary.
     vertex_descriptor getCompressedVertex(PathGraph1::vertex_descriptor);
 
-    // Get PathGraph1 vertices at the beginning and end of each edge.
-    PathGraph1::vertex_descriptor firstUncompressedVertex(edge_descriptor) const;
-    PathGraph1::vertex_descriptor lastUncompressedVertex(edge_descriptor) const;
-    PathGraph1::vertex_descriptor firstInternalUncompressedVertex(edge_descriptor) const;
-    PathGraph1::vertex_descriptor lastInternalUncompressedVertex(edge_descriptor) const;
+    // Get MarkerGraphEdgeIds at the beginning and end of each edge.
+    MarkerGraphEdgeId firstMarkerGraphEdgeId(edge_descriptor) const;
+    MarkerGraphEdgeId lastMarkerGraphEdgeId(edge_descriptor) const;
+    MarkerGraphEdgeId secondMarkerGraphEdgeId(edge_descriptor) const;
+    MarkerGraphEdgeId secondToLastMarkerGraphEdgeId(edge_descriptor) const;
 
+
+
+    // Output.
     void writeGraphviz(const string& fileNamePrefix) const;
 };
 
