@@ -686,6 +686,8 @@ private:
 
     // Output.
     void writeGraphviz(const string& fileNamePrefix) const;
+    void writeGfa(const string& fileNamePrefix) const;
+    void writeGfaAndGraphviz(const string& fileNamePrefix) const;
 };
 
 

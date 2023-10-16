@@ -34,10 +34,10 @@ CompressedPathGraph1A::CompressedPathGraph1A(
     const uint64_t detangleThresholdHigh = 6;
 
     create();
-    writeGraphviz("Initial");
+    writeGfaAndGraphviz("Initial");
 
     detangle(detangleThresholdLow, detangleThresholdHigh);
-    writeGraphviz("Final");
+    writeGfaAndGraphviz("Final");
 }
 
 
@@ -150,6 +150,56 @@ MarkerGraphEdgeId CompressedPathGraph1A::secondToLastMarkerGraphEdgeId(edge_desc
 
     SHASTA_ASSERT(chain.size() >= 2);
     return chain[chain.size() - 2];
+}
+
+
+
+void CompressedPathGraph1A::writeGfaAndGraphviz(const string& fileNamePrefix) const
+{
+    writeGfa(fileNamePrefix);
+    writeGraphviz(fileNamePrefix);
+}
+
+
+
+void CompressedPathGraph1A::writeGfa(const string& fileNamePrefix) const
+{
+    const CompressedPathGraph1A& cGraph = *this;
+
+    ofstream gfa("CompressedPathGraph1A-" + to_string(componentId) + "-" + fileNamePrefix + ".gfa");
+
+    // Write the header line.
+    gfa << "H\tVN:Z:1.0\n";
+
+    // Write a segment for each edge.
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1A) {
+
+        // Record type.
+        gfa << "S\t";
+
+        // Name.
+        gfa << edgeStringId(ce) << "\t";
+
+        // Sequence.
+        gfa << "*\t";
+
+        // Sequence length in bases.
+        gfa << "LN:i:" << totalBaseOffset(ce) << "\n";
+    }
+
+
+    // For each vertex, write links between each pair of incoming/outgoing edges.
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1A) {
+        BGL_FORALL_INEDGES(cv, ceIn, cGraph, CompressedPathGraph1A) {
+            BGL_FORALL_OUTEDGES(cv, ceOut, cGraph, CompressedPathGraph1A) {
+                gfa <<
+                    "L\t" <<
+                    edgeStringId(ceIn) << "\t+\t" <<
+                    edgeStringId(ceOut) << "\t+\t*\n";
+            }
+        }
+    }
+
 }
 
 
@@ -487,7 +537,7 @@ uint64_t CompressedPathGraph1A::totalBaseOffset(edge_descriptor ce) const
         const MarkerGraphEdgeId edgeId1 = chain[i];
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
 
-        if(info.common > 0) {
+        if(info.common > 0 and info.offsetInBases > 0) {
             totalOffset += info.offsetInBases;
         }
     }
