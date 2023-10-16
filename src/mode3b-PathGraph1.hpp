@@ -680,6 +680,8 @@ private:
     MarkerGraphEdgeId secondMarkerGraphEdgeId(edge_descriptor) const;
     MarkerGraphEdgeId secondToLastMarkerGraphEdgeId(edge_descriptor) const;
 
+    uint64_t totalBaseOffset(edge_descriptor) const;
+
 
 
     // Output.

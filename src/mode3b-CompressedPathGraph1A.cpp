@@ -186,7 +186,8 @@ void CompressedPathGraph1A::writeGraphviz(const string& fileNamePrefix) const
         dot << graph[v0].edgeId << "->" << graph[v1].edgeId;
 
         // Label.
-        dot << " [label=\"" << edgeStringId(ce);
+        dot << " [label=\"" << edgeStringId(ce) <<
+            "\\n" << totalBaseOffset(ce);
         if(chain.size() == 2) {
             // Nothing else
         } else if(chain.size() == 3) {
@@ -471,3 +472,24 @@ uint64_t CompressedPathGraph1A::TangleMatrix::outDegree() const
     return outEdges.size();
 }
 
+
+
+uint64_t CompressedPathGraph1A::totalBaseOffset(edge_descriptor ce) const
+{
+    const CompressedPathGraph1A& cGraph = *this;
+    const CompressedPathGraph1AEdge& edge = cGraph[ce];
+    const vector<MarkerGraphEdgeId>& chain = edge.chain;
+
+    uint64_t totalOffset = 0;
+    MarkerGraphEdgePairInfo info;
+    for(uint64_t i=0; i<chain.size(); i++) {
+        const MarkerGraphEdgeId edgeId0 = chain[i-1];
+        const MarkerGraphEdgeId edgeId1 = chain[i];
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+
+        if(info.common > 0) {
+            totalOffset += info.offsetInBases;
+        }
+    }
+    return totalOffset;
+}
