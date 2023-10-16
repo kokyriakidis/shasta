@@ -637,6 +637,10 @@ private:
         uint64_t detangleThresholdLow,
         uint64_t detangleThresholdHigh,
         vector<edge_descriptor>& removedEdges);
+    uint64_t detangleBubbleChains(
+        uint64_t detangleThresholdLow,
+        uint64_t detangleThresholdHigh
+        );
 
 
 
@@ -668,6 +672,36 @@ private:
         ) const;
 
 
+
+    // Classes used by detangleBubbleChains.
+    // Two successive Bubbles in a bubble chains are usually separated by an edge,
+    // but the edge can be missing.
+    class Bubble {
+    public:
+        vertex_descriptor source;
+        vertex_descriptor target;
+        vector<edge_descriptor> edges;
+        uint64_t degree() const {
+            return edges.size();
+        }
+        Bubble* previousBubble = 0;
+        Bubble* nextBubble = 0;
+    };
+    class InterBubble {
+    public:
+        edge_descriptor edge;
+        bool edgeExists;    // If false, edge is not valid.
+    };
+    class BubbleChain {
+    public:
+        vector<const Bubble*> bubbles;
+        vector<InterBubble> interBubbles;   // One less that the number of bubbles.
+    };
+    void findBubbles(vector<Bubble>&) const;
+    void findBubbleChains(vector<BubbleChain>&) const;
+
+
+
     // Accessors.
 
     // Get the vertex_descriptor corresponding to a PathGraph1::vertex_descriptor,
@@ -688,6 +722,7 @@ private:
     void writeGraphviz(const string& fileNamePrefix) const;
     void writeGfa(const string& fileNamePrefix) const;
     void writeGfaAndGraphviz(const string& fileNamePrefix) const;
+    void writeBubble(const Bubble&, ostream&) const;
 };
 
 

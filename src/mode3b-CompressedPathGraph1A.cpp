@@ -1,6 +1,7 @@
 // Shasta.
 #include "mode3b-PathGraph1.hpp"
 #include "Assembler.hpp"
+#include "deduplicate.hpp"
 #include "findLinearChains.hpp"
 using namespace shasta;
 using namespace mode3b;
@@ -277,6 +278,12 @@ void CompressedPathGraph1A::detangle(
         detangleEdges(
             detangleThresholdLow,
             detangleThresholdHigh));
+
+    // For now detangle bubble chains just once at the very end.
+    // Eventually we will iterate.
+    detangleBubbleChains(
+        detangleThresholdLow,
+        detangleThresholdHigh);
 }
 
 
@@ -471,6 +478,242 @@ bool CompressedPathGraph1A::detangleEdge(
 
 
 
+uint64_t CompressedPathGraph1A::detangleBubbleChains(
+    uint64_t detangleThresholdLow,
+    uint64_t detangleThresholdHigh
+    )
+{
+    // Find the bubble chains.
+    vector<BubbleChain> bubbleChains;
+    findBubbleChains(bubbleChains);
+
+    return 0;
+}
+
+
+
+void CompressedPathGraph1A::findBubbleChains(vector<BubbleChain>& bubbleChains) const
+{
+    const CompressedPathGraph1A& cGraph = *this;
+
+    // Find the bubbles.
+    vector<Bubble> bubbles;
+    findBubbles(bubbles);
+
+    // Index the bubbles by their source vertex.
+    std::map<vertex_descriptor, Bubble*> bubbleMap;
+    for(Bubble& bubble: bubbles) {
+        SHASTA_ASSERT(not bubbleMap.contains(bubble.source));
+        bubbleMap.insert({bubble.source, &bubble});
+    }
+
+    // Find the bubble following/preceding each bubble.
+    for(Bubble& bubble: bubbles) {
+
+        // See if there is bubble immediately following.
+        auto it = bubbleMap.find(bubble.target);
+        if(it != bubbleMap.end()) {
+            SHASTA_ASSERT(bubble.nextBubble == 0);
+            bubble.nextBubble = it->second;
+            SHASTA_ASSERT(bubble.nextBubble->previousBubble == 0);
+            bubble.nextBubble->previousBubble = &bubble;
+            continue;
+        }
+
+        // See if there is a bubble following, with an edge in between.
+        if(out_degree(bubble.target, cGraph) != 1) {
+            continue;
+        }
+        edge_descriptor nextEdge;
+        BGL_FORALL_OUTEDGES(bubble.target, ce, cGraph, CompressedPathGraph1A) {
+            nextEdge = ce;
+        }
+        const vertex_descriptor cv1 = target(nextEdge, cGraph);
+        if(in_degree(cv1, cGraph) != 1) {
+            continue;
+        }
+        it = bubbleMap.find(cv1);
+        if(it != bubbleMap.end()) {
+            SHASTA_ASSERT(bubble.nextBubble == 0);
+            bubble.nextBubble = it->second;
+            SHASTA_ASSERT(bubble.nextBubble->previousBubble == 0);
+            bubble.nextBubble->previousBubble = &bubble;
+        }
+    }
+
+    // Sanity check.
+    uint64_t noNextCount = 0;
+    uint64_t noPreviousCount = 0;
+    for(const Bubble& bubble: bubbles) {
+        if(bubble.nextBubble == 0) {
+            noNextCount++;
+        }
+        if(bubble.previousBubble == 0) {
+            noPreviousCount++;
+        }
+    }
+    SHASTA_ASSERT(noNextCount == noPreviousCount);
+
+
+    // Now we can construct the BubbleChains.
+    bubbleChains.clear();
+    for(const Bubble& bubble: bubbles) {
+
+        if(bubble.previousBubble) {
+            // A BubbleChain does not begin at this bubble.
+            continue;
+        }
+
+        bubbleChains.resize(bubbleChains.size() + 1);
+        BubbleChain& bubbleChain = bubbleChains.back();
+        const Bubble* b = &bubble;
+        while(b) {
+            bubbleChain.bubbles.push_back(b);
+            b = b->nextBubble;
+        }
+    }
+    cout << "Found " << bubbleChains.size() << " bubble chains." << endl;
+
+    // Find the InterBubbles.
+    for(BubbleChain& bubbleChain: bubbleChains) {
+        for(uint64_t i=1; i<bubbleChain.bubbles.size(); i++) {
+            const Bubble* bubble0 = bubbleChain.bubbles[i-1];
+            const Bubble* bubble1 = bubbleChain.bubbles[i];
+
+            if(bubble0->target == bubble1->source) {
+                // There is no edge in between.
+                bubbleChain.interBubbles.push_back({edge_descriptor(), false});
+            } else {
+                // Find the edge in between.
+                edge_descriptor ce;
+                bool edgeWasFound;
+                tie(ce, edgeWasFound) = boost::edge(bubble0->target, bubble1->source, cGraph);
+                SHASTA_ASSERT(edgeWasFound);
+                SHASTA_ASSERT(source(ce, cGraph) == bubble0->target);
+                SHASTA_ASSERT(target(ce, cGraph) == bubble1->source);
+                SHASTA_ASSERT(out_degree(bubble0->target, cGraph) == 1);
+                SHASTA_ASSERT(in_degree(bubble1->source, cGraph) == 1);
+                bubbleChain.interBubbles.push_back({ce, true});
+            }
+        }
+    }
+
+    if(true) {
+        for(const BubbleChain& bubbleChain: bubbleChains) {
+            cout << "Bubble chain with " << bubbleChain.bubbles.size() << " bubbles:" << flush;
+            for(uint64_t i=0; /* Check later */; i++) {
+                const Bubble* bubble = bubbleChain.bubbles[i];
+                SHASTA_ASSERT(bubble);
+                cout << " ";
+                writeBubble(*bubble, cout);
+                cout << flush;
+
+                if(i == bubbleChain.bubbles.size() - 1) {
+                    break;
+                }
+
+                const InterBubble& interbubble = bubbleChain.interBubbles[i];
+                if(interbubble.edgeExists) {
+                    cout << " " << edgeStringId(interbubble.edge);
+                }
+            }
+            cout << endl;
+        }
+    }
+
+}
+
+
+
+
+void CompressedPathGraph1A::findBubbles(vector<Bubble>& bubbles) const
+{
+    const CompressedPathGraph1A& cGraph = *this;
+    bubbles.clear();
+
+    vector<vertex_descriptor> targets;
+    BGL_FORALL_VERTICES(cv0, cGraph, CompressedPathGraph1A) {
+
+        // For cv0 to be the source of a bubble, all its out-edges must have the same target.
+        targets.clear();
+        BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1A) {
+            targets.push_back(target(ce, cGraph));
+        }
+        if(targets.size() < 2) {
+            continue;
+        }
+        deduplicate(targets);
+        if(targets.size() != 1) {
+            // No bubble with cv0 as the source.
+            continue;
+        }
+        const vertex_descriptor cv1 = targets.front();
+
+        // We must also check that all in-edges of cv1 have cv0 as their source.
+        bool isBubble = true;
+        BGL_FORALL_INEDGES(cv1, ce, cGraph, CompressedPathGraph1A) {
+            if(source(ce, cGraph) != cv0) {
+                isBubble = false;
+                break;
+            }
+        }
+        if(not isBubble) {
+            continue;
+        }
+
+        // Create a bubble.
+        Bubble bubble;
+        bubble.source = cv0;
+        bubble.target = cv1;
+        BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1A) {
+            bubble.edges.push_back(ce);
+        }
+        bubbles.push_back(bubble);
+
+    }
+
+    cout << "Found " << bubbles.size() << " bubbles." << endl;
+
+    // Bubble size histogram.
+    {
+        vector<uint64_t> histogram;
+        for(const Bubble& bubble: bubbles) {
+            const uint64_t degree = bubble.degree();
+            if(degree >= histogram.size()) {
+                histogram.resize(degree+1, 0);
+            }
+            ++histogram[degree];
+        }
+        cout << "Bubble degree histogram" << endl;
+        for(uint64_t degree=0; degree<histogram.size(); degree++) {
+            const uint64_t frequency = histogram[degree];
+            if(frequency) {
+                cout << degree << " " << frequency << endl;
+            }
+        }
+    }
+
+    // Bubble output.
+    if(false) {
+        for(const Bubble& bubble: bubbles) {
+            const PathGraph1::vertex_descriptor v0 = cGraph[bubble.source].v;
+            const PathGraph1::vertex_descriptor v1 = cGraph[bubble.target].v;
+
+            cout << "Bubble between vertices " <<
+                graph[v0].edgeId << " " <<
+                graph[v1].edgeId << ":";
+            for(const edge_descriptor ce: bubble.edges) {
+                cout << " " << edgeStringId(ce);
+            }
+            cout << endl;
+        }
+
+    }
+
+}
+
+
+
 void CompressedPathGraph1A::computeTangleMatrix(
     vertex_descriptor cv0,
     vertex_descriptor cv1,
@@ -542,4 +785,18 @@ uint64_t CompressedPathGraph1A::totalBaseOffset(edge_descriptor ce) const
         }
     }
     return totalOffset;
+}
+
+
+
+void CompressedPathGraph1A::writeBubble(const Bubble& bubble, ostream& s) const
+{
+    s << "{";
+    for(uint64_t i=0; i<bubble.edges.size(); i++) {
+        if(i != 0) {
+            s << ",";
+        }
+        s << edgeStringId(bubble.edges[i]);
+    }
+    s << "}";
 }
