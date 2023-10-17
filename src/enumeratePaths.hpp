@@ -7,15 +7,31 @@
 #include "algorithm.hpp"
 #include <stack>
 #include "tuple.hpp"
+#include "utility.hpp"
 #include "vector.hpp"
 
 namespace shasta {
 
-template<class G> void enumerateSelfAvoidingPaths(const G&,
-    typename G::vertex_descriptor vA, typename G::vertex_descriptor vB,
-    vector<vector<typename G::edge_descriptor> > &paths);
+    template<class G> void enumerateSelfAvoidingPaths(const G&,
+        typename G::vertex_descriptor vA, typename G::vertex_descriptor vB,
+        vector<vector<typename G::edge_descriptor> > &paths);
 
+    template<class G, class PathInspector> void enumeratePaths(
+        const G&,
+        typename G::vertex_descriptor v,
+        uint64_t pathLength,
+        PathInspector&);
+    template<class G, class PathInspector> void enumeratePathsRecursive(
+        const G&,
+        typename G::vertex_descriptor v,
+        uint64_t pathLength,
+        PathInspector&,
+        vector<typename G::edge_descriptor>& path);
+
+    void testEnumeratePaths();
 }
+
+
 
 // Enumerate self-avoiding paths starting at v0 and ending at v1.
 // Self-avoiding means that an edge cannot be used twice.
@@ -72,6 +88,40 @@ template<class G> void shasta::enumerateSelfAvoidingPaths(const G &g,
                 partialPaths.push(newPath);
             }
         }
+    }
+}
+
+
+
+// In a directed graph of type G,
+// enumerate all paths starting at v and with length (number of edges)
+// up to pathLength.
+// For each path found, apply the given function object by calling
+// functionObject(path), where path is a vector<G::edge_descriptor>
+template<class G, class PathInspector> void shasta::enumeratePaths(
+    const G& g,
+    typename G::vertex_descriptor v,
+    uint64_t maxPathLength,
+    PathInspector& pathInspector)
+{
+    vector<typename G::edge_descriptor> path;
+    enumeratePathsRecursive(g, v, maxPathLength, pathInspector, path);
+}
+template<class G, class PathInspector> void shasta::enumeratePathsRecursive(
+    const G& g,
+    typename G::vertex_descriptor v,
+    uint64_t maxPathLength,
+    PathInspector& pathInspector,
+    vector<typename G::edge_descriptor>& path)
+{
+    if(maxPathLength == 0) {
+        return;
+    }
+    BGL_FORALL_OUTEDGES_T(v, e, g, G) {
+        path.push_back(e);
+        pathInspector(path);
+        enumeratePathsRecursive(g, target(e, g), maxPathLength - 1, pathInspector, path);
+        path.pop_back();
     }
 }
 

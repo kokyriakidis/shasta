@@ -12,6 +12,7 @@
 #include "deduplicate.hpp"
 #include "dset64Test.hpp"
 #include "diploidBayesianPhase.hpp"
+#include "enumeratePaths.hpp"
 #include "shastaLapack.hpp"
 #include "globalMsa.hpp"
 #include "LongBaseSequence.hpp"
@@ -751,6 +752,9 @@ PYBIND11_MODULE(shasta, shastaModule)
         );
     shastaModule.def("testLongestPath",
         testLongestPath
+        );
+    shastaModule.def("testEnumeratePaths",
+        testEnumeratePaths
         );
     shastaModule.def("globalMsaPython",
         globalMsaPython
