@@ -2,6 +2,7 @@
 #include "mode3b-PathGraph1.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
+#include "enumeratePaths.hpp"
 #include "findLinearChains.hpp"
 using namespace shasta;
 using namespace mode3b;
@@ -279,11 +280,7 @@ void CompressedPathGraph1A::detangle(
             detangleThresholdLow,
             detangleThresholdHigh));
 
-    // For now detangle bubble chains just once at the very end.
-    // Eventually we will iterate.
-    detangleBubbleChains(
-        detangleThresholdLow,
-        detangleThresholdHigh);
+    analyzeChokePoints();
 }
 
 
@@ -740,6 +737,111 @@ void CompressedPathGraph1A::findBubbles(vector<Bubble>& bubbles) const
         }
 
     }
+
+}
+
+
+
+void CompressedPathGraph1A::analyzeChokePoints() const
+{
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t pathLength = 10;
+
+    const CompressedPathGraph1A& cGraph = *this;
+
+    using Path = vector<edge_descriptor>;
+    class PathInspector {
+    public:
+        PathInspector(
+            const CompressedPathGraph1A& cGraph,
+            uint64_t direction  // 0=forward, 1=backward
+            ) :
+            cGraph(cGraph), direction(direction) {}
+        void operator()(const Path& path)
+        {
+            if(path.size() == pathLength) {
+                ++pathCount;
+                // cout << "Path: ";
+                for(const edge_descriptor ce: path) {
+                    const vertex_descriptor cv = (direction == 0) ? target(ce, cGraph) : source(ce, cGraph);
+                    ++vertexCountMap[cv];
+                    // const PathGraph1::vertex_descriptor v = cGraph[cv].v;
+                    // cout << " " << cGraph.graph[v].edgeId;
+                }
+                // cout << endl;
+            }
+        }
+
+        const CompressedPathGraph1A& cGraph;
+        uint64_t direction;
+
+        // The number of paths with the specified length.
+        uint64_t pathCount = 0;
+
+        // The number of paths each vertex appears in.
+        std::map<vertex_descriptor, uint64_t> vertexCountMap;
+    };
+
+    vector< pair<vertex_descriptor, vertex_descriptor> > forwardPairs;
+    vector< pair<vertex_descriptor, vertex_descriptor> > backwardPairs;
+    BGL_FORALL_VERTICES(cv0, cGraph, CompressedPathGraph1A) {
+
+        // Forward
+        {
+            PathInspector pathInspector(cGraph, 0);
+            enumeratePaths(cGraph, cv0, pathLength, pathInspector);
+
+            for(const auto& p: pathInspector.vertexCountMap) {
+                if(p.second == pathInspector.pathCount) {
+                    // This vertex appears in all paths.
+                    const vertex_descriptor cv1 = p.first;
+                    forwardPairs.push_back({cv0, cv1});
+                }
+            }
+        }
+
+        // Backward
+        {
+            PathInspector pathInspector(cGraph, 1);
+            enumeratePathsReverse(cGraph, cv0, pathLength, pathInspector);
+
+            for(const auto& p: pathInspector.vertexCountMap) {
+                if(p.second == pathInspector.pathCount) {
+                    // This vertex appears in all paths.
+                    const vertex_descriptor cv1 = p.first;
+                    backwardPairs.push_back({cv1, cv0});
+                }
+            }
+        }
+    }
+    sort(forwardPairs.begin(), forwardPairs.end());
+    sort(backwardPairs.begin(), backwardPairs.end());
+
+    // Find the pairs that appear in both directions.
+    vector< pair<vertex_descriptor, vertex_descriptor> > bidirectionalPairs;
+    std::set_intersection(
+        forwardPairs.begin(), forwardPairs.end(),
+        backwardPairs.begin(), backwardPairs.end(),
+        back_inserter(bidirectionalPairs));
+    cout << "Found " << forwardPairs.size() << " forward pairs." << endl;
+    cout << "Found " << backwardPairs.size() << " backward pairs." << endl;
+    cout << "Found " << bidirectionalPairs.size() << " bidirectional pairs." << endl;
+
+
+
+    ofstream dot("BidirectionalPairs.dot");
+    dot << "digraph BidirectionalPairs {\n";
+    for(const auto& p: bidirectionalPairs) {
+        const vertex_descriptor cv0 = p.first;
+        const vertex_descriptor cv1 = p.second;
+
+        const PathGraph1::vertex_descriptor v0 = cGraph[cv0].v;
+        const PathGraph1::vertex_descriptor v1 = cGraph[cv1].v;
+
+        dot << graph[v0].edgeId << "->" << graph[v1].edgeId << ";\n";
+    }
+    dot << "}\n";
+
 
 }
 

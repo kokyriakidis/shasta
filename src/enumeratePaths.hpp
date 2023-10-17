@@ -28,6 +28,19 @@ namespace shasta {
         PathInspector&,
         vector<typename G::edge_descriptor>& path);
 
+    // Same, but in the reverse direction (backward paths).
+    template<class G, class PathInspector> void enumeratePathsReverse(
+        const G&,
+        typename G::vertex_descriptor v,
+        uint64_t pathLength,
+        PathInspector&);
+    template<class G, class PathInspector> void enumeratePathsReverseRecursive(
+        const G&,
+        typename G::vertex_descriptor v,
+        uint64_t pathLength,
+        PathInspector&,
+        vector<typename G::edge_descriptor>& path);
+
     void testEnumeratePaths();
 }
 
@@ -125,5 +138,33 @@ template<class G, class PathInspector> void shasta::enumeratePathsRecursive(
     }
 }
 
+
+
+template<class G, class PathInspector> void shasta::enumeratePathsReverse(
+    const G& g,
+    typename G::vertex_descriptor v,
+    uint64_t maxPathLength,
+    PathInspector& pathInspector)
+{
+    vector<typename G::edge_descriptor> path;
+    enumeratePathsReverseRecursive(g, v, maxPathLength, pathInspector, path);
+}
+template<class G, class PathInspector> void shasta::enumeratePathsReverseRecursive(
+    const G& g,
+    typename G::vertex_descriptor v,
+    uint64_t maxPathLength,
+    PathInspector& pathInspector,
+    vector<typename G::edge_descriptor>& path)
+{
+    if(maxPathLength == 0) {
+        return;
+    }
+    BGL_FORALL_INEDGES_T(v, e, g, G) {
+        path.push_back(e);
+        pathInspector(path);
+        enumeratePathsReverseRecursive(g, source(e, g), maxPathLength - 1, pathInspector, path);
+        path.pop_back();
+    }
+}
 #endif
 

@@ -641,6 +641,7 @@ private:
         uint64_t detangleThresholdLow,
         uint64_t detangleThresholdHigh
         );
+    void analyzeChokePoints() const;
 
 
 
