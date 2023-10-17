@@ -618,6 +618,37 @@ void CompressedPathGraph1A::findBubbleChains(vector<BubbleChain>& bubbleChains) 
                 }
             }
             cout << endl;
+
+
+            // Write tangle matrices between pairs of bubbles in this bubble chain.
+            for(uint64_t i0=0; i0<bubbleChain.bubbles.size()-1; i0++) {
+                const Bubble& bubble0 = *bubbleChain.bubbles[i0];
+                const vertex_descriptor cv0 = bubble0.target;
+                for(uint64_t i1=i0+1; i1<bubbleChain.bubbles.size(); i1++) {
+                    const Bubble& bubble1 = *bubbleChain.bubbles[i1];
+                    const vertex_descriptor cv1 = bubble1.source;
+                    TangleMatrix tangleMatrix;
+                    computeTangleMatrix(cv0, cv1, tangleMatrix);
+
+                    cout << "Tangle matrix between bubbles " << i0 << " ";
+                    writeBubble(bubble0, cout);
+                    cout << " " << i1 << " ";
+                    writeBubble(bubble1, cout);
+                    cout << endl;
+
+                    for(uint64_t i=0; i<tangleMatrix.inEdges.size(); i++) {
+                        const edge_descriptor ce0 = tangleMatrix.inEdges[i];
+
+                        for(uint64_t j=0; j<tangleMatrix.outEdges.size(); j++) {
+                            const edge_descriptor ce1 = tangleMatrix.outEdges[j];
+
+                            cout << edgeStringId(ce0) << " ";
+                            cout << edgeStringId(ce1) << " ";
+                            cout << tangleMatrix.m[i][j] << endl;
+                        }
+                    }
+                }
+            }
         }
     }
 
