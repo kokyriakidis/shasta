@@ -626,7 +626,8 @@ private:
     // Detangling.
     void detangle(
         uint64_t detangleThresholdLow,
-        uint64_t detangleThresholdHigh
+        uint64_t detangleThresholdHigh,
+        uint64_t pathLengthForChokePoints
         );
     uint64_t detangleEdges(
         uint64_t detangleThresholdLow,
@@ -643,7 +644,7 @@ private:
         uint64_t detangleThresholdHigh
         );
     */
-    void analyzeChokePoints() const;
+    void detangleUsingChokePoints(uint64_t pathLengthForChokePoints);
 
 
 
@@ -705,6 +706,34 @@ private:
 #endif
 
 
+
+    // Classes and functions used by detangleUsingChokePoints.
+
+    // A ChokePointChain describes a linear chain of "choke points" in the CompressedPathGraph1A
+    // and the intervening "superbubbles" in-between.
+    // A superbubble can have arbitrary complexity but will often consist of a single edge
+    // or a bubble, most commonly a diploid bubble. Diploid bubbles are used for detangling.
+    class Superbubble {
+    public:
+        vector<vertex_descriptor> internalVertices;
+        bool isDiploidBubble = false;
+        vector<edge_descriptor> diploidEdges; // Only if isDiploidBubble is true;
+    };
+    class ChokePointChain {
+    public:
+        vector<vertex_descriptor> chokePoints;
+        vector<Superbubble> superbubbles;       // Size is chokePoints.size() - 1
+    };
+    void findChokePointChains(uint64_t pathLengthForChokePoints, vector<ChokePointChain>&) const;
+    // void analyzeChokePoints() const;
+    void findVerticesBetweenChokePoints(
+        vertex_descriptor,
+        vertex_descriptor,
+        vector<vertex_descriptor>&
+    ) const;
+
+
+
     // Accessors.
 
     // Get the vertex_descriptor corresponding to a PathGraph1::vertex_descriptor,
@@ -726,6 +755,7 @@ private:
     void writeGfa(const string& fileNamePrefix) const;
     void writeGfaAndGraphviz(const string& fileNamePrefix) const;
     // void writeBubble(const Bubble&, ostream&) const;
+    void writeChokePointChain(const ChokePointChain&) const;
 };
 
 
