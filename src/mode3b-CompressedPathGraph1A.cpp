@@ -477,6 +477,7 @@ bool CompressedPathGraph1A::detangleEdge(
 
 
 
+#if 0
 uint64_t CompressedPathGraph1A::detangleBubbleChains(
     uint64_t detangleThresholdLow,
     uint64_t detangleThresholdHigh
@@ -741,6 +742,7 @@ void CompressedPathGraph1A::findBubbles(vector<Bubble>& bubbles) const
     }
 
 }
+#endif
 
 
 
@@ -1053,6 +1055,7 @@ uint64_t CompressedPathGraph1A::totalBaseOffset(edge_descriptor ce) const
 
 
 
+#if 0
 void CompressedPathGraph1A::writeBubble(const Bubble& bubble, ostream& s) const
 {
     s << "{";
@@ -1064,3 +1067,4 @@ void CompressedPathGraph1A::writeBubble(const Bubble& bubble, ostream& s) const
     }
     s << "}";
 }
+#endif

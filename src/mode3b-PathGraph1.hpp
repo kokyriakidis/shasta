@@ -637,10 +637,12 @@ private:
         uint64_t detangleThresholdLow,
         uint64_t detangleThresholdHigh,
         vector<edge_descriptor>& removedEdges);
+    /*
     uint64_t detangleBubbleChains(
         uint64_t detangleThresholdLow,
         uint64_t detangleThresholdHigh
         );
+    */
     void analyzeChokePoints() const;
 
 
@@ -673,7 +675,7 @@ private:
         ) const;
 
 
-
+#if 0
     // Classes used by detangleBubbleChains.
     // Two successive Bubbles in a bubble chains are usually separated by an edge,
     // but the edge can be missing.
@@ -700,7 +702,7 @@ private:
     };
     void findBubbles(vector<Bubble>&) const;
     void findBubbleChains(vector<BubbleChain>&) const;
-
+#endif
 
 
     // Accessors.
@@ -723,7 +725,7 @@ private:
     void writeGraphviz(const string& fileNamePrefix) const;
     void writeGfa(const string& fileNamePrefix) const;
     void writeGfaAndGraphviz(const string& fileNamePrefix) const;
-    void writeBubble(const Bubble&, ostream&) const;
+    // void writeBubble(const Bubble&, ostream&) const;
 };
 
 
