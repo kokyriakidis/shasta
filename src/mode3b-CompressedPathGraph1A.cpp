@@ -4,12 +4,14 @@
 #include "deduplicate.hpp"
 #include "enumeratePaths.hpp"
 #include "findLinearChains.hpp"
+#include "transitiveReduction.hpp"
 using namespace shasta;
 using namespace mode3b;
 
 // Boost libraries.
 #include <boost/graph/filtered_graph.hpp>
 #include <boost/graph/iteration_macros.hpp>
+#include <boost/graph/strong_components.hpp>
 
 // Standard library.
 #include "fstream.hpp"
@@ -829,6 +831,9 @@ void CompressedPathGraph1A::analyzeChokePoints() const
 
 
 
+    // The pairs that appear in both directions define a directed graph.
+    // Its vertices are the "choke points" or "bottlenecks" of the CompressedPathGraph1A.
+
     ofstream dot("BidirectionalPairs.dot");
     dot << "digraph BidirectionalPairs {\n";
     for(const auto& p: bidirectionalPairs) {
@@ -842,6 +847,132 @@ void CompressedPathGraph1A::analyzeChokePoints() const
     }
     dot << "}\n";
 
+    // Gather the choke points.
+    vector<vertex_descriptor> chokePoints;
+    for(const auto& p: bidirectionalPairs) {
+        chokePoints.push_back(p.first);
+        chokePoints.push_back(p.second);
+    }
+    deduplicate(chokePoints);
+    cout << "Found " << chokePoints.size() << " choke points." << endl;
+
+    // Create the choke point graph.
+    // Each vertex corresponds to a vertex of the CompressedPathGraph1A.
+    using ChokePointGraph = boost::adjacency_list<
+            boost::listS,
+            boost::vecS,
+            boost::bidirectionalS,
+            vertex_descriptor>;
+    ChokePointGraph chokePointGraph;
+    for(const vertex_descriptor cv: chokePoints) {
+        add_vertex({cv}, chokePointGraph);
+    }
+    for(const auto& p: bidirectionalPairs) {
+        const vertex_descriptor cv0 = p.first;
+        const vertex_descriptor cv1 = p.second;
+        const uint64_t iv0 = lower_bound(chokePoints.begin(), chokePoints.end(), cv0) - chokePoints.begin();
+        const uint64_t iv1 = lower_bound(chokePoints.begin(), chokePoints.end(), cv1) - chokePoints.begin();
+        add_edge(iv0, iv1, chokePointGraph);
+    }
+
+
+
+    // If the ChokePointGraph happens to have any non-trivial strongly connected components,
+    // remove them by disconnecting their vertices. We don't want to remove the vertices
+    // because we are using vecS for the ChokePoint to simplify operations.
+    std::map<ChokePointGraph::vertex_descriptor, uint64_t> componentMap;
+    boost::strong_components(
+        chokePointGraph,
+        boost::make_assoc_property_map(componentMap));
+
+    // Gather the vertices in each strong component.
+    std::map<uint64_t, vector<ChokePointGraph::vertex_descriptor> > componentVertices;
+    for(const auto& p: componentMap) {
+        componentVertices[p.second].push_back(p.first);
+    }
+
+    // Disconnect vertices belonging to non-trivial strongly connected components.
+    // A non-trivial strong component has at least one internal edge.
+    // This means that it either has more than one vertex,
+    // or it consists of a single vertex with a self-edge.
+    uint64_t stronglyConnectedChokePointsCount = 0;;
+    for(const auto& p: componentVertices) {
+
+        // Figure out if it is non-trivial.
+        bool isNonTrivial;
+        if(p.second.size() > 1) {
+
+            // More than one vertex. Certainly non-trivial.
+            isNonTrivial = true;
+        } else if (p.second.size() == 1) {
+
+            // Only one vertex. Non-trivial if self-edge present.
+            const ChokePointGraph::vertex_descriptor v = p.second.front();
+            bool selfEdgeExists = false;
+            tie(ignore, selfEdgeExists) = edge(v, v, chokePointGraph);
+            isNonTrivial = selfEdgeExists;
+        } else {
+
+            // Empty. This should never happen.
+            SHASTA_ASSERT(0);
+        }
+
+        // If non-trivial, disconnect all of its vertices.
+        if(isNonTrivial) {
+            for(const ChokePointGraph::vertex_descriptor v: p.second) {
+                clear_vertex(v, chokePointGraph);
+                ++stronglyConnectedChokePointsCount;
+            }
+        }
+    }
+    cout << "Found " << stronglyConnectedChokePointsCount <<
+        " choke points in strongly connected components and disconnected them." << endl;
+
+    // Now we can compute the transitive reduction of the ChokePointGraph.
+    transitiveReduction(chokePointGraph);
+    cout << "After transitive reduction, the choke point graph has " <<
+        num_vertices(chokePointGraph) << " vertices and " <<
+        num_edges(chokePointGraph) << " edges." << endl;
+    {
+        ofstream dot("ChokePointGraph.dot");
+        dot << "digraph ChokePointGraph{\n";
+        BGL_FORALL_EDGES(e, chokePointGraph, ChokePointGraph) {
+            const ChokePointGraph::vertex_descriptor cpv0 = source(e, chokePointGraph);
+            const ChokePointGraph::vertex_descriptor cpv1 = target(e, chokePointGraph);
+            const vertex_descriptor cv0 = chokePoints[cpv0];
+            const vertex_descriptor cv1 = chokePoints[cpv1];
+            const PathGraph1::vertex_descriptor v0 = cGraph[cv0].v;
+            const PathGraph1::vertex_descriptor v1 = cGraph[cv1].v;
+            dot << graph[v0].edgeId << "->" << graph[v1].edgeId << ";\n";
+        }
+        dot << "}\n";
+    }
+
+    // Linear chains in the ChokePointGraph will be used
+    // to create bubble chains for detangling.
+    vector< vector<ChokePointGraph::edge_descriptor> > chains;
+    findLinearChains(chokePointGraph, 0, chains);
+    cout << "Found " << chains.size() << " linear chains in the choke point graph." << endl;
+
+    // Compute a histogram of chain lengths.
+    {
+        vector<uint64_t> histogram;
+        for(const auto& chain: chains) {
+            const uint64_t length = chain.size();
+            if(histogram.size() <= length) {
+                histogram.resize(length + 1, 0);
+            }
+            ++histogram[length];
+        }
+        ofstream csv("ChokePointChainLengthHistogram.csv");
+        csv << "Length,Frequency\n";
+        for(uint64_t length=0; length<histogram.size(); length++) {
+            const uint64_t frequency = histogram[length];
+            if(frequency) {
+                csv << length << "," << frequency << "\n";
+            }
+        }
+    }
 
 }
 
