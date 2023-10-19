@@ -38,11 +38,16 @@ CompressedPathGraph1A::CompressedPathGraph1A(
     const uint64_t detangleThresholdLow = 2;
     const uint64_t detangleThresholdHigh = 6;
     const uint64_t pathLengthForChokePoints = 10;
+    const uint64_t maxBubbleIndexDelta = 10;
 
     create();
     writeGfaAndGraphviz("Initial");
 
-    detangle(detangleThresholdLow, detangleThresholdHigh, pathLengthForChokePoints);
+    detangle(
+        detangleThresholdLow,
+        detangleThresholdHigh,
+        pathLengthForChokePoints,
+        maxBubbleIndexDelta);
     writeGfaAndGraphviz("Final");
 }
 
@@ -277,7 +282,8 @@ string CompressedPathGraph1A::edgeStringId(edge_descriptor ce) const
 void CompressedPathGraph1A::detangle(
     uint64_t detangleThresholdLow,
     uint64_t detangleThresholdHigh,
-    uint64_t pathLengthForChokePoints
+    uint64_t pathLengthForChokePoints,
+    uint64_t maxBubbleIndexDelta
     )
 {
     while(
@@ -285,7 +291,7 @@ void CompressedPathGraph1A::detangle(
             detangleThresholdLow,
             detangleThresholdHigh));
 
-    detangleUsingChokePoints(pathLengthForChokePoints);
+    detangleUsingChokePoints(pathLengthForChokePoints, maxBubbleIndexDelta);
 }
 
 
@@ -478,6 +484,23 @@ bool CompressedPathGraph1A::detangleEdge(
     return true;
 }
 
+
+
+void CompressedPathGraph1A::writeTangleMatrix(const TangleMatrix& tangleMatrix) const
+{
+    for(uint64_t i=0; i<tangleMatrix.inEdges.size(); i++) {
+        const edge_descriptor ce0 = tangleMatrix.inEdges[i];
+
+        for(uint64_t j=0; j<tangleMatrix.outEdges.size(); j++) {
+            const edge_descriptor ce1 = tangleMatrix.outEdges[j];
+
+            cout << edgeStringId(ce0) << " ";
+            cout << edgeStringId(ce1) << " ";
+            cout << tangleMatrix.m[i][j] << endl;
+        }
+    }
+
+}
 
 
 #if 0
@@ -984,10 +1007,67 @@ void CompressedPathGraph1A::analyzeChokePoints() const
 
 
 
-void CompressedPathGraph1A::detangleUsingChokePoints(uint64_t pathLengthForChokePoints)
+void CompressedPathGraph1A::detangleUsingChokePoints(
+    uint64_t pathLengthForChokePoints,
+    uint64_t maxBubbleIndexDelta)
 {
     vector<ChokePointChain> chokePointChains;
     findChokePointChains(pathLengthForChokePoints, chokePointChains);
+
+    for(ChokePointChain& chokePointChain: chokePointChains) {
+        detangleChokePointChain(chokePointChain, maxBubbleIndexDelta);
+    }
+
+}
+
+
+
+void CompressedPathGraph1A::detangleChokePointChain(
+    ChokePointChain& chain,
+    uint64_t maxBubbleIndexDelta)
+{
+    // If the chain has less that 2 diploid bubbles, don't do anything.
+    if(chain.diploidBubblesIndexes.size() < 2) {
+        return;
+    }
+
+    cout << "Detangling a choke point chain with " << chain.chokePoints.size() << " choke points." << endl;
+    writeChokePointChain(chain);
+
+    // Compute tangle matrices for near pairs of bubbles.
+    for(uint64_t i0=0; i0<chain.diploidBubblesIndexes.size()-1; i0++) {
+        const uint64_t j0 = chain.diploidBubblesIndexes[i0];
+        const Superbubble& diploidBubble0 = chain.superbubbles[j0];
+        SHASTA_ASSERT(diploidBubble0.isDiploidBubble);
+        SHASTA_ASSERT(diploidBubble0.diploidEdges.size() == 2);
+        const vertex_descriptor cv0 = chain.chokePoints[j0 + 1];    // The vertex following diploidBubble0.
+        for(uint64_t i1=i0+1; i1<min(i0+maxBubbleIndexDelta+1, chain.diploidBubblesIndexes.size()); i1++) {
+            const uint64_t j1 = chain.diploidBubblesIndexes[i1];
+            const Superbubble& diploidBubble1 = chain.superbubbles[j1];
+            SHASTA_ASSERT(diploidBubble1.isDiploidBubble);
+            SHASTA_ASSERT(diploidBubble1.diploidEdges.size() == 2);
+            const vertex_descriptor cv1 = chain.chokePoints[j1];     // The vertex preceding diploidBubble0.
+
+            // Compute the tangle matrix between these two vertices.
+            TangleMatrix tangleMatrix;
+            computeTangleMatrix(cv0, cv1, tangleMatrix);
+
+            cout << "Tangle matrix for bubbles " << i0 << " " << i1 << endl;
+            for(uint64_t i=0; i<tangleMatrix.inEdges.size(); i++) {
+                const edge_descriptor ce0 = tangleMatrix.inEdges[i];
+
+                for(uint64_t j=0; j<tangleMatrix.outEdges.size(); j++) {
+                    const edge_descriptor ce1 = tangleMatrix.outEdges[j];
+
+                    cout << edgeStringId(ce0) << " ";
+                    cout << edgeStringId(ce1) << " ";
+                    cout << tangleMatrix.m[i][j] << endl;
+                }
+            }
+
+        }
+
+    }
 }
 
 
@@ -1268,18 +1348,10 @@ void CompressedPathGraph1A::findChokePointChains(
             }
             // If getting here, this must be a diploid bubble.
             superbubble.isDiploidBubble = true;
+            chokePointChain.diploidBubblesIndexes.push_back(chokePointChain.superbubbles.size() - 1);
             BGL_FORALL_OUTEDGES(cv0, e, cGraph, CompressedPathGraph1A) {
                 superbubble.diploidEdges.push_back(e);
             }
-        }
-    }
-
-    // Write out the choke point chains.
-    if(true) {
-        for(uint64_t i=0; i<chokePointChains.size(); i++) {
-            const ChokePointChain& chain = chokePointChains[i];
-            cout << "Choke point chain " << i << " with " << chain.chokePoints.size() << " choke points." << endl;
-            writeChokePointChain(chain);
         }
     }
 
@@ -1326,14 +1398,14 @@ void CompressedPathGraph1A::writeChokePointChain(const ChokePointChain& chain) c
 
         const vertex_descriptor cv = chain.chokePoints[i];
         const PathGraph1::vertex_descriptor v = cGraph[cv].v;
-        cout << "Choke point " << graph[v].edgeId << "\n";
+        cout << "Choke point at position " << i << ": " << graph[v].edgeId << "\n";
 
         if(i == chain.chokePoints.size() - 1) {
             break;
         }
 
         const Superbubble& superbubble = chain.superbubbles[i];
-        cout << "Superbubble:";
+        cout << "Superbubble at position " << i << ":";
         if(superbubble.internalVertices.empty()) {
             cout << " no vertices";
         } else {
@@ -1349,9 +1421,22 @@ void CompressedPathGraph1A::writeChokePointChain(const ChokePointChain& chain) c
                 edgeStringId(superbubble.diploidEdges[1]);
         }
         cout << "\n";
-
-
     }
+
+    // Also list the diploid bubbles again.
+    cout << "Diploid bubbles in this choke point chain:\n";
+    for(uint64_t i=0; i<chain.diploidBubblesIndexes.size(); i++) {
+        const uint64_t j = chain.diploidBubblesIndexes[i];
+        const Superbubble& superbubble = chain.superbubbles[j];
+        SHASTA_ASSERT(superbubble.isDiploidBubble);
+        SHASTA_ASSERT(superbubble.diploidEdges.size() == 2);
+        cout << "Diploid bubble " << i << " is superbubble at position " << j <<
+            " with edges " <<
+            edgeStringId(superbubble.diploidEdges[0]) << " " <<
+            edgeStringId(superbubble.diploidEdges[1]) << "\n";
+    }
+
+
     cout << flush;
 }
 

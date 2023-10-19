@@ -627,7 +627,8 @@ private:
     void detangle(
         uint64_t detangleThresholdLow,
         uint64_t detangleThresholdHigh,
-        uint64_t pathLengthForChokePoints
+        uint64_t pathLengthForChokePoints,
+        uint64_t maxBubbleIndexDelta
         );
     uint64_t detangleEdges(
         uint64_t detangleThresholdLow,
@@ -644,7 +645,13 @@ private:
         uint64_t detangleThresholdHigh
         );
     */
-    void detangleUsingChokePoints(uint64_t pathLengthForChokePoints);
+    void detangleUsingChokePoints(
+        uint64_t pathLengthForChokePoints,
+        uint64_t maxBubbleIndexDelta);
+    class ChokePointChain;
+    void detangleChokePointChain(
+        ChokePointChain&,
+        uint64_t maxBubbleIndexDelta);
 
 
 
@@ -674,6 +681,7 @@ private:
         vertex_descriptor,
         TangleMatrix&
         ) const;
+    void writeTangleMatrix(const TangleMatrix&) const;
 
 
 #if 0
@@ -723,6 +731,10 @@ private:
     public:
         vector<vertex_descriptor> chokePoints;
         vector<Superbubble> superbubbles;       // Size is chokePoints.size() - 1
+
+        // The indexes of the diploid bubbles in the superbubbles vector.
+        // Indexes into this vector can be used as ids for diploid bubbles during phasing.
+        vector<uint64_t> diploidBubblesIndexes;
     };
     void findChokePointChains(uint64_t pathLengthForChokePoints, vector<ChokePointChain>&) const;
     // void analyzeChokePoints() const;
