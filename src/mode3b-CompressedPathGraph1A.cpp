@@ -1040,17 +1040,15 @@ void CompressedPathGraph1A::detangleChokePointChain(
         const Superbubble& diploidBubble0 = chain.superbubbles[j0];
         SHASTA_ASSERT(diploidBubble0.isDiploidBubble);
         SHASTA_ASSERT(diploidBubble0.diploidEdges.size() == 2);
-        const vertex_descriptor cv0 = chain.chokePoints[j0 + 1];    // The vertex following diploidBubble0.
         for(uint64_t i1=i0+1; i1<min(i0+maxBubbleIndexDelta+1, chain.diploidBubblesIndexes.size()); i1++) {
             const uint64_t j1 = chain.diploidBubblesIndexes[i1];
             const Superbubble& diploidBubble1 = chain.superbubbles[j1];
             SHASTA_ASSERT(diploidBubble1.isDiploidBubble);
             SHASTA_ASSERT(diploidBubble1.diploidEdges.size() == 2);
-            const vertex_descriptor cv1 = chain.chokePoints[j1];     // The vertex preceding diploidBubble0.
 
             // Compute the tangle matrix between these two vertices.
             TangleMatrix tangleMatrix;
-            computeTangleMatrix(cv0, cv1, tangleMatrix);
+            computeTangleMatrix(diploidBubble0.diploidEdges, diploidBubble1.diploidEdges, tangleMatrix);
 
             cout << "Tangle matrix for bubbles " << i0 << " " << i1 << endl;
             for(uint64_t i=0; i<tangleMatrix.inEdges.size(); i++) {
@@ -1473,9 +1471,6 @@ void CompressedPathGraph1A::computeTangleMatrix(
 {
     const CompressedPathGraph1A& cGraph = *this;
 
-    tangleMatrix.cv0 = cv0;
-    tangleMatrix.cv1 = cv1;
-
     tangleMatrix.inEdges.clear();
     BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph1A) {
         tangleMatrix.inEdges.push_back(ce);
@@ -1486,9 +1481,27 @@ void CompressedPathGraph1A::computeTangleMatrix(
         tangleMatrix.outEdges.push_back(ce);
     }
 
+    computeTangleMatrix(tangleMatrix);
+}
 
 
-    // Fill in the tangle matrix entries.
+
+void CompressedPathGraph1A::computeTangleMatrix(
+    const vector<edge_descriptor>& inEdges,
+    const vector<edge_descriptor>& outEdges,
+    TangleMatrix& tangleMatrix
+    ) const
+{
+    tangleMatrix.inEdges = inEdges;
+    tangleMatrix.outEdges = outEdges;
+    computeTangleMatrix(tangleMatrix);
+}
+
+
+
+// This version only fills in m. The inEdges and out_edgesmust have already been filled in.
+void CompressedPathGraph1A::computeTangleMatrix(TangleMatrix& tangleMatrix) const
+{
     tangleMatrix.m.resize(tangleMatrix.inEdges.size(), vector<uint64_t>(tangleMatrix.outEdges.size()));
     MarkerGraphEdgePairInfo info;
     for(uint64_t i=0; i<tangleMatrix.inEdges.size(); i++) {
@@ -1503,6 +1516,7 @@ void CompressedPathGraph1A::computeTangleMatrix(
             tangleMatrix.m[i][j] = info.common;
         }
     }
+
 }
 
 

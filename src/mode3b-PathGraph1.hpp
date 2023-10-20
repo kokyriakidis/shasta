@@ -658,9 +658,6 @@ private:
     // The tangle matrix defined by two vertices.
     class TangleMatrix {
     public:
-        vertex_descriptor cv0;
-        vertex_descriptor cv1;
-
         // The in-edges of cv0.
         vector<edge_descriptor> inEdges;
 
@@ -681,6 +678,13 @@ private:
         vertex_descriptor,
         TangleMatrix&
         ) const;
+    void computeTangleMatrix(
+        const vector<edge_descriptor>& inEdges,
+        const vector<edge_descriptor>& outEdges,
+        TangleMatrix&
+        ) const;
+    // This version only fills in m. The inEdges and out_edgesmust have already been filled in.
+    void computeTangleMatrix(TangleMatrix&) const;
     void writeTangleMatrix(const TangleMatrix&) const;
 
 
