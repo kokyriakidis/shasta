@@ -771,12 +771,11 @@ private:
     // The PhasingGraph is used by detangleUsingChokePoints to phase
     // the diploid bubbles in a ChokePointChain.
     // It is an undirected graph in which each vertex represents a diploid bubble.
+    // It uses vecS for the vertex container, so the vertex_descriptor
+    // is the same as the bubble id in the ChokePointChain
+    // (index in bubbleChainIndexes).
     class PhasingGraphVertex {
     public:
-        // The id in the ChokePointChain of the diploid bubble represented by this vertex.
-        // This is an index into ChokePointChain::diploidBubblesIndexes and numbers
-        // the bubbles from 0 to the number of diploid bubbles in the ChokePointChain minus 1.
-        uint64_t bubbleId;
     };
     class PhasingGraphEdge {
     public:
@@ -787,6 +786,18 @@ private:
         // If phase = -1, minConcordant = min(m01, m10), maxDiscordant = max(m00, m11).
         uint64_t minConcordant;
         uint64_t maxDiscordant;
+
+        bool operator<(const PhasingGraphEdge& that) const
+        {
+            if(maxDiscordant < that.maxDiscordant) {
+                return true;
+            }
+            if(maxDiscordant > that.maxDiscordant) {
+                return false;
+            }
+            return minConcordant > that.minConcordant;
+        }
+        bool isSpanningTreeEdge = false;
     };
     using PhasingGraphBaseClass = boost::adjacency_list<
         boost::listS,
@@ -799,8 +810,8 @@ private:
         PhasingGraph(uint64_t bubbleCount);
         void addEdge(uint64_t bubbleId0, uint64_t bubbleId1, const PhasingGraphEdge& edge);
 
-        // Map bubble indexes to vertices.
-        std::map<uint64_t, vertex_descriptor> vertexMap;
+        // Assign a phase to a subset of the vertices.
+        void phase();
 
         void writeGraphviz(ostream&, const string& name) const;
     };

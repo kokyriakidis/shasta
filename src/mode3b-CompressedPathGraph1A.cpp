@@ -4,12 +4,15 @@
 #include "deduplicate.hpp"
 #include "enumeratePaths.hpp"
 #include "findLinearChains.hpp"
+#include "orderPairs.hpp"
 #include "orderVectors.hpp"
 #include "transitiveReduction.hpp"
 using namespace shasta;
 using namespace mode3b;
 
 // Boost libraries.
+#include <boost/pending/disjoint_sets.hpp>
+#include <boost/graph/connected_components.hpp>
 #include <boost/graph/filtered_graph.hpp>
 #include <boost/graph/iteration_macros.hpp>
 #include <boost/graph/strong_components.hpp>
@@ -1104,20 +1107,70 @@ void CompressedPathGraph1A::detangleChokePointChain(
             }
         }
     }
-
+    phasingGraph.phase();
     phasingGraph.writeGraphviz(cout, "PhasingGraph_" + to_string(chokePointChainId));
 }
 
 
 
-CompressedPathGraph1A::PhasingGraph::PhasingGraph(uint64_t bubbleCount)
+CompressedPathGraph1A::PhasingGraph::PhasingGraph(uint64_t bubbleCount) :
+    PhasingGraphBaseClass(bubbleCount)
+{
+}
+
+
+
+// Assign a phase to a subset of the vertices.
+void CompressedPathGraph1A::PhasingGraph::phase()
 {
     PhasingGraph& phasingGraph = *this;
+    const uint64_t vertexCount = num_vertices(phasingGraph);
 
-    for(uint64_t bubbleId=0; bubbleId<bubbleCount; bubbleId++) {
-        vertexMap.insert(make_pair(bubbleId, add_vertex({bubbleId}, phasingGraph)));
+    // Sort the edges in order of decreasing significance.
+    vector< pair<edge_descriptor, PhasingGraphEdge> > sortedEdges;
+    BGL_FORALL_EDGES(e, phasingGraph, PhasingGraph) {
+        sortedEdges.push_back({e, phasingGraph[e]});
     }
+    sort(sortedEdges.begin(), sortedEdges.end(), OrderPairsBySecondOnly<edge_descriptor, PhasingGraphEdge>());
+#if 0
+    cout << "Sorted edges:" << endl;
+    for(const auto& p: sortedEdges) {
+        const edge_descriptor e = p.first;
+        const PhasingGraphEdge& edge = phasingGraph[e];
+        const vertex_descriptor v0 = source(e, phasingGraph);
+        const vertex_descriptor v1 = target(e, phasingGraph);
+        cout <<
+            phasingGraph[v0].bubbleId << " " <<
+            phasingGraph[v1].bubbleId << " " <<
+            edge.phase << " " <<
+            edge.minConcordant << " " <<
+            edge.maxDiscordant << endl;
+    }
+#endif
+
+
+    // Compute optimal spanning tree and connected components.
+    vector<uint64_t> rank(vertexCount);
+    vector<uint64_t> parent(vertexCount);
+    boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
+    for(uint64_t i=0; i<vertexCount; i++) {
+        disjointSets.make_set(i);
+    }
+    for(const auto& p: sortedEdges) {
+        const edge_descriptor e = p.first;
+        PhasingGraphEdge& edge = phasingGraph[e];
+        const vertex_descriptor v0 = source(e, phasingGraph);
+        const vertex_descriptor v1 = target(e, phasingGraph);
+        const uint64_t componentId0 = disjointSets.find_set(v0);
+        const uint64_t componentId1 = disjointSets.find_set(v1);
+        if(componentId0 != componentId1) {
+            disjointSets.union_set(v0, v1);
+            edge.isSpanningTreeEdge = true;
+        }
+    }
+
 }
+
 
 
 void CompressedPathGraph1A::PhasingGraph::writeGraphviz(ostream& s, const string& name) const
@@ -1127,14 +1180,28 @@ void CompressedPathGraph1A::PhasingGraph::writeGraphviz(ostream& s, const string
     s << "graph " << name << " {\n";
 
     BGL_FORALL_VERTICES(v, phasingGraph, PhasingGraph) {
-        s << phasingGraph[v].bubbleId << ";\n";
+        s << v << ";\n";
     }
 
     BGL_FORALL_EDGES(e, phasingGraph, PhasingGraph) {
+        const PhasingGraphEdge& edge = phasingGraph[e];
         const vertex_descriptor v0 = source(e, phasingGraph);
         const vertex_descriptor v1 = target(e, phasingGraph);
-        s << phasingGraph[v0].bubbleId << "--";
-        s << phasingGraph[v1].bubbleId << ";\n";
+        s <<
+            v0 << "--" <<
+            v1 <<
+            " [";
+
+        s << "label=\"";
+        cout << ((edge.phase == +1) ? "+" : "-");
+        cout << "," << edge.minConcordant << "," << edge.maxDiscordant;
+        s << "\"";
+
+        if(not edge.isSpanningTreeEdge) {
+            s << " style=dashed";
+        }
+
+        s << "];\n";
     }
 
     s << "}\n";
@@ -1148,16 +1215,8 @@ void CompressedPathGraph1A::PhasingGraph::addEdge(
 {
     PhasingGraph& phasingGraph = *this;
 
-    // Get the vertices corresponding to these bubbles.
-    auto it0 = vertexMap.find(bubbleId0);
-    auto it1 = vertexMap.find(bubbleId1);
-    SHASTA_ASSERT(it0 != vertexMap.end());
-    SHASTA_ASSERT(it1 != vertexMap.end());
-    const vertex_descriptor v0 = it0->second;
-    const vertex_descriptor v1 = it1->second;
-
-    // Add the edge.
-    add_edge(v0, v1, edge, phasingGraph);
+    // The bubbleIds are the same as the corresponding vertex_descriptors.
+    add_edge(bubbleId0, bubbleId1, edge, phasingGraph);
 }
 
 
