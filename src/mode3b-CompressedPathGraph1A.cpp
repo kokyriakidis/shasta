@@ -291,7 +291,11 @@ void CompressedPathGraph1A::detangle(
             detangleThresholdLow,
             detangleThresholdHigh));
 
-    detangleUsingChokePoints(pathLengthForChokePoints, maxBubbleIndexDelta);
+    detangleUsingChokePoints(
+        pathLengthForChokePoints,
+        maxBubbleIndexDelta,
+        detangleThresholdLow,
+        detangleThresholdHigh);
 }
 
 
@@ -1009,13 +1013,21 @@ void CompressedPathGraph1A::analyzeChokePoints() const
 
 void CompressedPathGraph1A::detangleUsingChokePoints(
     uint64_t pathLengthForChokePoints,
-    uint64_t maxBubbleIndexDelta)
+    uint64_t maxBubbleIndexDelta,
+    uint64_t detangleThresholdLow,
+    uint64_t detangleThresholdHigh)
 {
     vector<ChokePointChain> chokePointChains;
     findChokePointChains(pathLengthForChokePoints, chokePointChains);
 
-    for(ChokePointChain& chokePointChain: chokePointChains) {
-        detangleChokePointChain(chokePointChain, maxBubbleIndexDelta);
+    for(uint64_t chokePointChainId=0; chokePointChainId<chokePointChains.size(); chokePointChainId++) {
+        ChokePointChain& chokePointChain = chokePointChains[chokePointChainId];
+        detangleChokePointChain(
+            chokePointChain,
+            chokePointChainId,
+            maxBubbleIndexDelta,
+            detangleThresholdLow,
+            detangleThresholdHigh);
     }
 
 }
@@ -1024,7 +1036,10 @@ void CompressedPathGraph1A::detangleUsingChokePoints(
 
 void CompressedPathGraph1A::detangleChokePointChain(
     ChokePointChain& chain,
-    uint64_t maxBubbleIndexDelta)
+    uint64_t chokePointChainId,
+    uint64_t maxBubbleIndexDelta,
+    uint64_t detangleThresholdLow,
+    uint64_t detangleThresholdHigh)
 {
     // If the chain has less that 2 diploid bubbles, don't do anything.
     if(chain.diploidBubblesIndexes.size() < 2) {
@@ -1034,7 +1049,8 @@ void CompressedPathGraph1A::detangleChokePointChain(
     cout << "Detangling a choke point chain with " << chain.chokePoints.size() << " choke points." << endl;
     writeChokePointChain(chain);
 
-    // Compute tangle matrices for near pairs of bubbles.
+    // Use tangle matrices for near pairs of bubbles to create a PhasingGraph.
+    PhasingGraph phasingGraph(chain.diploidBubblesIndexes.size());
     for(uint64_t i0=0; i0<chain.diploidBubblesIndexes.size()-1; i0++) {
         const uint64_t j0 = chain.diploidBubblesIndexes[i0];
         const Superbubble& diploidBubble0 = chain.superbubbles[j0];
@@ -1063,9 +1079,85 @@ void CompressedPathGraph1A::detangleChokePointChain(
                 }
             }
 
-        }
+            // Analyze the tangle matrix.
+            int64_t phase;
+            uint64_t minConcordant;
+            uint64_t maxDiscordant;
+            tangleMatrix.analyze(detangleThresholdLow, detangleThresholdHigh,
+                phase, minConcordant, maxDiscordant);
+            if(phase == 0) {
+                cout << "Ambiguous";
+            } else {
+                if (phase == 1) {
+                    cout << "In phase";
+                } else {
+                    cout << "Out of phase";
+                }
+                cout << " minConcordant " << minConcordant;
+                cout << " maxDiscordant " << maxDiscordant;
+            }
+            cout << endl;
 
+            // If not ambiguous, add an edge to the PhasingGraph.
+            if(phase != 0) {
+                phasingGraph.addEdge(i0, i1, {phase, minConcordant, maxDiscordant});
+            }
+        }
     }
+
+    phasingGraph.writeGraphviz(cout, "PhasingGraph_" + to_string(chokePointChainId));
+}
+
+
+
+CompressedPathGraph1A::PhasingGraph::PhasingGraph(uint64_t bubbleCount)
+{
+    PhasingGraph& phasingGraph = *this;
+
+    for(uint64_t bubbleId=0; bubbleId<bubbleCount; bubbleId++) {
+        vertexMap.insert(make_pair(bubbleId, add_vertex({bubbleId}, phasingGraph)));
+    }
+}
+
+
+void CompressedPathGraph1A::PhasingGraph::writeGraphviz(ostream& s, const string& name) const
+{
+    const PhasingGraph& phasingGraph = *this;
+
+    s << "graph " << name << " {\n";
+
+    BGL_FORALL_VERTICES(v, phasingGraph, PhasingGraph) {
+        s << phasingGraph[v].bubbleId << ";\n";
+    }
+
+    BGL_FORALL_EDGES(e, phasingGraph, PhasingGraph) {
+        const vertex_descriptor v0 = source(e, phasingGraph);
+        const vertex_descriptor v1 = target(e, phasingGraph);
+        s << phasingGraph[v0].bubbleId << "--";
+        s << phasingGraph[v1].bubbleId << ";\n";
+    }
+
+    s << "}\n";
+}
+
+
+void CompressedPathGraph1A::PhasingGraph::addEdge(
+    uint64_t bubbleId0,
+    uint64_t bubbleId1,
+    const PhasingGraphEdge& edge)
+{
+    PhasingGraph& phasingGraph = *this;
+
+    // Get the vertices corresponding to these bubbles.
+    auto it0 = vertexMap.find(bubbleId0);
+    auto it1 = vertexMap.find(bubbleId1);
+    SHASTA_ASSERT(it0 != vertexMap.end());
+    SHASTA_ASSERT(it1 != vertexMap.end());
+    const vertex_descriptor v0 = it0->second;
+    const vertex_descriptor v1 = it1->second;
+
+    // Add the edge.
+    add_edge(v0, v1, edge, phasingGraph);
 }
 
 
@@ -1528,6 +1620,63 @@ uint64_t CompressedPathGraph1A::TangleMatrix::inDegree() const
 uint64_t CompressedPathGraph1A::TangleMatrix::outDegree() const
 {
     return outEdges.size();
+}
+
+
+
+// Analyze the TangleMatrix.
+// A matrix element is considered negigible and treated as zero if it is <= lowThreshold.
+// A matrix element is considered significantly meaningful if it is >= highThreshold.
+// Otherwise a matrix element is considered ambiguous.
+void CompressedPathGraph1A::TangleMatrix::analyze(
+    uint64_t lowThreshold,
+    uint64_t highThreshold,
+    int64_t& phase,
+    uint64_t& minConcordant,
+    uint64_t& maxDiscordant) const
+{
+    SHASTA_ASSERT(inDegree() == 2);
+    SHASTA_ASSERT(inDegree() == 2);
+
+    // Classify matrix elements:
+    // 0 = low (<=lowThreshold)
+    // 1 = ambiguous (>lowThreshold, <highThreshold
+    // 2 = high (>=highThreshold)
+    array< array<uint64_t, 2>, 2> c;
+    for(uint64_t i=0; i<2; i++) {
+        for(uint64_t j=0; j<2; j++) {
+            const uint64_t matrixElement = m[i][j];
+            uint64_t& classification = c[i][j];
+            if(matrixElement <= lowThreshold) {
+                classification = 0;
+            } else if(matrixElement >= highThreshold) {
+                classification = 2;
+            } else {
+                classification = 1;
+            }
+        }
+    }
+
+    // Check if this tangle matrix is unambiguously in phase.
+    if(c[0][0]==2 and c[1][1]==2 and c[0][1]==0 and c[1][0]==0) {
+        phase = +1;
+        minConcordant = min(m[0][0], m[1][1]);
+        maxDiscordant = max(m[0][1], m[1][0]);
+    }
+
+    // Check if this tangle matrix is unambiguously out of phase.
+    else if(c[0][1]==2 and c[1][0]==2 and c[0][0]==0 and c[1][1]==0) {
+        phase = -1;
+        minConcordant = min(m[0][1], m[1][0]);
+        maxDiscordant = max(m[0][0], m[0][0]);
+    }
+
+    // Otherwise, it is ambiguous.
+    else {
+        phase = 0;
+        minConcordant = 0;
+        maxDiscordant = 0;
+    }
 }
 
 

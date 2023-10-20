@@ -647,11 +647,17 @@ private:
     */
     void detangleUsingChokePoints(
         uint64_t pathLengthForChokePoints,
-        uint64_t maxBubbleIndexDelta);
+        uint64_t maxBubbleIndexDelta,
+        uint64_t detangleThresholdLow,
+        uint64_t detangleThresholdHigh
+        );
     class ChokePointChain;
     void detangleChokePointChain(
         ChokePointChain&,
-        uint64_t maxBubbleIndexDelta);
+        uint64_t chokePointChainId,
+        uint64_t maxBubbleIndexDelta,
+        uint64_t detangleThresholdLow,
+        uint64_t detangleThresholdHigh);
 
 
 
@@ -672,6 +678,17 @@ private:
 
         uint64_t inDegree() const;
         uint64_t outDegree() const;
+
+        // Analyze the TangleMatrix.
+        // A matrix element is considered negigible and treated as zero if it is <= lowThreshold.
+        // A matrix element is considered significantly meaningful if it is >= highThreshold.
+        // Otherwise a matrix element is considered ambiguous.
+        void analyze(
+            uint64_t lowThreshold,
+            uint64_t highThreshold,
+            int64_t& phase,
+            uint64_t& minConcordant,
+            uint64_t& maxDiscordant) const;
     };
     void computeTangleMatrix(
         vertex_descriptor,
@@ -748,6 +765,45 @@ private:
         vertex_descriptor,
         vector<vertex_descriptor>&,
         vector<edge_descriptor>&) const;
+
+
+
+    // The PhasingGraph is used by detangleUsingChokePoints to phase
+    // the diploid bubbles in a ChokePointChain.
+    // It is an undirected graph in which each vertex represents a diploid bubble.
+    class PhasingGraphVertex {
+    public:
+        // The id in the ChokePointChain of the diploid bubble represented by this vertex.
+        // This is an index into ChokePointChain::diploidBubblesIndexes and numbers
+        // the bubbles from 0 to the number of diploid bubbles in the ChokePointChain minus 1.
+        uint64_t bubbleId;
+    };
+    class PhasingGraphEdge {
+    public:
+        int64_t phase;          // +1 (in phase) or -1 (out of phase)
+
+        // Tangle matrix metrics.
+        // If phase = +1, minConcordant = min(m00, m11), maxDiscordant = max(m01, m10).
+        // If phase = -1, minConcordant = min(m01, m10), maxDiscordant = max(m00, m11).
+        uint64_t minConcordant;
+        uint64_t maxDiscordant;
+    };
+    using PhasingGraphBaseClass = boost::adjacency_list<
+        boost::listS,
+        boost::vecS,
+        boost::undirectedS,
+        PhasingGraphVertex,
+        PhasingGraphEdge>;
+    class PhasingGraph : public PhasingGraphBaseClass {
+    public:
+        PhasingGraph(uint64_t bubbleCount);
+        void addEdge(uint64_t bubbleId0, uint64_t bubbleId1, const PhasingGraphEdge& edge);
+
+        // Map bubble indexes to vertices.
+        std::map<uint64_t, vertex_descriptor> vertexMap;
+
+        void writeGraphviz(ostream&, const string& name) const;
+    };
 
 
 
