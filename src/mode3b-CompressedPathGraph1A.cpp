@@ -1334,7 +1334,8 @@ void CompressedPathGraph1A::findChokePointChains(
             const vertex_descriptor cv1 = chokePointChain.chokePoints[i];
             chokePointChain.superbubbles.emplace_back();
             Superbubble& superbubble = chokePointChain.superbubbles.back();
-            findVerticesBetweenChokePoints(cv0, cv1, superbubble.internalVertices);
+            findVerticesAndEdgesBetweenChokePoints(cv0, cv1,
+                superbubble.internalVertices, superbubble.internalEdges);
 
             // Figure out if this superbubble is a diploid bubble.
             if(out_degree(cv0, cGraph) != 2) {
@@ -1359,10 +1360,11 @@ void CompressedPathGraph1A::findChokePointChains(
 
 
 
-void CompressedPathGraph1A::findVerticesBetweenChokePoints(
+void CompressedPathGraph1A::findVerticesAndEdgesBetweenChokePoints(
     vertex_descriptor cv0,
     vertex_descriptor cv1,
-    vector<vertex_descriptor>& interveningVertices) const
+    vector<vertex_descriptor>& interveningVertices,
+    vector<edge_descriptor>& interveningEdges) const
 {
     const CompressedPathGraph1A& cGraph = *this;
 
@@ -1386,6 +1388,18 @@ void CompressedPathGraph1A::findVerticesBetweenChokePoints(
     visitedVertices.erase(cv0);
     interveningVertices.clear();
     copy(visitedVertices.begin(), visitedVertices.end(), back_inserter(interveningVertices));
+
+
+    // The intervening edges are the out-edges of cv0 plus the out-edges of the internal vertices.
+    interveningEdges.clear();
+    BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1A) {
+        interveningEdges.push_back(ce);
+    }
+    for(const vertex_descriptor cv: interveningVertices) {
+        BGL_FORALL_OUTEDGES(cv, ce, cGraph, CompressedPathGraph1A) {
+            interveningEdges.push_back(ce);
+        }
+    }
 }
 
 
@@ -1409,9 +1423,18 @@ void CompressedPathGraph1A::writeChokePointChain(const ChokePointChain& chain) c
         if(superbubble.internalVertices.empty()) {
             cout << " no vertices";
         } else {
+            cout << " vertices ";
             for(const vertex_descriptor cv: superbubble.internalVertices) {
                 const PathGraph1::vertex_descriptor v = cGraph[cv].v;
                 cout << " " << graph[v].edgeId;
+            }
+        }
+        if(superbubble.internalEdges.empty()) {
+            cout << ", no edges";
+        } else {
+            cout << ", edges";
+            for(const edge_descriptor ce: superbubble.internalEdges) {
+                cout << " " << edgeStringId(ce);
             }
         }
         if(superbubble.isDiploidBubble) {

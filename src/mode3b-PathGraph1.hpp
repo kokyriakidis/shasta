@@ -724,6 +724,7 @@ private:
     class Superbubble {
     public:
         vector<vertex_descriptor> internalVertices;
+        vector<edge_descriptor> internalEdges;
         bool isDiploidBubble = false;
         vector<edge_descriptor> diploidEdges; // Only if isDiploidBubble is true;
     };
@@ -738,11 +739,11 @@ private:
     };
     void findChokePointChains(uint64_t pathLengthForChokePoints, vector<ChokePointChain>&) const;
     // void analyzeChokePoints() const;
-    void findVerticesBetweenChokePoints(
+    void findVerticesAndEdgesBetweenChokePoints(
         vertex_descriptor,
         vertex_descriptor,
-        vector<vertex_descriptor>&
-    ) const;
+        vector<vertex_descriptor>&,
+        vector<edge_descriptor>&) const;
 
 
 
