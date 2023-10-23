@@ -1023,21 +1023,22 @@ void CompressedPathGraph1A::detangleUsingChokePoints(
     vector<ChokePointChain> chokePointChains;
     findChokePointChains(pathLengthForChokePoints, chokePointChains);
 
+    uint64_t totalInconsistentEdgeCount = 0;
     for(uint64_t chokePointChainId=0; chokePointChainId<chokePointChains.size(); chokePointChainId++) {
         ChokePointChain& chokePointChain = chokePointChains[chokePointChainId];
-        detangleChokePointChain(
+        totalInconsistentEdgeCount += detangleChokePointChain(
             chokePointChain,
             chokePointChainId,
             maxBubbleIndexDelta,
             detangleThresholdLow,
             detangleThresholdHigh);
     }
-
+    cout << "Total number of inconsistent phasing graph edges " << totalInconsistentEdgeCount << endl;
 }
 
 
 
-void CompressedPathGraph1A::detangleChokePointChain(
+uint64_t CompressedPathGraph1A::detangleChokePointChain(
     ChokePointChain& chain,
     uint64_t chokePointChainId,
     uint64_t maxBubbleIndexDelta,
@@ -1046,7 +1047,7 @@ void CompressedPathGraph1A::detangleChokePointChain(
 {
     // If the chain has less that 2 diploid bubbles, don't do anything.
     if(chain.diploidBubblesIndexes.size() < 2) {
-        return;
+        return 0;
     }
 
     cout << "Detangling a choke point chain with " << chain.chokePoints.size() << " choke points." << endl;
@@ -1107,8 +1108,10 @@ void CompressedPathGraph1A::detangleChokePointChain(
             }
         }
     }
-    phasingGraph.phase();
+    const uint64_t inconsistentEdgeCount = phasingGraph.phase();
     phasingGraph.writeGraphviz(cout, "PhasingGraph_" + to_string(chokePointChainId));
+
+    return inconsistentEdgeCount;
 }
 
 
@@ -1121,7 +1124,8 @@ CompressedPathGraph1A::PhasingGraph::PhasingGraph(uint64_t bubbleCount) :
 
 
 // Assign a phase to a subset of the vertices.
-void CompressedPathGraph1A::PhasingGraph::phase()
+// Return the number of inconsistent edges.
+uint64_t CompressedPathGraph1A::PhasingGraph::phase()
 {
     PhasingGraph& phasingGraph = *this;
     const uint64_t vertexCount = num_vertices(phasingGraph);
@@ -1140,8 +1144,8 @@ void CompressedPathGraph1A::PhasingGraph::phase()
         const vertex_descriptor v0 = source(e, phasingGraph);
         const vertex_descriptor v1 = target(e, phasingGraph);
         cout <<
-            phasingGraph[v0].bubbleId << " " <<
-            phasingGraph[v1].bubbleId << " " <<
+            v0 << " " <<
+            v1 << " " <<
             edge.phase << " " <<
             edge.minConcordant << " " <<
             edge.maxDiscordant << endl;
@@ -1169,6 +1173,88 @@ void CompressedPathGraph1A::PhasingGraph::phase()
         }
     }
 
+    // Gather the vertices in each connected component.
+    vector< vector<vertex_descriptor> > components(vertexCount);
+    BGL_FORALL_VERTICES(v, phasingGraph, PhasingGraph) {
+        const uint64_t componentId = disjointSets.find_set(v);
+        components[componentId].push_back(v);
+    }
+
+    // Find the largest component and flag its vertices.
+    uint64_t largestComponentId = invalid<uint64_t>;
+    uint64_t largestComponentSize = 0;
+    for(uint64_t componentId=0; componentId<components.size(); componentId++) {
+        const vector<vertex_descriptor>& component = components[componentId];
+        const uint64_t componentSize = component.size();
+        if(componentSize > largestComponentSize) {
+            largestComponentSize = componentSize;
+            largestComponentId = componentId;
+        }
+    }
+    const vector<vertex_descriptor>& largestComponent = components[largestComponentId];
+    for(const vertex_descriptor v: largestComponent) {
+        phasingGraph[v].isInLargestComponent = true;
+    }
+
+
+    // Use the spanning tree to phase vertices in the largest component.
+    const vertex_descriptor vFirst = largestComponent.front();
+    phasingGraph[vFirst].phase = +1;
+    std::queue<vertex_descriptor> q;
+    q.push(vFirst);
+    while(not q.empty()) {
+        const vertex_descriptor v0 = q.front();
+        q.pop();
+        BGL_FORALL_OUTEDGES(v0, e, phasingGraph, PhasingGraph) {
+            PhasingGraphEdge& edge = phasingGraph[e];
+            if(not edge.isSpanningTreeEdge) {
+                continue;
+            }
+            const PhasingGraphVertex& vertex0 = phasingGraph[v0];
+            const vertex_descriptor v1 = target(e, phasingGraph);
+            PhasingGraphVertex& vertex1 = phasingGraph[v1];
+            if(vertex1.phase == 0) {
+                vertex1.phase = vertex0.phase;
+                if(edge.phase == -1) {
+                    vertex1.phase = - vertex1.phase;
+                }
+                q.push(v1);
+            }
+        }
+    }
+
+    uint64_t inconsistentEdgeCount = 0;
+    BGL_FORALL_EDGES(e, phasingGraph, PhasingGraph) {
+        if(not isConsistent(e)) {
+            ++inconsistentEdgeCount;
+        }
+    }
+    return inconsistentEdgeCount;
+}
+
+
+
+bool CompressedPathGraph1A::PhasingGraph::isConsistent(edge_descriptor e) const
+{
+    const PhasingGraph& phasingGraph = *this;
+    const PhasingGraphEdge& edge = phasingGraph[e];
+    if(edge.phase == 0) {
+        return true;
+    }
+
+    const vertex_descriptor v0 = source(e, phasingGraph);
+    const vertex_descriptor v1 = target(e, phasingGraph);
+    const PhasingGraphVertex& vertex0 = phasingGraph[v0];
+    const PhasingGraphVertex& vertex1 = phasingGraph[v1];
+
+    if(vertex0.phase==0 or vertex1.phase==0) {
+        return true;
+    }
+
+    return
+        (edge.phase == +1 and vertex0.phase == vertex1.phase)
+        or
+        (edge.phase == -1 and vertex0.phase == -vertex1.phase);
 }
 
 
@@ -1179,26 +1265,79 @@ void CompressedPathGraph1A::PhasingGraph::writeGraphviz(ostream& s, const string
 
     s << "graph " << name << " {\n";
 
+
+
     BGL_FORALL_VERTICES(v, phasingGraph, PhasingGraph) {
-        s << v << ";\n";
+        const PhasingGraphVertex& vertex = phasingGraph[v];
+        s << v;
+
+        s << " [style=filled fillcolor=";
+        if(vertex.isInLargestComponent) {
+            SHASTA_ASSERT(not vertex.phase==0);
+            if(vertex.phase == +1) {
+                s << "cyan";
+            } else {
+                s << "lightcoral";
+            }
+        } else {
+            s << "lightgray";
+        }
+        s << "]";
+
+        s << ";\n";
     }
+
+
 
     BGL_FORALL_EDGES(e, phasingGraph, PhasingGraph) {
         const PhasingGraphEdge& edge = phasingGraph[e];
         const vertex_descriptor v0 = source(e, phasingGraph);
         const vertex_descriptor v1 = target(e, phasingGraph);
+        const PhasingGraphVertex& vertex0 = phasingGraph[v0];
+        const PhasingGraphVertex& vertex1 = phasingGraph[v1];
+        SHASTA_ASSERT(edge.phase != 0);
+
         s <<
             v0 << "--" <<
             v1 <<
             " [";
 
-        s << "label=\"";
+        s << " penwidth=" << 0.3 * double(edge.minConcordant);
+
+        s << " tooltip=\"";
         cout << ((edge.phase == +1) ? "+" : "-");
-        cout << "," << edge.minConcordant << "," << edge.maxDiscordant;
+        cout << " " << edge.minConcordant << " " << edge.maxDiscordant;
         s << "\"";
 
-        if(not edge.isSpanningTreeEdge) {
-            s << " style=dashed";
+        if(phasingGraph[v0].isInLargestComponent) {
+            SHASTA_ASSERT(vertex0.phase != 0);
+            SHASTA_ASSERT(vertex1.phase != 0);
+
+            // Figure out if the edge and vertex phases are consistent.
+            const bool edgeIsConsistent = isConsistent(e);
+            if(edge.isSpanningTreeEdge) {
+                SHASTA_ASSERT(edgeIsConsistent);
+            }
+
+            // Color.
+            if(edgeIsConsistent) {
+                if(edge.phase == +1) {
+                    s << " color=green";
+                } else {
+                    s << " color=red";
+                }
+            } else {
+                s << " color=magenta";
+            }
+
+            // Style.
+            if(not edge.isSpanningTreeEdge) {
+                s << " style=dashed";
+            }
+        }
+
+        else {
+            s << " color=lightgray";
         }
 
         s << "];\n";

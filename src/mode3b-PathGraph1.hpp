@@ -652,7 +652,7 @@ private:
         uint64_t detangleThresholdHigh
         );
     class ChokePointChain;
-    void detangleChokePointChain(
+    uint64_t detangleChokePointChain(
         ChokePointChain&,
         uint64_t chokePointChainId,
         uint64_t maxBubbleIndexDelta,
@@ -776,6 +776,8 @@ private:
     // (index in bubbleChainIndexes).
     class PhasingGraphVertex {
     public:
+        int64_t phase = 0;  // +1 or -1 for phase vertices, 0 otherwise
+        bool isInLargestComponent = false;
     };
     class PhasingGraphEdge {
     public:
@@ -811,7 +813,10 @@ private:
         void addEdge(uint64_t bubbleId0, uint64_t bubbleId1, const PhasingGraphEdge& edge);
 
         // Assign a phase to a subset of the vertices.
-        void phase();
+        // Return the number of inconsistent edges.
+        uint64_t phase();
+
+        bool isConsistent(edge_descriptor) const;
 
         void writeGraphviz(ostream&, const string& name) const;
     };
