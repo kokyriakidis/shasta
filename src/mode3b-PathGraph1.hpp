@@ -586,6 +586,9 @@ public:
 class shasta::mode3b::CompressedPathGraph1AVertex {
 public:
     PathGraph1::vertex_descriptor v;
+
+    // The id of the ChokePointChain that this vertex belongs to, if any.
+    uint64_t chokePointChainId = invalid<uint64_t>;
 };
 
 
@@ -594,6 +597,9 @@ class shasta::mode3b::CompressedPathGraph1AEdge {
 public:
     uint64_t id;
     vector<MarkerGraphEdgeId> chain;
+
+    // The id of the ChokePointChain that this edge belongs to, if any.
+    uint64_t chokePointChainId = invalid<uint64_t>;
 };
 
 
@@ -757,6 +763,13 @@ private:
         // The indexes of the diploid bubbles in the superbubbles vector.
         // Indexes into this vector can be used as ids for diploid bubbles during phasing.
         vector<uint64_t> diploidBubblesIndexes;
+
+        void getAllVertices(vector<vertex_descriptor>&) const;
+        void getAllEdges(vector<edge_descriptor>&) const;
+
+        // Flag that indicates this ChokePointChain overlaps another, larger ChokePointChain,
+        // and should be discarded.
+        bool discard = false;
     };
     void findChokePointChains(uint64_t pathLengthForChokePoints, vector<ChokePointChain>&) const;
     // void analyzeChokePoints() const;
@@ -765,6 +778,7 @@ private:
         vertex_descriptor,
         vector<vertex_descriptor>&,
         vector<edge_descriptor>&) const;
+    void flagOverlappingChokePointChains(vector<ChokePointChain>&);
 
 
 
@@ -828,6 +842,9 @@ private:
     // Get the vertex_descriptor corresponding to a PathGraph1::vertex_descriptor,
     // adding a vertex if necessary.
     vertex_descriptor getCompressedVertex(PathGraph1::vertex_descriptor);
+
+    // Get the MarkerGraphEdgeId corresponding to a given vertex.
+    MarkerGraphEdgeId markerGraphVertexId(vertex_descriptor) const;
 
     // Get MarkerGraphEdgeIds at the beginning and end of each edge.
     MarkerGraphEdgeId firstMarkerGraphEdgeId(edge_descriptor) const;

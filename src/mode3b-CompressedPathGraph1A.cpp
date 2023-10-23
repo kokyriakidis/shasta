@@ -124,6 +124,16 @@ CompressedPathGraph1A::vertex_descriptor CompressedPathGraph1A::getCompressedVer
 
 
 
+// Get the MarkerGraphEdgeId corresponding to a given vertex.
+MarkerGraphEdgeId CompressedPathGraph1A::markerGraphVertexId(vertex_descriptor cv) const
+{
+    const CompressedPathGraph1A& cGraph = *this;
+    const PathGraph1::vertex_descriptor v = cGraph[cv].v;
+    return graph[v].edgeId;
+}
+
+
+
 MarkerGraphEdgeId CompressedPathGraph1A::firstMarkerGraphEdgeId(edge_descriptor ce) const
 {
     const CompressedPathGraph1A& cGraph = *this;
@@ -1022,10 +1032,16 @@ void CompressedPathGraph1A::detangleUsingChokePoints(
 {
     vector<ChokePointChain> chokePointChains;
     findChokePointChains(pathLengthForChokePoints, chokePointChains);
+    flagOverlappingChokePointChains(chokePointChains);
+
 
     uint64_t totalInconsistentEdgeCount = 0;
     for(uint64_t chokePointChainId=0; chokePointChainId<chokePointChains.size(); chokePointChainId++) {
         ChokePointChain& chokePointChain = chokePointChains[chokePointChainId];
+        if(chokePointChain.discard) {
+            continue;
+        }
+
         totalInconsistentEdgeCount += detangleChokePointChain(
             chokePointChain,
             chokePointChainId,
@@ -1049,6 +1065,11 @@ uint64_t CompressedPathGraph1A::detangleChokePointChain(
     if(chain.diploidBubblesIndexes.size() < 2) {
         return 0;
     }
+
+    // If any vertices or edges internal to this ChokePointChain have already been
+    // removed while detangling another ChokePointChain, skip this ChokePointChain.
+    // This is unusual but can happen.
+
 
     cout << "Detangling a choke point chain with " << chain.chokePoints.size() << " choke points." << endl;
     writeChokePointChain(chain);
@@ -1110,6 +1131,24 @@ uint64_t CompressedPathGraph1A::detangleChokePointChain(
     }
     const uint64_t inconsistentEdgeCount = phasingGraph.phase();
     phasingGraph.writeGraphviz(cout, "PhasingGraph_" + to_string(chokePointChainId));
+
+
+
+    // Find the first and last phased diploid bubbles.
+    // They define the portion of the ChokePointChain that will be phased.
+    uint64_t firstPhasedBubbleId = invalid<uint64_t>;
+    uint64_t lastPhasedBubbleId = invalid<uint64_t>;
+    BGL_FORALL_VERTICES(bubbleId, phasingGraph, PhasingGraph) {
+        if(phasingGraph[bubbleId].phase != 0) {
+            if(firstPhasedBubbleId == invalid<uint64_t>) {
+                firstPhasedBubbleId = bubbleId;
+            }
+            lastPhasedBubbleId = bubbleId;
+        }
+    }
+    cout << "First phased diploid bubble " << firstPhasedBubbleId <<
+        ", last phased diploid bubble " << lastPhasedBubbleId << endl;
+
 
     return inconsistentEdgeCount;
 }
@@ -1644,6 +1683,101 @@ void CompressedPathGraph1A::findChokePointChains(
         }
     }
 
+}
+
+
+
+// If a ChokePointChain overlaps a previous (larger) ChokePointChain,
+// mark it as discard. This is unusual but can happen.
+void CompressedPathGraph1A::flagOverlappingChokePointChains(
+    vector<ChokePointChain>& chains)
+{
+    CompressedPathGraph1A& cGraph = *this;
+
+    vector<vertex_descriptor> chainVertices;
+    vector<edge_descriptor> chainEdges;
+    uint64_t discardCount = 0;
+    for(uint64_t chokePointChainId=0; chokePointChainId<chains.size(); chokePointChainId++) {
+        ChokePointChain& chain = chains[chokePointChainId];
+        cout << "Checking choke point chain " << chokePointChainId << " " <<
+            markerGraphVertexId(chain.chokePoints.front()) << "..." <<
+            markerGraphVertexId(chain.chokePoints.back()) << endl;
+
+        chain.getAllVertices(chainVertices);
+        chain.getAllEdges(chainEdges);
+
+        // Find out if this ChokePointChain overlaps a previous one.
+        // This is the case if any of its vertices or edges are already assigned
+        // to another ChokePointChain.
+        bool overlaps = false;
+        for(const vertex_descriptor cv: chainVertices) {
+            if(cGraph[cv].chokePointChainId != invalid<uint64_t>) {
+                overlaps = true;
+                cout << "Overlaps choke point chain " << cGraph[cv].chokePointChainId << endl;
+                break;
+            }
+        }
+        if(not overlaps) {
+            for(const edge_descriptor ce: chainEdges) {
+                if(cGraph[ce].chokePointChainId != invalid<uint64_t>) {
+                    overlaps = true;
+                    cout << "Overlaps choke point chain " << cGraph[ce].chokePointChainId << endl;
+                    break;
+                }
+            }
+        }
+
+
+
+        if(overlaps) {
+            chain.discard = true;
+            ++discardCount;
+            cout << "Choke point chain " << chokePointChainId << " " <<
+                markerGraphVertexId(chain.chokePoints.front()) << "..." <<
+                markerGraphVertexId(chain.chokePoints.back()) << " with " <<
+                chain.chokePoints.size() << " choke points discarded due to overlap." << endl;
+        } else {
+            for(const vertex_descriptor cv: chainVertices) {
+                cGraph[cv].chokePointChainId = chokePointChainId;
+            }
+            for(const edge_descriptor ce: chainEdges) {
+                cGraph[ce].chokePointChainId = chokePointChainId;
+            }
+        }
+    }
+    cout << "Flagged " << discardCount <<
+        " choke point chains as discarded." << endl;
+}
+
+
+
+void CompressedPathGraph1A::ChokePointChain::getAllVertices(
+    vector<vertex_descriptor>& chainVertices) const
+{
+    chainVertices.clear();
+    for(const vertex_descriptor chokePoint: chokePoints) {
+        chainVertices.push_back(chokePoint);
+    }
+    for(const Superbubble& superbubble: superbubbles) {
+        copy(
+            superbubble.internalVertices.begin(),
+            superbubble.internalVertices.end(),
+            back_inserter(chainVertices));
+    }
+}
+
+
+
+void CompressedPathGraph1A::ChokePointChain::getAllEdges(
+    vector<edge_descriptor>& chainEdges) const
+{
+    chainEdges.clear();
+    for(const Superbubble& superbubble: superbubbles) {
+        copy(
+            superbubble.internalEdges.begin(),
+            superbubble.internalEdges.end(),
+            back_inserter(chainEdges));
+    }
 }
 
 
