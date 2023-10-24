@@ -595,7 +595,7 @@ public:
 
 class shasta::mode3b::CompressedPathGraph1AEdge {
 public:
-    uint64_t id;
+    uint64_t id = invalid<uint64_t>;
     vector<MarkerGraphEdgeId> chain;
 
     // The id of the ChokePointChain that this edge belongs to, if any.
@@ -844,7 +844,7 @@ private:
     vertex_descriptor getCompressedVertex(PathGraph1::vertex_descriptor);
 
     // Get the MarkerGraphEdgeId corresponding to a given vertex.
-    MarkerGraphEdgeId markerGraphVertexId(vertex_descriptor) const;
+    MarkerGraphEdgeId markerGraphEdgeId(vertex_descriptor) const;
 
     // Get MarkerGraphEdgeIds at the beginning and end of each edge.
     MarkerGraphEdgeId firstMarkerGraphEdgeId(edge_descriptor) const;

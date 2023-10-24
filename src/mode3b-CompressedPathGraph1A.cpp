@@ -125,7 +125,7 @@ CompressedPathGraph1A::vertex_descriptor CompressedPathGraph1A::getCompressedVer
 
 
 // Get the MarkerGraphEdgeId corresponding to a given vertex.
-MarkerGraphEdgeId CompressedPathGraph1A::markerGraphVertexId(vertex_descriptor cv) const
+MarkerGraphEdgeId CompressedPathGraph1A::markerGraphEdgeId(vertex_descriptor cv) const
 {
     const CompressedPathGraph1A& cGraph = *this;
     const PathGraph1::vertex_descriptor v = cGraph[cv].v;
@@ -180,6 +180,8 @@ MarkerGraphEdgeId CompressedPathGraph1A::secondToLastMarkerGraphEdgeId(edge_desc
 
 void CompressedPathGraph1A::writeGfaAndGraphviz(const string& fileNamePrefix) const
 {
+    cout << "CompressedPathGraph1A " << fileNamePrefix << ": " << num_vertices(*this) <<
+        " vertices, " << num_edges(*this) << " edges." << endl;
     writeGfa(fileNamePrefix);
     writeGraphviz(fileNamePrefix);
 }
@@ -231,9 +233,6 @@ void CompressedPathGraph1A::writeGfa(const string& fileNamePrefix) const
 void CompressedPathGraph1A::writeGraphviz(const string& fileNamePrefix) const
 {
     const CompressedPathGraph1A& cGraph = *this;
-
-    cout << fileNamePrefix << ": " << num_vertices(cGraph) <<
-        " vertices, " << num_edges(cGraph) << " edges." << endl;
 
     ofstream dot("CompressedPathGraph1A-" + to_string(componentId) + "-" + fileNamePrefix + ".dot");
     dot << "digraph CompressedPathGraph1A_" << componentId << " {\n";
@@ -303,6 +302,8 @@ void CompressedPathGraph1A::detangle(
         detangleEdges(
             detangleThresholdLow,
             detangleThresholdHigh));
+
+    writeGfaAndGraphviz("A");
 
     detangleUsingChokePoints(
         pathLengthForChokePoints,
@@ -1061,6 +1062,8 @@ uint64_t CompressedPathGraph1A::detangleChokePointChain(
     uint64_t detangleThresholdLow,
     uint64_t detangleThresholdHigh)
 {
+    CompressedPathGraph1A& cGraph = *this;
+
     // If the chain has less that 2 diploid bubbles, don't do anything.
     if(chain.diploidBubblesIndexes.size() < 2) {
         return 0;
@@ -1148,7 +1151,74 @@ uint64_t CompressedPathGraph1A::detangleChokePointChain(
     }
     cout << "First phased diploid bubble " << firstPhasedBubbleId <<
         ", last phased diploid bubble " << lastPhasedBubbleId << endl;
+    const uint64_t firstPhasedSuperbubbleIndex = chain.diploidBubblesIndexes[firstPhasedBubbleId];
+    const uint64_t lastPhasedSuperbubbleIndex = chain.diploidBubblesIndexes[lastPhasedBubbleId];
+    cout << "Superbubble indexes of first/last phased diploid bubbles: " <<
+        firstPhasedSuperbubbleIndex << " " << lastPhasedSuperbubbleIndex << endl;
 
+
+
+    // Create two new edges that will replace the ChokePointChain portion
+    // between the first and last phased diploid bubbles.
+    const vertex_descriptor cv0 = chain.chokePoints[firstPhasedSuperbubbleIndex];
+    const vertex_descriptor cv1 = chain.chokePoints[lastPhasedSuperbubbleIndex + 1];
+    array<edge_descriptor, 2> ceNew;
+    tie(ceNew[0], ignore) = add_edge(cv0, cv1, cGraph);
+    tie(ceNew[1], ignore) = add_edge(cv0, cv1, cGraph);
+    CompressedPathGraph1AEdge& newEdge0 = cGraph[ceNew[0]];
+    CompressedPathGraph1AEdge& newEdge1 = cGraph[ceNew[1]];
+    newEdge0.id = nextEdgeId++;
+    newEdge1.id = nextEdgeId++;
+    cout << "Creating new edges " << edgeStringId(ceNew[0]) << " " << edgeStringId(ceNew[1]) << endl;
+    for(uint64_t bubbleId=firstPhasedBubbleId; bubbleId<=lastPhasedBubbleId; bubbleId++) {
+        const int64_t phase = phasingGraph[bubbleId].phase;
+        if(phase == 0) {
+            continue;
+        }
+        const Superbubble& superbubble = chain.superbubbles[chain.diploidBubblesIndexes[bubbleId]];
+        SHASTA_ASSERT(superbubble.isDiploidBubble);
+
+        // Get the diploid edges.
+        SHASTA_ASSERT(superbubble.diploidEdges.size() == 2);
+        array<edge_descriptor, 2> ceOld = {superbubble.diploidEdges[0], superbubble.diploidEdges[1]};
+        if(phase == -1) {
+            std::swap(ceOld[0], ceOld[1]);
+        }
+        const CompressedPathGraph1AEdge& oldEdge0 = cGraph[ceOld[0]];
+        const CompressedPathGraph1AEdge& oldEdge1 = cGraph[ceOld[1]];
+        copy(oldEdge0.chain.begin(), oldEdge0.chain.end()-1, back_inserter(newEdge0.chain));
+        copy(oldEdge1.chain.begin(), oldEdge1.chain.end()-1, back_inserter(newEdge1.chain));
+    }
+    newEdge0.chain.push_back(markerGraphEdgeId(cv1));
+    newEdge1.chain.push_back(markerGraphEdgeId(cv1));
+
+    // Remove the old vertices and edges.
+    for(uint64_t j=firstPhasedSuperbubbleIndex; j<=lastPhasedSuperbubbleIndex; j++) {
+        const Superbubble& superbubble = chain.superbubbles[j];
+        for(const edge_descriptor ce: superbubble.internalEdges) {
+            boost::remove_edge(ce, cGraph);
+        }
+        for(const vertex_descriptor cv: superbubble.internalVertices) {
+            if(in_degree(cv, cGraph)>0 or out_degree(cv, cGraph)>0) {
+                cout << "Asserting when attempting to remove vertex " << markerGraphEdgeId(cv) << endl;
+                writeGfaAndGraphviz("AtAssertion");
+            }
+            SHASTA_ASSERT(in_degree(cv, cGraph) == 0);
+            SHASTA_ASSERT(out_degree(cv, cGraph) == 0);
+            boost::remove_vertex(cv, cGraph);
+        }
+    }
+    for(uint64_t j=firstPhasedSuperbubbleIndex+1; j<=lastPhasedSuperbubbleIndex; j++) {
+        const vertex_descriptor cv = chain.chokePoints[j];
+        if(in_degree(cv, cGraph)>0 or out_degree(cv, cGraph)>0) {
+            cout << "Asserting when attempting to remove vertex " << markerGraphEdgeId(cv) << endl;
+            writeGfaAndGraphviz("AtAssertion");
+        }
+        SHASTA_ASSERT(in_degree(cv, cGraph) == 0);
+        SHASTA_ASSERT(in_degree(cv, cGraph) == 0);
+        SHASTA_ASSERT(out_degree(cv, cGraph) == 0);
+        boost::remove_vertex(cv, cGraph);
+    }
 
     return inconsistentEdgeCount;
 }
@@ -1700,8 +1770,8 @@ void CompressedPathGraph1A::flagOverlappingChokePointChains(
     for(uint64_t chokePointChainId=0; chokePointChainId<chains.size(); chokePointChainId++) {
         ChokePointChain& chain = chains[chokePointChainId];
         cout << "Checking choke point chain " << chokePointChainId << " " <<
-            markerGraphVertexId(chain.chokePoints.front()) << "..." <<
-            markerGraphVertexId(chain.chokePoints.back()) << endl;
+            markerGraphEdgeId(chain.chokePoints.front()) << "..." <<
+            markerGraphEdgeId(chain.chokePoints.back()) << endl;
 
         chain.getAllVertices(chainVertices);
         chain.getAllEdges(chainEdges);
@@ -1733,8 +1803,8 @@ void CompressedPathGraph1A::flagOverlappingChokePointChains(
             chain.discard = true;
             ++discardCount;
             cout << "Choke point chain " << chokePointChainId << " " <<
-                markerGraphVertexId(chain.chokePoints.front()) << "..." <<
-                markerGraphVertexId(chain.chokePoints.back()) << " with " <<
+                markerGraphEdgeId(chain.chokePoints.front()) << "..." <<
+                markerGraphEdgeId(chain.chokePoints.back()) << " with " <<
                 chain.chokePoints.size() << " choke points discarded due to overlap." << endl;
         } else {
             for(const vertex_descriptor cv: chainVertices) {
