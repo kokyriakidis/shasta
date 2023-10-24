@@ -980,11 +980,17 @@ void PathGraph1::localTransitiveReduction(uint64_t distance)
                     continue;
                 }
 
+                // If eABwas already flagged as removed during transitive reduction,
+                // don't use it.
+                if(graph[eAB].isNonTransitiveReductionEdge) {
+                    continue;
+                }
+
                 // If we reached v1, mark e01 as a nonTransitiveReduction edge
                 // and stop the BFS.
                 const vertex_descriptor vB = target(eAB, graph);
                 if(vB == v1) {
-                    boost::remove_edge(e01, graph);
+                    graph[e01].isNonTransitiveReductionEdge = true;
                     endBfs = true;
                     // cout << "Reached " << v1 << endl;
                     ++histogram[coverage].second;
