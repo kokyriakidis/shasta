@@ -924,6 +924,10 @@ void PathGraph1::localTransitiveReduction(uint64_t distance)
 {
     PathGraph1& graph = *this;
 
+    // Histograms by coverage.
+    // (all edges, only edges removed by transitive reduction.
+    vector< pair<uint64_t, uint64_t> > histogram;
+
     // We want to process edges in order of increasing coverage.
     vector<pair<edge_descriptor, uint64_t> > edgeTable;
     BGL_FORALL_EDGES(e, graph, PathGraph1) {
@@ -936,6 +940,12 @@ void PathGraph1::localTransitiveReduction(uint64_t distance)
         edge_descriptor e01 = p.first;
         const vertex_descriptor v0 = source(e01, graph);
         const vertex_descriptor v1 = target(e01, graph);
+
+        const uint64_t coverage = graph[e01].coverage;
+        if(histogram.size() <= coverage) {
+            histogram.resize(coverage + 1, {0, 0});
+        }
+        ++histogram[coverage].first;
 
         // Do a BFS starting at v0, up to a distance maxPathLength.
         // Stop if we encounter v1.
@@ -977,6 +987,7 @@ void PathGraph1::localTransitiveReduction(uint64_t distance)
                     boost::remove_edge(e01, graph);
                     endBfs = true;
                     // cout << "Reached " << v1 << endl;
+                    ++histogram[coverage].second;
                     break;
                 }
 
@@ -997,6 +1008,16 @@ void PathGraph1::localTransitiveReduction(uint64_t distance)
             }
         }
     }
+
+    cout << "PathGraph1 edge coverage histogram" << endl;
+    cout << "Coverage,All edges,Edges removed by transitive reduction" << endl;
+    for(uint64_t coverage=0; coverage<histogram.size(); coverage++) {
+        const auto& p = histogram[coverage];
+        if(p.first>0 or p.second>0) {
+            cout << coverage << "," << p.first << "," << p.second << endl;
+        }
+    }
+
 
 }
 
