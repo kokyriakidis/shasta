@@ -662,7 +662,8 @@ private:
         uint64_t pathLengthForChokePoints,
         uint64_t maxBubbleIndexDelta,
         uint64_t detangleThresholdLow,
-        uint64_t detangleThresholdHigh
+        uint64_t detangleThresholdHigh,
+        bool debug
         );
     class ChokePointChain;
     uint64_t detangleChokePointChain(
@@ -670,7 +671,8 @@ private:
         uint64_t chokePointChainId,
         uint64_t maxBubbleIndexDelta,
         uint64_t detangleThresholdLow,
-        uint64_t detangleThresholdHigh);
+        uint64_t detangleThresholdHigh,
+        bool debug);
 
 
 
@@ -778,14 +780,19 @@ private:
         // and should be discarded.
         bool discard = false;
     };
-    void findChokePointChains(uint64_t pathLengthForChokePoints, vector<ChokePointChain>&) const;
+    void findChokePointChains(
+        uint64_t pathLengthForChokePoints,
+        vector<ChokePointChain>&,
+        bool debug) const;
     // void analyzeChokePoints() const;
     void findVerticesAndEdgesBetweenChokePoints(
         vertex_descriptor,
         vertex_descriptor,
         vector<vertex_descriptor>&,
         vector<edge_descriptor>&) const;
-    void flagOverlappingChokePointChains(vector<ChokePointChain>&);
+    void flagOverlappingChokePointChains(
+        vector<ChokePointChain>&,
+        bool debug);
 
 
 

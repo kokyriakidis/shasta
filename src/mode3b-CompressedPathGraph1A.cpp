@@ -303,13 +303,17 @@ void CompressedPathGraph1A::detangle(
             detangleThresholdLow,
             detangleThresholdHigh));
 
-    writeGfaAndGraphviz("A");
+    const uint64_t iterationCount = 6;
+    for(uint64_t iteration=0; iteration<iterationCount; iteration++) {
+        writeGfaAndGraphviz("A" + to_string(iteration));
 
-    detangleUsingChokePoints(
-        pathLengthForChokePoints,
-        maxBubbleIndexDelta,
-        detangleThresholdLow,
-        detangleThresholdHigh);
+        detangleUsingChokePoints(
+            pathLengthForChokePoints,
+            maxBubbleIndexDelta,
+            detangleThresholdLow,
+            detangleThresholdHigh,
+            iteration == iterationCount-1);
+    }
 }
 
 
@@ -1029,11 +1033,12 @@ void CompressedPathGraph1A::detangleUsingChokePoints(
     uint64_t pathLengthForChokePoints,
     uint64_t maxBubbleIndexDelta,
     uint64_t detangleThresholdLow,
-    uint64_t detangleThresholdHigh)
+    uint64_t detangleThresholdHigh,
+    bool debug)
 {
     vector<ChokePointChain> chokePointChains;
-    findChokePointChains(pathLengthForChokePoints, chokePointChains);
-    flagOverlappingChokePointChains(chokePointChains);
+    findChokePointChains(pathLengthForChokePoints, chokePointChains, debug);
+    flagOverlappingChokePointChains(chokePointChains, debug);
 
 
     uint64_t totalInconsistentEdgeCount = 0;
@@ -1048,9 +1053,12 @@ void CompressedPathGraph1A::detangleUsingChokePoints(
             chokePointChainId,
             maxBubbleIndexDelta,
             detangleThresholdLow,
-            detangleThresholdHigh);
+            detangleThresholdHigh,
+            debug);
     }
-    cout << "Total number of inconsistent phasing graph edges " << totalInconsistentEdgeCount << endl;
+    if(debug) {
+        cout << "Total number of inconsistent phasing graph edges " << totalInconsistentEdgeCount << endl;
+    }
 }
 
 
@@ -1060,7 +1068,8 @@ uint64_t CompressedPathGraph1A::detangleChokePointChain(
     uint64_t chokePointChainId,
     uint64_t maxBubbleIndexDelta,
     uint64_t detangleThresholdLow,
-    uint64_t detangleThresholdHigh)
+    uint64_t detangleThresholdHigh,
+    bool debug)
 {
     CompressedPathGraph1A& cGraph = *this;
 
@@ -1074,8 +1083,10 @@ uint64_t CompressedPathGraph1A::detangleChokePointChain(
     // This is unusual but can happen.
 
 
-    cout << "Detangling a choke point chain with " << chain.chokePoints.size() << " choke points." << endl;
-    writeChokePointChain(chain);
+    if(debug) {
+        cout << "Detangling a choke point chain with " << chain.chokePoints.size() << " choke points." << endl;
+        writeChokePointChain(chain);
+    }
 
     // Use tangle matrices for near pairs of bubbles to create a PhasingGraph.
     PhasingGraph phasingGraph(chain.diploidBubblesIndexes.size());
@@ -1094,16 +1105,18 @@ uint64_t CompressedPathGraph1A::detangleChokePointChain(
             TangleMatrix tangleMatrix;
             computeTangleMatrix(diploidBubble0.diploidEdges, diploidBubble1.diploidEdges, tangleMatrix);
 
-            cout << "Tangle matrix for bubbles " << i0 << " " << i1 << endl;
-            for(uint64_t i=0; i<tangleMatrix.inEdges.size(); i++) {
-                const edge_descriptor ce0 = tangleMatrix.inEdges[i];
+            if(debug) {
+                cout << "Tangle matrix for bubbles " << i0 << " " << i1 << endl;
+                for(uint64_t i=0; i<tangleMatrix.inEdges.size(); i++) {
+                    const edge_descriptor ce0 = tangleMatrix.inEdges[i];
 
-                for(uint64_t j=0; j<tangleMatrix.outEdges.size(); j++) {
-                    const edge_descriptor ce1 = tangleMatrix.outEdges[j];
+                    for(uint64_t j=0; j<tangleMatrix.outEdges.size(); j++) {
+                        const edge_descriptor ce1 = tangleMatrix.outEdges[j];
 
-                    cout << edgeStringId(ce0) << " ";
-                    cout << edgeStringId(ce1) << " ";
-                    cout << tangleMatrix.m[i][j] << endl;
+                        cout << edgeStringId(ce0) << " ";
+                        cout << edgeStringId(ce1) << " ";
+                        cout << tangleMatrix.m[i][j] << endl;
+                    }
                 }
             }
 
@@ -1113,18 +1126,21 @@ uint64_t CompressedPathGraph1A::detangleChokePointChain(
             uint64_t maxDiscordant;
             tangleMatrix.analyze(detangleThresholdLow, detangleThresholdHigh,
                 phase, minConcordant, maxDiscordant);
-            if(phase == 0) {
-                cout << "Ambiguous";
-            } else {
-                if (phase == 1) {
-                    cout << "In phase";
+
+            if(debug) {
+                if(phase == 0) {
+                    cout << "Ambiguous";
                 } else {
-                    cout << "Out of phase";
+                    if (phase == 1) {
+                        cout << "In phase";
+                    } else {
+                        cout << "Out of phase";
+                    }
+                    cout << " minConcordant " << minConcordant;
+                    cout << " maxDiscordant " << maxDiscordant;
                 }
-                cout << " minConcordant " << minConcordant;
-                cout << " maxDiscordant " << maxDiscordant;
+                cout << endl;
             }
-            cout << endl;
 
             // If not ambiguous, add an edge to the PhasingGraph.
             if(phase != 0) {
@@ -1133,7 +1149,9 @@ uint64_t CompressedPathGraph1A::detangleChokePointChain(
         }
     }
     const uint64_t inconsistentEdgeCount = phasingGraph.phase();
-    phasingGraph.writeGraphviz(cout, "PhasingGraph_" + to_string(chokePointChainId));
+    if(debug) {
+        phasingGraph.writeGraphviz(cout, "PhasingGraph_" + to_string(chokePointChainId));
+    }
 
 
 
@@ -1149,12 +1167,22 @@ uint64_t CompressedPathGraph1A::detangleChokePointChain(
             lastPhasedBubbleId = bubbleId;
         }
     }
-    cout << "First phased diploid bubble " << firstPhasedBubbleId <<
-        ", last phased diploid bubble " << lastPhasedBubbleId << endl;
+    if(debug) {
+        cout << "First phased diploid bubble " << firstPhasedBubbleId <<
+            ", last phased diploid bubble " << lastPhasedBubbleId << endl;
+    }
+    if(firstPhasedBubbleId == lastPhasedBubbleId) {
+        if(debug) {
+            cout << "Nothing to phase." << endl;
+        }
+        return 0;
+    }
     const uint64_t firstPhasedSuperbubbleIndex = chain.diploidBubblesIndexes[firstPhasedBubbleId];
     const uint64_t lastPhasedSuperbubbleIndex = chain.diploidBubblesIndexes[lastPhasedBubbleId];
-    cout << "Superbubble indexes of first/last phased diploid bubbles: " <<
-        firstPhasedSuperbubbleIndex << " " << lastPhasedSuperbubbleIndex << endl;
+    if(debug) {
+        cout << "Superbubble indexes of first/last phased diploid bubbles: " <<
+            firstPhasedSuperbubbleIndex << " " << lastPhasedSuperbubbleIndex << endl;
+    }
 
 
 
@@ -1169,7 +1197,9 @@ uint64_t CompressedPathGraph1A::detangleChokePointChain(
     CompressedPathGraph1AEdge& newEdge1 = cGraph[ceNew[1]];
     newEdge0.id = nextEdgeId++;
     newEdge1.id = nextEdgeId++;
-    cout << "Creating new edges " << edgeStringId(ceNew[0]) << " " << edgeStringId(ceNew[1]) << endl;
+    if(debug) {
+        cout << "Creating new edges " << edgeStringId(ceNew[0]) << " " << edgeStringId(ceNew[1]) << endl;
+    }
     for(uint64_t bubbleId=firstPhasedBubbleId; bubbleId<=lastPhasedBubbleId; bubbleId++) {
         const int64_t phase = phasingGraph[bubbleId].phase;
         if(phase == 0) {
@@ -1471,7 +1501,8 @@ void CompressedPathGraph1A::PhasingGraph::addEdge(
 
 void CompressedPathGraph1A::findChokePointChains(
     uint64_t pathLengthForChokePoints,
-    vector<ChokePointChain>& chokePointChains) const
+    vector<ChokePointChain>& chokePointChains,
+    bool debug) const
 {
     const CompressedPathGraph1A& cGraph = *this;
 
@@ -1588,7 +1619,9 @@ void CompressedPathGraph1A::findChokePointChains(
         chokePoints.push_back(p.second);
     }
     deduplicate(chokePoints);
-    cout << "Found " << chokePoints.size() << " choke points." << endl;
+    if(debug) {
+        cout << "Found " << chokePoints.size() << " choke points." << endl;
+    }
 
     // Create the choke point graph.
     // Each vertex corresponds to a vertex of the CompressedPathGraph1A.
@@ -1664,10 +1697,11 @@ void CompressedPathGraph1A::findChokePointChains(
 
     // Now we can compute the transitive reduction of the ChokePointGraph.
     transitiveReduction(chokePointGraph);
-    cout << "After transitive reduction, the choke point graph has " <<
-        num_vertices(chokePointGraph) << " vertices and " <<
-        num_edges(chokePointGraph) << " edges." << endl;
-    {
+    if(debug) {
+        cout << "After transitive reduction, the choke point graph has " <<
+            num_vertices(chokePointGraph) << " vertices and " <<
+            num_edges(chokePointGraph) << " edges." << endl;
+
         ofstream dot("ChokePointGraph.dot");
         dot << "digraph ChokePointGraph{\n";
         BGL_FORALL_EDGES(e, chokePointGraph, ChokePointGraph) {
@@ -1687,7 +1721,9 @@ void CompressedPathGraph1A::findChokePointChains(
     vector< vector<ChokePointGraph::edge_descriptor> > chains;
     findLinearChains(chokePointGraph, 0, chains);
     sort(chains.begin(), chains.end(), OrderVectorsByDecreasingSize<ChokePointGraph::edge_descriptor>());
-    cout << "Found " << chains.size() << " choke point chains." << endl;
+    if(debug) {
+        cout << "Found " << chains.size() << " choke point chains." << endl;
+    }
 
     // Compute a histogram of chain lengths.
     if(false) {
@@ -1760,18 +1796,29 @@ void CompressedPathGraph1A::findChokePointChains(
 // If a ChokePointChain overlaps a previous (larger) ChokePointChain,
 // mark it as discard. This is unusual but can happen.
 void CompressedPathGraph1A::flagOverlappingChokePointChains(
-    vector<ChokePointChain>& chains)
+    vector<ChokePointChain>& chains,
+    bool debug)
 {
     CompressedPathGraph1A& cGraph = *this;
+
+    // Initialize the chokePointChainId for all vertices and edges.
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1A) {
+        cGraph[cv].chokePointChainId = invalid<uint64_t>;
+    }
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1A) {
+        cGraph[ce].chokePointChainId = invalid<uint64_t>;
+    }
 
     vector<vertex_descriptor> chainVertices;
     vector<edge_descriptor> chainEdges;
     uint64_t discardCount = 0;
     for(uint64_t chokePointChainId=0; chokePointChainId<chains.size(); chokePointChainId++) {
         ChokePointChain& chain = chains[chokePointChainId];
-        cout << "Checking choke point chain " << chokePointChainId << " " <<
-            markerGraphEdgeId(chain.chokePoints.front()) << "..." <<
-            markerGraphEdgeId(chain.chokePoints.back()) << endl;
+        if(debug) {
+            cout << "Checking choke point chain " << chokePointChainId << " " <<
+                markerGraphEdgeId(chain.chokePoints.front()) << "..." <<
+                markerGraphEdgeId(chain.chokePoints.back()) << endl;
+        }
 
         chain.getAllVertices(chainVertices);
         chain.getAllEdges(chainEdges);
@@ -1783,7 +1830,9 @@ void CompressedPathGraph1A::flagOverlappingChokePointChains(
         for(const vertex_descriptor cv: chainVertices) {
             if(cGraph[cv].chokePointChainId != invalid<uint64_t>) {
                 overlaps = true;
-                cout << "Overlaps choke point chain " << cGraph[cv].chokePointChainId << endl;
+                if(debug) {
+                    cout << "Overlaps choke point chain " << cGraph[cv].chokePointChainId << endl;
+                }
                 break;
             }
         }
@@ -1791,7 +1840,9 @@ void CompressedPathGraph1A::flagOverlappingChokePointChains(
             for(const edge_descriptor ce: chainEdges) {
                 if(cGraph[ce].chokePointChainId != invalid<uint64_t>) {
                     overlaps = true;
-                    cout << "Overlaps choke point chain " << cGraph[ce].chokePointChainId << endl;
+                    if(debug) {
+                        cout << "Overlaps choke point chain " << cGraph[ce].chokePointChainId << endl;
+                    }
                     break;
                 }
             }
@@ -1802,10 +1853,12 @@ void CompressedPathGraph1A::flagOverlappingChokePointChains(
         if(overlaps) {
             chain.discard = true;
             ++discardCount;
-            cout << "Choke point chain " << chokePointChainId << " " <<
-                markerGraphEdgeId(chain.chokePoints.front()) << "..." <<
-                markerGraphEdgeId(chain.chokePoints.back()) << " with " <<
-                chain.chokePoints.size() << " choke points discarded due to overlap." << endl;
+            if(debug) {
+                cout << "Choke point chain " << chokePointChainId << " " <<
+                    markerGraphEdgeId(chain.chokePoints.front()) << "..." <<
+                    markerGraphEdgeId(chain.chokePoints.back()) << " with " <<
+                    chain.chokePoints.size() << " choke points discarded due to overlap." << endl;
+            }
         } else {
             for(const vertex_descriptor cv: chainVertices) {
                 cGraph[cv].chokePointChainId = chokePointChainId;
@@ -1815,8 +1868,10 @@ void CompressedPathGraph1A::flagOverlappingChokePointChains(
             }
         }
     }
-    cout << "Flagged " << discardCount <<
-        " choke point chains as discarded." << endl;
+    if(debug) {
+        cout << "Flagged " << discardCount <<
+            " choke point chains as discarded." << endl;
+    }
 }
 
 

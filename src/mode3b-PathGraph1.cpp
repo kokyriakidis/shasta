@@ -1026,12 +1026,14 @@ void PathGraph1::localTransitiveReduction(
         }
     }
 
-    cout << "PathGraph1 edge coverage histogram" << endl;
-    cout << "Coverage,All edges,Edges removed by transitive reduction" << endl;
-    for(uint64_t coverage=0; coverage<histogram.size(); coverage++) {
-        const auto& p = histogram[coverage];
-        if(p.first>0 or p.second>0) {
-            cout << coverage << "," << p.first << "," << p.second << endl;
+    if(false) {
+        cout << "PathGraph1 edge coverage histogram" << endl;
+        cout << "Coverage,All edges,Edges removed by transitive reduction" << endl;
+        for(uint64_t coverage=0; coverage<histogram.size(); coverage++) {
+            const auto& p = histogram[coverage];
+            if(p.first>0 or p.second>0) {
+                cout << coverage << "," << p.first << "," << p.second << endl;
+            }
         }
     }
 
