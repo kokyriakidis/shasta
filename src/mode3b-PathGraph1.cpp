@@ -162,7 +162,8 @@ void GlobalPathGraph1::assemble1(
     const uint64_t minEdgeCoverage = 1;
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
-    const uint64_t transitiveReductionDistance = 20;
+    const uint64_t transitiveReductionDistance = 1000;
+    const uint64_t transitiveReductionMaxCoverage = 100;
 
     GlobalPathGraph1 graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
@@ -175,7 +176,8 @@ void GlobalPathGraph1::assemble1(
     for(uint64_t componentId=0; componentId<graph.components.size(); componentId++) {
         assemble1(graph, threadCount0, threadCount1,
             componentId,
-            transitiveReductionDistance);
+            transitiveReductionDistance,
+            transitiveReductionMaxCoverage);
     }
 }
 
@@ -186,15 +188,16 @@ void GlobalPathGraph1::assemble1(
     uint64_t threadCount0,
     uint64_t threadCount1,
     uint64_t componentId,
-    uint64_t transitiveReductionDistance)
+    uint64_t transitiveReductionDistance,
+    uint64_t transitiveReductionMaxCoverage)
 {
     cout << "Assembly begins for connected component " << componentId << endl;
     PathGraph1& component = *globalGraph.components[componentId];
 
     // Local transitive reduction.
-    // This flags the non-transitive reduction edges.
-    // No edges are removed.
-    component.localTransitiveReduction(transitiveReductionDistance);
+    component.localTransitiveReduction(
+        transitiveReductionDistance,
+        transitiveReductionMaxCoverage);
 
     // Graphviz output.
     GlobalPathGraph1DisplayOptions options;
@@ -910,17 +913,21 @@ void GlobalPathGraph1::knn(uint64_t k)
 
 
 // Local transitive reduction of each connected component.
-void GlobalPathGraph1::localTransitiveReduction(uint64_t distance)
+void GlobalPathGraph1::localTransitiveReduction(
+    uint64_t distance,
+    uint64_t maxCoverage)
 {
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         PathGraph1& component = *components[componentRank];
-        component.localTransitiveReduction(distance);
+        component.localTransitiveReduction(distance, maxCoverage);
     }
 }
 
 
 
-void PathGraph1::localTransitiveReduction(uint64_t distance)
+void PathGraph1::localTransitiveReduction(
+    uint64_t distance,
+    uint64_t maxCoverage)
 {
     PathGraph1& graph = *this;
 
@@ -946,6 +953,10 @@ void PathGraph1::localTransitiveReduction(uint64_t distance)
             histogram.resize(coverage + 1, {0, 0});
         }
         ++histogram[coverage].first;
+
+        if(coverage > maxCoverage) {
+            continue;
+        }
 
         // Do a BFS starting at v0, up to a distance maxPathLength.
         // Stop if we encounter v1.

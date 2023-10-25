@@ -169,7 +169,9 @@ public:
     // without changing the PathGraph1 itself.
     vector< shared_ptr<PathGraph1> > createConnectedComponents(uint64_t minComponentSize) const;
 
-    void localTransitiveReduction(uint64_t distance);
+    void localTransitiveReduction(
+        uint64_t distance,
+        uint64_t maxCoverage);
 
 };
 
@@ -308,7 +310,11 @@ private:
     void knn(uint64_t k);
 
     // Local transitive reduction of each connected component.
-    void localTransitiveReduction(uint64_t distance);
+    // Only edges with coverage up to maxCoverage are subject to flagging
+    // as removed during transitive reduction.
+    void localTransitiveReduction(
+        uint64_t distance,
+        uint64_t maxCoverage);
 
 
 
@@ -431,7 +437,8 @@ private:
         uint64_t threadCount0,
         uint64_t threadCount1,
         uint64_t componentId,
-        uint64_t transitiveReductionDistance);
+        uint64_t transitiveReductionDistance,
+        uint64_t transitiveReductionMaxCoverage);
 
 };
 
