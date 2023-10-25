@@ -2091,7 +2091,7 @@ uint64_t CompressedPathGraph1A::totalBaseOffset(edge_descriptor ce) const
 
     uint64_t totalOffset = 0;
     MarkerGraphEdgePairInfo info;
-    for(uint64_t i=0; i<chain.size(); i++) {
+    for(uint64_t i=1; i<chain.size(); i++) {
         const MarkerGraphEdgeId edgeId0 = chain[i-1];
         const MarkerGraphEdgeId edgeId1 = chain[i];
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
