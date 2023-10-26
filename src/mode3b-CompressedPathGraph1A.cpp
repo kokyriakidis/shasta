@@ -41,7 +41,7 @@ CompressedPathGraph1A::CompressedPathGraph1A(
     const uint64_t detangleThresholdLow = 2;
     const uint64_t detangleThresholdHigh = 6;
     const uint64_t pathLengthForChokePoints = 10;
-    const uint64_t maxBubbleIndexDelta = 10;
+    const uint64_t maxBubbleIndexDelta = 20;
 
     create();
     writeGfaAndGraphviz("Initial");
@@ -1627,30 +1627,91 @@ void CompressedPathGraph1A::findChokePointChains(
     // Each vertex corresponds to a vertex of the CompressedPathGraph1A.
     using ChokePointGraph = boost::adjacency_list<
             boost::listS,
-            boost::vecS,
+            boost::listS,
             boost::bidirectionalS,
             vertex_descriptor>;
     ChokePointGraph chokePointGraph;
+    std::map<vertex_descriptor, ChokePointGraph::vertex_descriptor> chokePointMap;
     for(const vertex_descriptor cv: chokePoints) {
-        add_vertex({cv}, chokePointGraph);
+        const ChokePointGraph::vertex_descriptor cpv = add_vertex({cv}, chokePointGraph);
+        chokePointMap.insert({cv, cpv});
     }
     for(const auto& p: bidirectionalPairs) {
         const vertex_descriptor cv0 = p.first;
         const vertex_descriptor cv1 = p.second;
-        const uint64_t iv0 = lower_bound(chokePoints.begin(), chokePoints.end(), cv0) - chokePoints.begin();
-        const uint64_t iv1 = lower_bound(chokePoints.begin(), chokePoints.end(), cv1) - chokePoints.begin();
-        add_edge(iv0, iv1, chokePointGraph);
+        const auto it0 = chokePointMap.find(cv0);
+        const auto it1 = chokePointMap.find(cv1);
+        SHASTA_ASSERT(it0 != chokePointMap.end());
+        SHASTA_ASSERT(it1 != chokePointMap.end());
+        const ChokePointGraph::vertex_descriptor cpv0 = it0->second;
+        const ChokePointGraph::vertex_descriptor cpv1 = it1->second;
+        add_edge(cpv0, cpv1, chokePointGraph);
+    }
+
+    // Check that the ChokePointGraph has no isolated vertices.
+    BGL_FORALL_VERTICES(cpv, chokePointGraph, ChokePointGraph) {
+        SHASTA_ASSERT(
+            (out_degree(cpv, chokePointGraph) > 0) or
+            (in_degree(cpv, chokePointGraph) > 0));
     }
 
 
 
+#if 0
+    // Choke point pairs at distance greater than pathLengthForChokePoints are not found
+    // by the path enumeration process.
+    // To remedy that, use BFSs in the CompressedPathGraph1A starting at
+    // choke points with out-degree 0 in the choke point graph,
+    // and similarly in the opposite direction. The BFSs stop when a choke point is encountered
+    // and keeps track of the choke points encountered.
+    BGL_FORALL_VERTICES(cpv, chokePointGraph, ChokePointGraph) {
+        if(out_degree(cpv, chokePointGraph) > 0) {
+            continue;
+        }
+        const vertex_descriptor cv = chokePointGraph[cpv];
+
+        if(debug) {
+            cout << "Forward BFS at choke point " << markerGraphEdgeId(cv) << endl;
+        }
+
+        // Forward BFS.
+        std::queue<vertex_descriptor> q;
+        q.push(cv);
+        std::set<vertex_descriptor> seen;
+        while(not q.empty()) {
+            const vertex_descriptor cv0 = q.front();
+            q.pop();
+            BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1A) {
+                const vertex_descriptor cv1 = target(ce, cGraph);
+                if(not seen.contains(cv1)) {
+                    seen.insert(cv1);
+                    if(chokePointMap.contains(cv1)) {
+                        if(debug) {
+                            cout << "Found choke point " << markerGraphEdgeId(cv1) << endl;
+                        }
+                    } else {
+                        q.push(cv1);
+                    }
+                }
+            }
+        }
+    }
+#endif
+
+
+
     // If the ChokePointGraph happens to have any non-trivial strongly connected components,
-    // remove them by disconnecting their vertices. We don't want to remove the vertices
-    // because we are using vecS for the ChokePoint to simplify operations.
+    // remove them.
     std::map<ChokePointGraph::vertex_descriptor, uint64_t> componentMap;
+    std::map<vertex_descriptor, uint64_t> vertexIndexMap;
+    uint64_t vertexIndex = 0;
+    BGL_FORALL_VERTICES_T(v, chokePointGraph, ChokePointGraph) {
+        vertexIndexMap.insert({v, vertexIndex++});
+    }
     boost::strong_components(
         chokePointGraph,
-        boost::make_assoc_property_map(componentMap));
+        boost::make_assoc_property_map(componentMap),
+        boost::vertex_index_map(boost::make_assoc_property_map(vertexIndexMap)));
 
     // Gather the vertices in each strong component.
     std::map<uint64_t, vector<ChokePointGraph::vertex_descriptor> > componentVertices;
@@ -1658,7 +1719,7 @@ void CompressedPathGraph1A::findChokePointChains(
         componentVertices[p.second].push_back(p.first);
     }
 
-    // Disconnect vertices belonging to non-trivial strongly connected components.
+    // Remove vertices belonging to non-trivial strongly connected components.
     // A non-trivial strong component has at least one internal edge.
     // This means that it either has more than one vertex,
     // or it consists of a single vertex with a self-edge.
@@ -1684,10 +1745,11 @@ void CompressedPathGraph1A::findChokePointChains(
             SHASTA_ASSERT(0);
         }
 
-        // If non-trivial, disconnect all of its vertices.
+        // If non-trivial, remove all of its vertices.
         if(isNonTrivial) {
             for(const ChokePointGraph::vertex_descriptor v: p.second) {
                 clear_vertex(v, chokePointGraph);
+                remove_vertex(v, chokePointGraph);
                 ++stronglyConnectedChokePointsCount;
             }
         }
@@ -1696,9 +1758,38 @@ void CompressedPathGraph1A::findChokePointChains(
     //     " choke points in strongly connected components and disconnected them." << endl;
 
     // Now we can compute the transitive reduction of the ChokePointGraph.
-    transitiveReduction(chokePointGraph);
+    transitiveReductionAny(chokePointGraph);
+
+    // Remove from the ChokePointGraph linear chains of length 1,
+    // because those would generate trivial ChokePointChains.
+    // Then remove any isolated vertices created by this operation.
+    {
+        vector< vector<ChokePointGraph::edge_descriptor> > chains;
+        findLinearChains(chokePointGraph, 0, chains);
+
+        for(const vector<ChokePointGraph::edge_descriptor>& chain: chains){
+            if(chain.size() == 1) {
+                boost::remove_edge(chain.front(), chokePointGraph);
+            }
+        }
+
+        vector<ChokePointGraph::vertex_descriptor> verticesToBeRemoved;
+        BGL_FORALL_VERTICES(cpv, chokePointGraph, ChokePointGraph) {
+            if(
+                (in_degree(cpv, chokePointGraph) == 0) and
+                (out_degree(cpv, chokePointGraph) == 0)) {
+                verticesToBeRemoved.push_back(cpv);
+            }
+        }
+        for(const ChokePointGraph::vertex_descriptor cpv: verticesToBeRemoved) {
+            remove_vertex(cpv, chokePointGraph);
+        }
+    }
+
+
+
     if(debug) {
-        cout << "After transitive reduction, the choke point graph has " <<
+        cout << "The choke point graph has " <<
             num_vertices(chokePointGraph) << " vertices and " <<
             num_edges(chokePointGraph) << " edges." << endl;
 
@@ -1707,11 +1798,9 @@ void CompressedPathGraph1A::findChokePointChains(
         BGL_FORALL_EDGES(e, chokePointGraph, ChokePointGraph) {
             const ChokePointGraph::vertex_descriptor cpv0 = source(e, chokePointGraph);
             const ChokePointGraph::vertex_descriptor cpv1 = target(e, chokePointGraph);
-            const vertex_descriptor cv0 = chokePoints[cpv0];
-            const vertex_descriptor cv1 = chokePoints[cpv1];
-            const PathGraph1::vertex_descriptor v0 = cGraph[cv0].v;
-            const PathGraph1::vertex_descriptor v1 = cGraph[cv1].v;
-            dot << graph[v0].edgeId << "->" << graph[v1].edgeId << ";\n";
+            const vertex_descriptor cv0 = chokePointGraph[cpv0];
+            const vertex_descriptor cv1 = chokePointGraph[cpv1];
+            dot << markerGraphEdgeId(cv0) << "->" << markerGraphEdgeId(cv1) << ";\n";
         }
         dot << "}\n";
     }
@@ -1753,11 +1842,11 @@ void CompressedPathGraph1A::findChokePointChains(
         chokePointChains.emplace_back();
         ChokePointChain& chokePointChain = chokePointChains .back();
 
-        // Fill in the chokepoints.
+        // Fill in the choke points.
         SHASTA_ASSERT(not chain.empty());
-        chokePointChain.chokePoints.push_back(chokePoints[source(chain.front(), cGraph)]);
+        chokePointChain.chokePoints.push_back(chokePointGraph[source(chain.front(), cGraph)]);
         for(const ChokePointGraph::edge_descriptor cv: chain) {
-            chokePointChain.chokePoints.push_back(chokePoints[target(cv, cGraph)]);
+            chokePointChain.chokePoints.push_back(chokePointGraph[target(cv, cGraph)]);
         }
         SHASTA_ASSERT(chokePointChain.chokePoints.size() == chain.size() + 1);
 
