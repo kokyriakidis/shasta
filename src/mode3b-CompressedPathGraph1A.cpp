@@ -1619,9 +1619,6 @@ void CompressedPathGraph1A::findChokePointChains(
         chokePoints.push_back(p.second);
     }
     deduplicate(chokePoints);
-    if(debug) {
-        cout << "Found " << chokePoints.size() << " choke points." << endl;
-    }
 
     // Create the choke point graph.
     // Each vertex corresponds to a vertex of the CompressedPathGraph1A.
@@ -1654,49 +1651,6 @@ void CompressedPathGraph1A::findChokePointChains(
             (out_degree(cpv, chokePointGraph) > 0) or
             (in_degree(cpv, chokePointGraph) > 0));
     }
-
-
-
-#if 0
-    // Choke point pairs at distance greater than pathLengthForChokePoints are not found
-    // by the path enumeration process.
-    // To remedy that, use BFSs in the CompressedPathGraph1A starting at
-    // choke points with out-degree 0 in the choke point graph,
-    // and similarly in the opposite direction. The BFSs stop when a choke point is encountered
-    // and keeps track of the choke points encountered.
-    BGL_FORALL_VERTICES(cpv, chokePointGraph, ChokePointGraph) {
-        if(out_degree(cpv, chokePointGraph) > 0) {
-            continue;
-        }
-        const vertex_descriptor cv = chokePointGraph[cpv];
-
-        if(debug) {
-            cout << "Forward BFS at choke point " << markerGraphEdgeId(cv) << endl;
-        }
-
-        // Forward BFS.
-        std::queue<vertex_descriptor> q;
-        q.push(cv);
-        std::set<vertex_descriptor> seen;
-        while(not q.empty()) {
-            const vertex_descriptor cv0 = q.front();
-            q.pop();
-            BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1A) {
-                const vertex_descriptor cv1 = target(ce, cGraph);
-                if(not seen.contains(cv1)) {
-                    seen.insert(cv1);
-                    if(chokePointMap.contains(cv1)) {
-                        if(debug) {
-                            cout << "Found choke point " << markerGraphEdgeId(cv1) << endl;
-                        }
-                    } else {
-                        q.push(cv1);
-                    }
-                }
-            }
-        }
-    }
-#endif
 
 
 
@@ -1747,9 +1701,10 @@ void CompressedPathGraph1A::findChokePointChains(
 
         // If non-trivial, remove all of its vertices.
         if(isNonTrivial) {
-            for(const ChokePointGraph::vertex_descriptor v: p.second) {
-                clear_vertex(v, chokePointGraph);
-                remove_vertex(v, chokePointGraph);
+            for(const ChokePointGraph::vertex_descriptor cpv: p.second) {
+                chokePointMap.erase(chokePointGraph[cpv]);
+                clear_vertex(cpv, chokePointGraph);
+                remove_vertex(cpv, chokePointGraph);
                 ++stronglyConnectedChokePointsCount;
             }
         }
@@ -1782,7 +1737,82 @@ void CompressedPathGraph1A::findChokePointChains(
             }
         }
         for(const ChokePointGraph::vertex_descriptor cpv: verticesToBeRemoved) {
+            chokePointMap.erase(chokePointGraph[cpv]);
             remove_vertex(cpv, chokePointGraph);
+        }
+    }
+
+
+
+    // Add additional edges to the ChokePointGraph
+    // Choke point pairs at distance greater than pathLengthForChokePoints are not found
+    // by the path enumeration process.
+    // To remedy that, use BFSs in the CompressedPathGraph1A starting at
+    // choke points with out-degree 0 in the choke point graph,
+    // and similarly in the opposite direction. The BFSs stop when a choke point is encountered
+    // and keeps track of the choke points encountered.
+    if(false) {
+        vector< pair<ChokePointGraph::vertex_descriptor, ChokePointGraph::vertex_descriptor> > newForwardPairs;
+        vector< pair<ChokePointGraph::vertex_descriptor, ChokePointGraph::vertex_descriptor> > newBackwardPairs;
+        BGL_FORALL_VERTICES(cpv, chokePointGraph, ChokePointGraph) {
+
+            // Forward BFS.
+            if(out_degree(cpv, chokePointGraph) == 0) {
+                const vertex_descriptor cv = chokePointGraph[cpv];
+
+                std::queue<vertex_descriptor> q;
+                q.push(cv);
+                std::set<vertex_descriptor> seen;
+                while(not q.empty()) {
+                    const vertex_descriptor cv0 = q.front();
+                    q.pop();
+                    BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1A) {
+                        const vertex_descriptor cv1 = target(ce, cGraph);
+                        if(not seen.contains(cv1)) {
+                            seen.insert(cv1);
+                            if(chokePointMap.contains(cv1)) {
+                                newForwardPairs.push_back({cpv, chokePointMap[cv1]});
+                            } else {
+                                q.push(cv1);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Backward BFS.
+            if(in_degree(cpv, chokePointGraph) == 0) {
+                const vertex_descriptor cv = chokePointGraph[cpv];
+
+                std::queue<vertex_descriptor> q;
+                q.push(cv);
+                std::set<vertex_descriptor> seen;
+                while(not q.empty()) {
+                    const vertex_descriptor cv0 = q.front();
+                    q.pop();
+                    BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph1A) {
+                        const vertex_descriptor cv1 = source(ce, cGraph);
+                        if(not seen.contains(cv1)) {
+                            seen.insert(cv1);
+                            if(chokePointMap.contains(cv1)) {
+                                newBackwardPairs.push_back({chokePointMap[cv1], cpv});
+                            } else {
+                                q.push(cv1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        sort(newForwardPairs.begin(), newForwardPairs.end());
+        sort(newBackwardPairs.begin(), newBackwardPairs.end());
+        vector< pair<ChokePointGraph::vertex_descriptor, ChokePointGraph::vertex_descriptor> > newBidirectionalPairs;
+        std::set_intersection(
+            newForwardPairs.begin(), newForwardPairs.end(),
+            newBackwardPairs.begin(), newBackwardPairs.end(),
+            back_inserter(newBidirectionalPairs));
+        for(const auto& p: newBidirectionalPairs) {
+            add_edge(p.first, p.second, chokePointGraph);
         }
     }
 
