@@ -636,6 +636,18 @@ private:
     // Initial creation from the PathGraph1.
     void create();
 
+    // Transitive reduction.
+    // This removes an edge cv0->cv1 if:
+    // - It corresponds to a single PathGraph1 edge with coverage at most maxCoverage.
+    // - cv1 is reachable from cv0 with a path that:
+    //   * Has length at most maxDistance, as measured by number of edges in the CompressedPathGraph1A.
+    //   * Does not use the cv0->cv1.
+    // Edges are considered in order of increasing coverage.
+    void transitiveRedution(
+        uint64_t maxCoverage,
+        uint64_t maxDistance
+    );
+
     // Detangling.
     void detangle(
         uint64_t detangleThresholdLow,

@@ -38,6 +38,8 @@ CompressedPathGraph1A::CompressedPathGraph1A(
     assembler(assembler)
 {
     // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t transitiveRedutionMaxCoverage = 1;
+    const uint64_t transitiveRedutionMaxDistance = 1000;
     const uint64_t detangleThresholdLow = 2;
     const uint64_t detangleThresholdHigh = 6;
     const uint64_t pathLengthForChokePoints = 10;
@@ -46,11 +48,18 @@ CompressedPathGraph1A::CompressedPathGraph1A(
     create();
     writeGfaAndGraphviz("Initial");
 
+    transitiveRedution(
+        transitiveRedutionMaxCoverage,
+        transitiveRedutionMaxDistance);
+
     detangle(
         detangleThresholdLow,
         detangleThresholdHigh,
         pathLengthForChokePoints,
         maxBubbleIndexDelta);
+    transitiveRedution(
+        transitiveRedutionMaxCoverage,
+        transitiveRedutionMaxDistance);
     writeGfaAndGraphviz("Final");
 }
 
@@ -287,6 +296,129 @@ string CompressedPathGraph1A::edgeStringId(edge_descriptor ce) const
 {
     const CompressedPathGraph1A& cGraph = *this;
     return to_string(componentId) + "-" + to_string(cGraph[ce].id);
+}
+
+
+
+// Transitive reduction.
+// This removes an edge cv0->cv1 if:
+// - It corresponds to a single PathGraph1 edge with coverage at most maxCoverage.
+// - cv1 is reachable from cv0 with a path that:
+//   * Has length at most maxDistance, as measured by number of edges in the CompressedPathGraph1A.
+//   * Does not use the cv0->cv1.
+// Edges are considered in order of increasing coverage.
+void CompressedPathGraph1A::transitiveRedution(
+    uint64_t maxCoverage,
+    uint64_t maxDistance)
+{
+    CompressedPathGraph1A& cGraph = *this;
+    cout << "CompressedPathGraph1A::transitiveRedution begins" << endl;
+
+    // Gather candidate edges, by coverage.
+    vector< vector<edge_descriptor> > candidateEdges;
+    uint64_t candidateCount = 0;
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1A) {
+        if(cGraph[ce].chain.size() > 2) {
+            continue;
+        }
+        const vertex_descriptor cv0 = source(ce, cGraph);
+        const vertex_descriptor cv1 = target(ce, cGraph);
+        const PathGraph1::vertex_descriptor v0 = cGraph[cv0].v;
+        const PathGraph1::vertex_descriptor v1 = cGraph[cv1].v;
+
+        PathGraph1::edge_descriptor e;
+        bool edgeWasFound;
+        tie(e, edgeWasFound) = edge(v0, v1, graph);
+        if(edgeWasFound) {
+            const uint64_t coverage = graph[e].coverage;
+            if(coverage > maxCoverage) {
+                continue;
+            }
+            if(coverage >= candidateEdges.size()) {
+                candidateEdges.resize(coverage + 1);
+            }
+            candidateEdges[coverage].push_back(ce);
+            ++candidateCount;
+        }
+    }
+    cout << "CompressedPathGraph1A::transitiveRedution found " <<
+        candidateCount << " candidate edges." << endl;
+
+
+
+    // Process candidate edges in order of increasing coverage.
+    uint64_t removedEdgeCount = 0;
+    for(const vector<edge_descriptor>& candidateEdgesForCoverage: candidateEdges) {
+        for(const edge_descriptor ce01: candidateEdgesForCoverage) {
+            const vertex_descriptor cv0 = source(ce01, cGraph);
+            const vertex_descriptor cv1 = target(ce01, cGraph);
+
+            // Do a BFS starting at cv0, up to a distance maxPathLength.
+            // Stop if we encounter cv1.
+
+            // The BFS queue.
+            std::queue<vertex_descriptor> q;
+            q.push(cv0);
+
+            // The vertices we encountered so far, with their distance from cv0.
+            std::map<vertex_descriptor, uint64_t> m;
+            m.insert({cv0, 0});
+
+            // BFS loop.
+            // cout << "BFS loop begins for " << v0 << "->" << v1 << endl;
+            while(not q.empty()) {
+
+                // Dequeue a vertex.
+                const vertex_descriptor cvA = q.front();
+                q.pop();
+                const auto itA = m.find(cvA);
+                SHASTA_ASSERT(itA != m.end());
+                const uint64_t distanceA = itA->second;
+                const uint64_t distanceB = distanceA + 1;
+                // cout << "Dequeued " << vA << " at distance " << distanceA << endl;
+
+                // Loop over the out-edges of vA.
+                bool endBfs = false;
+                BGL_FORALL_OUTEDGES_T(cvA, ceAB, cGraph, CompressedPathGraph1A) {
+
+                    // Dont's use e01 in the BFS.
+                    if(ceAB == ce01) {
+                        continue;
+                    }
+
+                    // If we reached v1, mark e01 as a nonTransitiveReduction edge
+                    // and stop the BFS.
+                    const vertex_descriptor cvB = target(ceAB, cGraph);
+                    if(cvB == cv1) {
+                        ++removedEdgeCount;
+                        boost::remove_edge(ce01, cGraph);
+                        endBfs = true;
+                        // cout << "Reached " << v1 << endl;
+                        break;
+                    }
+
+                    // If we already reached this vertex, do nothing.
+                    if(m.contains(cvB)) {
+                        continue;
+                    }
+
+                    // If not at maximum distance, enqueue vB.
+                    if(distanceB < maxDistance) {
+                        q.push(cvB);
+                        m.insert({cvB, distanceB});
+                        // cout << "Enqueued " << vB << " at distance " << distanceB << endl;
+                    }
+                }
+                if(endBfs) {
+                    break;
+                }
+            }
+
+        }
+    }
+    cout << "Transitive reduction of the CompressedPathGraph1A removed " <<
+        removedEdgeCount << " edges." << endl;
+
 }
 
 
