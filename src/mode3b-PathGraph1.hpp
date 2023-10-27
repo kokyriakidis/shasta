@@ -653,8 +653,9 @@ private:
         uint64_t detangleThresholdLow,
         uint64_t detangleThresholdHigh,
         uint64_t pathLengthForChokePoints,
-        uint64_t maxBubbleIndexDelta
-        );
+        uint64_t maxBubbleIndexDelta,
+        uint64_t transitiveRedutionMaxCoverage,
+        uint64_t transitiveRedutionMaxDistance);
     uint64_t detangleEdges(
         uint64_t detangleThresholdLow,
         uint64_t detangleThresholdHigh
@@ -720,15 +721,17 @@ private:
     void computeTangleMatrix(
         vertex_descriptor,
         vertex_descriptor,
-        TangleMatrix&
+        TangleMatrix&,
+        bool debug
         ) const;
     void computeTangleMatrix(
         const vector<edge_descriptor>& inEdges,
         const vector<edge_descriptor>& outEdges,
-        TangleMatrix&
+        TangleMatrix&,
+        bool debug
         ) const;
     // This version only fills in m. The inEdges and out_edgesmust have already been filled in.
-    void computeTangleMatrix(TangleMatrix&) const;
+    void computeTangleMatrix(TangleMatrix&, bool debug) const;
     void writeTangleMatrix(const TangleMatrix&) const;
 
 

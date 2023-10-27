@@ -48,16 +48,11 @@ CompressedPathGraph1A::CompressedPathGraph1A(
     create();
     writeGfaAndGraphviz("Initial");
 
-    transitiveRedution(
-        transitiveRedutionMaxCoverage,
-        transitiveRedutionMaxDistance);
-
     detangle(
         detangleThresholdLow,
         detangleThresholdHigh,
         pathLengthForChokePoints,
-        maxBubbleIndexDelta);
-    transitiveRedution(
+        maxBubbleIndexDelta,
         transitiveRedutionMaxCoverage,
         transitiveRedutionMaxDistance);
     writeGfaAndGraphviz("Final");
@@ -427,15 +422,24 @@ void CompressedPathGraph1A::detangle(
     uint64_t detangleThresholdLow,
     uint64_t detangleThresholdHigh,
     uint64_t pathLengthForChokePoints,
-    uint64_t maxBubbleIndexDelta
-    )
+    uint64_t maxBubbleIndexDelta,
+    uint64_t transitiveRedutionMaxCoverage,
+    uint64_t transitiveRedutionMaxDistance)
 {
+    transitiveRedution(
+        transitiveRedutionMaxCoverage,
+        transitiveRedutionMaxDistance);
+
     while(
         detangleEdges(
             detangleThresholdLow,
             detangleThresholdHigh));
 
-    const uint64_t iterationCount = 6;
+    transitiveRedution(
+        transitiveRedutionMaxCoverage,
+        transitiveRedutionMaxDistance);
+
+    const uint64_t iterationCount = 10;
     for(uint64_t iteration=0; iteration<iterationCount; iteration++) {
         writeGfaAndGraphviz("A" + to_string(iteration));
 
@@ -445,6 +449,9 @@ void CompressedPathGraph1A::detangle(
             detangleThresholdLow,
             detangleThresholdHigh,
             iteration == iterationCount-1);
+        transitiveRedution(
+            transitiveRedutionMaxCoverage,
+            transitiveRedutionMaxDistance);
     }
 }
 
@@ -527,7 +534,7 @@ bool CompressedPathGraph1A::detangleEdge(
 
     // Compute the TangleMatrix.
     TangleMatrix tangleMatrix;
-    computeTangleMatrix(cv0, cv1, tangleMatrix);
+    computeTangleMatrix(cv0, cv1, tangleMatrix, false);
 
     // Only detangle if in-degree and out-degree are both 2.
     if(tangleMatrix.inDegree() != 2) {
@@ -1235,7 +1242,7 @@ uint64_t CompressedPathGraph1A::detangleChokePointChain(
 
             // Compute the tangle matrix between these two vertices.
             TangleMatrix tangleMatrix;
-            computeTangleMatrix(diploidBubble0.diploidEdges, diploidBubble1.diploidEdges, tangleMatrix);
+            computeTangleMatrix(diploidBubble0.diploidEdges, diploidBubble1.diploidEdges, tangleMatrix, debug);
 
             if(debug) {
                 cout << "Tangle matrix for bubbles " << i0 << " " << i1 << endl;
@@ -1883,7 +1890,7 @@ void CompressedPathGraph1A::findChokePointChains(
     // choke points with out-degree 0 in the choke point graph,
     // and similarly in the opposite direction. The BFSs stop when a choke point is encountered
     // and keeps track of the choke points encountered.
-    if(false) {
+    if(true) {
         vector< pair<ChokePointGraph::vertex_descriptor, ChokePointGraph::vertex_descriptor> > newForwardPairs;
         vector< pair<ChokePointGraph::vertex_descriptor, ChokePointGraph::vertex_descriptor> > newBackwardPairs;
         BGL_FORALL_VERTICES(cpv, chokePointGraph, ChokePointGraph) {
@@ -2266,7 +2273,8 @@ void CompressedPathGraph1A::writeChokePointChain(const ChokePointChain& chain) c
 void CompressedPathGraph1A::computeTangleMatrix(
     vertex_descriptor cv0,
     vertex_descriptor cv1,
-    TangleMatrix& tangleMatrix
+    TangleMatrix& tangleMatrix,
+    bool debug
     ) const
 {
     const CompressedPathGraph1A& cGraph = *this;
@@ -2281,7 +2289,7 @@ void CompressedPathGraph1A::computeTangleMatrix(
         tangleMatrix.outEdges.push_back(ce);
     }
 
-    computeTangleMatrix(tangleMatrix);
+    computeTangleMatrix(tangleMatrix, debug);
 }
 
 
@@ -2289,18 +2297,19 @@ void CompressedPathGraph1A::computeTangleMatrix(
 void CompressedPathGraph1A::computeTangleMatrix(
     const vector<edge_descriptor>& inEdges,
     const vector<edge_descriptor>& outEdges,
-    TangleMatrix& tangleMatrix
+    TangleMatrix& tangleMatrix,
+    bool debug
     ) const
 {
     tangleMatrix.inEdges = inEdges;
     tangleMatrix.outEdges = outEdges;
-    computeTangleMatrix(tangleMatrix);
+    computeTangleMatrix(tangleMatrix, debug);
 }
 
 
 
 // This version only fills in m. The inEdges and out_edgesmust have already been filled in.
-void CompressedPathGraph1A::computeTangleMatrix(TangleMatrix& tangleMatrix) const
+void CompressedPathGraph1A::computeTangleMatrix(TangleMatrix& tangleMatrix, bool debug) const
 {
     tangleMatrix.m.resize(tangleMatrix.inEdges.size(), vector<uint64_t>(tangleMatrix.outEdges.size()));
     MarkerGraphEdgePairInfo info;
@@ -2310,10 +2319,15 @@ void CompressedPathGraph1A::computeTangleMatrix(TangleMatrix& tangleMatrix) cons
 
         for(uint64_t j=0; j<tangleMatrix.outEdges.size(); j++) {
             const edge_descriptor ce1 = tangleMatrix.outEdges[j];
-            const MarkerGraphEdgeId markerGraphEdgeId1 = secondToLastMarkerGraphEdgeId(ce1);
+            const MarkerGraphEdgeId markerGraphEdgeId1 = secondMarkerGraphEdgeId(ce1);
 
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(markerGraphEdgeId0, markerGraphEdgeId1, info));
             tangleMatrix.m[i][j] = info.common;
+            if(debug) {
+                cout << edgeStringId(ce0) << " (" << markerGraphEdgeId0 << ") " <<
+                    edgeStringId(ce1) << " (" << markerGraphEdgeId1 << ") " <<
+                    info.common << endl;
+            }
         }
     }
 
