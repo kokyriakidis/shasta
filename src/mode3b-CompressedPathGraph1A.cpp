@@ -43,7 +43,7 @@ CompressedPathGraph1A::CompressedPathGraph1A(
     const uint64_t detangleThresholdLow = 2;
     const uint64_t detangleThresholdHigh = 6;
     const uint64_t pathLengthForChokePoints = 10;
-    const uint64_t maxBubbleIndexDelta = 20;
+    const uint64_t maxBubbleIndexDelta = 100;
 
     create();
     writeGfaAndGraphviz("Initial");
