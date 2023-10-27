@@ -173,6 +173,17 @@ public:
         uint64_t distance,
         uint64_t maxCoverage);
 
+    // Remove cross-edges.
+    // This removes an edge v0->v1 if the following are all true:
+    // - Its coverage is at most lowCoverageThreshold.
+    // - Its estimated offset is at least minOffset.
+    // - v0 has at least one out-edge with coverage at least highCoverageThreshold.
+    // - v1 has at least one in-edge with coverage at least highCoverageThreshold.
+    void removeCrossEdges(
+        uint64_t lowCoverageThreshold,
+        uint64_t highCoverageThreshold,
+        uint64_t minOffset);
+
 };
 
 
@@ -438,7 +449,10 @@ private:
         uint64_t threadCount1,
         uint64_t componentId,
         uint64_t transitiveReductionDistance,
-        uint64_t transitiveReductionMaxCoverage);
+        uint64_t transitiveReductionMaxCoverage,
+        uint64_t crossEdgesLowCoverageThreshold,
+        uint64_t crossEdgesHighCoverageThreshold,
+        uint64_t crossEdgesMinOffset);
 
 };
 

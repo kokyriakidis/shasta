@@ -164,6 +164,10 @@ void GlobalPathGraph1::assemble1(
     const uint64_t minComponentSize = 3;
     const uint64_t transitiveReductionDistance = 1000;
     const uint64_t transitiveReductionMaxCoverage = 100;
+    const uint64_t crossEdgesLowCoverageThreshold = 1;
+    const uint64_t crossEdgesHighCoverageThreshold = 6;
+    const uint64_t crossEdgesMinOffset = 10000;
+
 
     GlobalPathGraph1 graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
@@ -177,7 +181,10 @@ void GlobalPathGraph1::assemble1(
         assemble1(graph, threadCount0, threadCount1,
             componentId,
             transitiveReductionDistance,
-            transitiveReductionMaxCoverage);
+            transitiveReductionMaxCoverage,
+            crossEdgesLowCoverageThreshold,
+            crossEdgesHighCoverageThreshold,
+            crossEdgesMinOffset);
     }
 }
 
@@ -189,7 +196,10 @@ void GlobalPathGraph1::assemble1(
     uint64_t threadCount1,
     uint64_t componentId,
     uint64_t transitiveReductionDistance,
-    uint64_t transitiveReductionMaxCoverage)
+    uint64_t transitiveReductionMaxCoverage,
+    uint64_t crossEdgesLowCoverageThreshold,
+    uint64_t crossEdgesHighCoverageThreshold,
+    uint64_t crossEdgesMinOffset)
 {
     cout << "Assembly begins for connected component " << componentId << endl;
     PathGraph1& component = *globalGraph.components[componentId];
@@ -198,6 +208,12 @@ void GlobalPathGraph1::assemble1(
     component.localTransitiveReduction(
         transitiveReductionDistance,
         transitiveReductionMaxCoverage);
+
+    // Remove cross-edges.
+    component.removeCrossEdges(
+        crossEdgesLowCoverageThreshold,
+        crossEdgesHighCoverageThreshold,
+        crossEdgesMinOffset);
 
     // Graphviz output.
     GlobalPathGraph1DisplayOptions options;
@@ -2287,5 +2303,71 @@ void GlobalPathGraph1::writeConnectors(const vector<ChainConnector>& connectors)
                 info.jaccard() << "," <<
                 info.correctedJaccard() << "\n";
         }
+    }
+}
+
+
+
+// Remove cross-edges.
+// This removes an edge v0->v1 if the following are all true:
+// - Its coverage is at most lowCoverageThreshold.
+// - Its estimated offset is at least minOffset.
+// - v0 has at least one out-edge with coverage at least highCoverageThreshold.
+// - v1 has at least one in-edge with coverage at least highCoverageThreshold.
+void PathGraph1::removeCrossEdges(
+    uint64_t lowCoverageThreshold,
+    uint64_t highCoverageThreshold,
+    uint64_t minOffset)
+{
+    PathGraph1& graph = *this;
+
+    // Find the edges we are going to remove.
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, graph, PathGraph1) {
+        const PathGraph1Edge& edge = graph[e];
+
+        // Check coverage.
+        if(edge.coverage > lowCoverageThreshold) {
+            continue;
+        }
+
+        // Check estimated offset.
+        if(edge.info.offsetInBases < int64_t(minOffset)) {
+            continue;
+        }
+
+        // Check out-edges of v0.
+        const vertex_descriptor v0 = source(e, graph);
+        bool v0HasStrongOutEdge = false;
+        BGL_FORALL_OUTEDGES(v0, e0, graph, PathGraph1) {
+            if(graph[e0].coverage >= highCoverageThreshold) {
+                v0HasStrongOutEdge = true;
+                break;
+            }
+        }
+        if(not v0HasStrongOutEdge) {
+            continue;
+        }
+
+        // Check in-edges of v1.
+        const vertex_descriptor v1 = target(e, graph);
+        bool v1HasStrongOutEdge = false;
+        BGL_FORALL_INEDGES(v1, e1, graph, PathGraph1) {
+            if(graph[e1].coverage >= highCoverageThreshold) {
+                v1HasStrongOutEdge = true;
+                break;
+            }
+        }
+        if(not v1HasStrongOutEdge) {
+            continue;
+        }
+
+        // If all above checks passed, this edge will be removed.
+        edgesToBeRemoved.push_back(e);
+    }
+
+    // Remove the edges we found.
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, graph);
     }
 }
