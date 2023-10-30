@@ -1,6 +1,7 @@
 // Shasta.
 #include "mode3b-CompressedPathGraph1B.hpp"
 #include "mode3b-PathGraph1.hpp"
+#include "deduplicate.hpp"
 #include "findLinearChains.hpp"
 using namespace shasta;
 using namespace mode3b;
@@ -96,7 +97,11 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     CompressedPathGraph1B& cGraph = *this;
 
     create();
-    cout << "The CompressedPathGraph1B has " << num_vertices(cGraph) <<
+    cout << "The initial CompressedPathGraph1B has " << num_vertices(cGraph) <<
+        " vertices and " << num_edges(cGraph) << " edges." << endl;
+
+    compressParallelEdges();
+    cout << "After compressing parallel edges, the CompressedPathGraph1B has " << num_vertices(cGraph) <<
         " vertices and " << num_edges(cGraph) << " edges." << endl;
 }
 
@@ -160,8 +165,6 @@ void CompressedPathGraph1B::create()
         const PathGraph1::vertex_descriptor vLast = target(eLast, graph);
         chain.push_back(graph[vLast].edgeId);
     }
-
-
 }
 
 
@@ -180,6 +183,72 @@ CompressedPathGraph1B::vertex_descriptor CompressedPathGraph1B::getVertex(
         return cv;
     } else {
         return it->second;
+    }
+}
+
+
+
+// Compress parallel edges into bubbles, where possible.
+void CompressedPathGraph1B::compressParallelEdges()
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+    // Look for sets of parallel edges v0->v1.
+    vector<vertex_descriptor> childrenVertices;
+    vector<edge_descriptor> edgesToBeRemoved;
+    Bubble newBubble;
+    BGL_FORALL_VERTICES(v0, cGraph, CompressedPathGraph1B) {
+        if(out_degree(v0, cGraph) < 2) {
+            continue;
+        }
+
+        // Find distinct children vertices of v0.
+        childrenVertices.clear();
+        BGL_FORALL_OUTEDGES(v0, e, cGraph, CompressedPathGraph1B) {
+            childrenVertices.push_back(target(e, cGraph));
+        }
+        deduplicate(childrenVertices);
+
+        // Handle the children vertices one at a time.
+        for(const vertex_descriptor v1: childrenVertices) {
+
+            // Create the new bubble using parallel edges v0->v1.
+            newBubble.clear();
+            edgesToBeRemoved.clear();
+            BGL_FORALL_OUTEDGES(v0, e, cGraph, CompressedPathGraph1B) {
+                if(target(e, cGraph) != v1) {
+                    continue;
+                }
+                CompressedPathGraph1BEdge& edge = cGraph[e];
+
+                // The BubbleChain must have length 1.
+                if(edge.size() > 1) {
+                    continue;
+                }
+                const Bubble& oldBubble = edge.front();
+
+                copy(oldBubble.begin(), oldBubble.end(), back_inserter(newBubble));
+                edgesToBeRemoved.push_back(e);
+            }
+            if(edgesToBeRemoved.size() < 2) {
+                continue;
+            }
+
+            // Create the new edge.
+            edge_descriptor eNew;
+            tie(eNew, ignore) = add_edge(v0, v1, cGraph);
+            CompressedPathGraph1BEdge& newEdge = cGraph[eNew];
+            newEdge.id = nextEdgeId++;
+            newEdge.resize(1);  // Make it a single bubble.
+            Bubble& newEdgeBubble = newEdge.front();
+            newEdgeBubble = newBubble;
+
+            // Remove the old edges.
+            for(const edge_descriptor e: edgesToBeRemoved) {
+                boost::remove_edge(e, cGraph);
+            }
+
+        }
     }
 }
 

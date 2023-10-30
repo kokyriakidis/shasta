@@ -101,6 +101,9 @@ private:
     // Return the vertex corresponding to a given MarkerGraphEdgeId,
     // creating it if necessary.
     vertex_descriptor getVertex(MarkerGraphEdgeId);
+
+    // Compress parallel edges into bubbles, where possible.
+    void compressParallelEdges();
 };
 
 #endif
