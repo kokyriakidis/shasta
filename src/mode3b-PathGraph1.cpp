@@ -29,7 +29,7 @@ void GlobalPathGraph1::assemble(
     uint64_t threadCount0,
     uint64_t threadCount1)
 {
-    assemble1(assembler, threadCount0, threadCount1);
+    assemble2(assembler);
 }
 
 
@@ -248,6 +248,8 @@ void GlobalPathGraph1::assemble1(
     // cGraph.assembleVertices(threadCount0, threadCount1); ******** SKIPPING SEQUENCE ASSEMBLY
 #endif
 }
+
+
 
 GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     assembler(assembler)

@@ -454,6 +454,14 @@ private:
         uint64_t crossEdgesHighCoverageThreshold,
         uint64_t crossEdgesMinOffset);
 
+    static void assemble2(const Assembler&);
+    void assemble2(
+        uint64_t componentId,
+        uint64_t transitiveReductionDistance,
+        uint64_t transitiveReductionMaxCoverage,
+        uint64_t crossEdgesLowCoverageThreshold,
+        uint64_t crossEdgesHighCoverageThreshold,
+        uint64_t crossEdgesMinOffset);
 };
 
 
