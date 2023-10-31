@@ -10,6 +10,7 @@
 
 // Standard library
 #include <map>
+#include "string.hpp"
 #include "vector.hpp"
 
 
@@ -104,6 +105,34 @@ private:
 
     // Compress parallel edges into bubbles, where possible.
     void compressParallelEdges();
+
+    // Output.
+    void write(const string& name) const;
+    void writeCsv(const string& fileNamePrefix) const;
+    void writeBubbleChainsCsv(const string& fileNamePrefix) const;
+    void writeBubblesCsv(const string& fileNamePrefix) const;
+    void writeChainsCsv(const string& fileNamePrefix) const;
+    void writeChainsDetailsCsv(const string& fileNamePrefix) const;
+    void writeGraphviz(const string& fileNamePrefix) const;
+    void writeGfa(const string& fileNamePrefix) const;
+
+    string bubbleChainStringId(edge_descriptor) const;
+    string bubbleStringId(edge_descriptor, uint64_t positionInBubbleChain) const;
+    string chainStringId(edge_descriptor, uint64_t positionInBubbleChain, uint64_t indexInBubble) const;
+
+    uint64_t chainOffset(const Chain&) const;
+    void bubbleOffset(
+        const Bubble&,
+        uint64_t& averageOffset,
+        uint64_t& minOffset,
+        uint64_t& maxOffset
+        ) const;
+    void bubbleChainOffset(
+        const BubbleChain&,
+        uint64_t& averageOffset,
+        uint64_t& minOffset,
+        uint64_t& maxOffset
+        ) const;
 };
 
 #endif
