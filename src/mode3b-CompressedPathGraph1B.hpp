@@ -106,6 +106,9 @@ private:
     // Compress parallel edges into bubbles, where possible.
     void compressParallelEdges();
 
+    // Compress linear sequences of edges (BubbleChains) into longer BubbleChains.
+    void compressSequentialEdges();
+
     // Output.
     void write(const string& name) const;
     void writeCsv(const string& fileNamePrefix) const;

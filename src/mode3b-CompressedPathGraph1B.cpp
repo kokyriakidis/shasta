@@ -101,6 +101,9 @@ CompressedPathGraph1B::CompressedPathGraph1B(
 
     compressParallelEdges();
     write("A");
+
+    compressSequentialEdges();
+    write("B");
 }
 
 
@@ -252,6 +255,53 @@ void CompressedPathGraph1B::compressParallelEdges()
 
 
 
+// Compress linear sequences of edges (BubbleChains) into longer BubbleChains.
+void CompressedPathGraph1B::compressSequentialEdges()
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+    // Find linear chains of edges.
+    vector< vector<edge_descriptor> > linearChains;
+    findLinearChains(cGraph, 0, linearChains);
+
+
+
+    // Each linear chain of more than one edge gets compressed into a single edge (BubbleChain).
+    for(const vector<edge_descriptor>& linearChain: linearChains) {
+        if(linearChain.size() < 2) {
+            continue;
+        }
+
+        // Create the new edge.
+        const vertex_descriptor v0 = source(linearChain.front(), cGraph);
+        const vertex_descriptor v1 = target(linearChain.back(), cGraph);
+        edge_descriptor ceNew;
+        tie(ceNew, ignore) = add_edge(v0, v1, cGraph);
+        CompressedPathGraph1BEdge& newEdge = cGraph[ceNew];
+        newEdge.id = nextEdgeId++;
+        for(const edge_descriptor ce: linearChain) {
+            const CompressedPathGraph1BEdge& oldEdge = cGraph[ce];
+            copy(oldEdge.begin(), oldEdge.end(), back_inserter(newEdge));
+        }
+
+        // Remove the old edges.
+        for(const edge_descriptor ce: linearChain) {
+            boost::remove_edge(ce, cGraph);
+        }
+
+        // Remove the vertices internal to the old edge.
+        for(uint64_t i=1; i<linearChain.size(); i++) {
+            const vertex_descriptor cv = source(linearChain[i], cGraph);
+            SHASTA_ASSERT(in_degree(cv, cGraph) == 0);
+            SHASTA_ASSERT(out_degree(cv, cGraph) == 0);
+            boost::remove_vertex(cv, cGraph);
+        }
+    }
+
+}
+
+
+
 void CompressedPathGraph1B::write(const string& name) const
 {
     const string fileNamePrefix = name + "-" + to_string(componentId);
@@ -354,8 +404,6 @@ void CompressedPathGraph1B::writeChainsCsv(const string& fileNamePrefix) const
     csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,Index in bubble,Length,Offset\n";
 
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
-        const vertex_descriptor cv0 = source(ce, cGraph);
-        const vertex_descriptor cv1 = target(ce, cGraph);
         const BubbleChain& bubbleChain = cGraph[ce];
 
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
@@ -365,8 +413,6 @@ void CompressedPathGraph1B::writeChainsCsv(const string& fileNamePrefix) const
             for(uint64_t indexInBubble=0; indexInBubble<ploidy; indexInBubble++) {
                 const Chain& chain = bubble[indexInBubble];
                 SHASTA_ASSERT(chain.size() >= 2);
-                SHASTA_ASSERT(chain.front() == cGraph[cv0].edgeId);
-                SHASTA_ASSERT(chain.back() == cGraph[cv1].edgeId);
 
                 csv << chainStringId(ce, positionInBubbleChain, indexInBubble) << ",";
                 csv << componentId << ",";
@@ -392,8 +438,6 @@ void CompressedPathGraph1B::writeChainsDetailsCsv(const string& fileNamePrefix) 
     csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,Index in bubble,Position in chain,MarkerGraphEdgeId\n";
 
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
-        const vertex_descriptor cv0 = source(ce, cGraph);
-        const vertex_descriptor cv1 = target(ce, cGraph);
         const BubbleChain& bubbleChain = cGraph[ce];
 
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
@@ -403,8 +447,6 @@ void CompressedPathGraph1B::writeChainsDetailsCsv(const string& fileNamePrefix) 
             for(uint64_t indexInBubble=0; indexInBubble<ploidy; indexInBubble++) {
                 const Chain& chain = bubble[indexInBubble];
                 SHASTA_ASSERT(chain.size() >= 2);
-                SHASTA_ASSERT(chain.front() == cGraph[cv0].edgeId);
-                SHASTA_ASSERT(chain.back() == cGraph[cv1].edgeId);
 
                 for(uint64_t positionInChain=0; positionInChain<chain.size(); positionInChain++) {
                     csv << chainStringId(ce, positionInBubbleChain, indexInBubble) << ",";
