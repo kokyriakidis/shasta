@@ -113,7 +113,7 @@ private:
     void writeBubblesCsv(const string& fileNamePrefix) const;
     void writeChainsCsv(const string& fileNamePrefix) const;
     void writeChainsDetailsCsv(const string& fileNamePrefix) const;
-    void writeGraphviz(const string& fileNamePrefix) const;
+    void writeGraphviz(const string& fileNamePrefix, bool labels) const;
     void writeGfa(const string& fileNamePrefix) const;
 
     string bubbleChainStringId(edge_descriptor) const;

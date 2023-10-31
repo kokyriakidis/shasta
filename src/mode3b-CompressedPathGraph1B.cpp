@@ -260,7 +260,8 @@ void CompressedPathGraph1B::write(const string& name) const
         " vertices, " << num_edges(*this) << " edges." << endl;
 
     writeCsv(fileNamePrefix);
-    writeGraphviz(fileNamePrefix);
+    writeGraphviz(fileNamePrefix, true);
+    writeGraphviz(fileNamePrefix, false);
     writeGfa(fileNamePrefix);
 }
 
@@ -423,9 +424,46 @@ void CompressedPathGraph1B::writeChainsDetailsCsv(const string& fileNamePrefix) 
 
 
 
-void CompressedPathGraph1B::writeGraphviz(const string& fileNamePrefix) const
+void CompressedPathGraph1B::writeGraphviz(
+    const string& fileNamePrefix,
+    bool labels) const
 {
+    const CompressedPathGraph1B& cGraph = *this;
 
+    ofstream dot;
+    if(labels) {
+        dot.open(fileNamePrefix + ".dot");
+    } else {
+        dot.open(fileNamePrefix + "-NoLabels.dot");
+    }
+
+    dot << "digraph Component_" << componentId << "{\n";
+
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
+        dot << cGraph[cv].edgeId << ";\n";
+    }
+
+
+
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
+        const vertex_descriptor cv0 = source(ce, cGraph);
+        const vertex_descriptor cv1 = target(ce, cGraph);
+
+        uint64_t averageOffset;
+        uint64_t minOffset;
+        uint64_t maxOffset;
+        bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
+
+        dot << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId;
+        if(labels) {
+            dot << " [label=\"" <<
+                bubbleChainStringId(ce) << "\\n" <<
+                averageOffset << "\"]";
+        }
+        dot << ";\n";
+    }
+
+    dot << "}\n";
 }
 
 
