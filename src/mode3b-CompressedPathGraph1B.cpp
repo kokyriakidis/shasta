@@ -470,7 +470,45 @@ void CompressedPathGraph1B::writeGraphviz(
 
 void CompressedPathGraph1B::writeGfa(const string& fileNamePrefix) const
 {
+    const CompressedPathGraph1B& cGraph = *this;
 
+    ofstream gfa(fileNamePrefix + ".gfa");
+
+    // Write the header line.
+    gfa << "H\tVN:Z:1.0\n";
+
+    // Write a segment for each edge.
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
+
+        uint64_t averageOffset;
+        uint64_t minOffset;
+        uint64_t maxOffset;
+        bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
+
+        // Record type.
+        gfa << "S\t";
+
+        // Name.
+        gfa << bubbleChainStringId(ce) << "\t";
+
+        // Sequence.
+        gfa << "*\t";
+
+        // Sequence length in bases.
+        gfa << "LN:i:" << averageOffset << "\n";
+    }
+
+    // For each vertex, write links between each pair of incoming/outgoing edges.
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1A) {
+        BGL_FORALL_INEDGES(cv, ceIn, cGraph, CompressedPathGraph1B) {
+            BGL_FORALL_OUTEDGES(cv, ceOut, cGraph, CompressedPathGraph1B) {
+                gfa <<
+                    "L\t" <<
+                    bubbleChainStringId(ceIn) << "\t+\t" <<
+                    bubbleChainStringId(ceOut) << "\t+\t*\n";
+            }
+        }
+    }
 }
 
 
