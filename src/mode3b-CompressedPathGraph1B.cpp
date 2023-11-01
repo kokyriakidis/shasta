@@ -9,6 +9,7 @@ using namespace mode3b;
 
 // Boost libraries.
 #include <boost/graph/filtered_graph.hpp>
+#include <boost/pending/disjoint_sets.hpp>
 
 // Standard lirbary.
 #include "fstream.hpp"
@@ -96,13 +97,24 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     componentId(componentId),
     assembler(assembler)
 {
+    // *** EXPOSE WHEN CODE STABILIZES
+    const uint64_t superbubblesMaxOffset1 = 300;
+    const uint64_t superbubblesMaxOffset2 = 1000;
+
     create();
     write("Initial");
 
     compressParallelEdges();
+    compressSequentialEdges();
+    compressParallelEdges();
     write("A");
 
+    removeShortSuperbubbles(
+        superbubblesMaxOffset1,
+        superbubblesMaxOffset2);
+    compressParallelEdges();
     compressSequentialEdges();
+    compressParallelEdges();
     write("B");
 }
 
@@ -660,5 +672,149 @@ void CompressedPathGraph1B::bubbleChainOffset(
         averageOffset += bubbleAverageOffset;
         minOffset += bubbleMinOffset;
         maxOffset += bubbleMaxOffset;
+    }
+}
+
+
+
+// Remove short superbubbles with one entry and one exit.
+void CompressedPathGraph1B::removeShortSuperbubbles(
+    uint64_t maxOffset1,    // Used to define superbubbles
+    uint64_t maxOffset2)    // Compared against the offset between entry and exit
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+    // Map vertices to integers.
+    std::map<vertex_descriptor, uint64_t> vertexIndexMap;
+    uint64_t vertexIndex = 0;
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
+        vertexIndexMap.insert({cv, vertexIndex++});
+    }
+
+    // Compute connected components, using only edges with average offset up to maxOffset1.
+    const uint64_t n = vertexIndexMap.size();
+    vector<uint64_t> rank(n);
+    vector<uint64_t> parent(n);
+    boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
+    for(uint64_t i=0; i<n; i++) {
+        disjointSets.make_set(i);
+    }
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
+        uint64_t averageOffset;
+        uint64_t minOffset;
+        uint64_t maxOffset;
+        bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
+        if(averageOffset <= maxOffset1) {
+            const vertex_descriptor cv0 = source(ce, cGraph);
+            const vertex_descriptor cv1 = target(ce, cGraph);
+            disjointSets.union_set(vertexIndexMap[cv0], vertexIndexMap[cv1]);
+        }
+    }
+
+    // Gather the vertices in each connected component.
+    vector< vector<vertex_descriptor> > components(n);
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
+        const uint64_t componentId = disjointSets.find_set(vertexIndexMap[cv]);
+        components[componentId].push_back(cv);
+    }
+
+
+
+    // Each component with at least 2 vertices defines a superbubble.
+    for(uint64_t componentId=0; componentId<components.size(); componentId++) {
+        const vector<vertex_descriptor>& component = components[componentId];
+        if(component.size() < 2) {
+            continue;
+        }
+
+        /*
+        cout << "Superbubble with " << component.size() << " vertices:";
+        for(const vertex_descriptor cv: component) {
+            cout << " " << cGraph[cv].edgeId;
+        }
+        cout << endl;
+        */
+
+        // Find entrances. These are superbubble vertices with in-edges
+        // from outside the superbubble.
+        vector<vertex_descriptor> entrances;
+        for(const vertex_descriptor cv0: component) {
+            BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
+                const vertex_descriptor cv1 = source(ce, cGraph);
+                if(disjointSets.find_set(vertexIndexMap[cv1]) != componentId) {
+                    entrances.push_back(cv0);
+                    break;
+                }
+            }
+        }
+
+        // Find exits. These are superbubble vertices with out-edges
+        // to outside the superbubble.
+        vector<vertex_descriptor> exits;
+        for(const vertex_descriptor cv0: component) {
+            BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
+                const vertex_descriptor cv1 = target(ce, cGraph);
+                if(disjointSets.find_set(vertexIndexMap[cv1]) != componentId) {
+                    exits.push_back(cv0);
+                    break;
+                }
+            }
+        }
+
+        // cout << "This superbubble has " << entrances.size() << " entrances and " <<
+        //     exits.size() << " exits." << endl;
+        if(not(entrances.size()==1 and exits.size()==1)) {
+            continue;
+        }
+        const vertex_descriptor entrance = entrances.front();
+        const vertex_descriptor exit = exits.front();
+        if(entrance == exit) {
+            continue;
+        }
+
+        // Check the base offset between the entrance and the exit.
+        MarkerGraphEdgePairInfo info;
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(cGraph[entrance].edgeId, cGraph[exit].edgeId, info));
+        if(info.common == 0) {
+            continue;
+        }
+        if(info.offsetInBases > int64_t(maxOffset2)) {
+            continue;
+        }
+
+        // cout << "This superbubble will be removed." << endl;
+
+        // Remove all vertices and edges internal to the superbubble.
+        for(const vertex_descriptor cv: component) {
+            if(cv!=entrance and cv!=exit) {
+                boost::clear_vertex(cv, cGraph);
+                boost::remove_vertex(cv, cGraph);
+            }
+        }
+        // We must also remove edges between the entrance and the exit.
+        vector<edge_descriptor> entranceToExitEdges;
+        BGL_FORALL_OUTEDGES(entrance, ce, cGraph, CompressedPathGraph1B) {
+            if(target(ce, cGraph) == exit) {
+                entranceToExitEdges.push_back(ce);
+            }
+        }
+        for(const edge_descriptor ce: entranceToExitEdges) {
+            boost::remove_edge(ce, cGraph);
+        }
+
+        // Generate an edge between the entrance and the exit.
+        // This will be a BubbleChain consisting of a single haploid Bubble.
+        edge_descriptor eNew;
+        tie(eNew, ignore) = add_edge(entrance, exit, cGraph);
+        CompressedPathGraph1BEdge& newEdge = cGraph[eNew];
+        newEdge.id = nextEdgeId++;
+        BubbleChain& bubbleChain = newEdge;
+        bubbleChain.resize(1);
+        Bubble& bubble = bubbleChain.front();
+        bubble.resize(1);
+        Chain& chain = bubble.front();
+        chain.push_back(cGraph[entrance].edgeId);
+        chain.push_back(cGraph[exit].edgeId);
+
     }
 }

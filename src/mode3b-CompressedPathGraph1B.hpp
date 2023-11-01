@@ -109,6 +109,12 @@ private:
     // Compress linear sequences of edges (BubbleChains) into longer BubbleChains.
     void compressSequentialEdges();
 
+    // Remove short superbubbles with one entry and one exit.
+    void removeShortSuperbubbles(
+        uint64_t maxOffset1,    // Used to define superbubbles
+        uint64_t maxOffset2     // Compared against the offset between entry and exit
+    );
+
     // Output.
     void write(const string& name) const;
     void writeCsv(const string& fileNamePrefix) const;
