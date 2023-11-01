@@ -104,10 +104,13 @@ private:
     vertex_descriptor getVertex(MarkerGraphEdgeId);
 
     // Compress parallel edges into bubbles, where possible.
-    void compressParallelEdges();
+    bool compressParallelEdges();
 
     // Compress linear sequences of edges (BubbleChains) into longer BubbleChains.
-    void compressSequentialEdges();
+    bool compressSequentialEdges();
+
+    // Call compressParallelEdges and compressSequentialEdges iteratively until nothing changes.
+    void compress();
 
     // Remove short superbubbles with one entry and one exit.
     void removeShortSuperbubbles(

@@ -98,24 +98,18 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     assembler(assembler)
 {
     // *** EXPOSE WHEN CODE STABILIZES
-    const uint64_t superbubblesMaxOffset1 = 300;
-    const uint64_t superbubblesMaxOffset2 = 1000;
+    vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
+    {{300, 1000}, {1000, 3000}, {3000, 10000}, {10000, 30000}};
 
     create();
+    compress();
     write("Initial");
 
-    compressParallelEdges();
-    compressSequentialEdges();
-    compressParallelEdges();
-    write("A");
-
-    removeShortSuperbubbles(
-        superbubblesMaxOffset1,
-        superbubblesMaxOffset2);
-    compressParallelEdges();
-    compressSequentialEdges();
-    compressParallelEdges();
-    write("B");
+    for(const auto& p: superbubbleRemovalMaxOffsets) {
+        removeShortSuperbubbles(p.first, p.second);
+        compress();
+    }
+    write("Final");
 }
 
 
@@ -202,9 +196,10 @@ CompressedPathGraph1B::vertex_descriptor CompressedPathGraph1B::getVertex(
 
 
 // Compress parallel edges into bubbles, where possible.
-void CompressedPathGraph1B::compressParallelEdges()
+bool CompressedPathGraph1B::compressParallelEdges()
 {
     CompressedPathGraph1B& cGraph = *this;
+    bool changesWereMade = false;
 
     // Look for sets of parallel edges v0->v1.
     vector<vertex_descriptor> childrenVertices;
@@ -248,6 +243,7 @@ void CompressedPathGraph1B::compressParallelEdges()
             }
 
             // Create the new edge.
+            changesWereMade = true;
             edge_descriptor eNew;
             tie(eNew, ignore) = add_edge(v0, v1, cGraph);
             CompressedPathGraph1BEdge& newEdge = cGraph[eNew];
@@ -263,14 +259,16 @@ void CompressedPathGraph1B::compressParallelEdges()
 
         }
     }
+    return changesWereMade;
 }
 
 
 
 // Compress linear sequences of edges (BubbleChains) into longer BubbleChains.
-void CompressedPathGraph1B::compressSequentialEdges()
+bool CompressedPathGraph1B::compressSequentialEdges()
 {
     CompressedPathGraph1B& cGraph = *this;
+    bool changesWereMade = false;
 
     // Find linear chains of edges.
     vector< vector<edge_descriptor> > linearChains;
@@ -285,6 +283,7 @@ void CompressedPathGraph1B::compressSequentialEdges()
         }
 
         // Create the new edge.
+        changesWereMade = true;
         const vertex_descriptor v0 = source(linearChain.front(), cGraph);
         const vertex_descriptor v1 = target(linearChain.back(), cGraph);
         edge_descriptor ceNew;
@@ -309,7 +308,21 @@ void CompressedPathGraph1B::compressSequentialEdges()
             boost::remove_vertex(cv, cGraph);
         }
     }
+    return changesWereMade;
+}
 
+
+
+// Call compressParallelEdges and compressSequentialEdges iteratively until nothing changes.
+void CompressedPathGraph1B::compress()
+{
+    while(true) {
+        const bool compressParallelChanges = compressParallelEdges();
+        const bool compressSequentialChanges = compressSequentialEdges();
+        if(not(compressParallelChanges or compressSequentialChanges)) {
+            break;
+        }
+    }
 }
 
 
