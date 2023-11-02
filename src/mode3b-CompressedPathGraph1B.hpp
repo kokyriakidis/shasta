@@ -112,6 +112,10 @@ private:
     // Call compressParallelEdges and compressSequentialEdges iteratively until nothing changes.
     void compress();
 
+    // Vertex detangling.
+    bool detangleVerticesStrict();
+    bool detangleVertexStrict(vertex_descriptor);
+
     // Remove short superbubbles with one entry and one exit.
     void removeShortSuperbubbles(
         uint64_t maxOffset1,    // Used to define superbubbles
