@@ -4,6 +4,7 @@
 // Shasta
 #include "invalid.hpp"
 #include "shastaTypes.hpp"
+#include "SHASTA_ASSERT.hpp"
 
 // Boost libraries.
 #include <boost/graph/adjacency_list.hpp>
@@ -29,7 +30,7 @@ namespace shasta {
         class Bubble;
 
         // A BubbleChain is a sequence of Bubbles.
-        using BubbleChain = vector<Bubble>;
+        class BubbleChain;
 
         class CompressedPathGraph1B;
         class CompressedPathGraph1BVertex;
@@ -61,6 +62,22 @@ public:
     bool isGeneral() const
     {
         return size() > 2;
+    }
+};
+
+
+
+class shasta::mode3b::BubbleChain : public vector<Bubble> {
+public:
+    const Bubble& firstBubble() const
+    {
+        SHASTA_ASSERT(not empty());
+        return front();
+    }
+    const Bubble& lastBubble() const
+    {
+        SHASTA_ASSERT(not empty());
+        return back();
     }
 };
 
@@ -112,9 +129,28 @@ private:
     // Call compressParallelEdges and compressSequentialEdges iteratively until nothing changes.
     void compress();
 
+    // Compute the tangle matrix given in-edges and out-edges.
+    // The last bubble of each in-edge and the first bubble
+    // of each out-edge must be haploid.
+    void computeTangleMatrix(
+        const vector<edge_descriptor>& inEdges,
+        const vector<edge_descriptor>& outEdges,
+        vector< vector<uint64_t> >& tangleMatrix
+        ) const;
+
     // Vertex detangling.
     bool detangleVerticesStrict();
     bool detangleVertexStrict(vertex_descriptor);
+
+    // Edge detangling.
+    bool detangleEdges(
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
+    bool detangleEdge(
+        std::map<uint64_t, edge_descriptor>& edgeMap,
+        std::map<uint64_t, edge_descriptor>::iterator&,
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
 
     // Remove short superbubbles with one entry and one exit.
     void removeShortSuperbubbles(
