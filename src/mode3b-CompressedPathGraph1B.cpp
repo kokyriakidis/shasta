@@ -106,7 +106,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     create();
     write("Initial");
 
-    detangleVerticesStrict();
+    detangleVerticesStrict(false);
     compress();
     write("A");
 
@@ -845,7 +845,7 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
 
 
 
-bool CompressedPathGraph1B::detangleVerticesStrict()
+bool CompressedPathGraph1B::detangleVerticesStrict(bool debug)
 {
     CompressedPathGraph1B& cGraph = *this;
 
@@ -856,7 +856,7 @@ bool CompressedPathGraph1B::detangleVerticesStrict()
 
     bool changesWereMade = false;
     for(const vertex_descriptor cv: allVertices) {
-        if(detangleVertexStrict(cv)) {
+        if(detangleVertexStrict(cv, debug)) {
             changesWereMade = true;
         }
     }
@@ -908,10 +908,10 @@ void CompressedPathGraph1B::computeTangleMatrix(
 // This works if the following is true:
 // - For all incoming edges (bubble chains) of cv, the last bubble is haploid.
 // - For all outgoing edges (bubble chains) of cv, the first bubble is haploid.
-bool CompressedPathGraph1B::detangleVertexStrict(vertex_descriptor cv)
+bool CompressedPathGraph1B::detangleVertexStrict(
+    vertex_descriptor cv, bool debug)
 {
     CompressedPathGraph1B& cGraph = *this;
-    const bool debug = false;
 
     // Gather the in-edges and check that the last bubble is haploid.
     vector<edge_descriptor> inEdges;
@@ -940,6 +940,17 @@ bool CompressedPathGraph1B::detangleVertexStrict(vertex_descriptor cv)
     // Compute the tangle matrix.
     vector< vector<uint64_t> > tangleMatrix;
     computeTangleMatrix(inEdges, outEdges, tangleMatrix);
+
+    if(debug) {
+        cout << "Tangle matrix for vertex " << cGraph[cv].edgeId << endl;
+        for(uint64_t i0=0; i0<inEdges.size(); i0++) {
+            for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+                cout << bubbleChainStringId(inEdges[i0]) << " " <<
+                    bubbleChainStringId(outEdges[i1]) << " " <<
+                    tangleMatrix[i0][i1] << endl;
+            }
+        }
+    }
 
     // If the tangle matrix contains no zeros, there is nothing to do.
     bool foundZero = false;

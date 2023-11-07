@@ -139,8 +139,8 @@ private:
         ) const;
 
     // Vertex detangling.
-    bool detangleVerticesStrict();
-    bool detangleVertexStrict(vertex_descriptor);
+    bool detangleVerticesStrict(bool debug);
+    bool detangleVertexStrict(vertex_descriptor, bool debug);
 
     // Edge detangling.
     bool detangleEdges(
