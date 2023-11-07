@@ -1095,6 +1095,8 @@ bool CompressedPathGraph1B::detangleEdge(
     CompressedPathGraph1B& cGraph = *this;
     const edge_descriptor ce = it->second;
     ++it;
+    edgeMap.erase(cGraph[ce].id);
+
     const bool debug = true;
 
     // Tangle matrix elements <= detangleToleranceLow are treated as negigible.
@@ -1113,25 +1115,37 @@ bool CompressedPathGraph1B::detangleEdge(
     }
 
     // Gather the in-edges and check that the last bubble is haploid.
+    // Ignore in-edges coming from cv1 (back-edges).
     vector<edge_descriptor> inEdges;
+    vector<edge_descriptor> backEdges;
     BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.lastBubble().isHaploid()) {
             return false;
         }
-        inEdges.push_back(ce);
+        if(source(ce, cGraph) != cv1) {
+            inEdges.push_back(ce);
+        } else {
+            backEdges.push_back(ce);
+        }
     }
 
     // Gather the out-edges and check that the first bubble is haploid.
+    // Ignore out-edges going to cv0 (back-edges).
     vector<edge_descriptor> outEdges;
     BGL_FORALL_OUTEDGES(cv1, ce, cGraph, CompressedPathGraph1B) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.firstBubble().isHaploid()) {
             return false;
         }
-        outEdges.push_back(ce);
+        if(target(ce, cGraph) != cv0) {
+            outEdges.push_back(ce);
+        }
     }
 
+    if(inEdges.size() == 0 or outEdges.size() == 0) {
+        return false;
+    }
     if(inEdges.size() < 2 and outEdges.size() < 2) {
         return false;
     }
@@ -1231,6 +1245,7 @@ bool CompressedPathGraph1B::detangleEdge(
         }
     }
 
+#if 0
     // In an in-edge is also an out-edge, don't detangle.
     for(const edge_descriptor ce: inEdges) {
         if(find(outEdges.begin(), outEdges.end(), ce) != outEdges.end()) {
@@ -1240,6 +1255,7 @@ bool CompressedPathGraph1B::detangleEdge(
             return false;
         }
     }
+#endif
 
     if(debug) {
         cout << "This edge will be detangled " << inEdges.size() << " by " << outEdges.size() << endl;
@@ -1306,6 +1322,7 @@ bool CompressedPathGraph1B::detangleEdge(
 
     }
 
+
     // Now we can remove cv0, cv1, ce, and all of the in-edges and out-edges.
     // We have to do this while safely incrementing the edge iterator to point to the
     // next edge that was not removed.
@@ -1315,12 +1332,21 @@ bool CompressedPathGraph1B::detangleEdge(
         if(it != edgeMap.end() and cGraph[ce].id == it->first) {
             ++it;
         }
+        edgeMap.erase(cGraph[ce].id);
         boost::remove_edge(ce, cGraph);
     }
     for(const edge_descriptor ce: outEdges) {
         if(it != edgeMap.end() and cGraph[ce].id == it->first) {
             ++it;
         }
+        edgeMap.erase(cGraph[ce].id);
+        boost::remove_edge(ce, cGraph);
+    }
+    for(const edge_descriptor ce: backEdges) {
+        if(it != edgeMap.end() and cGraph[ce].id == it->first) {
+            ++it;
+        }
+        edgeMap.erase(cGraph[ce].id);
         boost::remove_edge(ce, cGraph);
     }
     SHASTA_ASSERT(in_degree(cv0, cGraph) == 0);
