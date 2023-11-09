@@ -152,6 +152,17 @@ private:
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
 
+    // Special treatment to detangle back edges that were too long
+    // to be handled by detangleEdges.
+    bool detangleBackEdges(
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
+    bool detangleBackEdge(
+        std::map<uint64_t, edge_descriptor>& edgeMap,
+        std::map<uint64_t, edge_descriptor>::iterator&,
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
+
     // Remove short superbubbles with one entry and one exit.
     void removeShortSuperbubbles(
         uint64_t maxOffset1,    // Used to define superbubbles
