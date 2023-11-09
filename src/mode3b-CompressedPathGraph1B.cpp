@@ -21,15 +21,15 @@ void GlobalPathGraph1::assemble2(const Assembler& assembler)
 {
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
     const uint64_t minPrimaryCoverage = 8;
-    const uint64_t maxPrimaryCoverage = 50;
+    const uint64_t maxPrimaryCoverage = 60;
     const uint64_t minEdgeCoverage = 1;
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
     const uint64_t transitiveReductionDistance = 5000;
     const uint64_t transitiveReductionMaxCoverage = 100;
-    const uint64_t crossEdgesLowCoverageThreshold = 1;
+    const uint64_t crossEdgesLowCoverageThreshold = 2;
     const uint64_t crossEdgesHighCoverageThreshold = 6;
-    const uint64_t crossEdgesMinOffset = 10000;
+    const uint64_t crossEdgesMinOffset = 1000;
 
 
     GlobalPathGraph1 graph(assembler);
@@ -100,7 +100,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     // *** EXPOSE WHEN CODE STABILIZES
     vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
     {{300, 1000}, {1000, 3000}, {3000, 10000}, {10000, 30000}};
-    const uint64_t detangleToleranceLow = 1;
+    const uint64_t detangleToleranceLow = 0;
     const uint64_t detangleToleranceHigh = 3;
 
     create();
@@ -117,7 +117,12 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     write("B");
 
     detangleEdges(detangleToleranceLow, detangleToleranceHigh);
+    detangleEdges(detangleToleranceLow, detangleToleranceHigh);
     write("C");
+    detangleEdges(detangleToleranceLow+1, detangleToleranceHigh);
+    write("D");
+    detangleVerticesStrict(true);
+    write("E");
 
     compress();
     write("Final");
@@ -1076,23 +1081,26 @@ bool CompressedPathGraph1B::detangleEdges(
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
 {
+    cout << "Detangling edges." << endl;
     CompressedPathGraph1B& cGraph = *this;
 
     // To safely iterate over edges while removing edges we must use edge ids
-    // as unique identifiers, becuase edge descriptors can be reused as edges are
+    // as unique identifiers, because edge descriptors can be reused as edges are
     // deleted ndw new edges are created.
     std::map<uint64_t, edge_descriptor> edgeMap;
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
         edgeMap.insert({cGraph[ce].id, ce});
     }
 
-    bool changesWereMade = false;
+    uint64_t detangleCount = 0;;
     for(auto it=edgeMap.begin(); it!=edgeMap.end(); /* Incremented safely by detangleEdgeStrict */) {
         if(detangleEdge(edgeMap, it, detangleToleranceLow, detangleToleranceHigh)) {
-            changesWereMade = true;
+            ++detangleCount;
         }
     }
-    return changesWereMade;
+    cout << "Detangled " << detangleCount << " edges." << endl;
+
+    return detangleCount > 0;
 }
 
 
@@ -1125,6 +1133,10 @@ bool CompressedPathGraph1B::detangleEdge(
         return false;
     }
 
+    if(debug) {
+        cout << "Attempting to detangle edge " << bubbleChainStringId(ce) << endl;
+    }
+
     // Gather the in-edges and check that the last bubble is haploid.
     // Ignore in-edges coming from cv1 (back-edges).
     vector<edge_descriptor> inEdges;
@@ -1132,6 +1144,10 @@ bool CompressedPathGraph1B::detangleEdge(
     BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.lastBubble().isHaploid()) {
+            if(debug) {
+                cout << "Not detangling because the last bubble of in-edge " <<
+                    bubbleChainStringId(ce) << " is not haploid." << endl;
+            }
             return false;
         }
         if(source(ce, cGraph) != cv1) {
@@ -1147,6 +1163,10 @@ bool CompressedPathGraph1B::detangleEdge(
     BGL_FORALL_OUTEDGES(cv1, ce, cGraph, CompressedPathGraph1B) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.firstBubble().isHaploid()) {
+            if(debug) {
+                cout << "Not detangling because the first bubble of out-edge " <<
+                    bubbleChainStringId(ce) << " is not haploid." << endl;
+            }
             return false;
         }
         if(target(ce, cGraph) != cv0) {
@@ -1155,9 +1175,15 @@ bool CompressedPathGraph1B::detangleEdge(
     }
 
     if(inEdges.size() == 0 or outEdges.size() == 0) {
+        if(debug) {
+            cout << "Not detangling due to degree (case 1)." << endl;
+        }
         return false;
     }
     if(inEdges.size() < 2 and outEdges.size() < 2) {
+        if(debug) {
+            cout << "Not detangling due to degree (case 2)." << endl;
+        }
         return false;
     }
 
