@@ -141,6 +141,14 @@ private:
     // Vertex detangling.
     bool detangleVerticesStrict(bool debug);
     bool detangleVertexStrict(vertex_descriptor, bool debug);
+    bool detangleVertices(bool debug,
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
+    bool detangleVertex(
+        vertex_descriptor,
+        bool debug,
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
 
     // Edge detangling.
     bool detangleEdges(
