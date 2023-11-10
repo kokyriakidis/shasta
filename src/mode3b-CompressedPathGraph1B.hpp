@@ -150,6 +150,24 @@ private:
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
 
+    // Vertex detangling that can deal with non-haploid bubbles adjacent to the
+    // vertex to be detangled.
+    bool detangleVerticesGeneral(bool debug,
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
+    bool detangleVertexGeneral(
+        vertex_descriptor,
+        bool debug,
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
+
+    // Split the first/last bubble of a bubble chain.
+    // Used by detangleVertexGeneral to eliminate
+    // non-haploid bubble adjacent to a vertex to be detangled.
+    void splitBubbleChainAtBeginning(edge_descriptor);
+    void splitBubbleChainAtEnd(edge_descriptor);
+
+
     // Edge detangling.
     bool detangleEdges(
         uint64_t detangleToleranceLow,

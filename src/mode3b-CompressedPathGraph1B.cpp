@@ -100,13 +100,12 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     // *** EXPOSE WHEN CODE STABILIZES
     vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
     {{300, 1000}, {1000, 3000}, {3000, 10000}, {10000, 30000}};
-    const uint64_t detangleToleranceLow = 0;
     const uint64_t detangleToleranceHigh = 3;
 
     create();
     write("Initial");
 
-    detangleVertices(false, detangleToleranceLow, detangleToleranceHigh);
+    detangleVertices(false, 0, detangleToleranceHigh);
     compress();
 
     for(const auto& p: superbubbleRemovalMaxOffsets) {
@@ -114,14 +113,17 @@ CompressedPathGraph1B::CompressedPathGraph1B(
         compress();
     }
 
-    detangleEdges(detangleToleranceLow, detangleToleranceHigh);
-    detangleEdges(detangleToleranceLow, detangleToleranceHigh);
-    detangleEdges(detangleToleranceLow+1, detangleToleranceHigh);
-    detangleVertices(false, detangleToleranceLow, detangleToleranceHigh);
+    detangleEdges(0, detangleToleranceHigh);
+    detangleEdges(0, detangleToleranceHigh);
+    detangleEdges(1, detangleToleranceHigh);
+    detangleVertices(false, 0, detangleToleranceHigh);
 
-    detangleBackEdges(detangleToleranceLow+1, detangleToleranceHigh);
+    detangleBackEdges(1, detangleToleranceHigh);
     compress();
-    detangleVertices(true, detangleToleranceLow, detangleToleranceHigh);
+
+    write("A");
+    detangleVerticesGeneral(true, 1, detangleToleranceHigh);
+    compress();
 
     write("Final");
 }
@@ -923,6 +925,38 @@ bool CompressedPathGraph1B::detangleVertices(
 }
 
 
+
+bool CompressedPathGraph1B::detangleVerticesGeneral(
+    bool debug,
+    uint64_t detangleToleranceLow,
+    uint64_t detangleToleranceHigh)
+{
+    if(debug) {
+        cout << "Detangling vertices (general detangling)." << endl;
+    }
+    CompressedPathGraph1B& cGraph = *this;
+
+    vector<vertex_descriptor> allVertices;
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
+        allVertices.push_back(cv);
+    }
+
+    uint64_t detangledCount = 0;
+    for(const vertex_descriptor cv: allVertices) {
+        if(detangleVertexGeneral(cv, debug, detangleToleranceLow, detangleToleranceHigh)) {
+            ++detangledCount;
+        }
+    }
+
+    if(true) {
+        cout << "Detangled " << detangledCount << " vertices." << endl;
+
+    }
+
+    return detangledCount > 0;
+}
+
+
 // Compute the tangle matrix given in-edges and out-edges.
 // The last bubble of each in-edge and the first bubble
 // of each out-edge must be haploid.
@@ -1342,6 +1376,312 @@ bool CompressedPathGraph1B::detangleVertex(
     remove_vertex(cv, cGraph);
 
     return true;
+}
+
+
+
+// Ths version can handle the case where the last bubble of an in-edge
+// or the first bubble of an out-edge is not haploid.
+// It works like this:
+// - Compute a generalized tangle matrix taking using the next to last
+//   MarkerGraphEdgeId of each incoming chain
+//   and the second MarkerGraphEdgeId of each outgoing chain.
+// - If detangling is possible based on this generalized tangle matrix,
+//   split the last bubble of each incoming edge and the first
+//   bubble of each outgoing edge. After this operation,
+//   the last bubble of each in-edge is haploid and the first bubble
+//   of each out-edge is haploid.
+// - Call detangleVertex to do the detangling.
+bool CompressedPathGraph1B::detangleVertexGeneral(
+    vertex_descriptor cv,
+    bool debug,
+    uint64_t detangleToleranceLow,
+    uint64_t detangleToleranceHigh)
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+#if 0
+    // Use detangleVertex, if possible.
+    bool involvesNonHaploidBubbles = false;
+    BGL_FORALL_INEDGES(cv, ce, cGraph, CompressedPathGraph1B) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        if(not bubbleChain.lastBubble().isHaploid()) {
+            involvesNonHaploidBubbles = true;
+        }
+    }
+    BGL_FORALL_OUTEDGES(cv, ce, cGraph, CompressedPathGraph1B) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        if(not bubbleChain.firstBubble().isHaploid()) {
+            involvesNonHaploidBubbles = true;
+        }
+    }
+    if(not involvesNonHaploidBubbles) {
+        if(debug) {
+            cout << "No non-haploid bubbles involved, using detangleVertex." << endl;
+        }
+        return detangleVertex(cv, debug, detangleToleranceLow, detangleToleranceHigh);
+    }
+#endif
+
+    if(in_degree(cv, cGraph) < 2 or out_degree(cv, cGraph) < 2) {
+        return false;
+    }
+
+    if(debug) {
+        cout << "Attempting general detangling for vertex " << cGraph[cv].edgeId << endl;
+    }
+
+    class ChainInfo {
+    public:
+        edge_descriptor ce;
+        uint64_t indexInBubble;
+        MarkerGraphEdgeId edgeId;
+    };
+    vector<ChainInfo> inChains;
+    BGL_FORALL_INEDGES(cv, ce, cGraph, CompressedPathGraph1B) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        const Bubble& bubble = bubbleChain.lastBubble();
+        for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+            const Chain& chain = bubble[indexInBubble];
+            inChains.push_back({ce, indexInBubble, chain[chain.size() - 2]});
+        }
+    }
+    vector<ChainInfo> outChains;
+    BGL_FORALL_OUTEDGES(cv, ce, cGraph, CompressedPathGraph1B) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        const Bubble& bubble = bubbleChain.firstBubble();
+        for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+            const Chain& chain = bubble[indexInBubble];
+            outChains.push_back({ce, indexInBubble, chain[1]});
+        }
+    }
+
+    if(debug) {
+
+        cout << "In:" << endl;
+        for(const ChainInfo& chainInfo: inChains) {
+            cout << bubbleChainStringId(chainInfo.ce) << " " <<
+                chainInfo.indexInBubble << " " <<
+                chainInfo.edgeId << endl;
+        }
+
+        cout << "Out:" << endl;
+        for(const ChainInfo& chainInfo: outChains) {
+            cout << bubbleChainStringId(chainInfo.ce) << " " <<
+                chainInfo.indexInBubble << " " <<
+                chainInfo.edgeId << endl;
+        }
+    }
+
+    // Compute a generalized tangle matrix.
+    vector<vector<uint64_t> > tangleMatrix(inChains.size(), vector<uint64_t>(outChains.size()));
+    for(uint64_t i0=0; i0<inChains.size(); i0++) {
+        const MarkerGraphEdgeId markerGraphEdgeId0 = inChains[i0].edgeId;
+
+        for(uint64_t i1=0; i1<outChains.size(); i1++) {
+            const MarkerGraphEdgeId markerGraphEdgeId1 = outChains[i1].edgeId;
+
+            MarkerGraphEdgePairInfo info;
+            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(markerGraphEdgeId0, markerGraphEdgeId1, info));
+            tangleMatrix[i0][i1] = info.common;
+        }
+    }
+
+    if(debug) {
+        cout << "Tangle matrix:" << endl;
+        for(uint64_t i0=0; i0<inChains.size(); i0++) {
+            const ChainInfo& chainInfo0 = inChains[i0];
+            for(uint64_t i1=0; i1<outChains.size(); i1++) {
+                const ChainInfo& chainInfo1 = outChains[i1];
+
+                cout <<
+                    bubbleChainStringId(chainInfo0.ce) << " " <<
+                    chainInfo0.indexInBubble << " " <<
+                    chainInfo0.edgeId << " " <<
+                    bubbleChainStringId(chainInfo1.ce) << " " <<
+                    chainInfo1.indexInBubble << " " <<
+                    chainInfo1.edgeId << " " <<
+                    tangleMatrix[i0][i1] << endl;
+            }
+        }
+
+    }
+
+    // Count the number of significant, ambiguous, and negligible elements
+    // in the tangle matrix.
+    uint64_t significantCount = 0;
+    uint64_t ambiguousCount = 0;
+    uint64_t negligibleCount = 0;
+    for(uint64_t i0=0; i0<inChains.size(); i0++) {
+        for(uint64_t i1=0; i1<outChains.size(); i1++) {
+            const uint64_t t = tangleMatrix[i0][i1];
+            if(t <= detangleToleranceLow) {
+                ++negligibleCount;
+            } else if(t >= detangleToleranceHigh) {
+                ++significantCount;
+            } else {
+                ++ambiguousCount;
+            }
+        }
+    }
+
+    // If the tangle matrix contains any ambiguous elements, do nothing.
+    if(ambiguousCount > 0) {
+        if(debug) {
+            cout << "Tangle matrix is ambiguous." << endl;
+        }
+        return false;
+    }
+    // There are no ambiguous elements.
+    // If there are no negligible element, that is all elements of the tangle matrix are significant,
+    // there is nothing to do.
+    if(negligibleCount == 0) {
+        return false;
+    }
+
+    // To avoid breaking contiguity, we require each column and each row of the
+    // tangle matrix to have at least one significant element.
+    // This means that each in-edge will be "merged" with at least one out-edge,
+    // and each out-edge will be "merged" with at least one in-edge.
+    for(uint64_t i0=0; i0<inChains.size(); i0++) {
+        bool foundSignificant = false;
+        for(uint64_t i1=0; i1<outChains.size(); i1++) {
+            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                foundSignificant = true;
+                break;
+            }
+        }
+        if(not foundSignificant) {
+            return false;
+        }
+    }
+    for(uint64_t i1=0; i1<outChains.size(); i1++) {
+        bool foundSignificant = false;
+        for(uint64_t i0=0; i0<inChains.size(); i0++) {
+            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                foundSignificant = true;
+                break;
+            }
+        }
+        if(not foundSignificant) {
+            return false;
+        }
+    }
+
+    if(debug) {
+        cout << "This vertex can be detangled after some splitting of bubble chains." << endl;
+    }
+
+
+    // Make sure the last bubble of all in-edges is haploid.
+    in_edge_iterator itIn, itInEnd;
+    tie(itIn, itInEnd) = in_edges(cv, cGraph);
+    while(itIn != itInEnd) {
+        const edge_descriptor ce = *itIn;
+        ++itIn; // Increment before possibly removing this edge!
+        const BubbleChain& bubbleChain = cGraph[ce];
+        if(not bubbleChain.lastBubble().isHaploid()) {
+            if(debug) {
+                cout << "In-edge " << bubbleChainStringId(ce) <<
+                    " needs to be split at the end." << endl;
+            }
+            splitBubbleChainAtEnd(ce);
+        }
+    }
+
+    // Make sure the first bubble of all out-edges is haploid.
+    out_edge_iterator itOut, itOutEnd;
+    tie(itOut, itOutEnd) = out_edges(cv, cGraph);
+    while(itOut != itOutEnd) {
+        const edge_descriptor ce = *itOut;
+        ++itOut; // Increment before possibly removing this edge!
+        const BubbleChain& bubbleChain = cGraph[ce];
+        if(not bubbleChain.firstBubble().isHaploid()) {
+            if(debug) {
+                cout << "Out-edge " << bubbleChainStringId(ce) <<
+                    " needs to be split at the beginning." << endl;
+            }
+            splitBubbleChainAtBeginning(ce);
+        }
+    }
+
+    // Now we can detangle using detangleVertex.
+    if(debug) {
+        cout << "Calling detangleVertex." << endl;
+    }
+    return detangleVertex(cv, debug, detangleToleranceLow, detangleToleranceHigh);
+}
+
+
+
+// Split the first bubble of a bubble chain.
+// Used by detangleVertexGeneral to eliminate
+// non-haploid bubble adjacent to a vertex to be detangled.
+void CompressedPathGraph1B::splitBubbleChainAtBeginning(edge_descriptor ce)
+{
+    SHASTA_ASSERT(0);
+}
+
+
+
+// Split the last bubble of a bubble chain.
+// Used by detangleVertexGeneral to eliminate
+// non-haploid bubble adjacent to a vertex to be detangled.
+void CompressedPathGraph1B::splitBubbleChainAtEnd(edge_descriptor ce)
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+    const BubbleChain& bubbleChain = cGraph[ce];
+    const Bubble& lastBubble = bubbleChain.lastBubble();
+    SHASTA_ASSERT(not lastBubble.isHaploid());
+
+    const vertex_descriptor cv0 = source(ce, cGraph);
+    const vertex_descriptor cv1 = target(ce, cGraph);
+
+
+
+    // General case where the bubble chain has more than one bubble.
+    // Generate a new edge containing the bubble chain except for
+    // the last bubble, plus one new edge for each chain in the lastBubble.
+    if(bubbleChain.size() > 1) {
+
+        // Generate one new edge containing the bubble chain except for
+        // the last bubble.
+        CompressedPathGraph1BEdge newEdge;
+        newEdge.id = nextEdgeId++;
+        copy(bubbleChain.begin(), bubbleChain.end()-1, back_inserter(newEdge));
+        const vertex_descriptor cv2 = getVertex(newEdge.back().front().back());
+        boost::add_edge(cv0, cv2, newEdge, cGraph);
+
+        // Generate a  new edge for each chain in the lastBubble.
+        for(const Chain& chain: lastBubble) {
+            CompressedPathGraph1BEdge newEdge;
+            newEdge.resize(1);  // The new edge has only one bubble.
+            Bubble& newBubble = newEdge.front();
+            newEdge.id = nextEdgeId++;
+            newBubble.push_back(chain);
+            boost::add_edge(cv2, cv1, newEdge, cGraph);
+        }
+    }
+
+
+    // Special case where the bubble chain has one bubble.
+    // We generate one new edge for each chain in the lastBubble.
+    else {
+
+        // Generate a new edge for each chain in the lastBubble.
+        for(const Chain& chain: lastBubble) {
+            CompressedPathGraph1BEdge newEdge;
+            newEdge.resize(1);  // The new edge has only one bubble.
+            Bubble& newBubble = newEdge.front();
+            newEdge.id = nextEdgeId++;
+            newBubble.push_back(chain);
+            boost::add_edge(cv0, cv1, newEdge, cGraph);
+        }
+    }
+
+    // Now we can remove the original bubble chain.
+    boost::remove_edge(ce, cGraph);
 }
 
 
