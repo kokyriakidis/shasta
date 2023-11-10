@@ -116,12 +116,10 @@ CompressedPathGraph1B::CompressedPathGraph1B(
 
     detangleEdges(detangleToleranceLow, detangleToleranceHigh);
     detangleEdges(detangleToleranceLow, detangleToleranceHigh);
-    // detangleEdges(detangleToleranceLow+1, detangleToleranceHigh);
-    detangleVerticesStrict(true);
+    detangleEdges(detangleToleranceLow+1, detangleToleranceHigh);
+    detangleVerticesStrict(false);
 
-    write("A");
-    detangleBackEdges(detangleToleranceLow, detangleToleranceHigh);
-    write("B");
+    detangleBackEdges(detangleToleranceLow+1, detangleToleranceHigh);
     compress();
 
     write("Final");
@@ -347,7 +345,7 @@ void CompressedPathGraph1B::write(const string& name) const
     const string fileNamePrefix = name + "-" + to_string(componentId);
 
     cout << fileNamePrefix << ": " << num_vertices(*this) <<
-        " vertices, " << num_edges(*this) << " edges." << endl;
+        " vertices, " << num_edges(*this) << " edges. Next edge id " << nextEdgeId << endl;
 
     writeCsv(fileNamePrefix);
     writeGraphviz(fileNamePrefix, true);
@@ -475,7 +473,8 @@ void CompressedPathGraph1B::writeChainsDetailsCsv(const string& fileNamePrefix) 
     const CompressedPathGraph1B& cGraph = *this;
 
     ofstream csv(fileNamePrefix + "-ChainsDetails.csv");
-    csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,Index in bubble,Position in chain,MarkerGraphEdgeId\n";
+    csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,"
+        "Index in bubble,Position in chain,MarkerGraphEdgeId,Coverage,Common,Offset\n";
 
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
         const BubbleChain& bubbleChain = cGraph[ce];
@@ -489,13 +488,27 @@ void CompressedPathGraph1B::writeChainsDetailsCsv(const string& fileNamePrefix) 
                 SHASTA_ASSERT(chain.size() >= 2);
 
                 for(uint64_t positionInChain=0; positionInChain<chain.size(); positionInChain++) {
+                    const MarkerGraphEdgeId markerGraphEdgeId = chain[positionInChain];
+                    const uint64_t coverage = assembler.markerGraph.edgeCoverage(markerGraphEdgeId);
                     csv << chainStringId(ce, positionInBubbleChain, indexInBubble) << ",";
                     csv << componentId << ",";
                     csv << cGraph[ce].id << ",";
                     csv << positionInBubbleChain << ",";
                     csv << indexInBubble << ",";
                     csv << positionInChain << ",";
-                    csv << chain[positionInChain] << ",";
+                    csv << markerGraphEdgeId << ",";
+                    csv << coverage << ",";
+
+                    if(positionInChain != 0) {
+                        const MarkerGraphEdgeId previousMarkerGraphEdgeId = chain[positionInChain - 1];
+                        MarkerGraphEdgePairInfo info;
+                        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
+                            previousMarkerGraphEdgeId, markerGraphEdgeId, info));
+                        csv << info.common << ",";
+                        if(info.common != 0) {
+                            csv << info.offsetInBases << ",";
+                        }
+                    }
                     csv << "\n";
                 }
             }
@@ -851,6 +864,9 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
 
 bool CompressedPathGraph1B::detangleVerticesStrict(bool debug)
 {
+    if(debug) {
+        cout << "Detangling vertices." << endl;
+    }
     CompressedPathGraph1B& cGraph = *this;
 
     vector<vertex_descriptor> allVertices;
@@ -858,13 +874,19 @@ bool CompressedPathGraph1B::detangleVerticesStrict(bool debug)
         allVertices.push_back(cv);
     }
 
-    bool changesWereMade = false;
+    uint64_t detangledCount = 0;
     for(const vertex_descriptor cv: allVertices) {
         if(detangleVertexStrict(cv, debug)) {
-            changesWereMade = true;
+            ++detangledCount;
         }
     }
-    return changesWereMade;
+
+    if(debug) {
+        cout << "Detangled " << detangledCount << " vertices." << endl;
+
+    }
+
+    return detangledCount > 0;
 }
 
 
