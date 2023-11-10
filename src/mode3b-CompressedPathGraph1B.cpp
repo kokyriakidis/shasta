@@ -408,12 +408,17 @@ void CompressedPathGraph1B::writeBubblesCsv(const string& fileNamePrefix) const
     csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,v0,v1,Ploidy,AverageOffset,MinOffset,MaxOffset,\n";
 
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
-        const vertex_descriptor cv0 = source(ce, cGraph);
-        const vertex_descriptor cv1 = target(ce, cGraph);
         const BubbleChain& bubbleChain = cGraph[ce];
 
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
             const Bubble& bubble = bubbleChain[positionInBubbleChain];
+            const Chain& firstChain = bubble.front();
+
+            // Check that all the chains begins/end in the same place.
+            for(const Chain& chain: bubble) {
+                SHASTA_ASSERT(chain.front() == firstChain.front());
+                SHASTA_ASSERT(chain.back() == firstChain.back());
+            }
 
             uint64_t averageOffset;
             uint64_t minOffset;
@@ -424,8 +429,8 @@ void CompressedPathGraph1B::writeBubblesCsv(const string& fileNamePrefix) const
             csv << componentId << ",";
             csv << cGraph[ce].id << ",";
             csv << positionInBubbleChain << ",";
-            csv << cGraph[cv0].edgeId << ",";
-            csv << cGraph[cv1].edgeId << ",";
+            csv << firstChain.front() << ",";
+            csv << firstChain.back() << ",";
             csv << bubble.size() << ",";
             csv << averageOffset << ",";
             csv << minOffset << ",";
