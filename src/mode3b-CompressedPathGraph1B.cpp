@@ -1639,7 +1639,59 @@ bool CompressedPathGraph1B::detangleVertexGeneral(
 // non-haploid bubbles adjacent to a vertex to be detangled.
 void CompressedPathGraph1B::splitBubbleChainAtBeginning(edge_descriptor ce)
 {
-    SHASTA_ASSERT(0);
+    CompressedPathGraph1B& cGraph = *this;
+
+    const BubbleChain& bubbleChain = cGraph[ce];
+    const Bubble& firstBubble = bubbleChain.firstBubble();
+    SHASTA_ASSERT(not firstBubble.isHaploid());
+
+    const vertex_descriptor cv0 = source(ce, cGraph);
+    const vertex_descriptor cv1 = target(ce, cGraph);
+
+
+
+    // General case where the bubble chain has more than one bubble.
+    // Generate a new edge containing the bubble chain except for
+    // the first bubble, plus one new edge for each chain in the firstBubble.
+    if(bubbleChain.size() > 1) {
+
+        // Generate one new edge containing the bubble chain except for
+        // the first bubble.
+        CompressedPathGraph1BEdge newEdge;
+        newEdge.id = nextEdgeId++;
+        copy(bubbleChain.begin() + 1, bubbleChain.end(), back_inserter(newEdge));
+        const vertex_descriptor cv2 = getVertex(newEdge.front().front().front());
+        boost::add_edge(cv2, cv1, newEdge, cGraph);
+
+        // Generate a  new edge for each chain in the firstBubble.
+        for(const Chain& chain: firstBubble) {
+            CompressedPathGraph1BEdge newEdge;
+            newEdge.resize(1);  // The new edge has only one bubble.
+            Bubble& newBubble = newEdge.front();
+            newEdge.id = nextEdgeId++;
+            newBubble.push_back(chain);
+            boost::add_edge(cv0, cv2, newEdge, cGraph);
+        }
+    }
+
+
+    // Special case where the bubble chain has one bubble.
+    // We generate one new edge for each chain in the firstBubble.
+    else {
+
+        // Generate a new edge for each chain in the firstBubble.
+        for(const Chain& chain: firstBubble) {
+            CompressedPathGraph1BEdge newEdge;
+            newEdge.resize(1);  // The new edge has only one bubble.
+            Bubble& newBubble = newEdge.front();
+            newEdge.id = nextEdgeId++;
+            newBubble.push_back(chain);
+            boost::add_edge(cv0, cv1, newEdge, cGraph);
+        }
+    }
+
+    // Now we can remove the original bubble chain.
+    boost::remove_edge(ce, cGraph);
 }
 
 
