@@ -211,6 +211,23 @@ CompressedPathGraph1B::vertex_descriptor CompressedPathGraph1B::getVertex(
 
 
 
+void CompressedPathGraph1B::removeVertex(vertex_descriptor cv)
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+    SHASTA_ASSERT(in_degree(cv, cGraph) == 0);
+    SHASTA_ASSERT(out_degree(cv, cGraph) == 0);
+
+    auto it = vertexMap.find(cGraph[cv].edgeId);
+    SHASTA_ASSERT(it != vertexMap.end());
+    SHASTA_ASSERT(it->second == cv);
+    vertexMap.erase(it);
+
+    boost::remove_vertex(cv, cGraph);
+}
+
+
+
 // Compress parallel edges into bubbles, where possible.
 bool CompressedPathGraph1B::compressParallelEdges()
 {
@@ -319,9 +336,7 @@ bool CompressedPathGraph1B::compressSequentialEdges()
         // Remove the vertices internal to the old edge.
         for(uint64_t i=1; i<linearChain.size(); i++) {
             const vertex_descriptor cv = source(linearChain[i], cGraph);
-            SHASTA_ASSERT(in_degree(cv, cGraph) == 0);
-            SHASTA_ASSERT(out_degree(cv, cGraph) == 0);
-            boost::remove_vertex(cv, cGraph);
+            cGraph.removeVertex(cv);
         }
     }
     return changesWereMade;
@@ -837,7 +852,7 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
         for(const vertex_descriptor cv: component) {
             if(cv!=entrance and cv!=exit) {
                 boost::clear_vertex(cv, cGraph);
-                boost::remove_vertex(cv, cGraph);
+                cGraph.removeVertex(cv);
             }
         }
         // We must also remove edges between the entrance and the exit.
@@ -1163,7 +1178,7 @@ bool CompressedPathGraph1B::detangleVertexStrict(
 
     // Now we can remove cv and all of its in-edges and out-edges.
     clear_vertex(cv, cGraph);
-    remove_vertex(cv, cGraph);
+    cGraph.removeVertex(cv);
 
     return true;
 }
@@ -1378,7 +1393,7 @@ bool CompressedPathGraph1B::detangleVertex(
 
     // Now we can remove cv and all of its in-edges and out-edges.
     clear_vertex(cv, cGraph);
-    remove_vertex(cv, cGraph);
+    cGraph.removeVertex(cv);
 
     return true;
 }
@@ -1621,7 +1636,7 @@ bool CompressedPathGraph1B::detangleVertexGeneral(
 
 // Split the first bubble of a bubble chain.
 // Used by detangleVertexGeneral to eliminate
-// non-haploid bubble adjacent to a vertex to be detangled.
+// non-haploid bubbles adjacent to a vertex to be detangled.
 void CompressedPathGraph1B::splitBubbleChainAtBeginning(edge_descriptor ce)
 {
     SHASTA_ASSERT(0);
@@ -1631,7 +1646,7 @@ void CompressedPathGraph1B::splitBubbleChainAtBeginning(edge_descriptor ce)
 
 // Split the last bubble of a bubble chain.
 // Used by detangleVertexGeneral to eliminate
-// non-haploid bubble adjacent to a vertex to be detangled.
+// non-haploid bubbles adjacent to a vertex to be detangled.
 void CompressedPathGraph1B::splitBubbleChainAtEnd(edge_descriptor ce)
 {
     CompressedPathGraph1B& cGraph = *this;
@@ -2007,12 +2022,8 @@ bool CompressedPathGraph1B::detangleEdge(
         edgeMap.erase(cGraph[ce].id);
         boost::remove_edge(ce, cGraph);
     }
-    SHASTA_ASSERT(in_degree(cv0, cGraph) == 0);
-    SHASTA_ASSERT(out_degree(cv0, cGraph) == 0);
-    SHASTA_ASSERT(in_degree(cv1, cGraph) == 0);
-    SHASTA_ASSERT(out_degree(cv1, cGraph) == 0);
-    remove_vertex(cv0, cGraph);
-    remove_vertex(cv1, cGraph);
+    cGraph.removeVertex(cv0);
+    cGraph.removeVertex(cv1);
 
     return true;
 }

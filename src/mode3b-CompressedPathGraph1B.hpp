@@ -120,6 +120,8 @@ private:
     // creating it if necessary.
     vertex_descriptor getVertex(MarkerGraphEdgeId);
 
+    void removeVertex(vertex_descriptor);
+
     // Compress parallel edges into bubbles, where possible.
     bool compressParallelEdges();
 
