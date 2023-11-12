@@ -4,6 +4,7 @@
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
 #include "findLinearChains.hpp"
+#include "orderPairs.hpp"
 using namespace shasta;
 using namespace mode3b;
 
@@ -13,6 +14,7 @@ using namespace mode3b;
 
 // Standard lirbary.
 #include "fstream.hpp"
+#include <queue>
 #include "tuple.hpp"
 
 
@@ -101,6 +103,8 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
     {{300, 1000}, {1000, 3000}, {3000, 10000}, {10000, 30000}};
     const uint64_t detangleToleranceHigh = 3;
+    const uint64_t phasingThresholdLow = 1;
+    const uint64_t phasingThresholdHigh = 6;
 
     create();
     write("Initial");
@@ -121,9 +125,11 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     detangleBackEdges(1, detangleToleranceHigh);
     compress();
 
-    write("A");
-    detangleVerticesGeneral(true, 1, detangleToleranceHigh);
+    detangleVerticesGeneral(false, 1, detangleToleranceHigh);
     compress();
+
+    write("A");
+    phaseBubbleChains(true, phasingThresholdLow, phasingThresholdHigh);
 
     write("Final");
 }
@@ -2242,4 +2248,486 @@ bool CompressedPathGraph1B::detangleBackEdge(
     }
 
     return false;
+}
+
+
+
+void CompressedPathGraph1B::phaseBubbleChains(
+    bool debug,
+    uint64_t lowThreshold,
+    uint64_t highThreshold)
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+    vector<edge_descriptor> allEdges;
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
+        allEdges.push_back(ce);
+    }
+
+    for(const edge_descriptor ce: allEdges) {
+        phaseBubbleChain(ce, lowThreshold, highThreshold, debug);
+    }
+}
+
+
+
+void CompressedPathGraph1B::phaseBubbleChain(
+    edge_descriptor ce,
+    uint64_t lowThreshold,
+    uint64_t highThreshold,
+    bool debug)
+{
+    CompressedPathGraph1B& cGraph = *this;
+    const BubbleChain& bubbleChain = cGraph[ce];
+
+    if(debug) {
+        cout << "Phasing " << bubbleChainStringId(ce) << endl;
+    }
+
+    const bool detailedDebug = false; // (cGraph[ce].id == 49557);
+
+    // Table to contain the Phasing graph vertex corresponding to each diploid bubble.
+    // Indexed bt the bubble position in the bubble chains, and contains
+    // PhasingGraph::null_vertex() for non-diploid bubbles.
+    vector<PhasingGraph::vertex_descriptor> vertexTable(bubbleChain.size(), PhasingGraph::null_vertex());
+
+    // Create the PhasingGraph and its vertices, one for
+    // each diploid bubble in the bubble chain.
+    PhasingGraph phasingGraph;
+    for(uint64_t i=0; i<bubbleChain.size(); i++) {
+        if(bubbleChain[i].isDiploid()) {
+            vertexTable[i] = add_vertex({i, 0}, phasingGraph);
+        }
+    }
+
+    // Write a histogram of the bubbles in this bubble chain by ploidy.
+    if(debug) {
+        vector<uint64_t> histogram;
+        for(const Bubble& bubble: bubbleChain) {
+            const uint64_t ploidy = bubble.size();
+            if(histogram.size() <= ploidy) {
+                histogram.resize(ploidy + 1);
+            }
+            ++histogram[ploidy];
+        }
+        cout << "This bubble chain has a total " << bubbleChain.size() << " bubbles." << endl;
+        for(uint64_t ploidy=1; ploidy<histogram.size(); ploidy++) {
+            const uint64_t frequency = histogram[ploidy];
+            if(frequency) {
+                cout << frequency << " bubbles of ploidy " << ploidy << endl;
+            }
+        }
+    }
+
+
+
+    // Add edges of the phasing graph.
+    for(uint64_t i0=0; i0<bubbleChain.size()-1; i0++) {
+        const PhasingGraph::vertex_descriptor pv0 = vertexTable[i0];
+        if(pv0 == PhasingGraph::null_vertex()) {
+            continue;
+        }
+
+        // Gather the next-to-last two marker graph edges for the two chains
+        // of this bubble.
+        const Bubble& bubble0 = bubbleChain[i0];
+        SHASTA_ASSERT(bubble0.size() == 2);
+        const Chain& chain00 = bubble0[0];
+        const Chain& chain01 = bubble0[1];
+        const array<MarkerGraphEdgeId, 2> edges0 =
+            {chain00[chain00.size()-2], chain01[chain01.size()-2]};
+
+        for(uint64_t i1=i0+1; i1<bubbleChain.size(); i1++) {
+            const PhasingGraph::vertex_descriptor pv1 = vertexTable[i1];
+            if(pv1 == PhasingGraph::null_vertex()) {
+                continue;
+            }
+
+            // Gather the next-to-last two marker graph edges for the two chains
+            // of this bubble.
+            const Bubble& bubble1 = bubbleChain[i1];
+            SHASTA_ASSERT(bubble1.size() == 2);
+            const Chain& chain10 = bubble1[0];
+            const Chain& chain11 = bubble1[1];
+            const array<MarkerGraphEdgeId, 2> edges1 =
+                {chain10[1], chain11[1]};
+
+            // Compute the tangle matrix.
+            TangleMatrix tangleMatrix;
+            for(uint64_t j0=0; j0<2; j0++) {
+                for(uint64_t j1=0; j1<2; j1++) {
+                    MarkerGraphEdgePairInfo info;
+                    SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
+                        edges0[j0], edges1[j1], info));
+                    tangleMatrix[j0][j1] = info.common;
+                }
+            }
+
+            // Analyze the tangle matrix.
+            int64_t phase;
+            uint64_t minConcordant;
+            uint64_t maxDiscordant;
+            uint64_t total;
+            tangleMatrix.analyze(
+                lowThreshold,
+                highThreshold,
+                phase,
+                minConcordant,
+                maxDiscordant,
+                total);
+
+            // If not ambiguous, add an edge to the PhasingGraph.
+            if(phase != 0) {
+                boost::add_edge(pv0, pv1, {phase, minConcordant, maxDiscordant}, phasingGraph);
+
+                if(detailedDebug) {
+                    cout << " Added phasing graph edge " <<
+                        phasingGraph[pv0].positionInBubbleChain << " " <<
+                        phasingGraph[pv1].positionInBubbleChain << " with minConcordant " <<
+                        minConcordant << ", maxDiscordant " << maxDiscordant << endl;
+                    cout << "Tangle matrix: " <<
+                        tangleMatrix[0][0] << " " <<
+                        tangleMatrix[0][1] << " " <<
+                        tangleMatrix[1][0] << " " <<
+                        tangleMatrix[1][1] << endl;
+                }
+            }
+
+            // If no common reads, stop the loop on i1.
+            if(total == 0) {
+                break;
+            }
+        }
+    }
+
+    if(debug) {
+        const uint64_t vertexCount = num_vertices(phasingGraph);
+        const uint64_t edgeCount = num_edges(phasingGraph);
+        const double connectivity = 2. * double(edgeCount) / double(vertexCount);
+        cout << "The phasing graph has " << vertexCount <<
+            " vertices and " << edgeCount << " edges."
+            " Average connectivity " << connectivity << endl;
+    }
+
+    phasingGraph.phase();
+
+}
+
+
+// To phase the PhasingGraph, we create an optimal spanning tree
+// using edges in order of decreasing "significance".
+void CompressedPathGraph1B::PhasingGraph::phase()
+{
+    PhasingGraph& phasingGraph = *this;
+    const bool debug = true;
+
+    // Gather edges by maxDiscordant and minConcordant.
+    // edgeTable[maxDiscordant][minConcordant] contains the
+    // edges with those values of maxDiscordant and minConcordant.
+    // This allows the code later ot process edges in order
+    // of increasing maxDiscordant and decreasing minConcordant.
+    vector< vector< vector<edge_descriptor> > > edgeTable;
+    BGL_FORALL_EDGES(pe, phasingGraph, PhasingGraph) {
+        const PhasingGraphEdge& edge = phasingGraph[pe];
+        const uint64_t maxDiscordant = edge.maxDiscordant;
+        const uint64_t minConcordant = edge.minConcordant;
+        if(edgeTable.size() <= maxDiscordant) {
+            edgeTable.resize(maxDiscordant + 1);
+        }
+        vector< vector<edge_descriptor> >& v = edgeTable[maxDiscordant];
+        if(v.size() <= minConcordant) {
+            v.resize(minConcordant + 1);
+        }
+        v[minConcordant].push_back(pe);
+    }
+
+    // Map vertices to integers.
+    std::map<vertex_descriptor, uint64_t> vertexIndexMap;
+    uint64_t vertexIndex = 0;
+    BGL_FORALL_VERTICES(pv, phasingGraph, PhasingGraph) {
+        vertexIndexMap.insert({pv, vertexIndex++});
+    }
+    const uint64_t vertexCount = vertexIndexMap.size();
+
+
+
+    // Compute optimal spanning tree and connected components.
+    vector<uint64_t> rank(vertexCount);
+    vector<uint64_t> parent(vertexCount);
+    boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
+    for(uint64_t i=0; i<vertexCount; i++) {
+        disjointSets.make_set(i);
+    }
+    uint64_t spanningTreeEdgeCount = 0;
+    for(uint64_t maxDiscordant=0; maxDiscordant<edgeTable.size(); maxDiscordant++) {
+        const vector< vector<edge_descriptor> >& v = edgeTable[maxDiscordant];
+        for(int64_t minConcordant=v.size()-1; minConcordant>=0; minConcordant--) {
+            const vector<edge_descriptor>& vv = v[minConcordant];
+            if(false) {
+                cout << "Processing " << vv.size() << " phasing graph edges with maxDiscordant=" <<
+                    maxDiscordant << ", minConcordant=" << minConcordant << endl;
+            }
+            for(const edge_descriptor e: vv) {
+                PhasingGraphEdge& edge = phasingGraph[e];
+                const vertex_descriptor pv0 = source(e, phasingGraph);
+                const vertex_descriptor pv1 = target(e, phasingGraph);
+                const uint64_t vertexIndex0 = vertexIndexMap[pv0];
+                const uint64_t vertexIndex1 = vertexIndexMap[pv1];
+                const uint64_t componentId0 = disjointSets.find_set(vertexIndex0);
+                const uint64_t componentId1 = disjointSets.find_set(vertexIndex1);
+                if(componentId0 != componentId1) {
+                    disjointSets.union_set(vertexIndex0, vertexIndex1);
+                    edge.isSpanningTreeEdge = true;
+                    ++spanningTreeEdgeCount;
+                }
+            }
+            if(false) {
+                cout << "Found " << spanningTreeEdgeCount << " spanning tree edges so far." << endl;
+            }
+        }
+    }
+
+    // Gather the vertices in each connected component.
+    vector< vector<vertex_descriptor> > components(vertexCount);
+    BGL_FORALL_VERTICES(pv, phasingGraph, PhasingGraph) {
+        const uint64_t componentId = disjointSets.find_set(vertexIndexMap[pv]);
+        components[componentId].push_back(pv);
+    }
+
+    // Write a histogram of component sizes.
+    if(debug) {
+        vector<uint64_t> histogram;
+        for(const vector<vertex_descriptor>& component: components) {
+            const uint64_t componentSize = component.size();
+            if(histogram.size() <= componentSize) {
+                histogram.resize(componentSize + 1, 0);
+            }
+            ++histogram[componentSize];
+        }
+
+        cout << "Histogram of component sizes:" << endl;
+        cout << "Size,Frequency,Vertices" << endl;
+        for(uint64_t componentSize=1; componentSize<histogram.size(); componentSize++) {
+            const uint64_t frequency = histogram[componentSize];
+            if(frequency) {
+                cout << componentSize << "," << frequency << ","  << componentSize*frequency << endl;
+            }
+        }
+    }
+
+    // Gather the non-trivial component and sort them by decreasing size.
+    vector< pair<uint64_t, uint64_t> > componentTable; // (componentId, componentSize)
+    for(uint64_t componentId=0; componentId<vertexCount; componentId++) {
+        const vector<vertex_descriptor>& component = components[componentId];
+        if(component.size() > 1) {
+            componentTable.push_back({componentId, component.size()});
+        }
+    }
+    sort(componentTable.begin(), componentTable.end(),
+        OrderPairsBySecondOnlyGreater<uint64_t, uint64_t>());
+
+
+
+    // Process the non-trivial components in order of decreasing size.
+    phasedComponents.clear();
+    for(const  pair<uint64_t, uint64_t>& p: componentTable) {
+        const uint64_t componentId = p.first;
+        const vector<vertex_descriptor>& component = components[componentId];
+        SHASTA_ASSERT(component.size() == p.second);
+        if(debug) {
+            cout << "Processing a phasing component with " << component.size() <<
+                " vertices." << endl;
+        }
+
+        // Use a BFS on the spanning tree to phase the vertices in this component.
+        // Use the spanning tree to phase vertices in the largest component.
+        // It does not matter which vertex we start from.
+        const vertex_descriptor vFirst = component.front();
+        phasingGraph[vFirst].phase = +1;
+        std::queue<vertex_descriptor> q;
+        q.push(vFirst);
+        while(not q.empty()) {
+            const vertex_descriptor v0 = q.front();
+            q.pop();
+            BGL_FORALL_OUTEDGES(v0, e, phasingGraph, PhasingGraph) {
+                PhasingGraphEdge& edge = phasingGraph[e];
+                if(not edge.isSpanningTreeEdge) {
+                    continue;
+                }
+                const PhasingGraphVertex& vertex0 = phasingGraph[v0];
+                const vertex_descriptor v1 = target(e, phasingGraph);
+                PhasingGraphVertex& vertex1 = phasingGraph[v1];
+                if(vertex1.phase == 0) {
+                    vertex1.phase = vertex0.phase;
+                    if(edge.phase == -1) {
+                        vertex1.phase = - vertex1.phase;
+                    }
+                    q.push(v1);
+                }
+            }
+        }
+
+        // Count inconsistent edges in this component.
+        if(debug) {
+            uint64_t inconsistentCount = 0;
+            uint64_t totalCount = 0;
+            for(const vertex_descriptor v: component) {
+                BGL_FORALL_OUTEDGES(v, e, phasingGraph, PhasingGraph) {
+                    totalCount++;
+                    if(not isConsistent(e)) {
+                        ++inconsistentCount;
+                    }
+                }
+            }
+            // This counts edges twice.
+            inconsistentCount /= 2;
+            totalCount /= 2;
+            cout << inconsistentCount << " inconsistent edges in this component out of " <<
+                totalCount << " total." << endl;
+        }
+
+
+        // Create the PhasedComponent corresponding to this component.
+        // Don't include any vertices that overlap previous PhasedComponent.
+        shared_ptr<PhasedComponent> phasedComponentPointer = make_shared<PhasedComponent>();
+        PhasedComponent& phasedComponent = *phasedComponentPointer;
+        for(const vertex_descriptor pv: component) {
+            const PhasingGraphVertex& vertex = phasingGraph[pv];
+            const uint64_t positionInBubbleChain = vertex.positionInBubbleChain;
+            bool overlapsPrevious = false;
+            for(const auto& phasedComponent: phasedComponents) {
+                if(
+                    positionInBubbleChain >= phasedComponent->minPositionInBubbleChain and
+                    positionInBubbleChain <= phasedComponent->maxPositionInBubbleChain) {
+                    overlapsPrevious = true;
+                    break;
+                }
+            }
+            if(not overlapsPrevious) {
+                phasedComponent.push_back({vertex.positionInBubbleChain, vertex.phase});
+            }
+        }
+        if(phasedComponent.size() < 2) {
+            if(debug) {
+                cout << "This component will be discarded due to overlap with previous components." << endl;
+            }
+            continue;
+        }
+        phasedComponent.sort();
+        if(debug) {
+            cout << "Phasing range for this component " << phasedComponent.minPositionInBubbleChain <<
+                " " << phasedComponent.maxPositionInBubbleChain << endl;
+        }
+        phasedComponents.push_back(phasedComponentPointer);
+    }
+
+    // Sort the phased components in order of increasing position.
+    class SortHelper {
+    public:
+        bool operator()(
+            const shared_ptr<PhasedComponent>& p0,
+            const shared_ptr<PhasedComponent>& p1
+            ) const
+        {
+            return p0->minPositionInBubbleChain < p1->minPositionInBubbleChain;
+        }
+    };
+    sort(phasedComponents.begin(), phasedComponents.end(), SortHelper());
+
+    if(debug) {
+        cout << "Kept " << phasedComponents.size() << " phased components:" << endl;
+        for(const auto& phasedComponent: phasedComponents) {
+            cout  << phasedComponent->size() << " diploid bubbles at positions " <<
+                phasedComponent->minPositionInBubbleChain << "..." <<
+                phasedComponent->maxPositionInBubbleChain << " in bubble chain." << endl;
+
+        }
+    }
+}
+
+
+
+void CompressedPathGraph1B::PhasedComponent::sort()
+{
+    SHASTA_ASSERT(size() > 1);
+    std::sort(begin(), end(), OrderPairsByFirstOnly<uint64_t, int64_t>());
+    minPositionInBubbleChain = front().first;
+    maxPositionInBubbleChain = back().first;
+}
+
+
+
+bool CompressedPathGraph1B::PhasingGraph::isConsistent(edge_descriptor e) const
+{
+    const PhasingGraph& phasingGraph = *this;
+    const vertex_descriptor v0 = source(e, phasingGraph);
+    const vertex_descriptor v1 = target(e, phasingGraph);
+    const int64_t phase0 = phasingGraph[v0].phase;
+    const int64_t phase1 = phasingGraph[v1].phase;
+    const int64_t phase = phasingGraph[e].phase;
+
+    SHASTA_ASSERT(phase0==+1 or phase0==-1);
+    SHASTA_ASSERT(phase1==+1 or phase1==-1);
+    SHASTA_ASSERT(phase==+1 or phase==-1);
+
+    if(phase == +1) {
+        return phase0 == phase1;
+    } else {
+        return phase0 != phase1;
+    }
+}
+
+
+
+void CompressedPathGraph1B::TangleMatrix::analyze(
+    uint64_t lowThreshold,
+    uint64_t highThreshold,
+    int64_t& phase,
+    uint64_t& minConcordant,
+    uint64_t& maxDiscordant,
+    uint64_t& total) const
+{
+    const TangleMatrix& m = *this;
+
+    // Classify matrix elements:
+    // 0 = low (<=lowThreshold)
+    // 1 = ambiguous (>lowThreshold, <highThreshold)
+    // 2 = high (>=highThreshold)
+    array< array<uint64_t, 2>, 2> c;
+    total = 0;
+    for(uint64_t i=0; i<2; i++) {
+        for(uint64_t j=0; j<2; j++) {
+            const uint64_t matrixElement = m[i][j];
+            total += matrixElement;
+            uint64_t& classification = c[i][j];
+            if(matrixElement <= lowThreshold) {
+                classification = 0;
+            } else if(matrixElement >= highThreshold) {
+                classification = 2;
+            } else {
+                classification = 1;
+            }
+        }
+    }
+
+    // Check if this tangle matrix is unambiguously in phase.
+    if(c[0][0]==2 and c[1][1]==2 and c[0][1]==0 and c[1][0]==0) {
+        phase = +1;
+        minConcordant = min(m[0][0], m[1][1]);
+        maxDiscordant = max(m[0][1], m[1][0]);
+    }
+
+    // Check if this tangle matrix is unambiguously out of phase.
+    else if(c[0][1]==2 and c[1][0]==2 and c[0][0]==0 and c[1][1]==0) {
+        phase = -1;
+        minConcordant = min(m[0][1], m[1][0]);
+        maxDiscordant = max(m[0][0], m[0][0]);
+    }
+
+    // Otherwise, it is ambiguous.
+    else {
+        phase = 0;
+        minConcordant = 0;
+        maxDiscordant = 0;
+    }
 }

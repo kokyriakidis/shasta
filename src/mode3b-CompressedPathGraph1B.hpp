@@ -10,8 +10,11 @@
 #include <boost/graph/adjacency_list.hpp>
 
 // Standard library
+#include "array.hpp"
 #include <map>
+#include "memory.hpp"
 #include "string.hpp"
+#include "utility.hpp"
 #include "vector.hpp"
 
 
@@ -196,6 +199,89 @@ private:
         uint64_t maxOffset1,    // Used to define superbubbles
         uint64_t maxOffset2     // Compared against the offset between entry and exit
     );
+
+
+
+    // Phasing of bubble chains.
+    void phaseBubbleChains(
+        bool debug,
+        uint64_t lowThreshold,
+        uint64_t highThreshold);
+    void phaseBubbleChain(
+        edge_descriptor e,
+        uint64_t lowThreshold,
+        uint64_t highThreshold,
+        bool debug);
+
+    // In the phasing graph, each vertex corresponds to a diploid bubble
+    // in the BubbleChain being phased.
+    class TangleMatrix : public array< array<uint64_t, 2>, 2> {
+    public:
+        void analyze(
+            uint64_t lowThreshold,
+            uint64_t highThreshold,
+            int64_t& phase,
+            uint64_t& minConcordant,
+            uint64_t& maxDiscordant,
+            uint64_t& total) const;
+    };
+
+
+    // A PhasedComponent is a set of phased diploid bubbles
+    // in a BubbleChain.
+    // It is a vector of (bubble position in bubble chain, phase),
+    // sorted by bubble position in bubble chain.
+    // PhasedComponents are created in such a way that their position ranges
+    // in the bubble chain are not overlapping.
+    class PhasedComponent : public vector< pair<uint64_t, int64_t> > {
+    public:
+        uint64_t minPositionInBubbleChain;
+        uint64_t maxPositionInBubbleChain;
+        void sort();
+    };
+
+    class PhasingGraphVertex {
+    public:
+        uint64_t positionInBubbleChain;
+        int64_t phase = 0;  // +1 or -1 for phased vertices, 0 otherwise
+    };
+
+    class PhasingGraphEdge {
+    public:
+        int64_t phase;          // +1 (in phase) or -1 (out of phase)
+
+        // Tangle matrix metrics.
+        // If phase = +1, minConcordant = min(m00, m11), maxDiscordant = max(m01, m10).
+        // If phase = -1, minConcordant = min(m01, m10), maxDiscordant = max(m00, m11).
+        uint64_t minConcordant;
+        uint64_t maxDiscordant;
+
+        bool operator<(const PhasingGraphEdge& that) const
+        {
+            if(maxDiscordant < that.maxDiscordant) {
+                return true;
+            }
+            if(maxDiscordant > that.maxDiscordant) {
+                return false;
+            }
+            return minConcordant > that.minConcordant;
+        }
+        bool isSpanningTreeEdge = false;
+    };
+    using PhasingGraphBaseClass = boost::adjacency_list<
+        boost::listS,
+        boost::listS,
+        boost::undirectedS,
+        PhasingGraphVertex,
+        PhasingGraphEdge>;
+    class PhasingGraph : public PhasingGraphBaseClass {
+    public:
+        void phase();
+        bool isConsistent(edge_descriptor) const;
+        vector< shared_ptr<PhasedComponent> > phasedComponents;
+    };
+
+
 
     // Output.
     void write(const string& name) const;
