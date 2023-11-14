@@ -206,11 +206,13 @@ private:
     void phaseBubbleChains(
         bool debug,
         uint64_t lowThreshold,
-        uint64_t highThreshold);
+        uint64_t highThreshold,
+        uint64_t longBubbleThreshold);
     void phaseBubbleChain(
         edge_descriptor e,
         uint64_t lowThreshold,
         uint64_t highThreshold,
+        uint64_t longBubbleThreshold,
         bool debug);
 
     // In the phasing graph, each vertex corresponds to a diploid bubble

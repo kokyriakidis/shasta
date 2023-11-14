@@ -105,6 +105,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     const uint64_t detangleToleranceHigh = 3;
     const uint64_t phasingThresholdLow = 1;
     const uint64_t phasingThresholdHigh = 6;
+    const uint64_t longBubbleThreshold = 5000;
 
     create();
     write("Initial");
@@ -129,7 +130,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     compress();
 
     write("A");
-    phaseBubbleChains(true, phasingThresholdLow, phasingThresholdHigh);
+    phaseBubbleChains(true, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
 
     write("Final");
 }
@@ -2255,7 +2256,8 @@ bool CompressedPathGraph1B::detangleBackEdge(
 void CompressedPathGraph1B::phaseBubbleChains(
     bool debug,
     uint64_t lowThreshold,
-    uint64_t highThreshold)
+    uint64_t highThreshold,
+    uint64_t longBubbleThreshold)
 {
     CompressedPathGraph1B& cGraph = *this;
 
@@ -2265,7 +2267,7 @@ void CompressedPathGraph1B::phaseBubbleChains(
     }
 
     for(const edge_descriptor ce: allEdges) {
-        phaseBubbleChain(ce, lowThreshold, highThreshold, debug);
+        phaseBubbleChain(ce, lowThreshold, highThreshold, longBubbleThreshold, debug);
     }
 }
 
@@ -2275,10 +2277,11 @@ void CompressedPathGraph1B::phaseBubbleChain(
     edge_descriptor ce,
     uint64_t lowThreshold,
     uint64_t highThreshold,
+    uint64_t longBubbleThreshold,
     bool debug)
 {
     CompressedPathGraph1B& cGraph = *this;
-    const BubbleChain& bubbleChain = cGraph[ce];
+    BubbleChain& bubbleChain = cGraph[ce];
 
     if(debug) {
         cout << "Phasing " << bubbleChainStringId(ce) << endl;
@@ -2287,7 +2290,7 @@ void CompressedPathGraph1B::phaseBubbleChain(
     const bool detailedDebug = false; // (cGraph[ce].id == 49557);
 
     // Table to contain the Phasing graph vertex corresponding to each diploid bubble.
-    // Indexed bt the bubble position in the bubble chains, and contains
+    // Indexed by the bubble position in the bubble chains, and contains
     // PhasingGraph::null_vertex() for non-diploid bubbles.
     vector<PhasingGraph::vertex_descriptor> vertexTable(bubbleChain.size(), PhasingGraph::null_vertex());
 
@@ -2411,6 +2414,107 @@ void CompressedPathGraph1B::phaseBubbleChain(
 
     phasingGraph.phase();
 
+
+
+    // Use the PhasingGraph to create a new BubbleChain that will replace the existing one.
+    BubbleChain newBubbleChain;
+    if(debug) {
+        cout << "Creating the new bubble chain for " << bubbleChainStringId(ce) << endl;
+    }
+
+    // Loop over the phased components stored in the phased graph.
+    for(uint64_t i=0; /* Check later */; i++) {
+
+        // Bubbles in-between phased components, or before the first phased component,
+        // or after the last phased component.
+        {
+            const uint64_t minPositionInBubbleChain =
+                (i == 0) ? 0 : phasingGraph.phasedComponents[i-1]->maxPositionInBubbleChain + 1;
+            const uint64_t maxPositionInBubbleChain =
+                (i == phasingGraph.phasedComponents.size()) ?
+                (bubbleChain.size() - 1) :
+                phasingGraph.phasedComponents[i]->minPositionInBubbleChain - 1;
+
+
+            if(debug) {
+                cout << "Adding unphased bubbles at positions " <<
+                    minPositionInBubbleChain << "-" << maxPositionInBubbleChain << endl;
+            }
+
+            for(uint64_t i=minPositionInBubbleChain; i<=maxPositionInBubbleChain; i++) {
+                const Bubble& bubble = bubbleChain[i];
+
+                // This unphased bubble will be copied verbatim to the new chain if it is
+                // haploid or if it is long.
+                bool copyVerbatim = bubble.isHaploid();
+                if(not copyVerbatim) {
+                    uint64_t averageOffset;
+                    uint64_t minOffset;
+                    uint64_t maxOffset;
+                    bubbleOffset(bubble, averageOffset, minOffset, maxOffset);
+                    copyVerbatim = maxOffset >= longBubbleThreshold;
+                }
+
+                if(copyVerbatim) {
+                    newBubbleChain.push_back(bubble);
+                } else {
+                    // Just add a simple haploid bubble with only the source
+                    // and target MarkerGraphEdgeIds.
+                    Bubble newBubble;
+                    newBubble.resize(1);    // Make it haploid
+                    Chain& newChain = newBubble.front();    // Its only chain.
+                    newChain.push_back(bubble.front().front()); // Source MarkerGraphEdgeId
+                    newChain.push_back(bubble.front().back());  // Target MarkerGraphEdgeId
+                    newBubbleChain.push_back(newBubble);
+                }
+            }
+        }
+
+
+
+        // If we are past the last phased component, we are done.
+        if(i == phasingGraph.phasedComponents.size()) {
+            break;
+        }
+
+        // Add a diploid bubble for the i-th phased component.
+        const PhasedComponent& phasedComponent = *phasingGraph.phasedComponents[i];
+        const uint64_t minPositionInBubbleChain = phasedComponent.minPositionInBubbleChain;
+        const uint64_t maxPositionInBubbleChain = phasedComponent.maxPositionInBubbleChain;
+        if(debug) {
+            cout << "Adding phased bubbles at positions " <<
+                minPositionInBubbleChain << "-" << maxPositionInBubbleChain << endl;
+        }
+        newBubbleChain.emplace_back();
+        Bubble& newBubble = newBubbleChain.back();
+        newBubble.resize(2);    // Make it diploid.
+        Chain& newChain0 = newBubble[0];    // The first haplotype after phasing.
+        Chain& newChain1 = newBubble[1];    // The second haplotype after phasing.
+
+        // Add the source MarkerGraphEdgeId.
+        newChain0.push_back(bubbleChain[minPositionInBubbleChain].front().front());
+        newChain1.push_back(bubbleChain[minPositionInBubbleChain].front().front());
+
+        // Add the internal MarkerGraphEdgeIds of all phased diploid bubbles in this PhasedComponent.
+        for(const auto& p: phasedComponent) {
+            const uint64_t positionInBubbleChain = p.first;
+            const int64_t phase = p.second;
+            SHASTA_ASSERT(phase==1 or phase==-1);
+            const Bubble& bubble = bubbleChain[positionInBubbleChain];
+            SHASTA_ASSERT(bubble.isDiploid());
+            const Chain& chain0 = (phase==1) ? bubble[0] : bubble[1];
+            const Chain& chain1 = (phase==1) ? bubble[1] : bubble[0];
+            copy(chain0.begin()+1, chain0.end()-1, back_inserter(newChain0));
+            copy(chain1.begin()+1, chain1.end()-1, back_inserter(newChain1));
+        }
+
+        // Add the target MarkerGraphEdgeId.
+        newChain0.push_back(bubbleChain[maxPositionInBubbleChain].front().back());
+        newChain1.push_back(bubbleChain[maxPositionInBubbleChain].front().back());
+    }
+
+    // Replace the old BubbleChain with the new one, leaving the id of the edge unchanged.
+    bubbleChain = newBubbleChain;
 }
 
 
