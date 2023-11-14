@@ -134,6 +134,11 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     write("B");
     compress();
 
+    write("C");
+    phaseBubbleChains(true, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    write("D");
+    compress();
+
     write("Final");
 }
 
@@ -2430,20 +2435,20 @@ void CompressedPathGraph1B::phaseBubbleChain(
         // Bubbles in-between phased components, or before the first phased component,
         // or after the last phased component.
         {
-            const uint64_t minPositionInBubbleChain =
+            const uint64_t beginPositionInBubbleChain =
                 (i == 0) ? 0 : phasingGraph.phasedComponents[i-1]->maxPositionInBubbleChain + 1;
-            const uint64_t maxPositionInBubbleChain =
+            const uint64_t endPositionInBubbleChain =
                 (i == phasingGraph.phasedComponents.size()) ?
-                (bubbleChain.size() - 1) :
-                phasingGraph.phasedComponents[i]->minPositionInBubbleChain - 1;
+                bubbleChain.size() :
+                phasingGraph.phasedComponents[i]->minPositionInBubbleChain;
 
 
             if(debug) {
-                cout << "Adding unphased bubbles at positions " <<
-                    minPositionInBubbleChain << "-" << maxPositionInBubbleChain << endl;
+                cout << "Adding unphased bubbles at positions [" <<
+                    beginPositionInBubbleChain << "," << endPositionInBubbleChain << ")" << endl;
             }
 
-            for(uint64_t i=minPositionInBubbleChain; i<=maxPositionInBubbleChain; i++) {
+            for(uint64_t i=beginPositionInBubbleChain; i<endPositionInBubbleChain; i++) {
                 const Bubble& bubble = bubbleChain[i];
 
                 // This unphased bubble will be copied verbatim to the new chain if it is
