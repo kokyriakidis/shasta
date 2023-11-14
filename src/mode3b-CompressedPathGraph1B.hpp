@@ -82,6 +82,9 @@ public:
         SHASTA_ASSERT(not empty());
         return back();
     }
+
+    // Collapse consecutive haploid bubbles.
+    void compress();
 };
 
 

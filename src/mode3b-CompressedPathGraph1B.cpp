@@ -131,6 +131,8 @@ CompressedPathGraph1B::CompressedPathGraph1B(
 
     write("A");
     phaseBubbleChains(true, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    write("B");
+    compress();
 
     write("Final");
 }
@@ -2514,6 +2516,7 @@ void CompressedPathGraph1B::phaseBubbleChain(
     }
 
     // Replace the old BubbleChain with the new one, leaving the id of the edge unchanged.
+    newBubbleChain.compress();
     bubbleChain = newBubbleChain;
 }
 
@@ -2834,4 +2837,40 @@ void CompressedPathGraph1B::TangleMatrix::analyze(
         minConcordant = 0;
         maxDiscordant = 0;
     }
+}
+
+
+
+// Collapse consecutive haploid bubbles of a BubbleChain.
+void BubbleChain::compress()
+{
+    BubbleChain& bubbleChain = *this;
+    BubbleChain newBubbleChain;
+
+    // Find sets of consecutive haploid bubbles.
+    for(uint64_t i=0; i<size(); i++) {
+        const Bubble& bubble = bubbleChain[i];
+
+        if(bubble.isHaploid()) {
+
+            // This bubble is haploid.
+            // If the last bubble of the new bubble is haploid, append it to that.
+            // Otherwise apppend it to the last bubble.
+            if(not newBubbleChain.empty() and newBubbleChain.back().isHaploid()) {
+                const Chain& chain = bubble.front();
+                Chain& newChain = newBubbleChain.back().front();
+                copy(chain.begin()+1, chain.end(), back_inserter(newChain));
+            } else {
+                newBubbleChain.push_back(bubble);
+            }
+        } else {
+
+            // This bubble is not haploid. Just append it to the last bubble.
+            newBubbleChain.push_back(bubble);
+        }
+
+    }
+
+    // Replace it with the new one.
+    bubbleChain = newBubbleChain;
 }
