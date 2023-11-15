@@ -140,6 +140,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     compress();
 
     write("Final");
+    writeGfaExpanded("Final");
 }
 
 
@@ -642,6 +643,103 @@ void CompressedPathGraph1B::writeGfa(const string& fileNamePrefix) const
         }
     }
 }
+
+
+
+// This version writes each chain as a segment, so it shows the
+// details of the BubbleChains.
+void CompressedPathGraph1B::writeGfaExpanded(const string& fileNamePrefix) const
+{
+    const CompressedPathGraph1B& cGraph = *this;
+
+    ofstream gfa(fileNamePrefix + "-" + to_string(componentId) + "-Expanded.gfa");
+
+    // Write the header line.
+    gfa << "H\tVN:Z:1.0\n";
+
+    // Loop over BubbleChains. Each Chain of each Bubble generates a GFA segment.
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+
+        // Loop over Bubbles of this chain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size();
+            ++positionInBubbleChain) {
+            const Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+            // Loop over chains of this bubble.
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                const Chain& chain = bubble[indexInBubble];
+                const uint64_t offset = chainOffset(chain);
+
+                // Record type.
+                gfa << "S\t";
+
+                // Name.
+                gfa << chainStringId(ce, positionInBubbleChain, indexInBubble) << "\t";
+
+                // Sequence.
+                gfa << "*\t";
+
+                // Sequence length in bases.
+                gfa << "LN:i:" << offset << "\n";
+            }
+        }
+    }
+
+
+
+    // Write links between adjacent Chains of each BubbleChain.
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+
+        // Loop over Bubbles of this chain.
+        for(uint64_t positionInBubbleChain=1; positionInBubbleChain<bubbleChain.size();
+            ++positionInBubbleChain) {
+            const Bubble& bubble0 = bubbleChain[positionInBubbleChain - 1];
+            const Bubble& bubble1 = bubbleChain[positionInBubbleChain];
+
+            for(uint64_t indexInBubble0=0; indexInBubble0<bubble0.size(); indexInBubble0++) {
+                const string chain0StringId = chainStringId(ce, positionInBubbleChain-1, indexInBubble0);
+
+                for(uint64_t indexInBubble1=0; indexInBubble1<bubble1.size(); indexInBubble1++) {
+                   const string chain1StringId = chainStringId(ce, positionInBubbleChain, indexInBubble1);
+
+                   gfa <<
+                       "L\t" <<
+                       chain0StringId << "\t+\t" <<
+                       chain1StringId << "\t+\t*\n";
+                }
+            }
+        }
+    }
+
+
+
+    // Write links between Chains in different bubble chains.
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1A) {
+        BGL_FORALL_INEDGES(cv, ce0, cGraph, CompressedPathGraph1B) {
+            const Bubble& bubble0 = cGraph[ce0].back();
+            BGL_FORALL_OUTEDGES(cv, ce1, cGraph, CompressedPathGraph1B) {
+                const Bubble& bubble1 = cGraph[ce1].front();
+
+                for(uint64_t indexInBubble0=0; indexInBubble0<bubble0.size(); indexInBubble0++) {
+                    const string chain0StringId = chainStringId(ce0, bubble0.size()-1, indexInBubble0);
+
+                    for(uint64_t indexInBubble1=0; indexInBubble1<bubble1.size(); indexInBubble1++) {
+                       const string chain1StringId = chainStringId(ce1, 0, indexInBubble1);
+
+                       gfa <<
+                           "L\t" <<
+                           chain0StringId << "\t+\t" <<
+                           chain1StringId << "\t+\t*\n";
+                    }
+                }
+            }
+        }
+    }
+
+}
+
 
 
 string CompressedPathGraph1B::bubbleChainStringId(edge_descriptor ce) const
