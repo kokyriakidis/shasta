@@ -29,7 +29,7 @@ void GlobalPathGraph1::assemble(
     uint64_t threadCount0,
     uint64_t threadCount1)
 {
-    assemble2(assembler);
+    assemble2(assembler, threadCount0, threadCount1);
 }
 
 

@@ -2,6 +2,7 @@
 #define SHASTA_MODE3B_COMPRESSED_PATH_GRAPH1B_HPP
 
 // Shasta
+#include "Base.hpp"
 #include "invalid.hpp"
 #include "shastaTypes.hpp"
 #include "SHASTA_ASSERT.hpp"
@@ -26,7 +27,7 @@ namespace shasta {
 
         // A Chain is a sequence of MarkerGraphEdgeIds.
         // It can be used to generate an AssemblyPath.
-        using Chain = vector<MarkerGraphEdgeId>;
+        class Chain;
 
         // A Bubble is a set of Chains that begin and end at the same MarkerGraphEdgeId.
         // It can consist of one or more Chains.
@@ -49,6 +50,15 @@ namespace shasta {
     }
     class Assembler;
 }
+
+
+
+// A Chain is a sequence of MarkerGraphEdgeIds.
+// It can be used to generate an AssemblyPath.
+class shasta::mode3b::Chain : public vector<MarkerGraphEdgeId> {
+public:
+    vector<Base> sequence;
+};
 
 
 
@@ -108,7 +118,9 @@ public:
     CompressedPathGraph1B(
         const PathGraph1&,
         uint64_t componentId,
-        const Assembler&);
+        const Assembler&,
+        uint64_t threadCount0,
+        uint64_t threadCount1);
 private:
     // Information stored by the constructor.
     const PathGraph1& graph;
@@ -287,6 +299,9 @@ private:
         vector< shared_ptr<PhasedComponent> > phasedComponents;
     };
 
+    // Sequence assembly.
+    void assembleChains(uint64_t threadCount0, uint64_t threadCount1);
+    void assembleChain(Chain&, uint64_t threadCount1) const;
 
 
     // Output.
@@ -298,7 +313,7 @@ private:
     void writeChainsDetailsCsv(const string& fileNamePrefix) const;
     void writeGraphviz(const string& fileNamePrefix, bool labels) const;
     void writeGfa(const string& fileNamePrefix) const;
-    void writeGfaExpanded(const string& fileNamePrefix) const;
+    void writeGfaExpanded(const string& fileNamePrefix, bool includeSequence) const;
 
     string bubbleChainStringId(edge_descriptor) const;
     string bubbleStringId(edge_descriptor, uint64_t positionInBubbleChain) const;

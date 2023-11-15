@@ -1,10 +1,12 @@
 // Shasta.
 #include "mode3b-CompressedPathGraph1B.hpp"
+#include "mode3b-AssemblyPath.hpp"
 #include "mode3b-PathGraph1.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
 #include "findLinearChains.hpp"
 #include "orderPairs.hpp"
+#include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3b;
 
@@ -19,7 +21,10 @@ using namespace mode3b;
 
 
 
-void GlobalPathGraph1::assemble2(const Assembler& assembler)
+void GlobalPathGraph1::assemble2(
+    const Assembler& assembler,
+    uint64_t threadCount0,
+    uint64_t threadCount1)
 {
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
     const uint64_t minPrimaryCoverage = 8;
@@ -49,7 +54,9 @@ void GlobalPathGraph1::assemble2(const Assembler& assembler)
             transitiveReductionMaxCoverage,
             crossEdgesLowCoverageThreshold,
             crossEdgesHighCoverageThreshold,
-            crossEdgesMinOffset);
+            crossEdgesMinOffset,
+            threadCount0,
+            threadCount1);
     }
 }
 
@@ -61,7 +68,9 @@ void GlobalPathGraph1::assemble2(
     uint64_t transitiveReductionMaxCoverage,
     uint64_t crossEdgesLowCoverageThreshold,
     uint64_t crossEdgesHighCoverageThreshold,
-    uint64_t crossEdgesMinOffset)
+    uint64_t crossEdgesMinOffset,
+    uint64_t threadCount0,
+    uint64_t threadCount1)
 {
     cout << "Assembly begins for connected component " << componentId << endl;
     PathGraph1& component = *components[componentId];
@@ -86,7 +95,7 @@ void GlobalPathGraph1::assemble2(
     component.writeGraphviz(verticesVector,
         "PathGraphCompact" + to_string(componentId), options);
 
-    CompressedPathGraph1B cGraph(component, componentId, assembler);
+    CompressedPathGraph1B cGraph(component, componentId, assembler, threadCount0, threadCount1);
 }
 
 
@@ -94,7 +103,9 @@ void GlobalPathGraph1::assemble2(
 CompressedPathGraph1B::CompressedPathGraph1B(
     const PathGraph1& graph,
     uint64_t componentId,
-    const Assembler& assembler) :
+    const Assembler& assembler,
+    uint64_t threadCount0,
+    uint64_t threadCount1) :
     graph(graph),
     componentId(componentId),
     assembler(assembler)
@@ -140,8 +151,10 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     compress();
 
     renumberEdges();
+    assembleChains(threadCount0, threadCount1);
+
     write("Final");
-    writeGfaExpanded("Final");
+    writeGfaExpanded("Final", true);
 }
 
 
@@ -661,7 +674,9 @@ void CompressedPathGraph1B::writeGfa(const string& fileNamePrefix) const
 
 // This version writes each chain as a segment, so it shows the
 // details of the BubbleChains.
-void CompressedPathGraph1B::writeGfaExpanded(const string& fileNamePrefix) const
+void CompressedPathGraph1B::writeGfaExpanded(
+    const string& fileNamePrefix,
+    bool includeSequence) const
 {
     const CompressedPathGraph1B& cGraph = *this;
 
@@ -690,11 +705,25 @@ void CompressedPathGraph1B::writeGfaExpanded(const string& fileNamePrefix) const
                 // Name.
                 gfa << chainStringId(ce, positionInBubbleChain, indexInBubble) << "\t";
 
-                // Sequence.
-                gfa << "*\t";
+                if(includeSequence) {
+                    using shasta::Base;
+                    const vector<Base>& sequence = chain.sequence;
 
-                // Sequence length in bases.
-                gfa << "LN:i:" << offset << "\n";
+                    // Sequence.
+                    copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(gfa));
+                    gfa << "\t";
+
+                    // Sequence length in bases.
+                    gfa << "LN:i:" << sequence.size() << "\n";
+
+                } else {
+
+                    // Sequence.
+                    gfa << "*\t";
+
+                    // Sequence length in bases.
+                    gfa << "LN:i:" << offset << "\n";
+                }
             }
         }
     }
@@ -2991,4 +3020,44 @@ void BubbleChain::compress()
 
     // Replace it with the new one.
     bubbleChain = newBubbleChain;
+}
+
+
+
+void CompressedPathGraph1B::assembleChains(
+    uint64_t threadCount0,
+    uint64_t threadCount1)
+{
+    CompressedPathGraph1B& cGraph = *this;
+    cout << timestamp << "Assembling sequence." << endl;
+
+    // ****** THIS SHOULD BE MADE MULTITHREADED USING threadCount0 threads.
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
+        BubbleChain& bubbleChain = cGraph[ce];
+        for(Bubble& bubble: bubbleChain) {
+            for(Chain& chain: bubble) {
+                assembleChain(chain, threadCount1);
+            }
+        }
+
+    }
+    cout << timestamp << "Done assembling sequence." << endl;
+}
+
+
+
+// Assemble sequence for a Chain.
+void CompressedPathGraph1B::assembleChain(Chain& chain, uint64_t threadCount1) const
+{
+
+    vector<MarkerGraphEdgePairInfo> infos(chain.size() - 1);
+    for(uint64_t i=0; i<infos.size(); i++) {
+        const MarkerGraphEdgeId edgeId0 = chain[i];
+        const MarkerGraphEdgeId edgeId1 = chain[i+1];
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
+            edgeId0, edgeId1, infos[i]));
+    }
+
+    AssemblyPath assemblyPath(assembler, chain, infos, threadCount1);
+    assemblyPath.getSequence(chain.sequence);
 }
