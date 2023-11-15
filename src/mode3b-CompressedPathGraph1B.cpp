@@ -139,6 +139,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     write("D");
     compress();
 
+    renumberEdges();
     write("Final");
     writeGfaExpanded("Final");
 }
@@ -239,6 +240,18 @@ void CompressedPathGraph1B::removeVertex(vertex_descriptor cv)
     vertexMap.erase(it);
 
     boost::remove_vertex(cv, cGraph);
+}
+
+
+
+void CompressedPathGraph1B::renumberEdges()
+{
+    CompressedPathGraph1B& cGraph = *this;
+    nextEdgeId = 0;
+
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
+        cGraph[ce].id = nextEdgeId++;
+    }
 }
 
 

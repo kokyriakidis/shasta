@@ -121,6 +121,7 @@ private:
     void create();
     std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
     uint64_t nextEdgeId = 0;
+    void renumberEdges();
 
     // Return the vertex corresponding to a given MarkerGraphEdgeId,
     // creating it if necessary.
