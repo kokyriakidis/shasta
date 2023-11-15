@@ -731,12 +731,14 @@ void CompressedPathGraph1B::writeGfaExpanded(const string& fileNamePrefix) const
     // Write links between Chains in different bubble chains.
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1A) {
         BGL_FORALL_INEDGES(cv, ce0, cGraph, CompressedPathGraph1B) {
-            const Bubble& bubble0 = cGraph[ce0].back();
+            const BubbleChain& bubbleChain0 = cGraph[ce0];
+            const Bubble& bubble0 = bubbleChain0.back();
             BGL_FORALL_OUTEDGES(cv, ce1, cGraph, CompressedPathGraph1B) {
-                const Bubble& bubble1 = cGraph[ce1].front();
+                const BubbleChain& bubbleChain1 = cGraph[ce1];
+                const Bubble& bubble1 = bubbleChain1.front();
 
                 for(uint64_t indexInBubble0=0; indexInBubble0<bubble0.size(); indexInBubble0++) {
-                    const string chain0StringId = chainStringId(ce0, bubble0.size()-1, indexInBubble0);
+                    const string chain0StringId = chainStringId(ce0, bubbleChain0.size()-1, indexInBubble0);
 
                     for(uint64_t indexInBubble1=0; indexInBubble1<bubble1.size(); indexInBubble1++) {
                        const string chain1StringId = chainStringId(ce1, 0, indexInBubble1);
