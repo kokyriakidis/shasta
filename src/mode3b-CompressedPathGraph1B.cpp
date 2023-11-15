@@ -155,6 +155,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
 
     write("Final");
     writeGfaExpanded("Final", true);
+    writeFastaExpanded("Final");
 }
 
 
@@ -782,6 +783,43 @@ void CompressedPathGraph1B::writeGfaExpanded(
         }
     }
 
+}
+
+
+
+void CompressedPathGraph1B::writeFastaExpanded(
+    const string& fileNamePrefix) const
+{
+    const CompressedPathGraph1B& cGraph = *this;
+
+    ofstream fasta(fileNamePrefix + "-" + to_string(componentId) + "-Expanded.fasta");
+
+    // Loop over BubbleChains. Each Chain of each Bubble generates a GFA segment.
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+
+        // Loop over Bubbles of this chain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size();
+            ++positionInBubbleChain) {
+            const Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+            // Loop over chains of this bubble.
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                const Chain& chain = bubble[indexInBubble];
+
+                using shasta::Base;
+                const vector<Base>& sequence = chain.sequence;
+
+                fasta << ">" << chainStringId(ce, positionInBubbleChain, indexInBubble) <<
+                    " " << sequence.size() << "\n";
+                copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(fasta));
+                fasta << "\n";
+
+
+
+            }
+        }
+    }
 }
 
 
