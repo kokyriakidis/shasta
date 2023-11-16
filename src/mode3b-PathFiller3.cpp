@@ -83,6 +83,15 @@ PathFiller3::PathFiller3(
     // to estimate the base offset between vertexIdA and vertexIdB.
     estimateOffset();
 
+    // If the offset is negative, stop here.
+    // This is pathological and results in empty assembled sequence.
+    if(estimatedABOffset <= 0) {
+        if(html) {
+            html << "<br>The estimated offset is not positive." << endl;
+        }
+        return;
+    }
+
     // Markers.
     gatherMarkers(estimatedOffsetRatio);
     writeOrientedReads();
@@ -101,9 +110,6 @@ PathFiller3::PathFiller3(
         minVertexCoverage = createVertices(minVertexCoverage, vertexSamplingRate);
         createEdges();
         writeGraph("Initial assembly graph");
-        if(removeInaccessibleVertices()) {
-            writeGraph("Assembly graph after removal of inaccessible vertices.");
-        }
 
         // Remove strongly connected components, then regenerate
         // edges from scratch with the remaining vertices.
@@ -111,6 +117,13 @@ PathFiller3::PathFiller3(
             removeAllEdges();
             createEdges();
             writeGraph("Assembly graph after removal of strong connected components");
+        }
+
+        // This must be done after removing strongly connected components.
+        // Otherwise we can have inaccessible vertices that cause the
+        // assembly path to encounter dead ends.
+        if(removeInaccessibleVertices()) {
+            writeGraph("Assembly graph after removal of inaccessible vertices.");
         }
 
         // Assemble.
