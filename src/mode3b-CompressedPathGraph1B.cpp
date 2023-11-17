@@ -935,33 +935,31 @@ void CompressedPathGraph1B::bubbleChainOffset(
 
 
 
-// Remove short superbubbles with one entry and one exit.
-void CompressedPathGraph1B::removeShortSuperbubbles(
+CompressedPathGraph1B::Superbubbles::Superbubbles(
+    const CompressedPathGraph1B& cGraph,
     uint64_t maxOffset1,    // Used to define superbubbles
-    uint64_t maxOffset2)    // Compared against the offset between entry and exit
+    uint64_t maxOffset2     // Compared against the offset between entries and exits
+    ) :
+    vertexCount(num_vertices(cGraph)),
+    rank(vertexCount),
+    parent(vertexCount),
+    disjointSets(&rank[0], &parent[0])
 {
-    CompressedPathGraph1B& cGraph = *this;
-
     // Map vertices to integers.
-    std::map<vertex_descriptor, uint64_t> vertexIndexMap;
     uint64_t vertexIndex = 0;
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
         vertexIndexMap.insert({cv, vertexIndex++});
     }
 
     // Compute connected components, using only edges with average offset up to maxOffset1.
-    const uint64_t n = vertexIndexMap.size();
-    vector<uint64_t> rank(n);
-    vector<uint64_t> parent(n);
-    boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
-    for(uint64_t i=0; i<n; i++) {
+    for(uint64_t i=0; i<vertexCount; i++) {
         disjointSets.make_set(i);
     }
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
         uint64_t averageOffset;
         uint64_t minOffset;
         uint64_t maxOffset;
-        bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
+        cGraph.bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
         if(averageOffset <= maxOffset1) {
             const vertex_descriptor cv0 = source(ce, cGraph);
             const vertex_descriptor cv1 = target(ce, cGraph);
@@ -970,17 +968,30 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
     }
 
     // Gather the vertices in each connected component.
-    vector< vector<vertex_descriptor> > components(n);
+    // The superbubbles are the components with size at least 2.
+    components.resize(vertexCount);
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
         const uint64_t componentId = disjointSets.find_set(vertexIndexMap[cv]);
         components[componentId].push_back(cv);
     }
 
+}
 
+
+
+// Remove short superbubbles with one entry and one exit.
+void CompressedPathGraph1B::removeShortSuperbubbles(
+    uint64_t maxOffset1,    // Used to define superbubbles
+    uint64_t maxOffset2)    // Compared against the offset between entry and exit
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+    // Find the superbubbles.
+    Superbubbles superbubbles(cGraph, maxOffset1, maxOffset2);
 
     // Each component with at least 2 vertices defines a superbubble.
-    for(uint64_t componentId=0; componentId<components.size(); componentId++) {
-        const vector<vertex_descriptor>& component = components[componentId];
+    for(uint64_t componentId=0; componentId<superbubbles.components.size(); componentId++) {
+        const vector<vertex_descriptor>& component = superbubbles.components[componentId];
         if(component.size() < 2) {
             continue;
         }
@@ -999,7 +1010,7 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
         for(const vertex_descriptor cv0: component) {
             BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
                 const vertex_descriptor cv1 = source(ce, cGraph);
-                if(disjointSets.find_set(vertexIndexMap[cv1]) != componentId) {
+                if(superbubbles.disjointSets.find_set(superbubbles.vertexIndexMap[cv1]) != componentId) {
                     entrances.push_back(cv0);
                     break;
                 }
@@ -1012,7 +1023,7 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
         for(const vertex_descriptor cv0: component) {
             BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
                 const vertex_descriptor cv1 = target(ce, cGraph);
-                if(disjointSets.find_set(vertexIndexMap[cv1]) != componentId) {
+                if(superbubbles.disjointSets.find_set(superbubbles.vertexIndexMap[cv1]) != componentId) {
                     exits.push_back(cv0);
                     break;
                 }

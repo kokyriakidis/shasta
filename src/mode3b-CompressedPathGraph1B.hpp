@@ -9,6 +9,7 @@
 
 // Boost libraries.
 #include <boost/graph/adjacency_list.hpp>
+#include <boost/pending/disjoint_sets.hpp>
 
 // Standard library
 #include "array.hpp"
@@ -209,6 +210,29 @@ private:
         std::map<uint64_t, edge_descriptor>::iterator&,
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
+
+
+
+    // Find short superbubbles in the CompressedPathGraph1B.
+    class Superbubbles {
+    public:
+        Superbubbles(
+            const CompressedPathGraph1B&,
+            uint64_t maxOffset1,    // Used to define superbubbles
+            uint64_t maxOffset2     // Compared against the offset between entries and exits
+            );
+
+        uint64_t vertexCount;
+        vector<uint64_t> rank;
+        vector<uint64_t> parent;
+        boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets;
+        std::map<vertex_descriptor, uint64_t> vertexIndexMap;
+
+        // The superbubbles are the components with size at least 2.
+        vector< vector<vertex_descriptor> > components;
+    };
+
+
 
     // Remove short superbubbles with one entry and one exit.
     void removeShortSuperbubbles(
