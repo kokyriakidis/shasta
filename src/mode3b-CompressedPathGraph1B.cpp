@@ -14,7 +14,7 @@ using namespace mode3b;
 #include <boost/graph/filtered_graph.hpp>
 #include <boost/pending/disjoint_sets.hpp>
 
-// Standard lirbary.
+// Standard library.
 #include "fstream.hpp"
 #include <queue>
 #include "tuple.hpp"
@@ -256,6 +256,30 @@ void CompressedPathGraph1B::removeVertex(vertex_descriptor cv)
     boost::remove_vertex(cv, cGraph);
 }
 
+
+
+// Compute vertexIndex for every vertex.
+// This numbers vertices consecutively starting at zero.
+// This numbering becomes invalid as soon as a vertex is added or removed.
+void CompressedPathGraph1B::numberVertices()
+{
+    CompressedPathGraph1B& cGraph = *this;
+    uint64_t index = 0;
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
+        cGraph[cv].index = index++;
+    }
+}
+
+
+
+void CompressedPathGraph1B::clearVertexNumbering()
+{
+    CompressedPathGraph1B& cGraph = *this;
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
+        cGraph[cv].index = invalid<uint64_t>;
+    }
+
+}
 
 
 void CompressedPathGraph1B::renumberEdges()
@@ -936,20 +960,18 @@ void CompressedPathGraph1B::bubbleChainOffset(
 
 
 CompressedPathGraph1B::Superbubbles::Superbubbles(
-    const CompressedPathGraph1B& cGraph,
+    CompressedPathGraph1B& cGraph,
     uint64_t maxOffset1,    // Used to define superbubbles
     uint64_t maxOffset2     // Compared against the offset between entries and exits
     ) :
-    vertexCount(num_vertices(cGraph)),
-    rank(vertexCount),
-    parent(vertexCount),
-    disjointSets(&rank[0], &parent[0])
+    cGraph(cGraph)
 {
-    // Map vertices to integers.
-    uint64_t vertexIndex = 0;
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
-        vertexIndexMap.insert({cv, vertexIndex++});
-    }
+    cGraph.numberVertices();
+    const uint64_t vertexCount = num_vertices(cGraph);
+
+    vector<uint64_t> rank(vertexCount);
+    vector<uint64_t> parent(vertexCount);
+    boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
 
     // Compute connected components, using only edges with average offset up to maxOffset1.
     for(uint64_t i=0; i<vertexCount; i++) {
@@ -963,14 +985,14 @@ CompressedPathGraph1B::Superbubbles::Superbubbles(
         if(averageOffset <= maxOffset1) {
             const vertex_descriptor cv0 = source(ce, cGraph);
             const vertex_descriptor cv1 = target(ce, cGraph);
-            disjointSets.union_set(vertexIndexMap[cv0], vertexIndexMap[cv1]);
+            disjointSets.union_set(cGraph[cv0].index, cGraph[cv1].index);
         }
     }
 
     // Gather the vertices in each connected component.
     components.resize(vertexCount);
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
-        const uint64_t componentId = disjointSets.find_set(vertexIndexMap[cv]);
+        const uint64_t componentId = disjointSets.find_set(cGraph[cv].index);
         components[componentId].push_back(cv);
     }
 
@@ -980,6 +1002,24 @@ CompressedPathGraph1B::Superbubbles::Superbubbles(
             superbubbles.push_back(componentId);
         }
     }
+
+    // Store superbubble ids in the vertices.
+    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
+        cGraph[cv].superbubbleId = invalid<uint64_t>;
+    }
+    for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
+        const vector<vertex_descriptor>& superbubble = getSuperbubble(superbubbleId);
+        for(const vertex_descriptor cv: superbubble) {
+            cGraph[cv].superbubbleId = superbubbleId;
+        }
+    }
+}
+
+
+
+CompressedPathGraph1B::Superbubbles::~Superbubbles()
+{
+    cGraph.clearVertexNumbering();
 }
 
 

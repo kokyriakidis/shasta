@@ -9,7 +9,6 @@
 
 // Boost libraries.
 #include <boost/graph/adjacency_list.hpp>
-#include <boost/pending/disjoint_sets.hpp>
 
 // Standard library
 #include "array.hpp"
@@ -103,6 +102,16 @@ public:
 class shasta::mode3b::CompressedPathGraph1BVertex {
 public:
     MarkerGraphEdgeId edgeId;
+
+    // Numbering of vertices consecutively starting at zero.
+    // This is computed by renumberVertices, and becomes
+    // invalid as soon as a vertex is added or removed.
+    uint64_t index = invalid<uint64_t>;
+
+    // The id of the Superbubble this vertex belongs to, if any.
+    // Stored by class Superbubbles.
+    uint64_t superbubbleId = invalid<uint64_t>;
+
 };
 
 
@@ -141,6 +150,12 @@ private:
     vertex_descriptor getVertex(MarkerGraphEdgeId);
 
     void removeVertex(vertex_descriptor);
+
+    // Compute vertexIndex for every vertex.
+    // This numbers vertices consecutively starting at zero.
+    // This numbering becomes invalid as soon as a vertex is added or removed.
+    void numberVertices();
+    void clearVertexNumbering();
 
     // Compress parallel edges into bubbles, where possible.
     bool compressParallelEdges();
@@ -217,10 +232,11 @@ private:
     class Superbubbles {
     public:
         Superbubbles(
-            const CompressedPathGraph1B&,
+            CompressedPathGraph1B&,
             uint64_t maxOffset1,    // Used to define superbubbles
             uint64_t maxOffset2     // Compared against the offset between entries and exits
             );
+        ~Superbubbles();
 
         // Return the number of superbubbbles.
         uint64_t size() const
@@ -235,25 +251,17 @@ private:
         }
 
         // Figure out if a vertex is in the specified superbubble.
-        bool isInSuperbubble(uint64_t superbubbleId, vertex_descriptor v)
+        bool isInSuperbubble(uint64_t superbubbleId, vertex_descriptor cv)
         {
-            auto it = vertexIndexMap.find(v);
-            SHASTA_ASSERT(it != vertexIndexMap.end());
-            const uint64_t vertexIndex = it->second;
-            const uint64_t componentId = disjointSets.find_set(vertexIndex);
-            return componentId == superbubbles[superbubbleId];
+            return cGraph[cv].superbubbleId == superbubbleId;
         }
 
     private:
 
-        uint64_t vertexCount;
+        CompressedPathGraph1B& cGraph;
 
         // The connected components of the CompressedPathGraph1B, computed
         // using only edges with offset up to maxOffset1.
-        vector<uint64_t> rank;
-        vector<uint64_t> parent;
-        boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets;
-        std::map<vertex_descriptor, uint64_t> vertexIndexMap;
         vector< vector<vertex_descriptor> > components;
 
         // The superbubbles are the components with size at least 2.
