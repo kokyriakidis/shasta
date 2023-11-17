@@ -222,14 +222,43 @@ private:
             uint64_t maxOffset2     // Compared against the offset between entries and exits
             );
 
+        // Return the number of superbubbbles.
+        uint64_t size() const
+        {
+            return superbubbles.size();
+        }
+
+        // Return the vertices in the specified superbubble.
+        const vector<vertex_descriptor>& getSuperbubble(uint64_t superBubbleId) const
+        {
+            return components[superbubbles[superBubbleId]];
+        }
+
+        // Figure out if a vertex is in the specified superbubble.
+        bool isInSuperbubble(uint64_t superbubbleId, vertex_descriptor v)
+        {
+            auto it = vertexIndexMap.find(v);
+            SHASTA_ASSERT(it != vertexIndexMap.end());
+            const uint64_t vertexIndex = it->second;
+            const uint64_t componentId = disjointSets.find_set(vertexIndex);
+            return componentId == superbubbles[superbubbleId];
+        }
+
+    private:
+
         uint64_t vertexCount;
+
+        // The connected components of the CompressedPathGraph1B, computed
+        // using only edges with offset up to maxOffset1.
         vector<uint64_t> rank;
         vector<uint64_t> parent;
         boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets;
         std::map<vertex_descriptor, uint64_t> vertexIndexMap;
+        vector< vector<vertex_descriptor> > components;
 
         // The superbubbles are the components with size at least 2.
-        vector< vector<vertex_descriptor> > components;
+        // Store the componentIds (index in components vector).
+        vector<uint64_t> superbubbles;
     };
 
 

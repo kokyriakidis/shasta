@@ -968,13 +968,18 @@ CompressedPathGraph1B::Superbubbles::Superbubbles(
     }
 
     // Gather the vertices in each connected component.
-    // The superbubbles are the components with size at least 2.
     components.resize(vertexCount);
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
         const uint64_t componentId = disjointSets.find_set(vertexIndexMap[cv]);
         components[componentId].push_back(cv);
     }
 
+    // The superbubbles are the components with size at least 2.
+    for(uint64_t componentId=0; componentId<components.size(); componentId++) {
+        if(components[componentId].size() > 1) {
+            superbubbles.push_back(componentId);
+        }
+    }
 }
 
 
@@ -989,12 +994,10 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
     // Find the superbubbles.
     Superbubbles superbubbles(cGraph, maxOffset1, maxOffset2);
 
-    // Each component with at least 2 vertices defines a superbubble.
-    for(uint64_t componentId=0; componentId<superbubbles.components.size(); componentId++) {
-        const vector<vertex_descriptor>& component = superbubbles.components[componentId];
-        if(component.size() < 2) {
-            continue;
-        }
+    // Loop over the superbubbles.
+    for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
+        const vector<vertex_descriptor>& superbubble = superbubbles.getSuperbubble(superbubbleId);
+        SHASTA_ASSERT(superbubble.size() > 1);
 
         /*
         cout << "Superbubble with " << component.size() << " vertices:";
@@ -1007,10 +1010,10 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
         // Find entrances. These are superbubble vertices with in-edges
         // from outside the superbubble.
         vector<vertex_descriptor> entrances;
-        for(const vertex_descriptor cv0: component) {
+        for(const vertex_descriptor cv0: superbubble) {
             BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
                 const vertex_descriptor cv1 = source(ce, cGraph);
-                if(superbubbles.disjointSets.find_set(superbubbles.vertexIndexMap[cv1]) != componentId) {
+                if(not superbubbles.isInSuperbubble(superbubbleId, cv1)) {
                     entrances.push_back(cv0);
                     break;
                 }
@@ -1020,10 +1023,10 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
         // Find exits. These are superbubble vertices with out-edges
         // to outside the superbubble.
         vector<vertex_descriptor> exits;
-        for(const vertex_descriptor cv0: component) {
+        for(const vertex_descriptor cv0: superbubble) {
             BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
                 const vertex_descriptor cv1 = target(ce, cGraph);
-                if(superbubbles.disjointSets.find_set(superbubbles.vertexIndexMap[cv1]) != componentId) {
+                if(not superbubbles.isInSuperbubble(superbubbleId, cv1)) {
                     exits.push_back(cv0);
                     break;
                 }
@@ -1054,7 +1057,7 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
         // cout << "This superbubble will be removed." << endl;
 
         // Remove all vertices and edges internal to the superbubble.
-        for(const vertex_descriptor cv: component) {
+        for(const vertex_descriptor cv: superbubble) {
             if(cv!=entrance and cv!=exit) {
                 boost::clear_vertex(cv, cGraph);
                 cGraph.removeVertex(cv);
