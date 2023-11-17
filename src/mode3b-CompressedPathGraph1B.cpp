@@ -990,7 +990,7 @@ CompressedPathGraph1B::Superbubbles::Superbubbles(
     }
 
     // Gather the vertices in each connected component.
-    components.resize(vertexCount);
+    vector< vector<vertex_descriptor> > components(vertexCount);
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph1B) {
         const uint64_t componentId = disjointSets.find_set(cGraph[cv].index);
         components[componentId].push_back(cv);
@@ -998,8 +998,9 @@ CompressedPathGraph1B::Superbubbles::Superbubbles(
 
     // The superbubbles are the components with size at least 2.
     for(uint64_t componentId=0; componentId<components.size(); componentId++) {
+        const vector<vertex_descriptor> component = components[componentId];
         if(components[componentId].size() > 1) {
-            superbubbles.push_back(componentId);
+            superbubbles.emplace_back(Superbubble(component));
         }
     }
 
@@ -1013,6 +1014,39 @@ CompressedPathGraph1B::Superbubbles::Superbubbles(
             cGraph[cv].superbubbleId = superbubbleId;
         }
     }
+
+
+
+    // Find entrances and exists of each superbubble.
+    for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
+        Superbubble& superbubble = getSuperbubble(superbubbleId);
+
+        // Find entrances. These are superbubble vertices with in-edges
+        // from outside the superbubble.
+        for(const vertex_descriptor cv0: superbubble) {
+            BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
+                const vertex_descriptor cv1 = source(ce, cGraph);
+                if(not isInSuperbubble(superbubbleId, cv1)) {
+                    superbubble.entrances.push_back(cv0);
+                    break;
+                }
+            }
+        }
+
+        // Find exits. These are superbubble vertices with out-edges
+        // to outside the superbubble.
+        vector<vertex_descriptor> exits;
+        for(const vertex_descriptor cv0: superbubble) {
+            BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
+                const vertex_descriptor cv1 = target(ce, cGraph);
+                if(not isInSuperbubble(superbubbleId, cv1)) {
+                    superbubble.exits.push_back(cv0);
+                    break;
+                }
+            }
+        }
+     }
+
 }
 
 
@@ -1036,50 +1070,16 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
 
     // Loop over the superbubbles.
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        const vector<vertex_descriptor>& superbubble = superbubbles.getSuperbubble(superbubbleId);
+        Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
         SHASTA_ASSERT(superbubble.size() > 1);
 
-        /*
-        cout << "Superbubble with " << component.size() << " vertices:";
-        for(const vertex_descriptor cv: component) {
-            cout << " " << cGraph[cv].edgeId;
-        }
-        cout << endl;
-        */
-
-        // Find entrances. These are superbubble vertices with in-edges
-        // from outside the superbubble.
-        vector<vertex_descriptor> entrances;
-        for(const vertex_descriptor cv0: superbubble) {
-            BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
-                const vertex_descriptor cv1 = source(ce, cGraph);
-                if(not superbubbles.isInSuperbubble(superbubbleId, cv1)) {
-                    entrances.push_back(cv0);
-                    break;
-                }
-            }
-        }
-
-        // Find exits. These are superbubble vertices with out-edges
-        // to outside the superbubble.
-        vector<vertex_descriptor> exits;
-        for(const vertex_descriptor cv0: superbubble) {
-            BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
-                const vertex_descriptor cv1 = target(ce, cGraph);
-                if(not superbubbles.isInSuperbubble(superbubbleId, cv1)) {
-                    exits.push_back(cv0);
-                    break;
-                }
-            }
-        }
-
-        // cout << "This superbubble has " << entrances.size() << " entrances and " <<
-        //     exits.size() << " exits." << endl;
-        if(not(entrances.size()==1 and exits.size()==1)) {
+        // Skip ii if it has mroe than one entrance or exit.
+        if(not(superbubble.entrances.size()==1 and superbubble.exits.size()==1)) {
             continue;
         }
-        const vertex_descriptor entrance = entrances.front();
-        const vertex_descriptor exit = exits.front();
+
+        const vertex_descriptor entrance = superbubble.entrances.front();
+        const vertex_descriptor exit = superbubble.exits.front();
         if(entrance == exit) {
             continue;
         }

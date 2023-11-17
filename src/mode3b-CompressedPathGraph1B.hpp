@@ -229,6 +229,11 @@ private:
 
 
     // Find short superbubbles in the CompressedPathGraph1B.
+    class Superbubble : public vector<vertex_descriptor> {
+    public:
+        vector<vertex_descriptor> entrances;
+        vector<vertex_descriptor> exits;
+    };
     class Superbubbles {
     public:
         Superbubbles(
@@ -245,9 +250,13 @@ private:
         }
 
         // Return the vertices in the specified superbubble.
-        const vector<vertex_descriptor>& getSuperbubble(uint64_t superBubbleId) const
+        Superbubble& getSuperbubble(uint64_t superBubbleId)
         {
-            return components[superbubbles[superBubbleId]];
+            return superbubbles[superBubbleId];
+        }
+        const Superbubble& getSuperbubble(uint64_t superBubbleId) const
+        {
+            return superbubbles[superBubbleId];
         }
 
         // Figure out if a vertex is in the specified superbubble.
@@ -260,13 +269,9 @@ private:
 
         CompressedPathGraph1B& cGraph;
 
-        // The connected components of the CompressedPathGraph1B, computed
-        // using only edges with offset up to maxOffset1.
-        vector< vector<vertex_descriptor> > components;
-
-        // The superbubbles are the components with size at least 2.
-        // Store the componentIds (index in components vector).
-        vector<uint64_t> superbubbles;
+        // The superbubbles are the connected components with size at least 2,
+        // computed using only the edges with offset up to maxOffset1.
+        vector<Superbubble> superbubbles;
     };
 
 
