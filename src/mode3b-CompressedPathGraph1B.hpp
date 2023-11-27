@@ -172,7 +172,8 @@ private:
     void computeTangleMatrix(
         const vector<edge_descriptor>& inEdges,
         const vector<edge_descriptor>& outEdges,
-        vector< vector<uint64_t> >& tangleMatrix
+        vector< vector<uint64_t> >& tangleMatrix,
+        bool setToZeroForComplementaryPairs
         ) const;
 
     // Vertex detangling.
@@ -238,8 +239,7 @@ private:
     public:
         Superbubbles(
             CompressedPathGraph1B&,
-            uint64_t maxOffset1,    // Used to define superbubbles
-            uint64_t maxOffset2     // Compared against the offset between entries and exits
+            uint64_t maxOffset1    // Used to define superbubbles
             );
         ~Superbubbles();
 
@@ -282,6 +282,11 @@ private:
         uint64_t maxOffset2     // Compared against the offset between entry and exit
     );
 
+    // Detangle short superbubbles with any number of entrances and exits.
+    bool detangleShortSuperbubbles(
+        uint64_t maxOffset1,    // Used to define superbubbles
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
 
 
     // Phasing of bubble chains.
