@@ -260,11 +260,10 @@ private:
         }
 
         // Figure out if a vertex is in the specified superbubble.
-        bool isInSuperbubble(uint64_t superbubbleId, vertex_descriptor cv)
+        bool isInSuperbubble(uint64_t superbubbleId, vertex_descriptor cv) const
         {
             return cGraph[cv].superbubbleId == superbubbleId;
         }
-
     private:
 
         CompressedPathGraph1B& cGraph;
@@ -273,6 +272,7 @@ private:
         // computed using only the edges with offset up to maxOffset1.
         vector<Superbubble> superbubbles;
     };
+
 
 
 
@@ -285,6 +285,11 @@ private:
     // Detangle short superbubbles with any number of entrances and exits.
     bool detangleShortSuperbubbles(
         uint64_t maxOffset1,    // Used to define superbubbles
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
+    bool detangleShortSuperbubble(
+        const Superbubbles&,
+        uint64_t superbubbleId,
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
 
