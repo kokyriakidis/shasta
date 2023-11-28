@@ -2352,6 +2352,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubbles(
     Superbubbles superbubbles(cGraph, maxOffset1);
 
     // Loop over the superbubbles.
+    bool changesWereMade = false;
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
         Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
         SHASTA_ASSERT(superbubble.size() > 1);
@@ -2539,7 +2540,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubbles(
         if(debug) {
             cout << "This superbubble will be detangled." << endl;
         }
-
+        changesWereMade = true;
 
 
         // Each significant element of the tangle matrix generates a new edge,
@@ -2608,7 +2609,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubbles(
 
     }
 
-    return false;
+    return changesWereMade;
 }
 
 
