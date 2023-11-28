@@ -58,6 +58,17 @@ namespace shasta {
 class shasta::mode3b::Chain : public vector<MarkerGraphEdgeId> {
 public:
     vector<Base> sequence;
+
+    MarkerGraphEdgeId second() const
+    {
+        SHASTA_ASSERT(size() > 1);
+        return (*this)[1];
+    }
+    MarkerGraphEdgeId secondToLast() const
+    {
+        SHASTA_ASSERT(size() > 1);
+        return (*this)[size() - 2];
+    }
 };
 
 
@@ -288,6 +299,19 @@ private:
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
     bool detangleShortSuperbubble(
+        const Superbubbles&,
+        uint64_t superbubbleId,
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
+
+    // The above versions require the last bubble of superbubble in-edges
+    // and the first bubble of superbubble out-edges to be haploid.
+    // This version does not.
+    bool detangleShortSuperbubblesGeneral(
+        uint64_t maxOffset1,    // Used to define superbubbles
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
+    bool detangleShortSuperbubbleGeneral(
         const Superbubbles&,
         uint64_t superbubbleId,
         uint64_t detangleToleranceLow,

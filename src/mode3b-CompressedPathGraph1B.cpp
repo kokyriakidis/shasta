@@ -152,6 +152,11 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     write("B");
     compress();
 
+    write("C");
+    detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
+    write("D");
+    compress();
+
     // Before final output, renumber the edges contiguously and assemble sequence.
     // renumberEdges();
     // assembleChains(threadCount0, threadCount1);
@@ -2624,6 +2629,295 @@ bool CompressedPathGraph1B::detangleShortSuperbubble(
     }
 
     return true;
+}
+
+
+
+// The above versions require the last bubble of superbubble in-edges
+// and the first bubble of superbubble out-edges to be haploid.
+// This version does not.
+bool CompressedPathGraph1B::detangleShortSuperbubblesGeneral(
+    uint64_t maxOffset1,    // Used to define superbubbles
+    uint64_t detangleToleranceLow,
+    uint64_t detangleToleranceHigh)
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+    // Find the superbubbles.
+    Superbubbles superbubbles(cGraph, maxOffset1);
+
+    // Loop over the superbubbles.
+    bool changesWereMade = false;
+    for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
+        if(detangleShortSuperbubbleGeneral(
+            superbubbles, superbubbleId, detangleToleranceLow, detangleToleranceHigh)) {
+            changesWereMade = true;
+        }
+    }
+
+    return changesWereMade;
+
+}
+
+
+
+bool CompressedPathGraph1B::detangleShortSuperbubbleGeneral(
+    const Superbubbles& superbubbles,
+    uint64_t superbubbleId,
+    uint64_t detangleToleranceLow,
+    uint64_t detangleToleranceHigh)
+{
+    CompressedPathGraph1B& cGraph = *this;
+    const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
+    const bool debug = true;
+
+    if(debug) {
+        cout << "General detangling of a superbubble with " << superbubble.size() <<
+            " vertices:";
+        for(const vertex_descriptor cv: superbubble) {
+            cout << " " << cGraph[cv].edgeId;
+        }
+        cout << endl;
+    }
+
+    // Gather the in-edges and out-edges.
+    // These cannot be computed while constructing the superbubbles
+    // as they can change when other superbubbles are detangled.
+    vector<edge_descriptor> inEdges;
+    vector<edge_descriptor> outEdges;
+    for(const vertex_descriptor cv0: superbubble) {
+        BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
+            const vertex_descriptor cv1 = source(ce, cGraph);
+            if(not superbubbles.isInSuperbubble(superbubbleId, cv1)) {
+                inEdges.push_back(ce);
+            }
+        }
+        BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph1B) {
+            const vertex_descriptor cv1 = target(ce, cGraph);
+            if(not superbubbles.isInSuperbubble(superbubbleId, cv1)) {
+                outEdges.push_back(ce);
+            }
+        }
+    }
+
+    if(debug) {
+        cout << inEdges.size() << " in-edges:";
+        for(const edge_descriptor ce: inEdges) {
+            cout << " " << bubbleChainStringId(ce);
+        }
+        cout << endl;
+        cout << outEdges.size() << " out-edges:";
+        for(const edge_descriptor ce: outEdges) {
+            cout << " " << bubbleChainStringId(ce);
+        }
+        cout << endl;
+    }
+
+
+
+    // See if we can use detangleShortSuperbubble.
+    // This is the case if:
+    // - The last bubble of every in-edge is haploid.
+    // - The first bubble of every out-edge is haploid.
+    bool isSimpleCase = true;
+    for(const edge_descriptor ce: inEdges) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        if(not bubbleChain.lastBubble().isHaploid()) {
+            isSimpleCase = false;
+        }
+    }
+    for(const edge_descriptor ce: outEdges) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        if(not bubbleChain.firstBubble().isHaploid()) {
+            isSimpleCase = false;
+        }
+    }
+    if(isSimpleCase) {
+        if(debug) {
+            cout << "Simple case: calling detangleShortSuperbubble." << endl;
+        }
+        return detangleShortSuperbubble(superbubbles, superbubbleId,
+            detangleToleranceLow, detangleToleranceHigh);
+    }
+    if(debug) {
+        cout << "General case." << endl;
+    }
+
+
+    // We will compute a generalized tangle matrix that takes into
+    // account all incoming and outgoing chains.
+
+    // Gather the second to last marker graph edge of each chain of
+    // the last bubble of each in-edge.
+    vector<MarkerGraphEdgeId> in;
+    for(const edge_descriptor ce: inEdges) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        const Bubble& lastBubble = bubbleChain.lastBubble();
+        for(const Chain& chain: lastBubble) {
+            in.push_back(chain.secondToLast());
+        }
+    }
+
+    // Gather the second marker graph edge of each chain of
+    // the first bubble of each out-edge.
+    vector<MarkerGraphEdgeId> out;
+    for(const edge_descriptor ce: outEdges) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        const Bubble& firstBubble = bubbleChain.firstBubble();
+        for(const Chain& chain: firstBubble) {
+            out.push_back(chain.second());
+        }
+    }
+
+    if(debug) {
+        cout << in.size() << " incoming marker graph edges:";
+        for(const MarkerGraphEdgeId edgeId: in) {
+            cout << " " << edgeId;
+        }
+        cout << endl;
+        cout << out.size() << " outgoing marker graph edges:";
+        for(const MarkerGraphEdgeId edgeId: out) {
+            cout << " " << edgeId;
+        }
+        cout << endl;
+    }
+
+    // Compute the tangle matrix.
+    vector< vector<uint64_t> > tangleMatrix(in.size(), vector<uint64_t>(out.size()));
+    for(uint64_t i0=0; i0<in.size(); i0++) {
+        const MarkerGraphEdgeId edgeId0 = in[i0];
+        for(uint64_t i1=0; i1<out.size(); i1++) {
+            const MarkerGraphEdgeId edgeId1 = out[i1];
+
+            if(edgeId1 == assembler.markerGraph.reverseComplementEdge[edgeId0]) {
+                tangleMatrix[i0][i1] = 0;
+            } else {
+                MarkerGraphEdgePairInfo info;
+                SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+                tangleMatrix[i0][i1] = info.common;
+            }
+        }
+    }
+
+    if(debug) {
+        cout << "Tangle matrix:" << endl;
+        for(uint64_t i0=0; i0<in.size(); i0++) {
+            const MarkerGraphEdgeId edgeId0 = in[i0];
+            for(uint64_t i1=0; i1<out.size(); i1++) {
+                const MarkerGraphEdgeId edgeId1 = out[i1];
+                cout << edgeId0 << " " << edgeId1 << " " << tangleMatrix[i0][i1] << endl;
+            }
+        }
+    }
+
+    // Count the number of significant, ambiguous, and negligible elements
+    // in the tangle matrix.
+    uint64_t significantCount = 0;
+    uint64_t ambiguousCount = 0;
+    uint64_t negligibleCount = 0;
+    for(uint64_t i0=0; i0<in.size(); i0++) {
+        for(uint64_t i1=0; i1<out.size(); i1++) {
+            const uint64_t t = tangleMatrix[i0][i1];
+            if(t <= detangleToleranceLow) {
+                ++negligibleCount;
+            } else if(t >= detangleToleranceHigh) {
+                ++significantCount;
+            } else {
+                ++ambiguousCount;
+            }
+        }
+    }
+
+    // If the tangle matrix contains any ambiguous elements, do nothing.
+    if(ambiguousCount > 0) {
+        if(debug) {
+            cout << "Not detangled because the tangle matrix contains ambiguous elements." << endl;
+        }
+        return false;
+    }
+
+    // There are no ambiguous elements.
+    // If there are no negligible element, that is all elements of the tangle matrix are significant,
+    // there is nothing to do.
+    if(negligibleCount == 0) {
+        if(debug) {
+            cout << "Not detangled because the tangle matrix contains no negligible elements." << endl;
+        }
+        return false;
+    }
+
+    // To avoid breaking contiguity, we require each column and each row of the
+    // tangle matrix to have at least one significant element.
+    // This means that each in-edge will be "merged" with at least one out-edge,
+    // and each out-edge will be "merged" with at least one in-edge.
+    bool ok = true;
+    for(uint64_t i0=0; i0<in.size(); i0++) {
+        bool foundSignificant = false;
+        for(uint64_t i1=0; i1<out.size(); i1++) {
+            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                foundSignificant = true;
+                break;
+            }
+        }
+        if(not foundSignificant) {
+            ok = false;
+            break;
+        }
+    }
+    for(uint64_t i1=0; i1<out.size(); i1++) {
+        bool foundSignificant = false;
+        for(uint64_t i0=0; i0<in.size(); i0++) {
+            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                foundSignificant = true;
+                break;
+            }
+        }
+        if(not foundSignificant) {
+            ok = false;
+            break;
+        }
+    }
+    if(not ok) {
+        if(debug) {
+            cout << "Not detangled to avoid breaking contiguity." << endl;
+        }
+        return false;
+    }
+
+    if(debug) {
+        cout << "This superbubble will be detangled but splitting of some edges is required." << endl;
+    }
+
+    // Make sure the last bubble of every in-edge is haploid.
+    for(const edge_descriptor ce: inEdges) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        if(not bubbleChain.lastBubble().isHaploid()) {
+            if(debug) {
+                cout << "In-edge " << bubbleChainStringId(ce) <<
+                    " needs to be split at the end." << endl;
+            }
+            splitBubbleChainAtEnd(ce);
+        }
+    }
+
+    // Make sure the first bubble of every out-edge is haploid.
+    for(const edge_descriptor ce: outEdges) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        if(not bubbleChain.firstBubble().isHaploid()) {
+            if(debug) {
+                cout << "Out-edge " << bubbleChainStringId(ce) <<
+                    " needs to be split at the beginning." << endl;
+            }
+            splitBubbleChainAtBeginning(ce);
+        }
+    }
+
+    // Now we can call detangleShortSuperbubble.
+    if(debug) {
+        cout << "Calling detangleShortSuperbubble after splitting some edges." << endl;
+    }
+    return detangleShortSuperbubble(superbubbles, superbubbleId,
+        detangleToleranceLow, detangleToleranceHigh);
 }
 
 
