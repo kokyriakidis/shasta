@@ -2262,65 +2262,24 @@ bool CompressedPathGraph1B::detangleEdge(
         cout << "This edge will be detangled " << inEdges.size() << " by " << outEdges.size() << endl;
     }
 
+    // Create truncated versions of the inEdges and outEdges.
+    vector<vertex_descriptor> inVertices;
+    for(const edge_descriptor ce: inEdges) {
+        inVertices.push_back(cloneAndTruncateAtEnd(ce));
+    }
+    vector<vertex_descriptor> outVertices;
+    for(const edge_descriptor ce: outEdges) {
+        outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+    }
 
 
-    // Each significant element of the tangle matrix generates a new edge,
-    // obtained by "merging" an in-edge with an out-edge.
+    // Each significant element of the tangle matrix generates a new edge.
     for(uint64_t i0=0; i0<inEdges.size(); i0++) {
-        const edge_descriptor ce0 = inEdges[i0];
-        const BubbleChain& bubbleChain0 = cGraph[ce0];
-        const Bubble& bubble0 = bubbleChain0.lastBubble();
-        SHASTA_ASSERT(bubble0.isHaploid());
-        const Chain& chain0 = bubble0.front();
-        SHASTA_ASSERT(chain0.size() >= 2);
         for(uint64_t i1=0; i1<outEdges.size(); i1++) {
-            if(tangleMatrix[i0][i1] < detangleToleranceHigh) {
-                continue;
+            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                connect(inVertices[i0], outVertices[i1]);
             }
-            const edge_descriptor ce1 = outEdges[i1];
-            const BubbleChain& bubbleChain1 = cGraph[ce1];
-            const Bubble& bubble1 = bubbleChain1.firstBubble();
-            SHASTA_ASSERT(bubble1.isHaploid());
-            const Chain& chain1 = bubble1.front();
-            SHASTA_ASSERT(chain1.size() >= 2);
-
-            edge_descriptor eNew;
-            tie(eNew, ignore) = add_edge(source(ce0, cGraph), target(ce1, graph), cGraph);
-            CompressedPathGraph1BEdge& newEdge = cGraph[eNew];
-            newEdge.id = nextEdgeId++;
-            BubbleChain& newBubbleChain = newEdge;
-
-            if(debug) {
-                cout << "Merging " <<
-                    bubbleChainStringId(ce0) << " " <<
-                    bubbleChainStringId(ce1) << " into " <<
-                    bubbleChainStringId(eNew) << endl;
-            }
-
-            // Create the new BubbleChain. It is obtained by joining
-            // bubbleChain0 and bubbleChain1, with vertex cv
-            // removed from the end of bubbleChain0
-            // and from the beginning of bubbleChain1.
-            // Here we use the above assumption that
-            // the last bubble of bubbleChain0 and the first bubble of bubbleChain1
-            // are haploid.
-            newBubbleChain = bubbleChain0;
-
-            // Remove cv from the end.
-            Bubble& newBubbleLast = newBubbleChain.back();
-            SHASTA_ASSERT(newBubbleLast.size() == 1);
-            Chain& newChainLast = newBubbleLast.front();
-            SHASTA_ASSERT(newChainLast.back() == cGraph[cv0].edgeId);
-            newChainLast.resize(newChainLast.size() - 1);
-
-            // Append chain1, except for cv1.
-            SHASTA_ASSERT(chain1.front() == cGraph[cv1].edgeId);
-            copy(chain1.begin() + 1, chain1.end(), back_inserter(newChainLast));
-
-            // Append the rest of bubbleChain1.
-            copy(bubbleChain1.begin() + 1, bubbleChain1.end(), back_inserter(newBubbleChain));
         }
-
     }
 
 
@@ -3758,4 +3717,217 @@ void CompressedPathGraph1B::assembleChain(Chain& chain, uint64_t threadCount1) c
 
     AssemblyPath assemblyPath(assembler, chain, infos, threadCount1);
     assemblyPath.getSequence(chain.sequence);
+}
+
+
+
+// Make a copy of an edge, truncating it at its end by removing the last MarkerGraphEdgeId.
+// Return the target vertex of the newly created edge.
+// The last bubble of the bubble chain of the given edge must be haploid.
+// If the bubble chain consists of just a single haploid bubble with a chain of length 2,
+// no new edge is created, and this simply returns the source vertex of the given edge.
+CompressedPathGraph1B::vertex_descriptor
+    CompressedPathGraph1B::cloneAndTruncateAtEnd(edge_descriptor ce)
+{
+    CompressedPathGraph1B& cGraph = *this;
+    const CompressedPathGraph1BEdge& edge = cGraph[ce];
+    const vertex_descriptor cv0 = source(ce, cGraph);
+    const BubbleChain& bubbleChain = cGraph[ce];
+
+    // Sanity checks.
+    SHASTA_ASSERT(not bubbleChain.empty());
+    SHASTA_ASSERT(bubbleChain.lastBubble().isHaploid());
+
+
+
+    // Case where the bubble chain consists of a single bubble, which must be haploid,
+    // that is, consist of a single chain.
+    if(bubbleChain.size() == 1) {
+        const Bubble& bubble = bubbleChain.lastBubble();
+        SHASTA_ASSERT(bubble.isHaploid());
+        const Chain& chain = bubble.front();
+        SHASTA_ASSERT(chain.size() > 1);
+
+        // If the Chain has length 2, we can't truncate it.
+        // So we don't create a new edge, and instead just return cv0.
+        // Detangling code will connect there, as prescribed by the tangle matrix.
+        if(chain.size() == 2) {
+            return cv0;
+        }
+
+        // Create the new edge, without adding it to the graph for now.
+        CompressedPathGraph1BEdge newEdge = edge;
+        newEdge.id = nextEdgeId++;
+        BubbleChain& newBubbleChain = newEdge;
+        SHASTA_ASSERT(newBubbleChain.size() == 1);
+        Bubble& newBubble = newBubbleChain.lastBubble();
+        SHASTA_ASSERT(newBubble.isHaploid());
+        Chain& newChain = newBubble.front();
+        SHASTA_ASSERT(chain.size() > 2);
+        newChain.pop_back();    // Remove the last MarkerGraphEdgeId.
+
+        // Add it to the graph.
+        // It will be dangling at its end.
+        // Detangling code will later connect it s prescribed by the tangle matrix.
+        const vertex_descriptor cv2 = createVertex(newBubbleChain.lastMarkerGraphEdgeId());
+        add_edge(cv0, cv2, newEdge, cGraph);
+        return cv2;
+    }
+
+
+
+    // Case where the bubble chain consists of more than one bubble.
+    else {
+        const Bubble& lastBubble = bubbleChain.lastBubble();
+        SHASTA_ASSERT(lastBubble.isHaploid());
+        const Chain& lastChain = lastBubble.front();
+        SHASTA_ASSERT(lastChain.size() > 1);
+
+        // Create the new edge, without adding it to the graph for now.
+        CompressedPathGraph1BEdge newEdge = edge;
+        newEdge.id = nextEdgeId++;
+        BubbleChain& newBubbleChain = newEdge;
+        SHASTA_ASSERT(newBubbleChain.size() > 1);
+        Bubble& newLastBubble = newBubbleChain.lastBubble();
+        SHASTA_ASSERT(newLastBubble.isHaploid());
+        Chain& newLastChain = newLastBubble.front();
+
+        // If the last chain has length 2, just remove the last bubble from newBubbleChain.
+        // Otherwise, remove the last MarkerGraphEdgeId from the lastChain.
+        if(newLastChain.size() == 2) {
+            newBubbleChain.pop_back();
+        } else {
+            newLastChain.pop_back();
+        }
+
+        // Add it to the graph.
+        // It will be dangling at its end.
+        // Detangling code will later connect it s prescribed by the tangle matrix.
+        const vertex_descriptor cv2 = createVertex(newBubbleChain.lastMarkerGraphEdgeId());
+        add_edge(cv0, cv2, newEdge, cGraph);
+        return cv2;
+    }
+
+}
+
+
+
+
+
+// Make a copy of an edge, truncating it at its beginning by removing the first MarkerGraphEdgeId.
+// Return the source vertex of the newly created edge.
+// The first bubble of the bubble chain of the given edge must be haploid.
+// If the bubble chain consists of just a single haploid bubble with a chain of length 2,
+// no new edge is created, and this simply returns the target vertex of the given edge.
+CompressedPathGraph1B::vertex_descriptor
+    CompressedPathGraph1B::cloneAndTruncateAtBeginning(edge_descriptor ce)
+{
+    CompressedPathGraph1B& cGraph = *this;
+    const CompressedPathGraph1BEdge& edge = cGraph[ce];
+    const vertex_descriptor cv1 = target(ce, cGraph);
+    const BubbleChain& bubbleChain = cGraph[ce];
+
+    // Sanity checks.
+    SHASTA_ASSERT(not bubbleChain.empty());
+    SHASTA_ASSERT(bubbleChain.firstBubble().isHaploid());
+
+
+
+    // Case where the bubble chain consists of a single bubble, which must be haploid,
+    // that is, consist of a single chain.
+    if(bubbleChain.size() == 1) {
+        const Bubble& bubble = bubbleChain.firstBubble();
+        SHASTA_ASSERT(bubble.isHaploid());
+        const Chain& chain = bubble.front();
+        SHASTA_ASSERT(chain.size() > 1);
+
+        // If the Chain has length 2, we can't truncate it.
+        // So we don't create a new edge, and instead just return cv1.
+        // Detangling code will connect there, as prescribed by the tangle matrix.
+        if(chain.size() == 2) {
+            return cv1;
+        }
+
+        // Create the new edge, without adding it to the graph for now.
+        CompressedPathGraph1BEdge newEdge = edge;
+        newEdge.id = nextEdgeId++;
+        BubbleChain& newBubbleChain = newEdge;
+        SHASTA_ASSERT(newBubbleChain.size() == 1);
+        Bubble& newBubble = newBubbleChain.firstBubble();
+        SHASTA_ASSERT(newBubble.isHaploid());
+        Chain& newChain = newBubble.front();
+        SHASTA_ASSERT(chain.size() > 2);
+        newChain.erase(newChain.begin());    // Remove the first MarkerGraphEdgeId.
+
+        // Add it to the graph.
+        // It will be dangling at its beginning.
+        // Detangling code will later connect it s prescribed by the tangle matrix.
+        const vertex_descriptor cv2 = createVertex(newBubbleChain.firstMarkerGraphEdgeId());
+        add_edge(cv2, cv1, newEdge, cGraph);
+        return cv2;
+    }
+
+
+
+    // Case where the bubble chain consists of more than one bubble.
+    else {
+        const Bubble& firstBubble = bubbleChain.firstBubble();
+        SHASTA_ASSERT(firstBubble.isHaploid());
+        const Chain& firstChain = firstBubble.front();
+        SHASTA_ASSERT(firstChain.size() > 1);
+
+        // Create the new edge, without adding it to the graph for now.
+        CompressedPathGraph1BEdge newEdge = edge;
+        newEdge.id = nextEdgeId++;
+        BubbleChain& newBubbleChain = newEdge;
+        SHASTA_ASSERT(newBubbleChain.size() > 1);
+        Bubble& newFirstBubble = newBubbleChain.firstBubble();
+        SHASTA_ASSERT(newFirstBubble.isHaploid());
+        Chain& newFirstChain = newFirstBubble.front();
+
+        // If the last chain has length 2, just remove the first bubble from newBubbleChain.
+        // Otherwise, remove the first MarkerGraphEdgeId from the lastChain.
+        if(newFirstChain.size() == 2) {
+            newBubbleChain.erase(newBubbleChain.begin());
+        } else {
+            newFirstChain.erase(newFirstChain.begin());
+        }
+
+        // Add it to the graph.
+        // It will be dangling at its end.
+        // Detangling code will later connect it s prescribed by the tangle matrix.
+        const vertex_descriptor cv2 = createVertex(newBubbleChain.firstMarkerGraphEdgeId());
+        add_edge(cv2, cv1, newEdge, cGraph);
+        return cv2;
+    }
+
+}
+
+
+// Create a new edge connecting the cv0 and cv1.
+// The new edge will consist of a simple BubbleChain with a single
+// haploid Bubble with a Chain of length 2.
+void CompressedPathGraph1B::connect(vertex_descriptor cv0, vertex_descriptor cv1)
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+    edge_descriptor ceNew;
+    tie(ceNew, ignore) = add_edge(cv0, cv1, cGraph);
+    CompressedPathGraph1BEdge& newEdge = cGraph[ceNew];
+    newEdge.id = nextEdgeId++;
+    BubbleChain& newBubbleChain = newEdge;
+
+    // The new BubbleChain consists of a single Bubble.
+    newBubbleChain.resize(1);
+    Bubble& bubble = newBubbleChain.front();
+
+    // The new Bubble is haploid, that is, consists of a single Chain.
+    bubble.resize(1);
+
+    // The new Bubble consists of just the two MarkerGraphEdgeIds
+    // corresponding to cv0 and cv1.
+    Chain& chain = bubble.front();
+    chain.push_back(cGraph[cv0].edgeId);
+    chain.push_back(cGraph[cv1].edgeId);
+
 }

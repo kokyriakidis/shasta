@@ -98,7 +98,17 @@ public:
         SHASTA_ASSERT(not empty());
         return front();
     }
+    Bubble& firstBubble()
+    {
+        SHASTA_ASSERT(not empty());
+        return front();
+    }
     const Bubble& lastBubble() const
+    {
+        SHASTA_ASSERT(not empty());
+        return back();
+    }
+    Bubble& lastBubble()
     {
         SHASTA_ASSERT(not empty());
         return back();
@@ -106,6 +116,28 @@ public:
 
     // Collapse consecutive haploid bubbles.
     void compress();
+
+    MarkerGraphEdgeId firstMarkerGraphEdgeId() const
+    {
+        SHASTA_ASSERT(not empty());
+        const Bubble& firstBubble = front();
+        const MarkerGraphEdgeId markerGraphEdgeId = firstBubble.front().front();
+        for(const Chain& chain: firstBubble) {
+            SHASTA_ASSERT(chain.front() == markerGraphEdgeId);
+        }
+        return markerGraphEdgeId;
+    }
+
+    MarkerGraphEdgeId lastMarkerGraphEdgeId() const
+    {
+        SHASTA_ASSERT(not empty());
+        const Bubble& lastBubble = back();
+        const MarkerGraphEdgeId markerGraphEdgeId = lastBubble.front().back();
+        for(const Chain& chain: lastBubble) {
+            SHASTA_ASSERT(chain.back() == markerGraphEdgeId);
+        }
+        return markerGraphEdgeId;
+    }
 };
 
 
@@ -174,6 +206,11 @@ private:
     void numberVertices();
     void clearVertexNumbering();
 
+    // Create a new edge connecting cv0 and cv1.
+    // The new edge will consist of a simple BubbleChain with a single
+    // haploid Bubble with a Chain of length 2.
+    void connect(vertex_descriptor cv0, vertex_descriptor cv1);
+
     // Compress parallel edges into bubbles, where possible.
     bool compressParallelEdges();
 
@@ -192,6 +229,11 @@ private:
         vector< vector<uint64_t> >& tangleMatrix,
         bool setToZeroForComplementaryPairs
         ) const;
+
+    // Low level primitives used in detangling.
+    // See the implementation for details.
+    vertex_descriptor cloneAndTruncateAtEnd(edge_descriptor);
+    vertex_descriptor cloneAndTruncateAtBeginning(edge_descriptor);
 
     // Vertex detangling.
     bool detangleVerticesStrict(bool debug);
