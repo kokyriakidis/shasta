@@ -152,13 +152,19 @@ private:
     // Each linear chain of edges in the PathGraph1 after transitive reduction generates
     // a CompressedPathGraph1BEdge (BubbleChain) consisting of a single haploid bubble.
     void create();
-    std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
     uint64_t nextEdgeId = 0;
     void renumberEdges();
 
     // Return the vertex corresponding to a given MarkerGraphEdgeId,
-    // creating it if necessary.
-    vertex_descriptor getVertex(MarkerGraphEdgeId);
+    // creating it if it is not in the given vertexMap.
+    // This is only used in create().
+    vertex_descriptor getVertex(
+        MarkerGraphEdgeId,
+        std::map<MarkerGraphEdgeId, vertex_descriptor>& vertexMap
+        );
+
+    // Create a new vertex with a given MarkerGraphEdgeId.
+    vertex_descriptor createVertex(MarkerGraphEdgeId);
 
     void removeVertex(vertex_descriptor);
 

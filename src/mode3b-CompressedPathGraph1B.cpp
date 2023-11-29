@@ -128,11 +128,15 @@ CompressedPathGraph1B::CompressedPathGraph1B(
         removeShortSuperbubbles(p.first, p.second);
         compress();
     }
+    write("A");
+    writeGfaExpanded("A", false);
 
     detangleEdges(0, detangleToleranceHigh);
     detangleEdges(0, detangleToleranceHigh);
     detangleEdges(1, detangleToleranceHigh);
     detangleVertices(false, 0, detangleToleranceHigh);
+    write("B");
+    writeGfaExpanded("B", false);
 
     detangleBackEdges(1, detangleToleranceHigh);
     compress();
@@ -147,14 +151,18 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     compress();
 
     renumberEdges();    //  To facilitate debugging.
-    write("A");
+    write("C");
+    writeGfaExpanded("C", false);
     detangleShortSuperbubbles(100000, 1, detangleToleranceHigh);
-    write("B");
+    write("D");
+    writeGfaExpanded("D", false);
     compress();
 
-    write("C");
+    write("E");
+    writeGfaExpanded("E", false);
     detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
-    write("D");
+    write("F");
+    writeGfaExpanded("F", false);
     compress();
 
     // Before final output, renumber the edges contiguously and assemble sequence.
@@ -198,13 +206,14 @@ void CompressedPathGraph1B::create()
 
     // Each chain generates an edge.
     // Vertices are added as needed.
+    std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
     for(const vector<PathGraph1::edge_descriptor>& inputChain: inputChains) {
         const PathGraph1::vertex_descriptor v0 = source(inputChain.front(), graph);
         const PathGraph1::vertex_descriptor v1 = target(inputChain.back(), graph);
         const MarkerGraphEdgeId markerGraphEdgeId0 = graph[v0].edgeId;
         const MarkerGraphEdgeId markerGraphEdgeId1 = graph[v1].edgeId;
-        const vertex_descriptor cv0 = getVertex(markerGraphEdgeId0);
-        const vertex_descriptor cv1 = getVertex(markerGraphEdgeId1);
+        const vertex_descriptor cv0 = getVertex(markerGraphEdgeId0, vertexMap);
+        const vertex_descriptor cv1 = getVertex(markerGraphEdgeId1, vertexMap);
 
         // Create an edge for this input chain.
         edge_descriptor ce;
@@ -232,9 +241,10 @@ void CompressedPathGraph1B::create()
 
 
 // Return the vertex corresponding to a given MarkerGraphEdgeId,
-// creating it if necessary.
+// creating it if it is not in the given vertexMap
 CompressedPathGraph1B::vertex_descriptor CompressedPathGraph1B::getVertex(
-    MarkerGraphEdgeId markerGraphEdgeId)
+    MarkerGraphEdgeId markerGraphEdgeId,
+    std::map<MarkerGraphEdgeId, vertex_descriptor>& vertexMap)
 {
     CompressedPathGraph1B& cGraph = *this;
 
@@ -250,17 +260,21 @@ CompressedPathGraph1B::vertex_descriptor CompressedPathGraph1B::getVertex(
 
 
 
+// Create a new vertex with a given MarkerGraphEdgeId.
+CompressedPathGraph1B::vertex_descriptor CompressedPathGraph1B::createVertex(
+    MarkerGraphEdgeId markerGraphEdgeId)
+{
+    return add_vertex({markerGraphEdgeId}, *this);
+}
+
+
+
 void CompressedPathGraph1B::removeVertex(vertex_descriptor cv)
 {
     CompressedPathGraph1B& cGraph = *this;
 
     SHASTA_ASSERT(in_degree(cv, cGraph) == 0);
     SHASTA_ASSERT(out_degree(cv, cGraph) == 0);
-
-    auto it = vertexMap.find(cGraph[cv].edgeId);
-    SHASTA_ASSERT(it != vertexMap.end());
-    SHASTA_ASSERT(it->second == cv);
-    vertexMap.erase(it);
 
     boost::remove_vertex(cv, cGraph);
 }
@@ -1922,7 +1936,7 @@ void CompressedPathGraph1B::splitBubbleChainAtBeginning(edge_descriptor ce)
         CompressedPathGraph1BEdge newEdge;
         newEdge.id = nextEdgeId++;
         copy(bubbleChain.begin() + 1, bubbleChain.end(), back_inserter(newEdge));
-        const vertex_descriptor cv2 = getVertex(newEdge.front().front().front());
+        const vertex_descriptor cv2 = createVertex(newEdge.front().front().front());
         boost::add_edge(cv2, cv1, newEdge, cGraph);
 
         // Generate a  new edge for each chain in the firstBubble.
@@ -1984,7 +1998,7 @@ void CompressedPathGraph1B::splitBubbleChainAtEnd(edge_descriptor ce)
         CompressedPathGraph1BEdge newEdge;
         newEdge.id = nextEdgeId++;
         copy(bubbleChain.begin(), bubbleChain.end()-1, back_inserter(newEdge));
-        const vertex_descriptor cv2 = getVertex(newEdge.back().front().back());
+        const vertex_descriptor cv2 = createVertex(newEdge.back().front().back());
         boost::add_edge(cv0, cv2, newEdge, cGraph);
 
         // Generate a  new edge for each chain in the lastBubble.
