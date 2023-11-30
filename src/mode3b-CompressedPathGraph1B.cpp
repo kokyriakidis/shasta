@@ -103,6 +103,17 @@ void GlobalPathGraph1::assemble2(
 
 
 
+void GlobalPathGraph1::loadAndAssemble(
+    const Assembler& assembler,
+    const string& fileName,
+    uint64_t threadCount0,
+    uint64_t threadCount1)
+{
+    CompressedPathGraph1B cGraph(fileName, assembler,threadCount0, threadCount1);
+}
+
+
+
 // Create from a PathGraph1, then call run.
 CompressedPathGraph1B::CompressedPathGraph1B(
     const PathGraph1& graph,
@@ -126,7 +137,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
 // Load it from a binary archive, then call run.
 CompressedPathGraph1B::CompressedPathGraph1B(
     const string& fileName,
-    const Assembler&,
+    const Assembler& assembler,
     uint64_t threadCount0,
     uint64_t threadCount1) :
     assembler(assembler)

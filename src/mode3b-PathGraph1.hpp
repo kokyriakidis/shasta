@@ -237,6 +237,11 @@ public:
         const Assembler&,
         uint64_t threadCount0,
         uint64_t threadCount1);
+    static void loadAndAssemble(
+        const Assembler&,
+        const string& fileName,
+        uint64_t threadCount0,
+        uint64_t threadCount1);
 private:
     GlobalPathGraph1(const Assembler&);
     const Assembler& assembler;

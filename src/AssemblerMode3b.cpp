@@ -69,6 +69,17 @@ void Assembler::findMode3bPaths(
 
 
 
+void Assembler::loadAndAssembleCompressedPathGraph1B(
+    const string& fileName,
+    uint64_t threadCount0,  // High level parallelization
+    uint64_t threadCount1   // Low level parallelization
+    ) const
+{
+    mode3b::GlobalPathGraph1::loadAndAssemble(*this, fileName, threadCount0, threadCount1);
+}
+
+
+
 // Given two consecutive primary edges in the marker graph,
 // find the secondary edges in between.
 // This works with mode3b assembly and the complete marker graph.

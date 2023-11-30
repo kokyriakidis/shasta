@@ -2369,6 +2369,11 @@ public:
         uint64_t threadCount0,  // High level parallelization
         uint64_t threadCount1   // Low level parallelization
     ) const;
+    void loadAndAssembleCompressedPathGraph1B(
+        const string& fileName,
+        uint64_t threadCount0,  // High level parallelization
+        uint64_t threadCount1   // Low level parallelization
+        ) const;
 
 public:
     void test();

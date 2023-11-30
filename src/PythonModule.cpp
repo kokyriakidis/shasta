@@ -628,6 +628,8 @@ PYBIND11_MODULE(shasta, shastaModule)
             &Assembler::findMode3bPaths,
             arg("threadCount0"),
             arg("threadCount1"))
+        .def("loadAndAssembleCompressedPathGraph1B",
+            &Assembler::loadAndAssembleCompressedPathGraph1B)
 
 
 
