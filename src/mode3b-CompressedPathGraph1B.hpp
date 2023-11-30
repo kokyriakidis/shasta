@@ -9,11 +9,13 @@
 
 // Boost libraries.
 #include <boost/graph/adjacency_list.hpp>
+#include <boost/serialization/vector.hpp>
 
 // Standard library
 #include "array.hpp"
 #include <map>
 #include "memory.hpp"
+#include "fstream.hpp"
 #include "string.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
@@ -69,6 +71,11 @@ public:
         SHASTA_ASSERT(size() > 1);
         return (*this)[size() - 2];
     }
+
+    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    {
+        ar & boost::serialization::base_object< vector<MarkerGraphEdgeId> >(*this);
+    }
 };
 
 
@@ -86,6 +93,11 @@ public:
     bool isGeneral() const
     {
         return size() > 2;
+    }
+
+    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    {
+        ar & boost::serialization::base_object< vector<Chain> >(*this);
     }
 };
 
@@ -138,6 +150,11 @@ public:
         }
         return markerGraphEdgeId;
     }
+
+    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    {
+        ar & boost::serialization::base_object< vector<Bubble> >(*this);
+    }
 };
 
 
@@ -155,6 +172,10 @@ public:
     // Stored by class Superbubbles.
     uint64_t superbubbleId = invalid<uint64_t>;
 
+    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    {
+        ar & edgeId;
+    }
 };
 
 
@@ -162,6 +183,11 @@ public:
 class shasta::mode3b::CompressedPathGraph1BEdge : public BubbleChain {
 public:
     uint64_t id = invalid<uint64_t>;
+
+    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    {
+        ar & boost::serialization::base_object<BubbleChain>(*this);
+    }
 };
 
 
@@ -179,6 +205,13 @@ private:
     const PathGraph1& graph;
     uint64_t componentId;
     const Assembler& assembler;
+
+    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    {
+        ar & boost::serialization::base_object<CompressedPathGraph1BBaseClass>(*this);
+        ar & componentId;
+        ar & nextEdgeId;
+    }
 
     // Initial creation from the PathGraph1.
     // Each linear chain of edges in the PathGraph1 after transitive reduction generates
@@ -236,8 +269,8 @@ private:
     vertex_descriptor cloneAndTruncateAtBeginning(edge_descriptor);
 
     // Vertex detangling.
-    bool detangleVerticesStrict(bool debug);
-    bool detangleVertexStrict(vertex_descriptor, bool debug);
+    // bool detangleVerticesStrict(bool debug);
+    // bool detangleVertexStrict(vertex_descriptor, bool debug);
     bool detangleVertices(bool debug,
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
@@ -442,8 +475,9 @@ private:
         PhasingGraphEdge>;
     class PhasingGraph : public PhasingGraphBaseClass {
     public:
-        void phase();
+        void phase(bool debug);
         bool isConsistent(edge_descriptor) const;
+        void writeGraphviz(const string& fileName) const;
         vector< shared_ptr<PhasedComponent> > phasedComponents;
     };
 

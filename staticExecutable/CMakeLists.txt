@@ -62,14 +62,14 @@ if(X86_64)
     target_link_libraries(
         shastaStaticExecutable
         shastaStaticLibrary
-        atomic boost_system boost_program_options boost_chrono spoa png z
+        atomic boost_system boost_program_options boost_chrono boost_serialization  spoa png z
         lapack blas gfortran quadmath
         -Wl,--whole-archive -lpthread -Wl,--no-whole-archive)
 else(X86_64)
     target_link_libraries(
         shastaStaticExecutable
         shastaStaticLibrary
-        atomic boost_system boost_program_options boost_chrono spoa png z
+        atomic boost_system boost_program_options boost_chrono boost_serialization spoa png z
         lapack blas gfortran
         -Wl,--whole-archive -lpthread -Wl,--no-whole-archive)
 endif(X86_64) 

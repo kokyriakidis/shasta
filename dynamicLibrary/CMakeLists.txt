@@ -77,7 +77,7 @@ SET(CMAKE_LINKER_FLAGS  "${CMAKE_LINKER_FLAGS} ${SHASTA_PYTHON_LIBRARIES}")
 # Libraries to link with.
 target_link_libraries(
     shastaDynamicLibrary 
-     atomic png boost_program_options pthread z spoa lapack blas ${SHASTA_PYTHON_LIBRARIES})
+     atomic png boost_program_options boost_serialization pthread z spoa lapack blas ${SHASTA_PYTHON_LIBRARIES})
 
 # Install the shared library into the bin directory.
 install(TARGETS shastaDynamicLibrary DESTINATION shasta-install/bin)

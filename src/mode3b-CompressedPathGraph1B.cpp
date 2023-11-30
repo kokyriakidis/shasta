@@ -128,15 +128,11 @@ CompressedPathGraph1B::CompressedPathGraph1B(
         removeShortSuperbubbles(p.first, p.second);
         compress();
     }
-    write("A");
-    writeGfaExpanded("A", false);
 
     detangleEdges(0, detangleToleranceHigh);
     detangleEdges(0, detangleToleranceHigh);
     detangleEdges(1, detangleToleranceHigh);
     detangleVertices(false, 0, detangleToleranceHigh);
-    write("B");
-    writeGfaExpanded("B", false);
 
     detangleBackEdges(1, detangleToleranceHigh);
     compress();
@@ -150,19 +146,10 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     phaseBubbleChains(false, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
     compress();
 
-    renumberEdges();    //  To facilitate debugging.
-    write("C");
-    writeGfaExpanded("C", false);
     detangleShortSuperbubbles(100000, 1, detangleToleranceHigh);
-    write("D");
-    writeGfaExpanded("D", false);
     compress();
 
-    write("E");
-    writeGfaExpanded("E", false);
     detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
-    write("F");
-    writeGfaExpanded("F", false);
     compress();
 
     // Before final output, renumber the edges contiguously and assemble sequence.
@@ -1155,6 +1142,7 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
 
 
 
+#if 0
 bool CompressedPathGraph1B::detangleVerticesStrict(bool debug)
 {
     if(debug) {
@@ -1181,6 +1169,7 @@ bool CompressedPathGraph1B::detangleVerticesStrict(bool debug)
 
     return detangledCount > 0;
 }
+#endif
 
 
 
@@ -1294,6 +1283,7 @@ void CompressedPathGraph1B::computeTangleMatrix(
 
 
 
+#if 0
 // This works if the following is true:
 // - For all incoming edges (bubble chains) of cv, the last bubble is haploid.
 // - For all outgoing edges (bubble chains) of cv, the first bubble is haploid.
@@ -1458,6 +1448,7 @@ bool CompressedPathGraph1B::detangleVertexStrict(
 
     return true;
 }
+#endif
 
 
 
@@ -1607,7 +1598,27 @@ bool CompressedPathGraph1B::detangleVertex(
     }
 
 
+    // Create truncated versions of the inEdges and outEdges.
+    vector<vertex_descriptor> inVertices;
+    for(const edge_descriptor ce: inEdges) {
+        inVertices.push_back(cloneAndTruncateAtEnd(ce));
+    }
+    vector<vertex_descriptor> outVertices;
+    for(const edge_descriptor ce: outEdges) {
+        outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+    }
 
+    // Each significant element of the tangle matrix generates a new edge.
+    for(uint64_t i0=0; i0<inEdges.size(); i0++) {
+        for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                connect(inVertices[i0], outVertices[i1]);
+            }
+        }
+    }
+
+
+#if 0
     // Each significant element of the tangle matrix generates a new edge,
     // obtained by "merging" an in-edge with an out-edge.
     for(uint64_t i0=0; i0<inEdges.size(); i0++) {
@@ -1666,6 +1677,7 @@ bool CompressedPathGraph1B::detangleVertex(
         }
 
     }
+#endif
 
     // Now we can remove cv and all of its in-edges and out-edges.
     clear_vertex(cv, cGraph);
@@ -3089,11 +3101,13 @@ void CompressedPathGraph1B::phaseBubbleChain(
     CompressedPathGraph1B& cGraph = *this;
     BubbleChain& bubbleChain = cGraph[ce];
 
+    // debug = debug and (cGraph[ce].id == 500048);
+
     if(debug) {
         cout << "Phasing " << bubbleChainStringId(ce) << endl;
     }
 
-    const bool detailedDebug = false; // (cGraph[ce].id == 49557);
+    const bool detailedDebug = debug; // (cGraph[ce].id == 49557);
 
     // Table to contain the Phasing graph vertex corresponding to each diploid bubble.
     // Indexed by the bubble position in the bubble chains, and contains
@@ -3218,7 +3232,7 @@ void CompressedPathGraph1B::phaseBubbleChain(
             " Average connectivity " << connectivity << endl;
     }
 
-    phasingGraph.phase();
+    phasingGraph.phase(debug);
 
 
 
@@ -3327,10 +3341,9 @@ void CompressedPathGraph1B::phaseBubbleChain(
 
 // To phase the PhasingGraph, we create an optimal spanning tree
 // using edges in order of decreasing "significance".
-void CompressedPathGraph1B::PhasingGraph::phase()
+void CompressedPathGraph1B::PhasingGraph::phase(bool debug)
 {
     PhasingGraph& phasingGraph = *this;
-    const bool debug = false;
 
     // Gather edges by maxDiscordant and minConcordant.
     // edgeTable[maxDiscordant][minConcordant] contains the
@@ -3553,6 +3566,7 @@ void CompressedPathGraph1B::PhasingGraph::phase()
                 phasedComponent->maxPositionInBubbleChain << " in bubble chain." << endl;
 
         }
+        phasingGraph.writeGraphviz("PhasingGraph.dot");
     }
 }
 
@@ -3586,6 +3600,32 @@ bool CompressedPathGraph1B::PhasingGraph::isConsistent(edge_descriptor e) const
     } else {
         return phase0 != phase1;
     }
+}
+
+
+
+void CompressedPathGraph1B::PhasingGraph::writeGraphviz(const string& fileName) const
+{
+    const PhasingGraph& phasingGraph = *this;
+
+    ofstream dot(fileName);
+    dot << "graph PhasingGraph {\n";
+
+    BGL_FORALL_EDGES(e, phasingGraph, PhasingGraph) {
+        const vertex_descriptor v0 = source(e, phasingGraph);
+        const vertex_descriptor v1 = target(e, phasingGraph);
+        dot <<
+            phasingGraph[v0].positionInBubbleChain << "--" <<
+            phasingGraph[v1].positionInBubbleChain;
+        if(phasingGraph[e].isSpanningTreeEdge) {
+            dot << " [color=green]";
+        } else  if(not isConsistent(e)) {
+            dot << " [color=red]";
+        }
+        dot << ";\n";
+    }
+
+    dot << "}\n";
 }
 
 
