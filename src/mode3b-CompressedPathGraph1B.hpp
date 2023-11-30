@@ -202,7 +202,6 @@ public:
         uint64_t threadCount1);
 private:
     // Information stored by the constructor.
-    const PathGraph1& graph;
     uint64_t componentId;
     const Assembler& assembler;
 
@@ -218,7 +217,7 @@ private:
     // Initial creation from the PathGraph1.
     // Each linear chain of edges in the PathGraph1 after transitive reduction generates
     // a CompressedPathGraph1BEdge (BubbleChain) consisting of a single haploid bubble.
-    void create();
+    void create(const PathGraph1&);
     uint64_t nextEdgeId = 0;
     void renumberEdges();
 

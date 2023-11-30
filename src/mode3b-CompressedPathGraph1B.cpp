@@ -109,7 +109,6 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     const Assembler& assembler,
     uint64_t threadCount0,
     uint64_t threadCount1) :
-    graph(graph),
     componentId(componentId),
     assembler(assembler)
 {
@@ -121,7 +120,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     const uint64_t phasingThresholdHigh = 6;
     const uint64_t longBubbleThreshold = 5000;
 
-    create();
+    create(graph);
     write("Initial");
 
     // Serialize it so we can restore it to facilitate debugging.
@@ -173,7 +172,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
 // Initial creation from the PathGraph1.
 // Each linear chain of edges in the PathGraph1 after transitive reduction generates
 // a CompressedPathGraph1BEdge (BubbleChain) consisting of a single haploid bubble.
-void CompressedPathGraph1B::create()
+void CompressedPathGraph1B::create(const PathGraph1& graph)
 {
     CompressedPathGraph1B& cGraph = *this;
 
