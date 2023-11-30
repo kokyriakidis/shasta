@@ -103,6 +103,7 @@ void GlobalPathGraph1::assemble2(
 
 
 
+// Create from a PathGraph1, then call run.
 CompressedPathGraph1B::CompressedPathGraph1B(
     const PathGraph1& graph,
     uint64_t componentId,
@@ -112,6 +113,32 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     componentId(componentId),
     assembler(assembler)
 {
+    create(graph);
+
+    // Serialize it so we can restore it to facilitate debugging.
+    save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
+
+    run();
+}
+
+
+
+// Load it from a binary archive, then call run.
+CompressedPathGraph1B::CompressedPathGraph1B(
+    const string& fileName,
+    const Assembler&,
+    uint64_t threadCount0,
+    uint64_t threadCount1) :
+    assembler(assembler)
+{
+    load(fileName);
+    run();
+}
+
+
+
+void CompressedPathGraph1B::run()
+{
     // *** EXPOSE WHEN CODE STABILIZES
     vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
     {{300, 1000}, {1000, 3000}, {3000, 10000}, {10000, 30000}};
@@ -120,11 +147,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     const uint64_t phasingThresholdHigh = 6;
     const uint64_t longBubbleThreshold = 5000;
 
-    create(graph);
     write("Initial");
-
-    // Serialize it so we can restore it to facilitate debugging.
-    save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
 
     detangleVertices(false, 0, detangleToleranceHigh);
     compress();
@@ -3984,4 +4007,13 @@ void CompressedPathGraph1B::save(const string& fileName) const
     ofstream file(fileName);
     boost::archive::binary_oarchive archive(file);
     archive << *this;
+}
+
+
+
+void CompressedPathGraph1B::load(const string& fileName)
+{
+    ifstream file(fileName);
+    boost::archive::binary_iarchive archive(file);
+    archive >> *this;
 }

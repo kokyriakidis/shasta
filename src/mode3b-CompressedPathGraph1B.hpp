@@ -194,12 +194,22 @@ public:
 
 class shasta::mode3b::CompressedPathGraph1B: public CompressedPathGraph1BBaseClass {
 public:
+
+    // Create from a PathGraph1, then call run.
     CompressedPathGraph1B(
         const PathGraph1&,
         uint64_t componentId,
         const Assembler&,
         uint64_t threadCount0,
         uint64_t threadCount1);
+
+    // Load it from a binary archive, then call run.
+    CompressedPathGraph1B(
+        const string& fileName,
+        const Assembler&,
+        uint64_t threadCount0,
+        uint64_t threadCount1);
+
 private:
     // Information stored by the constructor.
     uint64_t componentId;
@@ -213,6 +223,9 @@ private:
         ar & nextEdgeId;
     }
     void save(const string& fileName) const;
+    void load(const string& fileName);
+
+    void run();
 
     // Initial creation from the PathGraph1.
     // Each linear chain of edges in the PathGraph1 after transitive reduction generates
