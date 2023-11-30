@@ -125,7 +125,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     write("Initial");
 
     // Serialize it so we can restore it to facilitate debugging.
-    save("CompressedPathGraph1B-" + to_string(componentId));
+    save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
 
     detangleVertices(false, 0, detangleToleranceHigh);
     compress();
@@ -2576,7 +2576,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubble(
             SHASTA_ASSERT(chain1.size() >= 2);
 
             edge_descriptor eNew;
-            tie(eNew, ignore) = add_edge(source(ce0, cGraph), target(ce1, graph), cGraph);
+            tie(eNew, ignore) = add_edge(source(ce0, cGraph), target(ce1, cGraph), cGraph);
             CompressedPathGraph1BEdge& newEdge = cGraph[eNew];
             newEdge.id = nextEdgeId++;
             BubbleChain& newBubbleChain = newEdge;
