@@ -11,7 +11,10 @@ using namespace shasta;
 using namespace mode3b;
 
 // Boost libraries.
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
 #include <boost/graph/filtered_graph.hpp>
+#include <boost/graph/adj_list_serialize.hpp>
 #include <boost/pending/disjoint_sets.hpp>
 
 // Standard library.
@@ -120,6 +123,9 @@ CompressedPathGraph1B::CompressedPathGraph1B(
 
     create();
     write("Initial");
+
+    // Serialize it so we can restore it to facilitate debugging.
+    save("CompressedPathGraph1B-" + to_string(componentId));
 
     detangleVertices(false, 0, detangleToleranceHigh);
     compress();
@@ -3970,4 +3976,13 @@ void CompressedPathGraph1B::connect(vertex_descriptor cv0, vertex_descriptor cv1
     chain.push_back(cGraph[cv0].edgeId);
     chain.push_back(cGraph[cv1].edgeId);
 
+}
+
+
+
+void CompressedPathGraph1B::save(const string& fileName) const
+{
+    ofstream file(fileName);
+    boost::archive::binary_oarchive archive(file);
+    archive << *this;
 }

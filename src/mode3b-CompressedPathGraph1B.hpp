@@ -206,12 +206,14 @@ private:
     uint64_t componentId;
     const Assembler& assembler;
 
+    friend class boost::serialization::access;
     template<class Archive> void serialize(Archive & ar, const unsigned int version)
     {
         ar & boost::serialization::base_object<CompressedPathGraph1BBaseClass>(*this);
         ar & componentId;
         ar & nextEdgeId;
     }
+    void save(const string& fileName) const;
 
     // Initial creation from the PathGraph1.
     // Each linear chain of edges in the PathGraph1 after transitive reduction generates
