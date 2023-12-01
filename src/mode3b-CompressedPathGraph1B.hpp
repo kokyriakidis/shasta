@@ -187,6 +187,7 @@ public:
     template<class Archive> void serialize(Archive & ar, const unsigned int version)
     {
         ar & boost::serialization::base_object<BubbleChain>(*this);
+        ar & id;
     }
 };
 
@@ -225,7 +226,9 @@ private:
     void save(const string& fileName) const;
     void load(const string& fileName);
 
-    void run();
+    void run(
+        uint64_t threadCount0,
+        uint64_t threadCount1);
 
     // Initial creation from the PathGraph1.
     // Each linear chain of edges in the PathGraph1 after transitive reduction generates
@@ -490,6 +493,7 @@ private:
     class PhasingGraph : public PhasingGraphBaseClass {
     public:
         void phase(bool debug);
+        void phase1(bool debug);
         bool isConsistent(edge_descriptor) const;
         void writeGraphviz(const string& fileName) const;
         vector< shared_ptr<PhasedComponent> > phasedComponents;

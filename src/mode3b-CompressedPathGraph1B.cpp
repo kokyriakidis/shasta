@@ -129,7 +129,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
 
-    run();
+    run(threadCount0, threadCount1);
 }
 
 
@@ -143,12 +143,14 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     assembler(assembler)
 {
     load(fileName);
-    run();
+    run(threadCount0, threadCount1);
 }
 
 
 
-void CompressedPathGraph1B::run()
+void CompressedPathGraph1B::run(
+    uint64_t threadCount0,
+    uint64_t threadCount1)
 {
     // *** EXPOSE WHEN CODE STABILIZES
     vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
@@ -3164,6 +3166,7 @@ void CompressedPathGraph1B::phaseBubbleChain(
 
     // Write a histogram of the bubbles in this bubble chain by ploidy.
     if(debug) {
+        cout << "Phasing a bubble chain with " << bubbleChain.size() << " bubbles." << endl;
         vector<uint64_t> histogram;
         for(const Bubble& bubble: bubbleChain) {
             const uint64_t ploidy = bubble.size();
@@ -3172,7 +3175,6 @@ void CompressedPathGraph1B::phaseBubbleChain(
             }
             ++histogram[ploidy];
         }
-        cout << "This bubble chain has a total " << bubbleChain.size() << " bubbles." << endl;
         for(uint64_t ploidy=1; ploidy<histogram.size(); ploidy++) {
             const uint64_t frequency = histogram[ploidy];
             if(frequency) {
@@ -3271,7 +3273,7 @@ void CompressedPathGraph1B::phaseBubbleChain(
             " Average connectivity " << connectivity << endl;
     }
 
-    phasingGraph.phase(debug);
+    phasingGraph.phase1(false);
 
 
 
@@ -3606,6 +3608,340 @@ void CompressedPathGraph1B::PhasingGraph::phase(bool debug)
 
         }
         phasingGraph.writeGraphviz("PhasingGraph.dot");
+    }
+}
+
+
+
+// To phase the PhasingGraph, we create an optimal spanning tree
+// using edges in order of decreasing "significance".
+// We do this iteratively. At each iteration we process the largest
+// connected component of the surviving PhasingGraph.
+void CompressedPathGraph1B::PhasingGraph::phase1(bool debug)
+{
+    PhasingGraph& phasingGraph = *this;
+    phasedComponents.clear();
+
+    if(debug) {
+        cout << "Beginning phasing for a PhasingGraph with " << num_vertices(phasingGraph) <<
+            " vertices." << endl;
+    }
+
+    // Main iteration loop.
+    while(true) {
+
+        // Clear the isSpanningTreeEdge flag of all edges.
+        BGL_FORALL_EDGES(pe, phasingGraph, PhasingGraph) {
+            phasingGraph[pe].isSpanningTreeEdge = false;
+        }
+
+        // Gather edges by maxDiscordant and minConcordant.
+        // edgeTable[maxDiscordant][minConcordant] contains the
+        // edges with those values of maxDiscordant and minConcordant.
+        // This allows the code later to process edges in order
+        // of increasing maxDiscordant and decreasing minConcordant.
+        vector< vector< vector<edge_descriptor> > > edgeTable;
+        BGL_FORALL_EDGES(pe, phasingGraph, PhasingGraph) {
+            const PhasingGraphEdge& edge = phasingGraph[pe];
+            const uint64_t maxDiscordant = edge.maxDiscordant;
+            const uint64_t minConcordant = edge.minConcordant;
+            if(edgeTable.size() <= maxDiscordant) {
+                edgeTable.resize(maxDiscordant + 1);
+            }
+            vector< vector<edge_descriptor> >& v = edgeTable[maxDiscordant];
+            if(v.size() <= minConcordant) {
+                v.resize(minConcordant + 1);
+            }
+            v[minConcordant].push_back(pe);
+        }
+
+        // Map vertices to integers.
+        // This is needed for the computation of the spanning tree and
+        // connected components.
+        std::map<vertex_descriptor, uint64_t> vertexIndexMap;
+        uint64_t vertexIndex = 0;
+        BGL_FORALL_VERTICES(pv, phasingGraph, PhasingGraph) {
+            vertexIndexMap.insert({pv, vertexIndex++});
+        }
+        const uint64_t vertexCount = vertexIndexMap.size();
+
+        if(debug) {
+            cout << "Beginning a new phasing iteration. The phasing graph has " <<
+                vertexCount << " vertices left." << endl;
+        }
+
+
+
+        // Compute optimal spanning tree and connected components.
+        vector<uint64_t> rank(vertexCount);
+        vector<uint64_t> parent(vertexCount);
+        boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
+        for(uint64_t i=0; i<vertexCount; i++) {
+            disjointSets.make_set(i);
+        }
+        uint64_t spanningTreeEdgeCount = 0;
+        // Process edges in order of decreasing significance.
+        for(uint64_t maxDiscordant=0; maxDiscordant<edgeTable.size(); maxDiscordant++) {
+            const vector< vector<edge_descriptor> >& v = edgeTable[maxDiscordant];
+            for(int64_t minConcordant=v.size()-1; minConcordant>=0; minConcordant--) {
+                const vector<edge_descriptor>& vv = v[minConcordant];
+                if(false) {
+                    cout << "Processing " << vv.size() << " phasing graph edges with maxDiscordant=" <<
+                        maxDiscordant << ", minConcordant=" << minConcordant << endl;
+                }
+                for(const edge_descriptor e: vv) {
+                    PhasingGraphEdge& edge = phasingGraph[e];
+                    const vertex_descriptor pv0 = source(e, phasingGraph);
+                    const vertex_descriptor pv1 = target(e, phasingGraph);
+                    const uint64_t vertexIndex0 = vertexIndexMap[pv0];
+                    const uint64_t vertexIndex1 = vertexIndexMap[pv1];
+                    const uint64_t componentId0 = disjointSets.find_set(vertexIndex0);
+                    const uint64_t componentId1 = disjointSets.find_set(vertexIndex1);
+                    if(componentId0 != componentId1) {
+                        disjointSets.union_set(vertexIndex0, vertexIndex1);
+                        edge.isSpanningTreeEdge = true;
+                        ++spanningTreeEdgeCount;
+                    }
+                }
+                if(false) {
+                    cout << "Found " << spanningTreeEdgeCount << " spanning tree edges so far." << endl;
+                }
+            }
+        }
+
+        // Gather the vertices in each connected component.
+        vector< vector<vertex_descriptor> > components(vertexCount);
+        BGL_FORALL_VERTICES(pv, phasingGraph, PhasingGraph) {
+            const uint64_t componentId = disjointSets.find_set(vertexIndexMap[pv]);
+            components[componentId].push_back(pv);
+        }
+
+        // Find the largest connected component.
+        uint64_t largestComponentId = invalid<uint64_t>;
+        uint64_t largestComponentSize = 0;
+        for(uint64_t componentId=0; componentId<vertexCount; componentId++) {
+            const uint64_t componentSize = components[componentId].size();
+            if(componentSize > largestComponentSize) {
+                largestComponentSize = componentSize;
+                largestComponentId = componentId;
+            }
+        }
+
+        // If the largest component has less than two vertices, we are done.
+        if(largestComponentSize < 2) {
+            if(debug) {
+                cout << "Phasing terminates because  only trivial connected components were found." << endl;
+            }
+            break;
+        }
+
+        // Access the largest connected component, which we will be working on
+        // for the rest of this iteration.
+        const vector<vertex_descriptor>& component = components[largestComponentId];
+        SHASTA_ASSERT(component.size() == largestComponentSize);
+        if(debug) {
+            cout << "The largest component of the current PhasingGraph has " <<
+                largestComponentSize << " vertices." << endl;
+        }
+
+        // Use a BFS on the spanning tree to phase the vertices in this component.
+        // It does not matter which vertex we start from.
+        const vertex_descriptor vFirst = component.front();
+        phasingGraph[vFirst].phase = +1;
+        std::queue<vertex_descriptor> q;
+        q.push(vFirst);
+        while(not q.empty()) {
+            const vertex_descriptor v0 = q.front();
+            q.pop();
+            BGL_FORALL_OUTEDGES(v0, e, phasingGraph, PhasingGraph) {
+                PhasingGraphEdge& edge = phasingGraph[e];
+                if(not edge.isSpanningTreeEdge) {
+                    continue;
+                }
+                const PhasingGraphVertex& vertex0 = phasingGraph[v0];
+                const vertex_descriptor v1 = target(e, phasingGraph);
+                PhasingGraphVertex& vertex1 = phasingGraph[v1];
+                if(vertex1.phase == 0) {
+                    vertex1.phase = vertex0.phase;
+                    if(edge.phase == -1) {
+                        vertex1.phase = - vertex1.phase;
+                    }
+                    q.push(v1);
+                }
+            }
+        }
+
+        // Count inconsistent edges in this component.
+        if(debug) {
+            uint64_t inconsistentCount = 0;
+            uint64_t totalCount = 0;
+            for(const vertex_descriptor v: component) {
+                BGL_FORALL_OUTEDGES(v, e, phasingGraph, PhasingGraph) {
+                    totalCount++;
+                    if(not isConsistent(e)) {
+                        ++inconsistentCount;
+                    }
+                }
+            }
+            // This counts edges twice.
+            inconsistentCount /= 2;
+            totalCount /= 2;
+            cout << inconsistentCount << " inconsistent edges in this component out of " <<
+                totalCount << " total." << endl;
+        }
+
+        // All vertices in this component have been phased.
+        // However, when creating the PhasedComponent, we have to make sure that adjacent
+        // phased vertices have common reads.
+        // To guarantee this, we find a longest path in this component, in order of increasing
+        // positionInBubbleChain. Only vertices in this longest path are then included in the
+        // PhasedComponent.
+
+        // To find this longest path, we use an algorithm similar to the one in longestPath.cpp,
+        // using the topological ordering induced by positionInBubbleChain.
+
+        // Table of the vertices in order of increasing positionInBubbleChain.
+        vector< pair<vertex_descriptor, uint64_t> > vertexTable;
+        for(const vertex_descriptor v: component) {
+            vertexTable.push_back({v, phasingGraph[v].positionInBubbleChain});
+        }
+        sort(vertexTable.begin(), vertexTable.end(), OrderPairsBySecondOnly<vertex_descriptor, uint64_t>());
+
+        // The length of the longest path ending at each vertex.
+        std::map<vertex_descriptor, uint64_t> lengthMap;
+        for(const vertex_descriptor v: component) {
+            lengthMap.insert(make_pair(v, 0));
+        }
+
+        // Process the vertices in order of increasing positionInBubbleChain.
+        for(const auto& p: vertexTable) {
+            const vertex_descriptor v0 = p.first;
+            const uint64_t positionInBubbleChain0 = phasingGraph[v0].positionInBubbleChain;
+
+            uint64_t maximumLength = 0;
+            BGL_FORALL_OUTEDGES_T(v0, e, phasingGraph, PhasingGraph) {
+                const vertex_descriptor v1 = target(e, phasingGraph);
+                const uint64_t positionInBubbleChain1 = phasingGraph[v1].positionInBubbleChain;
+
+                if(positionInBubbleChain1 < positionInBubbleChain0) {
+                    maximumLength = max(maximumLength, lengthMap[v1]);
+                }
+            }
+            lengthMap[v0] = maximumLength + 1;
+        }
+
+        // Find the vertex with the longest length.
+        // This will be the end of the longest path.
+        vertex_descriptor v = PhasingGraph::null_vertex();
+        uint64_t maximumLength = 0;
+        for(const auto& p: lengthMap) {
+            if(p.second > maximumLength) {
+                v = p.first;
+                maximumLength = p.second;
+            }
+        }
+
+        // Constuct the path, moving backward from here.
+        vector<vertex_descriptor> longestPath;
+        longestPath.push_back(v);
+        while(true) {
+            vertex_descriptor vPrevious = PhasingGraph::null_vertex();
+            uint64_t maximumLength = 0;
+            BGL_FORALL_OUTEDGES(v, e, phasingGraph, PhasingGraph) {
+                const vertex_descriptor v0 = target(e, phasingGraph);
+                if(phasingGraph[v0].positionInBubbleChain < phasingGraph[v].positionInBubbleChain) {
+                    const uint64_t length = lengthMap[v0];
+                    if(length > maximumLength) {
+                        vPrevious = v0;
+                        maximumLength = length;
+                    }
+                }
+            }
+            if(vPrevious == PhasingGraph::null_vertex()) {
+                break;
+            }
+            v = vPrevious;
+            longestPath.push_back(v);
+
+        }
+        std::reverse(longestPath.begin(), longestPath.end());
+
+        if(debug) {
+            cout << "The longest path contains " << longestPath.size() << " vertices." << endl;
+        }
+
+
+
+        // If the longest path is non-trivial, use it to create a new PhasedComponent.
+        if(longestPath.size() > 1) {
+            if(debug) {
+                cout << "Creating a new PhasedComponent." << endl;
+            }
+            shared_ptr<PhasedComponent> phasedComponentPointer = make_shared<PhasedComponent>();
+            phasedComponents.push_back(phasedComponentPointer);
+            PhasedComponent& phasedComponent = *phasedComponentPointer;
+
+            for(const vertex_descriptor v: longestPath) {
+                const PhasingGraphVertex& vertex = phasingGraph[v];
+                phasedComponent.push_back({vertex.positionInBubbleChain, vertex.phase});
+            }
+            phasedComponent.minPositionInBubbleChain = phasingGraph[longestPath.front()].positionInBubbleChain;
+            phasedComponent.maxPositionInBubbleChain = phasingGraph[longestPath.back()].positionInBubbleChain;
+            if(debug) {
+                cout << "Phasing range for this component " << phasedComponent.minPositionInBubbleChain <<
+                    " " << phasedComponent.maxPositionInBubbleChain << endl;
+            }
+
+            // Now remove from the PhasingGraph all vertices of this component
+            // plus any vertices with a positionInBubbleChain
+            // that overlaps this phased component.
+            vector<vertex_descriptor> verticesToBeRemoved = component;
+            BGL_FORALL_VERTICES(v, phasingGraph, PhasingGraph) {
+                const uint64_t positionInBubbleChain = phasingGraph[v].positionInBubbleChain;
+                if( positionInBubbleChain >= phasedComponent.minPositionInBubbleChain and
+                    positionInBubbleChain <= phasedComponent.maxPositionInBubbleChain) {
+                    verticesToBeRemoved.push_back(v);
+                }
+            }
+            deduplicate(verticesToBeRemoved);
+            for(const vertex_descriptor v: verticesToBeRemoved) {
+                clear_vertex(v, phasingGraph);
+                remove_vertex(v, phasingGraph);
+            }
+        } else {
+
+            // Now remove from the PhasingGraph all vertices of this component.
+            for(const vertex_descriptor v: component) {
+                clear_vertex(v, phasingGraph);
+                remove_vertex(v, phasingGraph);
+            }
+        }
+    }
+
+
+
+    // Sort the phased components in order of increasing position.
+    class SortHelper {
+    public:
+        bool operator()(
+            const shared_ptr<PhasedComponent>& p0,
+            const shared_ptr<PhasedComponent>& p1
+            ) const
+        {
+            return p0->minPositionInBubbleChain < p1->minPositionInBubbleChain;
+        }
+    };
+    sort(phasedComponents.begin(), phasedComponents.end(), SortHelper());
+
+    if(debug) {
+        cout << phasedComponents.size() << " phased components:" << endl;
+        for(const auto& phasedComponent: phasedComponents) {
+            cout  << phasedComponent->size() << " diploid bubbles at positions " <<
+                phasedComponent->minPositionInBubbleChain << "..." <<
+                phasedComponent->maxPositionInBubbleChain << " in bubble chain." << endl;
+
+        }
+        // phasingGraph.writeGraphviz("PhasingGraph.dot");
     }
 }
 
