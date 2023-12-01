@@ -193,6 +193,27 @@ void CompressedPathGraph1B::run(
     detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
     compress();
 
+    phaseBubbleChains(false, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    compress();
+
+    removeShortSuperbubbles(30000, 100000);
+    compress();
+
+    phaseBubbleChains(false, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    compress();
+
+    removeShortSuperbubbles(30000, 100000);
+    compress();
+
+    phaseBubbleChains(false, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    compress();
+
+    removeShortSuperbubbles(30000, 100000);
+    compress();
+
+    phaseBubbleChains(true, 1, 4, longBubbleThreshold);
+    compress();
+
     // Before final output, renumber the edges contiguously and assemble sequence.
     // renumberEdges();
     // assembleChains(threadCount0, threadCount1);
@@ -2589,7 +2610,29 @@ bool CompressedPathGraph1B::detangleShortSuperbubble(
         cout << "This superbubble will be detangled." << endl;
     }
 
+    // Create truncated versions of the inEdges and outEdges.
+    vector<vertex_descriptor> inVertices;
+    for(const edge_descriptor ce: inEdges) {
+        inVertices.push_back(cloneAndTruncateAtEnd(ce));
+    }
+    vector<vertex_descriptor> outVertices;
+    for(const edge_descriptor ce: outEdges) {
+        outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+    }
 
+
+
+    // Each significant element of the tangle matrix generates a new edge.
+    for(uint64_t i0=0; i0<inEdges.size(); i0++) {
+        for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                connect(inVertices[i0], outVertices[i1]);
+            }
+        }
+    }
+
+
+#if 0
     // Each significant element of the tangle matrix generates a new edge,
     // obtained by "merging" an in-edge with an out-edge.
     for(uint64_t i0=0; i0<inEdges.size(); i0++) {
@@ -2646,7 +2689,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubble(
         }
 
     }
-
+#endif
 
     // Now we can remove all the vertices in the superbubble.
     for(const vertex_descriptor cv: superbubble) {
@@ -3240,6 +3283,16 @@ void CompressedPathGraph1B::phaseBubbleChain(
                 maxDiscordant,
                 total);
 
+            if(detailedDebug) {
+                cout << "Tangle matrix: " <<
+                    tangleMatrix[0][0] << " " <<
+                    tangleMatrix[0][1] << " " <<
+                    tangleMatrix[1][0] << " " <<
+                    tangleMatrix[1][1] << endl;
+                cout << "minConcordant " << minConcordant << endl;
+                cout << "maxDiscordant " << maxDiscordant << endl;
+            }
+
             // If not ambiguous, add an edge to the PhasingGraph.
             if(phase != 0) {
                 boost::add_edge(pv0, pv1, {phase, minConcordant, maxDiscordant}, phasingGraph);
@@ -3249,11 +3302,6 @@ void CompressedPathGraph1B::phaseBubbleChain(
                         phasingGraph[pv0].positionInBubbleChain << " " <<
                         phasingGraph[pv1].positionInBubbleChain << " with minConcordant " <<
                         minConcordant << ", maxDiscordant " << maxDiscordant << endl;
-                    cout << "Tangle matrix: " <<
-                        tangleMatrix[0][0] << " " <<
-                        tangleMatrix[0][1] << " " <<
-                        tangleMatrix[1][0] << " " <<
-                        tangleMatrix[1][1] << endl;
                 }
             }
 
