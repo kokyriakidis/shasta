@@ -387,6 +387,7 @@ private:
 
     // Remove short superbubbles with one entry and one exit.
     void removeShortSuperbubbles(
+        bool debug,
         uint64_t maxOffset1,    // Used to define superbubbles
         uint64_t maxOffset2     // Compared against the offset between entry and exit
     );

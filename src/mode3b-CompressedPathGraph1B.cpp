@@ -166,7 +166,7 @@ void CompressedPathGraph1B::run(
     compress();
 
     for(const auto& p: superbubbleRemovalMaxOffsets) {
-        removeShortSuperbubbles(p.first, p.second);
+        removeShortSuperbubbles(false, p.first, p.second);
         compress();
     }
 
@@ -196,22 +196,25 @@ void CompressedPathGraph1B::run(
     phaseBubbleChains(false, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
     compress();
 
-    removeShortSuperbubbles(30000, 100000);
+    removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
     phaseBubbleChains(false, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
     compress();
 
-    removeShortSuperbubbles(30000, 100000);
+    removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
     phaseBubbleChains(false, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
     compress();
 
-    removeShortSuperbubbles(30000, 100000);
+    removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(true, 1, 4, longBubbleThreshold);
+    phaseBubbleChains(false, 1, 4, longBubbleThreshold);
+    compress();
+
+    removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
     // Before final output, renumber the edges contiguously and assemble sequence.
@@ -1131,6 +1134,7 @@ CompressedPathGraph1B::Superbubbles::~Superbubbles()
 
 // Remove short superbubbles with one entry and one exit.
 void CompressedPathGraph1B::removeShortSuperbubbles(
+    bool debug,
     uint64_t maxOffset1,    // Used to define superbubbles
     uint64_t maxOffset2)    // Compared against the offset between entry and exit
 {
@@ -1144,14 +1148,32 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
         Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
         SHASTA_ASSERT(superbubble.size() > 1);
 
+        if(debug) {
+            cout << "Found a superbubble with " << superbubble.size() << " vertices:";
+            for(const vertex_descriptor v: superbubble) {
+                cout << " " << cGraph[v].edgeId;
+            }
+            cout << endl;
+        }
+
+
         // Skip it if it has more than one entrance or exit.
         if(not(superbubble.entrances.size()==1 and superbubble.exits.size()==1)) {
+            if(debug) {
+                cout << "This superbubble will not be removed because it has " <<
+                    superbubble.entrances.size() << " entrances and " <<
+                    superbubble.exits.size() << " exits." << endl;
+            }
             continue;
         }
 
         const vertex_descriptor entrance = superbubble.entrances.front();
         const vertex_descriptor exit = superbubble.exits.front();
         if(entrance == exit) {
+            if(debug) {
+                cout << "This superbubble will not be removed because it the entrance vertex"
+                    " is the same as the exit vertex." << endl;
+            }
             continue;
         }
 
@@ -1159,13 +1181,23 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
         MarkerGraphEdgePairInfo info;
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(cGraph[entrance].edgeId, cGraph[exit].edgeId, info));
         if(info.common == 0) {
+            if(debug) {
+                cout << "This superbubble will not be removed because "
+                    "there are no common oriented reads betwene the entrance and the exit." << endl;
+            }
             continue;
         }
         if(info.offsetInBases > int64_t(maxOffset2)) {
+            if(debug) {
+                cout << "This superbubble will not be removed because offsetInBases is " <<
+                    info.offsetInBases << endl;
+            }
             continue;
         }
 
-        // cout << "This superbubble will be removed." << endl;
+        if(debug) {
+            cout << "This superbubble will be removed." << endl;
+        }
 
         // Remove all vertices and edges internal to the superbubble.
         for(const vertex_descriptor cv: superbubble) {
@@ -1182,6 +1214,15 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
             }
         }
         for(const edge_descriptor ce: entranceToExitEdges) {
+            boost::remove_edge(ce, cGraph);
+        }
+        vector<edge_descriptor> exitToEntranceEdges;
+        BGL_FORALL_OUTEDGES(exit, ce, cGraph, CompressedPathGraph1B) {
+            if(target(ce, cGraph) == entrance) {
+                exitToEntranceEdges.push_back(ce);
+            }
+        }
+        for(const edge_descriptor ce: exitToEntranceEdges) {
             boost::remove_edge(ce, cGraph);
         }
 
@@ -2424,7 +2465,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubble(
 {
     CompressedPathGraph1B& cGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
-    const bool debug = true;
+    const bool debug = false;
 
     if(debug) {
         cout << "Found a superbubble with " << superbubble.size() <<
@@ -2738,7 +2779,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubbleGeneral(
 {
     CompressedPathGraph1B& cGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
-    const bool debug = true;
+    const bool debug = false;
 
     if(debug) {
         cout << "General detangling of a superbubble with " << superbubble.size() <<
