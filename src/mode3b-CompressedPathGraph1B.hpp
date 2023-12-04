@@ -51,6 +51,7 @@ namespace shasta {
         class PathGraph1;
     }
     class Assembler;
+    class OrientedReadId;
 }
 
 
@@ -420,11 +421,13 @@ private:
     // Phasing of bubble chains.
     void phaseBubbleChains(
         bool debug,
+        uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
         uint64_t lowThreshold,
         uint64_t highThreshold,
         uint64_t longBubbleThreshold);
     void phaseBubbleChain(
         edge_descriptor e,
+        uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
         uint64_t lowThreshold,
         uint64_t highThreshold,
         uint64_t longBubbleThreshold,
@@ -442,6 +445,28 @@ private:
             uint64_t& maxDiscordant,
             uint64_t& total) const;
     };
+
+
+    // Compute the tangle matrix between two incoming chains
+    // and two outgoing chains, taking into account up to
+    // n MarkergraphEdgeIds for each Chain.
+    void computeTangleMatrix(
+        const array<const Chain*, 2> inChains,
+        const array<const Chain*, 2> outChains,
+        uint64_t n,
+        TangleMatrix&) const;
+
+    // Gather OrientedReadIds from up to n MarkergraphEdgeIds
+    // near the beginning or end of a chain.
+    void gatherOrientedReadIdsAtBeginning(
+        const Chain&,
+        uint64_t n,
+        vector<OrientedReadId>&) const;
+    void gatherOrientedReadIdsAtEnd(
+        const Chain&,
+        uint64_t n,
+        vector<OrientedReadId>&) const;
+
 
 
     // A PhasedComponent is a set of phased diploid bubbles

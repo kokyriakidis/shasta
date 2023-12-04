@@ -181,10 +181,10 @@ void CompressedPathGraph1B::run(
     detangleVerticesGeneral(false, 1, detangleToleranceHigh);
     compress();
 
-    phaseBubbleChains(false, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
     compress();
 
-    phaseBubbleChains(false, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
     compress();
 
     detangleShortSuperbubbles(100000, 1, detangleToleranceHigh);
@@ -193,29 +193,35 @@ void CompressedPathGraph1B::run(
     detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
     compress();
 
-    phaseBubbleChains(false, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
     compress();
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(false, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
     compress();
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(false, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
     compress();
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(false, 1, 4, longBubbleThreshold);
+    phaseBubbleChains(false, 1, 1, 4, longBubbleThreshold);
     compress();
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
+
+    write("A");
+    writeGfaExpanded("A", false);
+    phaseBubbleChains(true, 10, 1, 4, longBubbleThreshold);
+    write("B");
+    writeGfaExpanded("B", false);
 
     // Before final output, renumber the edges contiguously and assemble sequence.
     // renumberEdges();
@@ -3198,6 +3204,7 @@ bool CompressedPathGraph1B::detangleBackEdge(
 
 void CompressedPathGraph1B::phaseBubbleChains(
     bool debug,
+    uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
     uint64_t lowThreshold,
     uint64_t highThreshold,
     uint64_t longBubbleThreshold)
@@ -3210,7 +3217,7 @@ void CompressedPathGraph1B::phaseBubbleChains(
     }
 
     for(const edge_descriptor ce: allEdges) {
-        phaseBubbleChain(ce, lowThreshold, highThreshold, longBubbleThreshold, debug);
+        phaseBubbleChain(ce, n, lowThreshold, highThreshold, longBubbleThreshold, debug);
     }
 }
 
@@ -3218,6 +3225,7 @@ void CompressedPathGraph1B::phaseBubbleChains(
 
 void CompressedPathGraph1B::phaseBubbleChain(
     edge_descriptor ce,
+    uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
     uint64_t lowThreshold,
     uint64_t highThreshold,
     uint64_t longBubbleThreshold,
@@ -3302,13 +3310,20 @@ void CompressedPathGraph1B::phaseBubbleChain(
 
             // Compute the tangle matrix.
             TangleMatrix tangleMatrix;
-            for(uint64_t j0=0; j0<2; j0++) {
-                for(uint64_t j1=0; j1<2; j1++) {
-                    MarkerGraphEdgePairInfo info;
-                    SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
-                        edges0[j0], edges1[j1], info));
-                    tangleMatrix[j0][j1] = info.common;
+            if(n == 1) {
+                for(uint64_t j0=0; j0<2; j0++) {
+                    for(uint64_t j1=0; j1<2; j1++) {
+                        MarkerGraphEdgePairInfo info;
+                        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
+                            edges0[j0], edges1[j1], info));
+                        tangleMatrix[j0][j1] = info.common;
+                    }
                 }
+            } else {
+                computeTangleMatrix(
+                    {&chain00, &chain01},
+                    {&chain10, &chain11},
+                    n, tangleMatrix);
             }
 
             // Analyze the tangle matrix.
@@ -3325,7 +3340,7 @@ void CompressedPathGraph1B::phaseBubbleChain(
                 total);
 
             if(detailedDebug) {
-                cout << "Tangle matrix: " <<
+                cout << "Tangle matrix " << i0 << " " << i1 << ": " <<
                     tangleMatrix[0][0] << " " <<
                     tangleMatrix[0][1] << " " <<
                     tangleMatrix[1][0] << " " <<
@@ -3467,6 +3482,113 @@ void CompressedPathGraph1B::phaseBubbleChain(
     newBubbleChain.compress();
     bubbleChain = newBubbleChain;
 }
+
+
+
+// Compute the tangle matrix between two incoming chains
+// and two outgoing chains, taking into account up to
+// n MarkergraphEdgeIds for each Chain.
+void CompressedPathGraph1B::computeTangleMatrix(
+    const array<const Chain*, 2> inChains,
+    const array<const Chain*, 2> outChains,
+    uint64_t n,
+    TangleMatrix& tangleMatrix) const
+{
+    // Gather the OrientedReadIds near the end of the inChains.
+    array<vector<OrientedReadId>, 2> allOrientedReadIdsIn;
+    for(uint64_t i=0; i<2; i++) {
+        gatherOrientedReadIdsAtEnd(*inChains[i], n, allOrientedReadIdsIn[i]);
+
+    }
+
+    // Gather the OrientedReadIds near the beginning of the outChains.
+    array<vector<OrientedReadId>, 2> allOrientedReadIdsOut;
+    for(uint64_t i=0; i<2; i++) {
+        gatherOrientedReadIdsAtBeginning(*outChains[i], n, allOrientedReadIdsOut[i]);
+    }
+
+    // Discard OrientedReadIds that appear in both inChains.
+    array<vector<OrientedReadId>, 2> orientedReadIdsIn;
+    for(uint64_t i=0; i<2; i++) {
+        std::set_difference(
+            allOrientedReadIdsIn[i]  .begin(), allOrientedReadIdsIn[i]  .end(),
+            allOrientedReadIdsIn[1-i].begin(), allOrientedReadIdsIn[1-i].end(),
+            back_inserter(orientedReadIdsIn[i]));
+    }
+
+    // Discard OrientedReadIds that appear in both outChains.
+    array<vector<OrientedReadId>, 2> orientedReadIdsOut;
+    for(uint64_t i=0; i<2; i++) {
+        std::set_difference(
+            allOrientedReadIdsOut[i]  .begin(), allOrientedReadIdsOut[i]  .end(),
+            allOrientedReadIdsOut[1-i].begin(), allOrientedReadIdsOut[1-i].end(),
+            back_inserter(orientedReadIdsOut[i]));
+    }
+
+    // Now we can compute the tangle matrix.
+    vector<OrientedReadId> commonOrientedReads;
+    for(uint64_t i0=0; i0<2; i0++) {
+        for(uint64_t i1=0; i1<2; i1++) {
+            commonOrientedReads.clear();
+            set_intersection(
+                orientedReadIdsIn[i0] .begin(), orientedReadIdsIn[i0] .end(),
+                orientedReadIdsOut[i1].begin(), orientedReadIdsOut[i1].end(),
+                back_inserter(commonOrientedReads));
+            tangleMatrix[i0][i1] = commonOrientedReads.size();
+        }
+    }
+}
+
+
+
+// Gather OrientedReadIds from up to n MarkergraphEdgeIds
+// near the end of a chain.
+void CompressedPathGraph1B::gatherOrientedReadIdsAtEnd(
+    const Chain& chain,
+    uint64_t n,
+    vector<OrientedReadId>& orientedReadIds) const
+{
+
+    const uint64_t last = chain.size() - 2;                     // Exclude last MarkergraphEdgeId.
+    const uint64_t first = (last > (n-1)) ? last + 1 - n : 0;   // Use up to n.
+
+    orientedReadIds.clear();
+    for(uint64_t i=first; i<=last; i++) {
+        const MarkerGraphEdgeId markerGraphEdgeId = chain[i];
+        const auto& markerIntervals =
+            assembler.markerGraph.edgeMarkerIntervals[markerGraphEdgeId];
+        for(const MarkerInterval& markerInterval: markerIntervals) {
+            orientedReadIds.push_back(markerInterval.orientedReadId);
+        }
+    }
+    deduplicate(orientedReadIds);
+}
+
+
+
+// Gather OrientedReadIds from up to n MarkergraphEdgeIds
+// near the beginning of a chain.
+void CompressedPathGraph1B::gatherOrientedReadIdsAtBeginning(
+    const Chain& chain,
+    uint64_t n,
+    vector<OrientedReadId>& orientedReadIds) const
+{
+
+    const uint64_t first = 1;   // / Exclude first MarkergraphEdgeId.
+    const uint64_t last = (chain.size() > (n+1)) ? n : chain.size();
+
+    orientedReadIds.clear();
+    for(uint64_t i=first; i<=last; i++) {
+        const MarkerGraphEdgeId markerGraphEdgeId = chain[i];
+        const auto& markerIntervals =
+            assembler.markerGraph.edgeMarkerIntervals[markerGraphEdgeId];
+        for(const MarkerInterval& markerInterval: markerIntervals) {
+            orientedReadIds.push_back(markerInterval.orientedReadId);
+        }
+    }
+    deduplicate(orientedReadIds);
+}
+
 
 
 // To phase the PhasingGraph, we create an optimal spanning tree
