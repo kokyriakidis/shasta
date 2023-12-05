@@ -527,7 +527,11 @@ private:
 
     // Sequence assembly.
     void assembleChains(uint64_t threadCount0, uint64_t threadCount1);
-    void assembleChain(Chain&, uint64_t threadCount1) const;
+    void assembleChain(
+        Chain&,
+        uint64_t threadCount1,
+        const string& chainName,
+        ostream& csv) const;
 
 
     // Output.

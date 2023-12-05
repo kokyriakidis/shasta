@@ -224,13 +224,13 @@ void CompressedPathGraph1B::run(
     writeGfaExpanded("B", false);
 
     // Before final output, renumber the edges contiguously and assemble sequence.
-    // renumberEdges();
-    // assembleChains(threadCount0, threadCount1);
+    renumberEdges();
+    assembleChains(threadCount0, threadCount1);
 
     // Final output.
     write("Final");
-    writeGfaExpanded("Final", false);
-    // writeFastaExpanded("Final");
+    writeGfaExpanded("Final", true);
+    writeFastaExpanded("Final");
 }
 
 
@@ -4312,17 +4312,22 @@ void CompressedPathGraph1B::assembleChains(
     uint64_t threadCount1)
 {
     CompressedPathGraph1B& cGraph = *this;
+
+    ofstream csv("ChainsAssemblyDetails.csv");
     cout << timestamp << "Assembling sequence." << endl;
 
     // ****** THIS SHOULD BE MADE MULTITHREADED USING threadCount0 threads.
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
         BubbleChain& bubbleChain = cGraph[ce];
-        for(Bubble& bubble: bubbleChain) {
-            for(Chain& chain: bubble) {
-                assembleChain(chain, threadCount1);
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size();
+            positionInBubbleChain++)  {
+            Bubble& bubble = bubbleChain[positionInBubbleChain];
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                Chain& chain = bubble[indexInBubble];
+                const string chainName = chainStringId(ce, positionInBubbleChain, indexInBubble);
+                assembleChain(chain, threadCount1, chainName, csv);
             }
         }
-
     }
     cout << timestamp << "Done assembling sequence." << endl;
 }
@@ -4330,7 +4335,11 @@ void CompressedPathGraph1B::assembleChains(
 
 
 // Assemble sequence for a Chain.
-void CompressedPathGraph1B::assembleChain(Chain& chain, uint64_t threadCount1) const
+void CompressedPathGraph1B::assembleChain(
+    Chain& chain,
+    uint64_t threadCount1,
+    const string& chainName,
+    ostream& csv) const
 {
 
     vector<MarkerGraphEdgePairInfo> infos(chain.size() - 1);
@@ -4343,6 +4352,7 @@ void CompressedPathGraph1B::assembleChain(Chain& chain, uint64_t threadCount1) c
 
     AssemblyPath assemblyPath(assembler, chain, infos, threadCount1);
     assemblyPath.getSequence(chain.sequence);
+    assemblyPath.writeCsv(csv, chainName);
 }
 
 

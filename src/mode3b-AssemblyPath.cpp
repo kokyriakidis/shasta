@@ -241,7 +241,6 @@ void AssemblyPath::writeFasta(ostream& fasta, const string& name) const
 
 void AssemblyPath::writeCsv(ostream& csv, const string& name) const
 {
-    csv << "Name,Step,EdgeId,Begin,End,Length,\n";
 
     uint64_t positionBegin = 0;
 
