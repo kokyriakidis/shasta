@@ -1076,9 +1076,8 @@ bool Assembler::analyzeMarkerGraphEdgePair(
     }
 
     // Compute the estimated offsets.
-    info.offsetInMarkers = uint64_t(std::round(double(sumMarkerOffsets) / double(info.common)));
-    info.offsetInBases = uint64_t(0.5 * std::round(double(sumTwiceBaseOffsets) / double(info.common)));
-
+    info.offsetInMarkers = int64_t(std::round(double(sumMarkerOffsets) / double(info.common)));
+    info.offsetInBases = int64_t(0.5 * std::round(double(sumTwiceBaseOffsets) / double(info.common)));
 
     // Now do the joint loop again, and count the onlyA and onlyB oriented reads
     // that are too short to appear in the other edge.
