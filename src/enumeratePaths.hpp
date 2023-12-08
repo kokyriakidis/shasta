@@ -5,6 +5,7 @@
 #include <boost/graph/iteration_macros.hpp>
 
 #include "algorithm.hpp"
+#include "iostream.hpp"
 #include <stack>
 #include "tuple.hpp"
 #include "utility.hpp"
@@ -40,6 +41,20 @@ namespace shasta {
         uint64_t pathLength,
         PathInspector&,
         vector<typename G::edge_descriptor>& path);
+
+    // Similar to the above, but for paths of any length beginning at vA and ending at vB.
+    template<class G, class PathInspector> void enumeratePathsBetween(
+        const G&,
+        typename G::vertex_descriptor vA,
+        typename G::vertex_descriptor vB,
+        PathInspector&);
+    template<class G, class PathInspector> void enumeratePathsBetweenRecursive(
+        const G&,
+        typename G::vertex_descriptor vA,
+        typename G::vertex_descriptor vB,
+        PathInspector&,
+        vector<typename G::edge_descriptor>& path);
+
 
     void testEnumeratePaths();
 }
@@ -166,5 +181,39 @@ template<class G, class PathInspector> void shasta::enumeratePathsReverseRecursi
         path.pop_back();
     }
 }
+
+
+// In a directed graph of type G,
+// enumerate all paths of any length starting at vA ending at vB.
+// For each path found, apply the given function object by calling
+// functionObject(path), where path is a vector<G::edge_descriptor>
+template<class G, class PathInspector> void shasta::enumeratePathsBetween(
+    const G& g,
+    typename G::vertex_descriptor vA,
+    typename G::vertex_descriptor vB,
+    PathInspector& pathInspector)
+{
+    vector<typename G::edge_descriptor> path;
+    enumeratePathsBetweenRecursive(g, vA, vB, pathInspector, path);
+}
+template<class G, class PathInspector> void shasta::enumeratePathsBetweenRecursive(
+    const G& g,
+    typename G::vertex_descriptor vA,
+    typename G::vertex_descriptor vB,
+    PathInspector& pathInspector,
+    vector<typename G::edge_descriptor>& path)
+{
+    BGL_FORALL_OUTEDGES_T(vA, e, g, G) {
+        path.push_back(e);
+        typename G::vertex_descriptor vC = target(e, g);
+        if(vC == vB) {
+            pathInspector(path);
+        } else {
+            enumeratePathsBetweenRecursive(g, vC, vB, pathInspector, path);
+        }
+        path.pop_back();
+    }
+}
+
 #endif
 

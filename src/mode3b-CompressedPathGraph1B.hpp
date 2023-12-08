@@ -525,6 +525,20 @@ private:
         vector< shared_ptr<PhasedComponent> > phasedComponents;
     };
 
+    // Optimize chains before assembly, to remove assembly steps with
+    // less that minCommon reads.
+    void optimizeChains(
+        bool debug,
+        uint64_t minCommon,
+        uint64_t k
+        );
+    void optimizeChain(
+        bool debug,
+        Chain&,
+        uint64_t minCommon,
+        uint64_t k
+        );
+
     // Sequence assembly.
     void assembleChains(uint64_t threadCount0, uint64_t threadCount1);
     void assembleChain(

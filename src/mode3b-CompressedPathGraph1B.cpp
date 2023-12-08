@@ -4,6 +4,8 @@
 #include "mode3b-PathGraph1.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
+#include "dominatorTree.hpp"
+#include "enumeratePaths.hpp"
 #include "findLinearChains.hpp"
 #include "orderPairs.hpp"
 #include "timestamp.hpp"
@@ -159,6 +161,9 @@ void CompressedPathGraph1B::run(
     const uint64_t phasingThresholdLow = 1;
     const uint64_t phasingThresholdHigh = 6;
     const uint64_t longBubbleThreshold = 5000;
+    const uint64_t optimizeChainsMinCommon = 3;
+    const uint64_t optimizeChainsK = 6;
+
 
     write("Initial");
 
@@ -217,14 +222,21 @@ void CompressedPathGraph1B::run(
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
+    phaseBubbleChains(true, 10, 1, 4, longBubbleThreshold);
+
+    // Before final output, renumber the edges contiguously.
+    renumberEdges();
+
+    // Optimize the chains and assemble sequence.
     write("A");
     writeGfaExpanded("A", false);
-    phaseBubbleChains(true, 10, 1, 4, longBubbleThreshold);
+    optimizeChains(
+        true,
+        optimizeChainsMinCommon,
+        optimizeChainsK);
     write("B");
     writeGfaExpanded("B", false);
 
-    // Before final output, renumber the edges contiguously and assemble sequence.
-    renumberEdges();
     assembleChains(threadCount0, threadCount1);
 
     // Final output.
@@ -982,6 +994,9 @@ uint64_t CompressedPathGraph1B::chainOffset(const Chain& chain) const
 
         MarkerGraphEdgePairInfo info;
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+        if(info.common == 0) {
+            cout << "No common oriented reads for " << edgeId0 << " " << edgeId1 << endl;
+        }
         SHASTA_ASSERT(info.common > 0);
         if(info.offsetInBases > 0) {
             offset += info.offsetInBases;
@@ -4584,4 +4599,354 @@ void CompressedPathGraph1B::load(const string& fileName)
     ifstream file(fileName);
     boost::archive::binary_iarchive archive(file);
     archive >> *this;
+}
+
+
+
+// Optimize chains before assembly, to remove assembly steps with
+// less that minCommon reads.
+void CompressedPathGraph1B::optimizeChains(
+    bool debug,
+    uint64_t minCommon,
+    uint64_t k)
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
+        BubbleChain& bubbleChain = cGraph[ce];
+
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            Bubble& bubble = bubbleChain[positionInBubbleChain];
+            const uint64_t ploidy = bubble.size();
+
+            for(uint64_t indexInBubble=0; indexInBubble<ploidy; indexInBubble++) {
+                Chain& chain = bubble[indexInBubble];
+                SHASTA_ASSERT(chain.size() >= 2);
+
+                if(debug) {
+                    cout << "Optimizing chain " << chainStringId(ce, positionInBubbleChain, indexInBubble) << endl;
+                }
+                optimizeChain(debug, chain, minCommon, k);
+            }
+        }
+    }
+
+}
+
+
+
+// Optimize a chain before assembly, to remove assembly steps with
+// less that minCommon reads.
+void CompressedPathGraph1B::optimizeChain(
+    bool debug,
+    Chain& chain,
+    uint64_t minCommon,
+    uint64_t k)
+{
+    if(debug) {
+        cout << "Optimizing a chain of length " << chain.size() << endl;
+    }
+    SHASTA_ASSERT(chain.size() >= 2);
+
+
+    // A directed graph describing the initial and final chains.
+    // Each vertex stores a MarkerGraphEdgeId.
+    // Each edge stores the number of common oriented reads.
+    class ChainGraphVertex {
+    public:
+        MarkerGraphEdgeId edgeId;
+        uint64_t immediateDominator = invalid<uint64_t>;
+    };
+    class ChainGraphEdge {
+    public:
+        uint64_t commonCount;
+        bool keep = false;
+    };
+    using ChainGraphBaseClass = boost::adjacency_list<
+        boost::listS,
+        boost::vecS,
+        boost::bidirectionalS,
+        ChainGraphVertex,
+        ChainGraphEdge>;
+    class ChainGraph : public ChainGraphBaseClass {
+    public:
+    };
+    ChainGraph chainGraph;
+
+    class PathInspector {
+    public:
+        PathInspector(ChainGraph& chainGraph, bool debug) : chainGraph(chainGraph), debug(debug) {}
+        ChainGraph& chainGraph;
+        bool debug;
+        using Path = vector<ChainGraph::edge_descriptor>;
+        Path bestPath;
+        uint64_t bestPathMinCommonCount = 0;
+        void operator()(const Path& path)
+        {
+            // Compute the minimum number of common oriented reads over edges of this path.
+            uint64_t minCommonCount = invalid<uint64_t>;
+            for(const ChainGraph::edge_descriptor e: path) {
+                minCommonCount = min(minCommonCount, chainGraph[e].commonCount);
+            }
+
+            if(debug) {
+                cout << "Path with minCommonCount " << minCommonCount << ":";
+                for(const ChainGraph::edge_descriptor e: path) {
+                    cout << " " << source(e, chainGraph);
+                }
+                cout << " " << target(path.back(), chainGraph) << "\n";
+            }
+
+            // A Path is better if it has a higher minCommonCount or
+            // it has the same minCommonCount and is longer.
+            //
+            if( (minCommonCount >  bestPathMinCommonCount) or
+                (minCommonCount == bestPathMinCommonCount and path.size() > bestPath.size())) {
+                bestPath = path;
+                bestPathMinCommonCount = minCommonCount;
+            }
+        }
+
+    };
+
+    // Construct the initial ChainGraph.
+
+    // Add the vertices.
+    // We are using vecS as the second template argument for ChainGraph,
+    // so positions in the chain are also vertex descriptors in the ChainGraph.
+    for(const MarkerGraphEdgeId edgeId: chain) {
+        add_vertex({edgeId}, chainGraph);
+    }
+
+    // Add the edges that correspond to the initial Chain.
+    for(uint64_t i1=1; i1<chain.size(); i1++) {
+        const uint64_t i0 = i1 - 1;
+        const MarkerGraphEdgeId edgeId0 = chainGraph[i0].edgeId;
+        const MarkerGraphEdgeId edgeId1 = chainGraph[i1].edgeId;
+        MarkerGraphEdgePairInfo info;
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+        add_edge(i0, i1, {info.common}, chainGraph);
+    }
+
+
+
+    // Add edges that skip around any edges with less than minCommon common oriented reads.
+    uint64_t totalAddedEdgesCount = 0;
+    uint64_t totalRemovedEdgesCount = 0;
+    for(uint64_t i1=1; i1<chain.size(); i1++) {
+        const uint64_t i0 = i1 - 1;
+        ChainGraph::edge_descriptor e;
+        bool edgeWasFound = false;
+        tie(e, edgeWasFound) = edge(i0, i1, chainGraph);
+        SHASTA_ASSERT(edgeWasFound);
+
+        // If this edge has enough common reads, don't do anything.
+        if(chainGraph[e].commonCount >= minCommon) {
+            continue;
+        }
+
+        if(debug) {
+            cout << i0 << "->" << i1 << " " << chainGraph[i0].edgeId << "->" << chainGraph[i1].edgeId <<
+                " has " << chainGraph[e].commonCount << " common oriented reads, adding edges to skip it." << endl;
+        }
+
+        // Loop over pairs of predecessors of v0 and successors of v1.
+        uint64_t addedEdgesCount = 0;
+        for(uint64_t j0=i0; j0>=i0-k; j0--) {
+            for(uint64_t j1=i1; j1<=i1+k; j1++) {
+                if(j1 >= chain.size()) {
+                    break;
+                }
+                if(j0==i0 and j1 == i1) {
+                    // We already have the edge between v0 and v1.
+                    continue;
+                }
+                MarkerGraphEdgePairInfo info;
+                SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(chainGraph[j0].edgeId, chainGraph[j1].edgeId, info));
+
+                // If the number of common reads is better than for e, add this edge.
+                if(info.common > chainGraph[e].commonCount) {
+                    add_edge(j0, j1, {info.common}, chainGraph);
+                    ++addedEdgesCount;
+                    cout << " Added " << j0 << "->" << j1 << " " << chainGraph[j0].edgeId << "->" << chainGraph[j1].edgeId <<
+                        " with " << info.common << " common oriented reads." << endl;
+                }
+            }
+
+            if(j0 == 0) {
+                break;
+            }
+        }
+        totalAddedEdgesCount += addedEdgesCount;
+
+        // If we added any edges skipping e, we can remove e.
+        if(addedEdgesCount > 0) {
+            cout << "Removed " << i0 << "->" << i1 << " " << chainGraph[i0].edgeId << "->" << chainGraph[i1].edgeId <<
+                " with " << chainGraph[e].commonCount << " common oriented reads." << endl;
+            boost::remove_edge(e, chainGraph);
+            ++totalRemovedEdgesCount;
+        } else {
+            if(debug) {
+                cout << "Did not find any suitable replacement edges." << endl;
+            }
+        }
+    }
+
+
+    // If we did not add or remove any edges, leave this Chain alone.
+    if(totalAddedEdgesCount == 0) {
+        SHASTA_ASSERT(totalRemovedEdgesCount == 0);
+        if(debug) {
+            cout << "No edges were added or removed, so this Chain will be left unchanged." << endl;
+        }
+        return;
+    }
+
+    if(debug) {
+        cout << "This chain will be optimized." << endl;
+    }
+
+
+
+    // To find the optimized chain, we want to do path enumeration on the ChainGraph,
+    // looking for paths that only use edges with large numbers of common oriented reads.
+    // Specifically, we use as the new chain the path that maximizes the minimum
+    // number of common oriented reads encountered on edges along the path.
+    // For efficiency of the path enumeration, we compute a dominator tree
+    // for the ChainGraph, with entrance at the beginning of the chain.
+    // The unique path on that tree from the entrance to the exit
+    // divides the graph in segments, and we can do path enumeration on one segment at a time.
+    shasta::lengauer_tarjan_dominator_tree(chainGraph, 0,
+        boost::get(&ChainGraphVertex::immediateDominator, chainGraph));
+
+    // The unique path on the dominator tree from the entrance to the exit.
+    vector<ChainGraph::vertex_descriptor> dominatorTreePath;
+    ChainGraph::vertex_descriptor v = chain.size() - 1;
+    while(true) {
+        dominatorTreePath.push_back(v);
+        if(v == 0) {
+            break;
+        }
+        v = chainGraph[v].immediateDominator;
+        if(v == invalid<uint64_t>) {
+            cout << "Assertion failure at " << v << endl;
+        }
+        SHASTA_ASSERT(v != invalid<uint64_t>);
+    }
+    if(debug) {
+        cout << "Dominator tree path length " << dominatorTreePath.size() << endl;
+    }
+    reverse(dominatorTreePath.begin(), dominatorTreePath.end());
+
+    if(false) {
+        cout << "Dominator tree path:" << endl;
+        for(uint64_t i=0; i<dominatorTreePath.size(); i++) {
+            const uint64_t v = dominatorTreePath[i];
+            cout << i << "," << v << "," << chainGraph[v].edgeId << "\n";
+        }
+    }
+
+
+
+    // The dominator tree path divides the graph in segments,
+    // and we can do path enumeration on one segment at a time.
+    // For each segment we find the best path and mark the edges on that
+    // best path as to be kept in the final chain.
+    for(uint64_t i1=1; i1<dominatorTreePath.size(); i1++) {
+        const uint64_t i0 = i1 - 1;
+        const ChainGraph::vertex_descriptor v0 = dominatorTreePath[i0];
+        const ChainGraph::vertex_descriptor v1 = dominatorTreePath[i1];
+
+        // Fast handling of the most common case.
+        if(v1 == v0+1 and out_degree(v0, chainGraph)==1 and in_degree(v1, chainGraph)==1) {
+            ChainGraph::edge_descriptor e;
+            bool edgeWasFound = true;
+            tie(e, edgeWasFound) = edge(v0, v1, chainGraph);
+            if(edgeWasFound) {
+                chainGraph[e].keep = true;
+                continue;
+            }
+        }
+
+        // If getting here, we have to do path enumeration.
+        if(debug) {
+            cout << "Starting path enumeration between " << v0 << " " << v1 << endl;
+        }
+
+        // Enumerate paths starting at v0 and ending at v1.
+        PathInspector pathInspector(chainGraph, debug);
+        enumeratePathsBetween(chainGraph, v0, v1, pathInspector);
+
+        if(debug) {
+            if(debug) {
+                cout << "The best path has minCommonCount " << pathInspector.bestPathMinCommonCount << ":";
+                for(const ChainGraph::edge_descriptor e: pathInspector.bestPath) {
+                    cout << " " << source(e, chainGraph);
+                }
+                cout << " " << target(pathInspector.bestPath.back(), chainGraph) << "\n";
+            }
+        }
+
+        // Mark as to be kept all edges on the best path.
+        for(const ChainGraph::edge_descriptor e: pathInspector.bestPath) {
+            chainGraph[e].keep = true;
+        }
+    }
+
+
+    // Remove all edges not marked to be kept.
+    vector<ChainGraph::edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, chainGraph, ChainGraph) {
+        if(not chainGraph[e].keep) {
+            edgesToBeRemoved.push_back(e);
+        }
+    }
+    for(const ChainGraph::edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, chainGraph);
+    }
+
+    // The remaining edges should form a path in the ChainGraph
+    // which defines the optimized Chain.
+    SHASTA_ASSERT(in_degree(0, chainGraph) == 0);
+    SHASTA_ASSERT(out_degree(0, chainGraph) == 1);
+    SHASTA_ASSERT(in_degree(chain.size()-1, chainGraph) == 1);
+    SHASTA_ASSERT(out_degree(chain.size()-1, chainGraph) == 0);
+    for(uint64_t i=1; i<chain.size()-1; i++) {
+        const uint64_t inDegree = in_degree(i, chainGraph);
+        const uint64_t outDegree = out_degree(i, chainGraph);
+        SHASTA_ASSERT(
+            (inDegree==1 and outDegree==1) or   // In the new chain.
+            (inDegree==0 and outDegree==0)      // Now isolated.
+            );
+    }
+
+    // Find the path from the entrance to the exit in the update ChainGraph.
+    vector<uint64_t> newPath;
+    v = 0;
+    while(true) {
+        newPath.push_back(v);
+        if(v == chain.size()-1) {
+            break;
+        }
+
+        // Move forward.
+        SHASTA_ASSERT(out_degree(v, chainGraph) == 1);
+        ChainGraph::out_edge_iterator it;
+        tie(it, ignore) = out_edges(v, chainGraph);
+        const ChainGraph::edge_descriptor e = *it;
+        v = target(e, chainGraph);
+    }
+
+    // Sanity check that the path is moving forward.
+    for(uint64_t i=1; i<newPath.size(); i++) {
+        SHASTA_ASSERT(newPath[i] > newPath[i-1]);
+    }
+
+    // Construct the new Chain.
+    chain.clear();
+    chain.sequence.clear();
+    for(const uint64_t v: newPath) {
+        chain.push_back(chainGraph[v].edgeId);
+    }
+
 }
