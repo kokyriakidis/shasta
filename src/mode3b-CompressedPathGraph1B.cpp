@@ -222,20 +222,16 @@ void CompressedPathGraph1B::run(
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(true, 10, 1, 4, longBubbleThreshold);
+    phaseBubbleChains(false, 10, 1, 4, longBubbleThreshold);
 
     // Before final output, renumber the edges contiguously.
     renumberEdges();
 
     // Optimize the chains and assemble sequence.
-    write("A");
-    writeGfaExpanded("A", false);
     optimizeChains(
-        true,
+        false,
         optimizeChainsMinCommon,
         optimizeChainsK);
-    write("B");
-    writeGfaExpanded("B", false);
 
     assembleChains(threadCount0, threadCount1);
 
@@ -3567,6 +3563,9 @@ void CompressedPathGraph1B::gatherOrientedReadIdsAtEnd(
     const uint64_t last = chain.size() - 2;                     // Exclude last MarkergraphEdgeId.
     const uint64_t first = (last > (n-1)) ? last + 1 - n : 0;   // Use up to n.
 
+    SHASTA_ASSERT(first < chain.size());
+    SHASTA_ASSERT(last < chain.size());
+
     orientedReadIds.clear();
     for(uint64_t i=first; i<=last; i++) {
         const MarkerGraphEdgeId markerGraphEdgeId = chain[i];
@@ -3590,7 +3589,10 @@ void CompressedPathGraph1B::gatherOrientedReadIdsAtBeginning(
 {
 
     const uint64_t first = 1;   // / Exclude first MarkergraphEdgeId.
-    const uint64_t last = (chain.size() > (n+1)) ? n : chain.size();
+    const uint64_t last = (chain.size() > (n+1)) ? n : chain.size() - 1;
+
+    SHASTA_ASSERT(first < chain.size());
+    SHASTA_ASSERT(last < chain.size());
 
     orientedReadIds.clear();
     for(uint64_t i=first; i<=last; i++) {
