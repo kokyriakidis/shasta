@@ -49,7 +49,7 @@ void GlobalPathGraph1::assemble2(
     const uint64_t transitiveReductionMaxCoverage = 100;
     const uint64_t crossEdgesLowCoverageThreshold = 2;
     const uint64_t crossEdgesHighCoverageThreshold = 6;
-    const uint64_t crossEdgesMinOffset = 1000;
+    const uint64_t crossEdgesMinOffset = 0;
 
 
     GlobalPathGraph1 graph(assembler);
@@ -87,6 +87,18 @@ void GlobalPathGraph1::assemble2(
 {
     cout << "Assembly begins for connected component " << componentId << endl;
     PathGraph1& component = *components[componentId];
+
+    // Graphviz output.
+    if(true) {
+        GlobalPathGraph1DisplayOptions options;
+        options.showNonTransitiveReductionEdges = true;
+        component.writeGraphviz(verticesVector,
+            "PathGraphInitial" + to_string(componentId), options);
+        options.makeCompact();
+        component.writeGraphviz(verticesVector,
+            "PathGraphCompactInitial" + to_string(componentId), options);
+    }
+
 
     // Local transitive reduction.
     component.localTransitiveReduction(

@@ -2312,10 +2312,13 @@ void GlobalPathGraph1::writeConnectors(const vector<ChainConnector>& connectors)
 
 // Remove cross-edges.
 // This removes an edge v0->v1 if the following are all true:
+// - It is not marked as removed by transitive reduction.
 // - Its coverage is at most lowCoverageThreshold.
 // - Its estimated offset is at least minOffset.
-// - v0 has at least one out-edge with coverage at least highCoverageThreshold.
+// - v0 has at least one out-edge with coverage at least highCoverageThreshold
+//   (ignoring edges marked as removed by transitive reduction).
 // - v1 has at least one in-edge with coverage at least highCoverageThreshold.
+//   (ignoring edges marked as removed by transitive reduction).
 void PathGraph1::removeCrossEdges(
     uint64_t lowCoverageThreshold,
     uint64_t highCoverageThreshold,
@@ -2327,6 +2330,11 @@ void PathGraph1::removeCrossEdges(
     vector<edge_descriptor> edgesToBeRemoved;
     BGL_FORALL_EDGES(e, graph, PathGraph1) {
         const PathGraph1Edge& edge = graph[e];
+
+        // If it is marked as removed by transitive reduction, skip it.
+        if(edge.isNonTransitiveReductionEdge) {
+            continue;
+        }
 
         // Check coverage.
         if(edge.coverage > lowCoverageThreshold) {
@@ -2342,6 +2350,10 @@ void PathGraph1::removeCrossEdges(
         const vertex_descriptor v0 = source(e, graph);
         bool v0HasStrongOutEdge = false;
         BGL_FORALL_OUTEDGES(v0, e0, graph, PathGraph1) {
+            // If it is marked as removed by transitive reduction, ignore it.
+            if(graph[e0].isNonTransitiveReductionEdge) {
+                continue;
+            }
             if(graph[e0].coverage >= highCoverageThreshold) {
                 v0HasStrongOutEdge = true;
                 break;
@@ -2355,6 +2367,10 @@ void PathGraph1::removeCrossEdges(
         const vertex_descriptor v1 = target(e, graph);
         bool v1HasStrongOutEdge = false;
         BGL_FORALL_INEDGES(v1, e1, graph, PathGraph1) {
+            // If it is marked as removed by transitive reduction, ignore it.
+            if(graph[e1].isNonTransitiveReductionEdge) {
+                continue;
+            }
             if(graph[e1].coverage >= highCoverageThreshold) {
                 v1HasStrongOutEdge = true;
                 break;
