@@ -230,6 +230,9 @@ private:
     void run(
         uint64_t threadCount0,
         uint64_t threadCount1);
+    void run1(
+        uint64_t threadCount0,
+        uint64_t threadCount1);
 
     // Initial creation from the PathGraph1.
     // Each linear chain of edges in the PathGraph1 after transitive reduction generates
@@ -325,6 +328,7 @@ private:
         std::map<uint64_t, edge_descriptor>::iterator&,
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
+    bool removeSelfComplementaryEdges();
 
     // Special treatment to detangle back edges that were too long
     // to be handled by detangleEdges.

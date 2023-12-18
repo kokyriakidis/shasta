@@ -32,8 +32,16 @@ void GlobalPathGraph1::assemble2(
     uint64_t threadCount1)
 {
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
+#if 1
+    // For test1-UUL, test2-UUL.
     const uint64_t minPrimaryCoverage = 8;
     const uint64_t maxPrimaryCoverage = 60;
+#else
+    // For test1-EC.
+    const uint64_t minPrimaryCoverage = 6;
+    const uint64_t maxPrimaryCoverage = 40;
+#endif
+
     const uint64_t minEdgeCoverage = 1;
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
@@ -241,6 +249,72 @@ void CompressedPathGraph1B::run(
     writeFastaExpanded("Final");
 }
 
+
+
+// This works well with test1-EC.
+void CompressedPathGraph1B::run1(
+    uint64_t threadCount0,
+    uint64_t threadCount1)
+{
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t detangleToleranceHigh = 3;
+    const uint64_t phasingThresholdLow = 1;
+    const uint64_t phasingThresholdHigh = 6;
+    const uint64_t longBubbleThreshold = 5000;
+
+    write("Initial");
+    writeGfaExpanded("Initial", false);
+
+    removeSelfComplementaryEdges();
+
+    while(true) {
+        const bool detangledSomeVertices = detangleVerticesGeneral(false, 0, detangleToleranceHigh);
+        if(detangledSomeVertices) {
+            compress();
+        }
+
+        const bool detangledSomeEdges =  detangleEdges(0, detangleToleranceHigh);
+        if(detangledSomeEdges) {
+            compress();
+        }
+
+        if(not (detangledSomeVertices or detangledSomeEdges)) {
+            break;
+        }
+    }
+
+
+    for(uint64_t iteration=0; iteration<3; iteration++) {
+        write("A-" + to_string(iteration));
+        writeGfaExpanded("A-" + to_string(iteration), false);
+        detangleShortSuperbubblesGeneral(1000, 0, detangleToleranceHigh);
+        compress();
+    }
+
+    for(uint64_t iteration=0; iteration<3; iteration++) {
+        write("B-" + to_string(iteration));
+        writeGfaExpanded("B-" + to_string(iteration), false);
+        detangleShortSuperbubblesGeneral(10000, 0, detangleToleranceHigh);
+        compress();
+    }
+
+    removeShortSuperbubbles(true, 1000, 3000);
+    compress();
+
+    for(uint64_t iteration=0; iteration<3; iteration++) {
+        write("C-" + to_string(iteration));
+        writeGfaExpanded("C-" + to_string(iteration), false);
+        detangleShortSuperbubblesGeneral(10000, 0, detangleToleranceHigh);
+        compress();
+
+        phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+        compress();
+    }
+
+
+    write("Final");
+    writeGfaExpanded("Final", false);
+}
 
 
 // Initial creation from the PathGraph1.
@@ -1317,7 +1391,6 @@ bool CompressedPathGraph1B::detangleVertices(
 
     if(true) {
         cout << "Detangled " << detangledCount << " vertices." << endl;
-
     }
 
     return detangledCount > 0;
@@ -4951,4 +5024,30 @@ void CompressedPathGraph1B::optimizeChain(
         chain.push_back(chainGraph[v].edgeId);
     }
 
+}
+
+
+
+bool CompressedPathGraph1B::removeSelfComplementaryEdges()
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
+        const vertex_descriptor v0 = source(ce, cGraph);
+        const vertex_descriptor v1 = target(ce, cGraph);
+        const MarkerGraphEdgeId edgeId0 = cGraph[v0].edgeId;
+        const MarkerGraphEdgeId edgeId1 = cGraph[v1].edgeId;
+
+        if(assembler.markerGraph.reverseComplementEdge[edgeId0] == edgeId1) {
+            SHASTA_ASSERT(assembler.markerGraph.reverseComplementEdge[edgeId1] == edgeId0);
+            edgesToBeRemoved.push_back(ce);
+        }
+    }
+
+    for(const edge_descriptor ce: edgesToBeRemoved) {
+        boost::remove_edge(ce, cGraph);
+    }
+
+    return not edgesToBeRemoved.empty();
 }
