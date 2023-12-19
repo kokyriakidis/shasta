@@ -269,10 +269,13 @@ void CompressedPathGraph1B::run1(
     uint64_t threadCount1)
 {
     // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t detangleToleranceLow = 1;
     const uint64_t detangleToleranceHigh = 3;
     const uint64_t phasingThresholdLow = 1;
     const uint64_t phasingThresholdHigh = 6;
     const uint64_t longBubbleThreshold = 5000;
+    // const uint64_t optimizeChainsMinCommon = 3;
+    // const uint64_t optimizeChainsK = 6;
 
     write("Initial");
     writeGfaExpanded("Initial", false);
@@ -280,12 +283,12 @@ void CompressedPathGraph1B::run1(
     removeSelfComplementaryEdges();
 
     while(true) {
-        const bool detangledSomeVertices = detangleVerticesGeneral(false, 0, detangleToleranceHigh);
+        const bool detangledSomeVertices = detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh);
         if(detangledSomeVertices) {
             compress();
         }
 
-        const bool detangledSomeEdges =  detangleEdges(0, detangleToleranceHigh);
+        const bool detangledSomeEdges =  detangleEdges(detangleToleranceLow, detangleToleranceHigh);
         if(detangledSomeEdges) {
             compress();
         }
@@ -299,14 +302,14 @@ void CompressedPathGraph1B::run1(
     for(uint64_t iteration=0; iteration<3; iteration++) {
         write("A-" + to_string(iteration));
         writeGfaExpanded("A-" + to_string(iteration), false);
-        detangleShortSuperbubblesGeneral(1000, 0, detangleToleranceHigh);
+        detangleShortSuperbubblesGeneral(1000, detangleToleranceLow, detangleToleranceHigh);
         compress();
     }
 
     for(uint64_t iteration=0; iteration<3; iteration++) {
         write("B-" + to_string(iteration));
         writeGfaExpanded("B-" + to_string(iteration), false);
-        detangleShortSuperbubblesGeneral(10000, 0, detangleToleranceHigh);
+        detangleShortSuperbubblesGeneral(10000, detangleToleranceLow, detangleToleranceHigh);
         compress();
     }
 
@@ -316,16 +319,42 @@ void CompressedPathGraph1B::run1(
     for(uint64_t iteration=0; iteration<3; iteration++) {
         write("C-" + to_string(iteration));
         writeGfaExpanded("C-" + to_string(iteration), false);
-        detangleShortSuperbubblesGeneral(10000, 0, detangleToleranceHigh);
+        detangleShortSuperbubblesGeneral(10000, detangleToleranceLow, detangleToleranceHigh);
+        compress();
+
+        removeShortSuperbubbles(true, 1000, 3000);
         compress();
 
         phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
         compress();
     }
 
+    write("D");
+    writeGfaExpanded("D", false);
+    detangleShortSuperbubblesGeneral(30000, detangleToleranceLow, detangleToleranceHigh);
+    write("E");
+    writeGfaExpanded("E", false);
 
+
+#if 1
+    // Skip sequence assembly.
     write("Final");
     writeGfaExpanded("Final", false);
+#else
+
+    // Optimize the chains and assemble sequence.
+    optimizeChains(
+        false,
+        optimizeChainsMinCommon,
+        optimizeChainsK);
+
+    assembleChains(threadCount0, threadCount1);
+
+    // Final output.
+    write("Final");
+    writeGfaExpanded("Final", true);
+    writeFastaExpanded("Final");
+#endif
 }
 
 
@@ -2701,6 +2730,8 @@ bool CompressedPathGraph1B::detangleShortSuperbubble(
         return false;
     }
 
+#if 0
+    // (Skip this check - we still want to get rid of the superbubble in that case too!)
     // There are no ambiguous elements.
     // If there are no negligible element, that is all elements of the tangle matrix are significant,
     // there is nothing to do.
@@ -2710,6 +2741,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubble(
         }
         return false;
     }
+#endif
 
     // To avoid breaking contiguity, we require each column and each row of the
     // tangle matrix to have at least one significant element.
@@ -3048,6 +3080,8 @@ bool CompressedPathGraph1B::detangleShortSuperbubbleGeneral(
         return false;
     }
 
+#if 0
+    // (Skip this check - we still want to get rid of the superbubble in that case too!)
     // There are no ambiguous elements.
     // If there are no negligible element, that is all elements of the tangle matrix are significant,
     // there is nothing to do.
@@ -3057,6 +3091,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubbleGeneral(
         }
         return false;
     }
+#endif
 
     // To avoid breaking contiguity, we require each column and each row of the
     // tangle matrix to have at least one significant element.
