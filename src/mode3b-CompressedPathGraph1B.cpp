@@ -33,11 +33,9 @@ void GlobalPathGraph1::assemble2(
 {
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
 #if 0
-    // For test1-UUL, test2-UUL.
     const uint64_t minPrimaryCoverage = 8;
     const uint64_t maxPrimaryCoverage = 60;
 #else
-    // For test1-EC.
     const uint64_t minPrimaryCoverage = 6;
     const uint64_t maxPrimaryCoverage = 40;
 #endif
@@ -242,7 +240,13 @@ void CompressedPathGraph1B::run(
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(false, 10, 1, 4, longBubbleThreshold);
+    phaseBubbleChains(true, 10, 1, 4, longBubbleThreshold);
+
+#if 1
+    // Skip sequence assembly.
+    write("Final");
+    writeGfaExpanded("Final", false);
+#else
 
     // Before final output, renumber the edges contiguously.
     renumberEdges();
@@ -259,6 +263,7 @@ void CompressedPathGraph1B::run(
     write("Final");
     writeGfaExpanded("Final", true);
     writeFastaExpanded("Final");
+#endif
 }
 
 
@@ -379,42 +384,42 @@ void CompressedPathGraph1B::run2(
     const uint64_t detangleToleranceHigh = 3;
     const uint64_t phasingThresholdLow = 1;
     const uint64_t phasingThresholdHigh = 3;
-    const uint64_t longBubbleThreshold = 10000;
-    const uint64_t optimizeChainsMinCommon = 3;
-    const uint64_t optimizeChainsK = 6;
+    const uint64_t longBubbleThreshold = 20000;
+    // const uint64_t optimizeChainsMinCommon = 3;
+    // const uint64_t optimizeChainsK = 6;
 
     write("Initial");
     writeGfaExpanded("Initial", false);
 
     uint64_t maxLength = 100000;
-    for(uint64_t iteration=0; iteration<8; iteration++) {
+    for(uint64_t iteration=0; iteration<20; iteration++) {
         detangleShortSuperbubblesGeneral(maxLength, detangleToleranceLow, detangleToleranceHigh);
         compress();
 
         phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
         compress();
 
-        maxLength = uint64_t(double(maxLength) / 1.5);
+        maxLength = uint64_t(double(maxLength) / 1.2);
     }
 
-    for(uint64_t iteration=0; iteration<8; iteration++) {
+    for(uint64_t iteration=0; iteration<20; iteration++) {
         removeShortSuperbubbles(true, maxLength/3, maxLength);
         compress();
 
         phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
         compress();
 
-        maxLength = uint64_t(double(maxLength) * 1.5);
+        maxLength = uint64_t(double(maxLength) * 1.2);
     }
 
     write("A");
-    writeGfaExpanded("S", false);
+    writeGfaExpanded("A", false);
     phaseBubbleChains(true, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
     write("B");
     writeGfaExpanded("B", false);
 
 
-#if 0
+#if 1
     // Skip sequence assembly.
     write("Final");
     writeGfaExpanded("Final", false);
@@ -2728,12 +2733,16 @@ bool CompressedPathGraph1B::detangleShortSuperbubble(
         }
         return false;
     }
+
+#if 0
+    // Skip this check. We still want to remove the superbubble if possible.
     if(inDegree < 2 and outDegree < 2) {
         if(debug) {
             cout << "Not detangling due to degree (case 2)." << endl;
         }
         return false;
     }
+#endif
 
     // This requires the last bubble of each in-edge
     // and the first bubble of each out-edge to be haploid.
