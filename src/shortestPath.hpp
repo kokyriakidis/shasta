@@ -32,6 +32,7 @@
 #include <boost/graph/iteration_macros.hpp>
 
 // Standard library.
+#include "algorithm.hpp"
 #include "cstddef.hpp"
 #include "cstdint.hpp"
 #include <queue>
