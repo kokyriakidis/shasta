@@ -233,6 +233,9 @@ private:
     void run1(
         uint64_t threadCount0,
         uint64_t threadCount1);
+    void run2(
+        uint64_t threadCount0,
+        uint64_t threadCount1);
 
     // Initial creation from the PathGraph1.
     // Each linear chain of edges in the PathGraph1 after transitive reduction generates

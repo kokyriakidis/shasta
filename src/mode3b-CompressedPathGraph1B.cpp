@@ -32,7 +32,7 @@ void GlobalPathGraph1::assemble2(
     uint64_t threadCount1)
 {
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
-#if 1
+#if 0
     // For test1-UUL, test2-UUL.
     const uint64_t minPrimaryCoverage = 8;
     const uint64_t maxPrimaryCoverage = 60;
@@ -151,7 +151,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
 
-    run(threadCount0, threadCount1);
+    run2(threadCount0, threadCount1);
 }
 
 
@@ -165,7 +165,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     assembler(assembler)
 {
     load(fileName);
-    run(threadCount0, threadCount1);
+    run2(threadCount0, threadCount1);
 }
 
 
@@ -273,7 +273,7 @@ void CompressedPathGraph1B::run1(
     const uint64_t detangleToleranceHigh = 3;
     const uint64_t phasingThresholdLow = 1;
     const uint64_t phasingThresholdHigh = 6;
-    const uint64_t longBubbleThreshold = 5000;
+    const uint64_t longBubbleThreshold = 10000;
     // const uint64_t optimizeChainsMinCommon = 3;
     // const uint64_t optimizeChainsK = 6;
 
@@ -329,11 +329,21 @@ void CompressedPathGraph1B::run1(
         compress();
     }
 
+    detangleShortSuperbubblesGeneral(30000, detangleToleranceLow, detangleToleranceHigh);
+    compress();
+    detangleEdges(detangleToleranceLow, detangleToleranceHigh);
+    compress();
+    detangleShortSuperbubblesGeneral(30000, detangleToleranceLow, detangleToleranceHigh);
+    compress();
+    removeShortSuperbubbles(true, 10000, 30000);
+    removeShortSuperbubbles(true, 10000, 30000);
+
     write("D");
     writeGfaExpanded("D", false);
-    detangleShortSuperbubblesGeneral(30000, detangleToleranceLow, detangleToleranceHigh);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
     write("E");
     writeGfaExpanded("E", false);
+    compress();
 
 
 #if 1
@@ -356,6 +366,76 @@ void CompressedPathGraph1B::run1(
     writeFastaExpanded("Final");
 #endif
 }
+
+
+
+// Experiment with the detangling strategy.
+void CompressedPathGraph1B::run2(
+    uint64_t threadCount0,
+    uint64_t threadCount1)
+{
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t detangleToleranceLow = 1;
+    const uint64_t detangleToleranceHigh = 3;
+    const uint64_t phasingThresholdLow = 1;
+    const uint64_t phasingThresholdHigh = 3;
+    const uint64_t longBubbleThreshold = 10000;
+    const uint64_t optimizeChainsMinCommon = 3;
+    const uint64_t optimizeChainsK = 6;
+
+    write("Initial");
+    writeGfaExpanded("Initial", false);
+
+    uint64_t maxLength = 100000;
+    for(uint64_t iteration=0; iteration<8; iteration++) {
+        detangleShortSuperbubblesGeneral(maxLength, detangleToleranceLow, detangleToleranceHigh);
+        compress();
+
+        phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+        compress();
+
+        maxLength = uint64_t(double(maxLength) / 1.5);
+    }
+
+    for(uint64_t iteration=0; iteration<8; iteration++) {
+        removeShortSuperbubbles(true, maxLength/3, maxLength);
+        compress();
+
+        phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+        compress();
+
+        maxLength = uint64_t(double(maxLength) * 1.5);
+    }
+
+    write("A");
+    writeGfaExpanded("S", false);
+    phaseBubbleChains(true, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    write("B");
+    writeGfaExpanded("B", false);
+
+
+#if 0
+    // Skip sequence assembly.
+    write("Final");
+    writeGfaExpanded("Final", false);
+#else
+
+    // Optimize the chains and assemble sequence.
+    optimizeChains(
+        false,
+        optimizeChainsMinCommon,
+        optimizeChainsK);
+
+    assembleChains(threadCount0, threadCount1);
+
+    // Final output.
+    write("Final");
+    writeGfaExpanded("Final", true);
+    writeFastaExpanded("Final");
+#endif
+}
+
+
 
 
 // Initial creation from the PathGraph1.
@@ -2284,7 +2364,7 @@ bool CompressedPathGraph1B::detangleEdges(
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
 {
-    const bool debug = false;
+    const bool debug = true;
     if(debug) {
         cout << "Detangling edges." << endl;
     }
@@ -2326,7 +2406,7 @@ bool CompressedPathGraph1B::detangleEdge(
     ++it;
     // edgeMap.erase(cGraph[ce].id);
 
-    const bool debug = false;
+    const bool debug = true;
 
     // Tangle matrix elements <= detangleToleranceLow are treated as negigible.
     // Tangle matrix elements >= detangleToleranceHigh are treated as significant.
@@ -2596,7 +2676,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubble(
 {
     CompressedPathGraph1B& cGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
-    const bool debug = false;
+    const bool debug = true;
 
     if(debug) {
         cout << "Found a superbubble with " << superbubble.size() <<
@@ -2913,7 +2993,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubbleGeneral(
 {
     CompressedPathGraph1B& cGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
-    const bool debug = false;
+    const bool debug = true;
 
     if(debug) {
         cout << "General detangling of a superbubble with " << superbubble.size() <<
