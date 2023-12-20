@@ -26,6 +26,7 @@
 #include <boost/graph/iteration_macros.hpp>
 
 // Standard library.
+#include "algorithm.hpp"
 #include "array.hpp"
 #include "iostream.hpp"
 #include  <limits>
