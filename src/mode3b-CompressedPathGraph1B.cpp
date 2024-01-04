@@ -32,7 +32,7 @@ void GlobalPathGraph1::assemble2(
     uint64_t threadCount1)
 {
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
-#if 0
+#if 1
     const uint64_t minPrimaryCoverage = 8;
     const uint64_t maxPrimaryCoverage = 60;
 #else
@@ -149,7 +149,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
 
-    run2(threadCount0, threadCount1);
+    run(threadCount0, threadCount1, true);
 }
 
 
@@ -163,14 +163,15 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     assembler(assembler)
 {
     load(fileName);
-    run2(threadCount0, threadCount1);
+    run(threadCount0, threadCount1, true);
 }
 
 
 
 void CompressedPathGraph1B::run(
     uint64_t threadCount0,
-    uint64_t threadCount1)
+    uint64_t threadCount1,
+    bool assembleSequence)
 {
     // *** EXPOSE WHEN CODE STABILIZES
     vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
@@ -240,30 +241,32 @@ void CompressedPathGraph1B::run(
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(true, 10, 1, 4, longBubbleThreshold);
+    phaseBubbleChains(false, 10, 1, 4, longBubbleThreshold);
 
-#if 1
-    // Skip sequence assembly.
-    write("Final");
-    writeGfaExpanded("Final", false);
-#else
+    if(assembleSequence) {
 
-    // Before final output, renumber the edges contiguously.
-    renumberEdges();
+        // Before final output, renumber the edges contiguously.
+        renumberEdges();
 
-    // Optimize the chains and assemble sequence.
-    optimizeChains(
-        false,
-        optimizeChainsMinCommon,
-        optimizeChainsK);
+        // Optimize the chains and assemble sequence.
+        optimizeChains(
+            false,
+            optimizeChainsMinCommon,
+            optimizeChainsK);
 
-    assembleChains(threadCount0, threadCount1);
+        assembleChains(threadCount0, threadCount1);
 
-    // Final output.
-    write("Final");
-    writeGfaExpanded("Final", true);
-    writeFastaExpanded("Final");
-#endif
+        // Final output.
+        write("Final");
+        writeGfaExpanded("Final", true);
+        writeFastaExpanded("Final");
+
+    } else {
+
+        // Skip sequence assembly.
+        write("Final");
+        writeGfaExpanded("Final", false);
+    }
 }
 
 
@@ -271,7 +274,8 @@ void CompressedPathGraph1B::run(
 // This works well with test1-EC.
 void CompressedPathGraph1B::run1(
     uint64_t threadCount0,
-    uint64_t threadCount1)
+    uint64_t threadCount1,
+    bool assembleSequence)
 {
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t detangleToleranceLow = 1;
@@ -279,8 +283,8 @@ void CompressedPathGraph1B::run1(
     const uint64_t phasingThresholdLow = 1;
     const uint64_t phasingThresholdHigh = 6;
     const uint64_t longBubbleThreshold = 10000;
-    // const uint64_t optimizeChainsMinCommon = 3;
-    // const uint64_t optimizeChainsK = 6;
+    const uint64_t optimizeChainsMinCommon = 3;
+    const uint64_t optimizeChainsK = 6;
 
     write("Initial");
     writeGfaExpanded("Initial", false);
@@ -351,25 +355,25 @@ void CompressedPathGraph1B::run1(
     compress();
 
 
-#if 1
-    // Skip sequence assembly.
-    write("Final");
-    writeGfaExpanded("Final", false);
-#else
+    if(assembleSequence) {
+        // Optimize the chains and assemble sequence.
+        optimizeChains(
+            false,
+            optimizeChainsMinCommon,
+            optimizeChainsK);
 
-    // Optimize the chains and assemble sequence.
-    optimizeChains(
-        false,
-        optimizeChainsMinCommon,
-        optimizeChainsK);
+        assembleChains(threadCount0, threadCount1);
 
-    assembleChains(threadCount0, threadCount1);
+        // Final output.
+        write("Final");
+        writeGfaExpanded("Final", true);
+        writeFastaExpanded("Final");
+    } else {
 
-    // Final output.
-    write("Final");
-    writeGfaExpanded("Final", true);
-    writeFastaExpanded("Final");
-#endif
+        // Skip sequence assembly.
+        write("Final");
+        writeGfaExpanded("Final", false);
+    }
 }
 
 
@@ -377,7 +381,8 @@ void CompressedPathGraph1B::run1(
 // Experiment with the detangling strategy.
 void CompressedPathGraph1B::run2(
     uint64_t threadCount0,
-    uint64_t threadCount1)
+    uint64_t threadCount1,
+    bool assembleSequence)
 {
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t detangleToleranceLow = 1;
@@ -385,8 +390,8 @@ void CompressedPathGraph1B::run2(
     const uint64_t phasingThresholdLow = 1;
     const uint64_t phasingThresholdHigh = 3;
     const uint64_t longBubbleThreshold = 20000;
-    // const uint64_t optimizeChainsMinCommon = 3;
-    // const uint64_t optimizeChainsK = 6;
+    const uint64_t optimizeChainsMinCommon = 3;
+    const uint64_t optimizeChainsK = 6;
 
     write("Initial");
     writeGfaExpanded("Initial", false);
@@ -418,28 +423,146 @@ void CompressedPathGraph1B::run2(
     write("B");
     writeGfaExpanded("B", false);
 
+    if(assembleSequence) {
 
-#if 1
-    // Skip sequence assembly.
-    write("Final");
-    writeGfaExpanded("Final", false);
-#else
+        // Optimize the chains and assemble sequence.
+        optimizeChains(
+            false,
+            optimizeChainsMinCommon,
+            optimizeChainsK);
 
-    // Optimize the chains and assemble sequence.
-    optimizeChains(
-        false,
-        optimizeChainsMinCommon,
-        optimizeChainsK);
+        assembleChains(threadCount0, threadCount1);
 
-    assembleChains(threadCount0, threadCount1);
+        // Final output.
+        write("Final");
+        writeGfaExpanded("Final", true);
+        writeFastaExpanded("Final");
+    } else {
 
-    // Final output.
-    write("Final");
-    writeGfaExpanded("Final", true);
-    writeFastaExpanded("Final");
-#endif
+        // Skip sequence assembly.
+        write("Final");
+        writeGfaExpanded("Final", false);
+    }
 }
 
+
+
+// Experiment with the detangling strategy.
+void CompressedPathGraph1B::run3(
+    uint64_t threadCount0,
+    uint64_t threadCount1,
+    bool assembleSequence)
+{
+
+    // EXPOSE WHEN CODE STABILIZES.
+    vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets = {
+        {100, 1000},
+        {200, 2000},
+        {500, 5000},
+        {1000, 10000},
+        {2000, 20000},
+        {5000, 50000},
+        {10000, 100000}
+    };
+    // const uint64_t detangleToleranceLow = 0;
+    const uint64_t detangleToleranceHigh = 3;
+    const uint64_t phasingThresholdLow = 1;
+    const uint64_t phasingThresholdHigh = 4;
+    const uint64_t longBubbleThreshold = 20000;
+    const uint64_t optimizeChainsMinCommon = 3;
+    const uint64_t optimizeChainsK = 6;
+
+
+    write("Initial");
+    writeGfaExpanded("Initial", false);
+
+    for(uint64_t detangleToleranceLow=0; detangleToleranceLow<2; detangleToleranceLow++) {
+        cout << "Iteration begins for detangleToleranceLow " << detangleToleranceLow << endl;
+
+        // Loop over increasing lengths of superbubble removal.
+        for(const pair<uint64_t, uint64_t>& p: superbubbleRemovalMaxOffsets) {
+            cout << "Iteration begins for superbubble size thresholds " <<
+                p.first << " " << p.second << endl;
+
+            while(true) {
+
+                // Inner iteration.
+                // At each iteration we use all available detangling and phasing primitives.
+                for(uint64_t iteration=0; ; iteration++) {
+                    cout << "Inner iteration " << iteration << " begins: " <<
+                        num_vertices(*this) << " vertices, " << num_edges(*this) << " edges." << endl;
+                    bool changesWereMade = false;
+
+                    if(detangleEdges(detangleToleranceLow, detangleToleranceHigh)) {
+                        cout << "Changes made by detangleEdges." << endl;
+                        changesWereMade = true;
+                        compress();
+                    }
+
+                    if(detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh)) {
+                        cout << "Changes made by detangleVerticesGeneral." << endl;
+                        changesWereMade = true;
+                        compress();
+
+                    }
+
+                    if(detangleShortSuperbubbles(p.first, detangleToleranceLow, detangleToleranceHigh)) {
+                        cout << "Changes made by detangleShortSuperbubbles." << endl;
+                        changesWereMade = true;
+                        compress();
+                    }
+
+                    if(detangleShortSuperbubblesGeneral(p.first, detangleToleranceLow, detangleToleranceHigh)) {
+                        cout << "Changes made by detangleShortSuperbubblesGeneral." << endl;
+                        changesWereMade = true;
+                        compress();
+                    }
+
+                    // For phaseBubbleChains it's not easy to figure out if changes were made.
+                    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+                    compress();
+                    phaseBubbleChains(false, 10, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+                    compress();
+
+                    // If this inner iteration did not change anything, terminate
+                    // the inner iteration loop.
+                    if(not changesWereMade) {
+                        break;
+                    }
+                }
+
+                if(removeShortSuperbubbles(false, p.first, p.second)) {
+                    cout << "Changes made by removeShortSuperbubbles." << endl;
+                    compress();
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    if(assembleSequence) {
+
+        // Optimize the chains and assemble sequence.
+        optimizeChains(
+            false,
+            optimizeChainsMinCommon,
+            optimizeChainsK);
+
+        assembleChains(threadCount0, threadCount1);
+
+        // Final output.
+        write("Final");
+        writeGfaExpanded("Final", true);
+        writeFastaExpanded("Final");
+
+    } else {
+
+        // Skip sequence assembly.
+        write("Final");
+        writeGfaExpanded("Final", false);
+    }
+}
 
 
 
@@ -700,15 +823,25 @@ bool CompressedPathGraph1B::compressSequentialEdges()
 
 
 // Call compressParallelEdges and compressSequentialEdges iteratively until nothing changes.
-void CompressedPathGraph1B::compress()
+bool CompressedPathGraph1B::compress()
 {
+    bool changesWereMade = false;
+
     while(true) {
         const bool compressParallelChanges = compressParallelEdges();
         const bool compressSequentialChanges = compressSequentialEdges();
-        if(not(compressParallelChanges or compressSequentialChanges)) {
+
+        if(compressParallelChanges or compressSequentialChanges) {
+            // Something changed. Continue the iteration loop.
+            changesWereMade = true;
+            continue;
+        } else {
+            // Nothing changed at this iteration. Stop iteration loop.
             break;
         }
     }
+
+    return changesWereMade;
 }
 
 
@@ -1350,12 +1483,13 @@ CompressedPathGraph1B::Superbubbles::~Superbubbles()
 
 
 // Remove short superbubbles with one entry and one exit.
-void CompressedPathGraph1B::removeShortSuperbubbles(
+bool CompressedPathGraph1B::removeShortSuperbubbles(
     bool debug,
     uint64_t maxOffset1,    // Used to define superbubbles
     uint64_t maxOffset2)    // Compared against the offset between entry and exit
 {
     CompressedPathGraph1B& cGraph = *this;
+    bool changesWereMade = false;
 
     // Find the superbubbles.
     Superbubbles superbubbles(cGraph, maxOffset1);
@@ -1372,7 +1506,6 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
             }
             cout << endl;
         }
-
 
         // Skip it if it has more than one entrance or exit.
         if(not(superbubble.entrances.size()==1 and superbubble.exits.size()==1)) {
@@ -1400,7 +1533,7 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
         if(info.common == 0) {
             if(debug) {
                 cout << "This superbubble will not be removed because "
-                    "there are no common oriented reads betwene the entrance and the exit." << endl;
+                    "there are no common oriented reads between the entrance and the exit." << endl;
             }
             continue;
         }
@@ -1412,6 +1545,26 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
             continue;
         }
 
+#if 1
+        // If a trivial superbubble, skip it.
+        // Trivial means:
+        // - Has two vertices of which one is the entrance and one is the exit.
+        // - There is only one edge between the two.
+        if(superbubble.size() == 2) {
+            uint64_t edgeCount = 0;
+            BGL_FORALL_OUTEDGES(entrance, e, cGraph, CompressedPathGraph1B) {
+                if(target(e, cGraph) == exit) {
+                    ++edgeCount;
+                }
+            }
+            if(edgeCount == 1) {
+                if(debug) {
+                    cout << "This superbubble will not be removed because it is trivial." << endl;
+                }
+                continue;
+            }
+        }
+#endif
         if(debug) {
             cout << "This superbubble will be removed." << endl;
         }
@@ -1457,7 +1610,10 @@ void CompressedPathGraph1B::removeShortSuperbubbles(
         chain.push_back(cGraph[entrance].edgeId);
         chain.push_back(cGraph[exit].edgeId);
 
+        changesWereMade = true;
     }
+
+    return changesWereMade;
 }
 
 
@@ -1515,7 +1671,7 @@ bool CompressedPathGraph1B::detangleVertices(
         }
     }
 
-    if(true) {
+    if(debug) {
         cout << "Detangled " << detangledCount << " vertices." << endl;
     }
 
@@ -1546,7 +1702,7 @@ bool CompressedPathGraph1B::detangleVerticesGeneral(
         }
     }
 
-    if(true) {
+    if(debug) {
         cout << "Detangled " << detangledCount << " vertices." << endl;
 
     }
@@ -2369,7 +2525,7 @@ bool CompressedPathGraph1B::detangleEdges(
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
 {
-    const bool debug = true;
+    const bool debug = false;
     if(debug) {
         cout << "Detangling edges." << endl;
     }
@@ -2391,7 +2547,7 @@ bool CompressedPathGraph1B::detangleEdges(
         }
     }
 
-    if(true) {
+    if(debug) {
         cout << "Detangled " << detangleCount << " edges." << endl;
     }
 
@@ -2411,7 +2567,7 @@ bool CompressedPathGraph1B::detangleEdge(
     ++it;
     // edgeMap.erase(cGraph[ce].id);
 
-    const bool debug = true;
+    const bool debug = false;
 
     // Tangle matrix elements <= detangleToleranceLow are treated as negigible.
     // Tangle matrix elements >= detangleToleranceHigh are treated as significant.
@@ -2681,7 +2837,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubble(
 {
     CompressedPathGraph1B& cGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
-    const bool debug = true;
+    const bool debug = false;
 
     if(debug) {
         cout << "Found a superbubble with " << superbubble.size() <<
@@ -3002,7 +3158,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubbleGeneral(
 {
     CompressedPathGraph1B& cGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
-    const bool debug = true;
+    const bool debug = false;
 
     if(debug) {
         cout << "General detangling of a superbubble with " << superbubble.size() <<
@@ -3431,6 +3587,10 @@ void CompressedPathGraph1B::phaseBubbleChains(
 {
     CompressedPathGraph1B& cGraph = *this;
 
+    if(debug) {
+        cout << "phaseBubbleChains begins." << endl;
+    }
+
     vector<edge_descriptor> allEdges;
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
         allEdges.push_back(ce);
@@ -3438,6 +3598,10 @@ void CompressedPathGraph1B::phaseBubbleChains(
 
     for(const edge_descriptor ce: allEdges) {
         phaseBubbleChain(ce, n, lowThreshold, highThreshold, longBubbleThreshold, debug);
+    }
+
+    if(debug) {
+        cout << "phaseBubbleChains ends." << endl;
     }
 }
 
@@ -3461,6 +3625,14 @@ void CompressedPathGraph1B::phaseBubbleChain(
     }
 
     const bool detailedDebug = debug; // (cGraph[ce].id == 49557);
+
+    // If this bubble chain has a single bubble, there is nothing to do.
+    if(bubbleChain.size() == 1) {
+        if(debug) {
+            cout << "Not phased because it has only one bubble." << endl;
+        }
+        return;
+    }
 
     // Table to contain the Phasing graph vertex corresponding to each diploid bubble.
     // Indexed by the bubble position in the bubble chains, and contains
@@ -3495,7 +3667,21 @@ void CompressedPathGraph1B::phaseBubbleChain(
         }
     }
 
-
+#if 0
+    // If this bubble chain has less than two diploid bubbles, there is nothing to do.
+    uint64_t diploidBubblesCount = 0;
+    for(const Bubble& bubble: bubbleChain) {
+        if(bubble.size() == 2) {
+            ++diploidBubblesCount;
+        }
+    }
+    if(diploidBubblesCount < 2) {
+        if(debug) {
+            cout << "Not phased because it has less than 2 diploid bubbles." << endl;
+        }
+        return;
+    }
+#endif
 
     // Add edges of the phasing graph.
     for(uint64_t i0=0; i0<bubbleChain.size()-1; i0++) {

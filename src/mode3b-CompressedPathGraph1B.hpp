@@ -229,13 +229,20 @@ private:
 
     void run(
         uint64_t threadCount0,
-        uint64_t threadCount1);
+        uint64_t threadCount1,
+        bool assembleSequence);
     void run1(
         uint64_t threadCount0,
-        uint64_t threadCount1);
+        uint64_t threadCount1,
+        bool assembleSequence);
     void run2(
         uint64_t threadCount0,
-        uint64_t threadCount1);
+        uint64_t threadCount1,
+        bool assembleSequence);
+    void run3(
+        uint64_t threadCount0,
+        uint64_t threadCount1,
+        bool assembleSequence);
 
     // Initial creation from the PathGraph1.
     // Each linear chain of edges in the PathGraph1 after transitive reduction generates
@@ -275,7 +282,7 @@ private:
     bool compressSequentialEdges();
 
     // Call compressParallelEdges and compressSequentialEdges iteratively until nothing changes.
-    void compress();
+    bool compress();
 
     // Compute the tangle matrix given in-edges and out-edges.
     // The last bubble of each in-edge and the first bubble
@@ -394,7 +401,7 @@ private:
 
 
     // Remove short superbubbles with one entry and one exit.
-    void removeShortSuperbubbles(
+    bool removeShortSuperbubbles(
         bool debug,
         uint64_t maxOffset1,    // Used to define superbubbles
         uint64_t maxOffset2     // Compared against the offset between entry and exit
