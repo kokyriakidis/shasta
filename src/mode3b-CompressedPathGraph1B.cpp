@@ -149,7 +149,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
 
-    run(threadCount0, threadCount1, true);
+    run3(threadCount0, threadCount1, true);
 }
 
 
@@ -163,7 +163,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     assembler(assembler)
 {
     load(fileName);
-    run(threadCount0, threadCount1, true);
+    run3(threadCount0, threadCount1, true);
 }
 
 
@@ -174,7 +174,7 @@ void CompressedPathGraph1B::run(
     bool assembleSequence)
 {
     // *** EXPOSE WHEN CODE STABILIZES
-    vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
+    const vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
     {{300, 1000}, {1000, 3000}, {3000, 10000}, {10000, 30000}};
     const uint64_t detangleToleranceHigh = 3;
     const uint64_t phasingThresholdLow = 1;
@@ -182,6 +182,9 @@ void CompressedPathGraph1B::run(
     const uint64_t longBubbleThreshold = 5000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
+
+    const bool writeSnapshots = true;
+    uint64_t snapshotNumber = 0;
 
 
     write("Initial");
@@ -199,14 +202,25 @@ void CompressedPathGraph1B::run(
     detangleEdges(1, detangleToleranceHigh);
     detangleVertices(false, 0, detangleToleranceHigh);
 
-    detangleBackEdges(1, detangleToleranceHigh);
-    compress();
+    // detangleBackEdges(1, detangleToleranceHigh);
+    // compress();
 
     detangleVerticesGeneral(false, 1, detangleToleranceHigh);
     compress();
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    if(writeSnapshots) {
+        writeSnapshot(snapshotNumber);
+    }
+
+    phaseBubbleChains(true, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    if(writeSnapshots) {
+        writeSnapshot(snapshotNumber);
+    }
     compress();
+
+    if(writeSnapshots) {
+        writeSnapshot(snapshotNumber);
+    }
 
     phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
     compress();
@@ -250,7 +264,7 @@ void CompressedPathGraph1B::run(
 
         // Optimize the chains and assemble sequence.
         optimizeChains(
-            true,
+            false,
             optimizeChainsMinCommon,
             optimizeChainsK);
 
@@ -453,32 +467,154 @@ void CompressedPathGraph1B::run3(
     uint64_t threadCount1,
     bool assembleSequence)
 {
+    // *** EXPOSE WHEN CODE STABILIZES
+    const vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
+    {{300, 1000}, {1000, 3000}, {3000, 10000}, {10000, 30000}};
+    const uint64_t detangleToleranceHigh = 3;
+    const uint64_t phasingThresholdLow = 1;
+    const uint64_t phasingThresholdHigh = 6;
+    const uint64_t longBubbleThreshold = 5000;
+    const uint64_t optimizeChainsMinCommon = 3;
+    const uint64_t optimizeChainsK = 6;
 
+    // const bool writeSnapshots = true;
+    // uint64_t snapshotNumber = 0;
+
+
+    write("Initial");
+
+    detangleVertices(false, 0, detangleToleranceHigh);
+    compress();
+
+    for(const auto& p: superbubbleRemovalMaxOffsets) {
+        removeShortSuperbubbles(false, p.first, p.second);
+        compress();
+    }
+
+    detangleEdges(0, detangleToleranceHigh);
+    detangleEdges(0, detangleToleranceHigh);
+    detangleEdges(1, detangleToleranceHigh);
+    detangleVertices(false, 0, detangleToleranceHigh);
+
+    // detangleBackEdges(1, detangleToleranceHigh);
+    // compress();
+
+    detangleVerticesGeneral(false, 1, detangleToleranceHigh);
+    compress();
+
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    compress();
+
+    writeGfaExpanded("A", false);
+
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    compress();
+
+    writeGfaExpanded("B", false);
+
+    detangleShortSuperbubbles(100000, 1, detangleToleranceHigh);
+    compress();
+
+    writeGfaExpanded("C", false);
+
+    detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
+    compress();
+
+    writeGfaExpanded("D", false);
+
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    compress();
+
+    writeGfaExpanded("E", false);
+
+    removeShortSuperbubbles(false, 30000, 100000);
+    compress();
+
+    writeGfaExpanded("F", false);
+
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    compress();
+
+    writeGfaExpanded("G", false);
+
+    removeShortSuperbubbles(false, 30000, 100000);
+    compress();
+
+    writeGfaExpanded("H", false);
+
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    compress();
+
+    writeGfaExpanded("I", false);
+
+    removeShortSuperbubbles(false, 30000, 100000);
+    compress();
+
+    writeGfaExpanded("J", false);
+
+    phaseBubbleChains(false, 1, 1, 4, longBubbleThreshold);
+    compress();
+
+    writeGfaExpanded("K", false);
+
+    removeShortSuperbubbles(false, 30000, 100000);
+    compress();
+
+    writeGfaExpanded("L", false);
+
+    phaseBubbleChains(false, 10, 1, 4, longBubbleThreshold);
+
+    if(assembleSequence) {
+
+        // Before final output, renumber the edges contiguously.
+        renumberEdges();
+
+        // Optimize the chains and assemble sequence.
+        optimizeChains(
+            false,
+            optimizeChainsMinCommon,
+            optimizeChainsK);
+
+        assembleChains(threadCount0, threadCount1);
+
+        // Final output.
+        write("Final");
+        writeGfaExpanded("Final", true);
+        writeFastaExpanded("Final");
+
+    } else {
+
+        // Skip sequence assembly.
+        write("Final");
+        writeGfaExpanded("Final", false);
+    }
+
+#if 0
     // EXPOSE WHEN CODE STABILIZES.
-    vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets = {
-        {100, 1000},
-        {200, 2000},
-        {500, 5000},
-        {1000, 10000},
-        {2000, 20000},
-        {5000, 50000},
-        {10000, 100000},
-        {20000, 200000},
-        {50000, 500000},
-        {100000, 1000000}
-    };
+    const vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
+    {{300, 1000}, {1000, 3000}, {3000, 10000}, {10000, 30000}};
     // const uint64_t detangleToleranceLow = 0;
     const uint64_t detangleToleranceHigh = 3;
     const uint64_t phasingThresholdLow = 1;
-    const uint64_t phasingThresholdHigh = 4;
+    const uint64_t phasingThresholdHigh = 6;
     const uint64_t longBubbleThreshold = 20000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 20;
+
+    const bool writeSnapshots = true;
+    uint64_t snapshotNumber = 0;
 
 
     write("Initial");
     writeGfaExpanded("Initial", false);
 
+    // An initial pass of superbubble removal.
+    for(const auto& p: superbubbleRemovalMaxOffsets) {
+        removeShortSuperbubbles(false, p.first, p.second);
+        compress();
+    }
+
+    // Main iteration.
     for(uint64_t detangleToleranceLow=0; detangleToleranceLow<2; detangleToleranceLow++) {
         cout << "Iteration begins for detangleToleranceLow " << detangleToleranceLow << endl;
 
@@ -494,6 +630,9 @@ void CompressedPathGraph1B::run3(
                 for(uint64_t iteration=0; ; iteration++) {
                     cout << "Inner iteration " << iteration << " begins: " <<
                         num_vertices(*this) << " vertices, " << num_edges(*this) << " edges." << endl;
+                    if(writeSnapshots) {
+                        writeSnapshot(snapshotNumber);
+                    }
                     bool changesWereMade = false;
 
                     if(detangleEdges(detangleToleranceLow, detangleToleranceHigh)) {
@@ -501,6 +640,13 @@ void CompressedPathGraph1B::run3(
                         changesWereMade = true;
                         compress();
                     }
+
+                    if(detangleVertices(false, detangleToleranceLow, detangleToleranceHigh)) {
+                        cout << "Changes made by detangleVerticesGeneral." << endl;
+                        changesWereMade = true;
+                        compress();
+                    }
+
 
                     if(detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh)) {
                         cout << "Changes made by detangleVerticesGeneral." << endl;
@@ -520,6 +666,10 @@ void CompressedPathGraph1B::run3(
                         compress();
                     }
 
+                    if(writeSnapshots) {
+                        writeSnapshot(snapshotNumber);
+                    }
+
                     // For phaseBubbleChains it's not easy to figure out if changes were made.
                     phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
                     compress();
@@ -529,6 +679,10 @@ void CompressedPathGraph1B::run3(
                         false,
                         optimizeChainsMinCommon,
                         optimizeChainsK);
+
+                    if(writeSnapshots) {
+                        writeSnapshot(snapshotNumber);
+                    }
 
                     // If this inner iteration did not change anything, terminate
                     // the inner iteration loop.
@@ -546,6 +700,7 @@ void CompressedPathGraph1B::run3(
             }
         }
     }
+
 
     if(assembleSequence) {
 
@@ -568,6 +723,7 @@ void CompressedPathGraph1B::run3(
         write("Final");
         writeGfaExpanded("Final", false);
     }
+#endif
 }
 
 
@@ -1272,6 +1428,15 @@ void CompressedPathGraph1B::writeFastaExpanded(
             }
         }
     }
+}
+
+
+
+void CompressedPathGraph1B::writeSnapshot(uint64_t& snapshotNumber) const
+{
+    const string name = to_string(snapshotNumber++);
+    write(name);
+    writeGfaExpanded(name, false);
 }
 
 
@@ -3770,6 +3935,12 @@ void CompressedPathGraph1B::phaseBubbleChain(
                         phasingGraph[pv0].positionInBubbleChain << " " <<
                         phasingGraph[pv1].positionInBubbleChain << " with minConcordant " <<
                         minConcordant << ", maxDiscordant " << maxDiscordant << endl;
+                }
+            } else {
+                if(false) {
+                    cout << " No phasing graph edge for " <<
+                        phasingGraph[pv0].positionInBubbleChain << " " <<
+                        phasingGraph[pv1].positionInBubbleChain << endl;
                 }
             }
 

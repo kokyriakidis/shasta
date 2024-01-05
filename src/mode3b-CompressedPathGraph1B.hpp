@@ -573,6 +573,7 @@ private:
     void writeGfa(const string& fileNamePrefix) const;
     void writeGfaExpanded(const string& fileNamePrefix, bool includeSequence) const;
     void writeFastaExpanded(const string& fileNamePrefix) const;
+    void writeSnapshot(uint64_t& snapshotNumber) const;
 
     string bubbleChainStringId(edge_descriptor) const;
     string bubbleStringId(edge_descriptor, uint64_t positionInBubbleChain) const;
