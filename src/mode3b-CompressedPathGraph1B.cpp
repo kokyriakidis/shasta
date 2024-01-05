@@ -250,7 +250,7 @@ void CompressedPathGraph1B::run(
 
         // Optimize the chains and assemble sequence.
         optimizeChains(
-            false,
+            true,
             optimizeChainsMinCommon,
             optimizeChainsK);
 
@@ -462,7 +462,10 @@ void CompressedPathGraph1B::run3(
         {1000, 10000},
         {2000, 20000},
         {5000, 50000},
-        {10000, 100000}
+        {10000, 100000},
+        {20000, 200000},
+        {50000, 500000},
+        {100000, 1000000}
     };
     // const uint64_t detangleToleranceLow = 0;
     const uint64_t detangleToleranceHigh = 3;
@@ -470,7 +473,7 @@ void CompressedPathGraph1B::run3(
     const uint64_t phasingThresholdHigh = 4;
     const uint64_t longBubbleThreshold = 20000;
     const uint64_t optimizeChainsMinCommon = 3;
-    const uint64_t optimizeChainsK = 6;
+    const uint64_t optimizeChainsK = 20;
 
 
     write("Initial");
@@ -503,7 +506,6 @@ void CompressedPathGraph1B::run3(
                         cout << "Changes made by detangleVerticesGeneral." << endl;
                         changesWereMade = true;
                         compress();
-
                     }
 
                     if(detangleShortSuperbubbles(p.first, detangleToleranceLow, detangleToleranceHigh)) {
@@ -523,6 +525,10 @@ void CompressedPathGraph1B::run3(
                     compress();
                     phaseBubbleChains(false, 10, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
                     compress();
+                    optimizeChains(
+                        false,
+                        optimizeChainsMinCommon,
+                        optimizeChainsK);
 
                     // If this inner iteration did not change anything, terminate
                     // the inner iteration loop.
@@ -863,10 +869,10 @@ void CompressedPathGraph1B::write(const string& name) const
 
 void CompressedPathGraph1B::writeCsv(const string& fileNamePrefix) const
 {
-    writeBubbleChainsCsv(fileNamePrefix);
-    writeBubblesCsv(fileNamePrefix);
-    writeChainsCsv(fileNamePrefix);
     writeChainsDetailsCsv(fileNamePrefix);
+    writeChainsCsv(fileNamePrefix);
+    writeBubblesCsv(fileNamePrefix);
+    writeBubbleChainsCsv(fileNamePrefix);
 }
 
 
@@ -5149,11 +5155,12 @@ void CompressedPathGraph1B::optimizeChain(
 
         // Loop over pairs of predecessors of v0 and successors of v1.
         uint64_t addedEdgesCount = 0;
-        for(uint64_t j0=i0; j0>=i0-k; j0--) {
-            for(uint64_t j1=i1; j1<=i1+k; j1++) {
-                if(j1 >= chain.size()) {
-                    break;
-                }
+        const uint64_t j0First = (k < i0) ? (i0 - k) : 0;
+        const uint64_t j0Last = i0;
+        const uint64_t j1First = i1;
+        const uint64_t j1Last = min(i1 + k, chain.size() - 1);
+        for(uint64_t j0=j0First; j0<=j0Last; j0++) {
+            for(uint64_t j1=j1First; j1<=j1Last; j1++) {
                 if(j0==i0 and j1 == i1) {
                     // We already have the edge between v0 and v1.
                     continue;
@@ -5165,8 +5172,16 @@ void CompressedPathGraph1B::optimizeChain(
                 if(info.common > chainGraph[e].commonCount) {
                     add_edge(j0, j1, {info.common}, chainGraph);
                     ++addedEdgesCount;
+                    if(debug) {
                     cout << " Added " << j0 << "->" << j1 << " " << chainGraph[j0].edgeId << "->" << chainGraph[j1].edgeId <<
                         " with " << info.common << " common oriented reads." << endl;
+                    }
+                } else {
+                    if(debug) {
+                        cout << "Found " << j0 << "->" << j1 << " " << chainGraph[j0].edgeId << "->" << chainGraph[j1].edgeId <<
+                            " with " << info.common << " common oriented reads." << endl;
+
+                    }
                 }
             }
 
@@ -5178,10 +5193,14 @@ void CompressedPathGraph1B::optimizeChain(
 
         // If we added any edges skipping e, we can remove e.
         if(addedEdgesCount > 0) {
-            cout << "Removed " << i0 << "->" << i1 << " " << chainGraph[i0].edgeId << "->" << chainGraph[i1].edgeId <<
-                " with " << chainGraph[e].commonCount << " common oriented reads." << endl;
-            boost::remove_edge(e, chainGraph);
-            ++totalRemovedEdgesCount;
+            if(debug) {
+                cout << "Removed " << i0 << "->" << i1 << " " << chainGraph[i0].edgeId << "->" << chainGraph[i1].edgeId <<
+                    " with " << chainGraph[e].commonCount << " common oriented reads." << endl;
+            }
+            // DON'T REMOVE THE EDGE. THIS IS NECESSARY TO MAKE SURE WE
+            // STILL HAVE A PATH FROM THE ENTRANCE TO THE EXIT.
+            // boost::remove_edge(e, chainGraph);
+            // ++totalRemovedEdgesCount;
         } else {
             if(debug) {
                 cout << "Did not find any suitable replacement edges." << endl;
