@@ -12,6 +12,7 @@
 #include <boost/serialization/vector.hpp>
 
 // Standard library
+#include "algorithm.hpp"
 #include "array.hpp"
 #include <map>
 #include "memory.hpp"
@@ -438,12 +439,18 @@ private:
         uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
         uint64_t lowThreshold,
         uint64_t highThreshold,
+        bool useBayesianModel,
+        double epsilon,
+        double minLogP,
         uint64_t longBubbleThreshold);
     void phaseBubbleChain(
         edge_descriptor e,
         uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
         uint64_t lowThreshold,
         uint64_t highThreshold,
+        bool useBayesianModel,
+        double epsilon,
+        double minLogP,
         uint64_t longBubbleThreshold,
         bool debug);
 
@@ -457,7 +464,11 @@ private:
             int64_t& phase,
             uint64_t& minConcordant,
             uint64_t& maxDiscordant,
-            uint64_t& total) const;
+            uint64_t& total,
+            double epsilon,
+            double& logPin, // log[P(in-phase)/P(random)] in decibels
+            double& logPout // log[P(out-of-phase)/P(random)] in decibels
+            ) const;
     };
 
 
@@ -511,8 +522,15 @@ private:
         // If phase = -1, minConcordant = min(m01, m10), maxDiscordant = max(m00, m11).
         uint64_t minConcordant;
         uint64_t maxDiscordant;
+        double logPInPhase;
+        double logPOutOfPhase;
+        double logP() const
+        {
+            return max(max(logPInPhase, logPOutOfPhase), fabs(logPInPhase - logPOutOfPhase));
+        }
 
-        bool operator<(const PhasingGraphEdge& that) const
+#if 0
+        bool sortByCounts(const PhasingGraphEdge& that) const
         {
             if(maxDiscordant < that.maxDiscordant) {
                 return true;
@@ -522,6 +540,11 @@ private:
             }
             return minConcordant > that.minConcordant;
         }
+        bool sortByProbabilities(const PhasingGraphEdge& that) const
+        {
+            return logP() > that.logP();
+        }
+#endif
         bool isSpanningTreeEdge = false;
     };
     using PhasingGraphBaseClass = boost::adjacency_list<
@@ -533,10 +556,15 @@ private:
     class PhasingGraph : public PhasingGraphBaseClass {
     public:
         void phase(bool debug);
-        void phase1(bool debug);
+        void phase1(bool debug, bool useBayesianModel);
         bool isConsistent(edge_descriptor) const;
         void writeGraphviz(const string& fileName) const;
         vector< shared_ptr<PhasedComponent> > phasedComponents;
+
+        // Sort edges in order of decreasing significance:
+        // - If using the Bayesian model, logP.
+        // - Otherwise, minConcordant/maxDiscordant.
+        void sortEdges(vector<edge_descriptor>& sortedEdges, bool useBayesianModel) const;
     };
 
     // Optimize chains before assembly, to remove assembly steps with

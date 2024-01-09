@@ -4,6 +4,7 @@
 #include "mode3b-PathGraph1.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
+#include "diploidBayesianPhase.hpp"
 #include "dominatorTree.hpp"
 #include "enumeratePaths.hpp"
 #include "findLinearChains.hpp"
@@ -149,7 +150,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
 
-    run3(threadCount0, threadCount1, true);
+    run3(threadCount0, threadCount1, false);
 }
 
 
@@ -163,7 +164,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     assembler(assembler)
 {
     load(fileName);
-    run3(threadCount0, threadCount1, true);
+    run3(threadCount0, threadCount1, false);
 }
 
 
@@ -179,6 +180,9 @@ void CompressedPathGraph1B::run(
     const uint64_t detangleToleranceHigh = 3;
     const uint64_t phasingThresholdLow = 1;
     const uint64_t phasingThresholdHigh = 6;
+    const bool useBayesianModel = false;
+    const double epsilon = 0.1;
+    const double minLogP = 10.;
     const uint64_t longBubbleThreshold = 5000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
@@ -212,7 +216,7 @@ void CompressedPathGraph1B::run(
         writeSnapshot(snapshotNumber);
     }
 
-    phaseBubbleChains(true, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(true, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     if(writeSnapshots) {
         writeSnapshot(snapshotNumber);
     }
@@ -222,7 +226,7 @@ void CompressedPathGraph1B::run(
         writeSnapshot(snapshotNumber);
     }
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     detangleShortSuperbubbles(100000, 1, detangleToleranceHigh);
@@ -231,31 +235,31 @@ void CompressedPathGraph1B::run(
     detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
     compress();
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(false, 1, 1, 4, longBubbleThreshold);
+    phaseBubbleChains(false, 1, 1, 4, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(false, 10, 1, 4, longBubbleThreshold);
+    phaseBubbleChains(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
 
     if(assembleSequence) {
 
@@ -296,6 +300,9 @@ void CompressedPathGraph1B::run1(
     const uint64_t detangleToleranceHigh = 3;
     const uint64_t phasingThresholdLow = 1;
     const uint64_t phasingThresholdHigh = 6;
+    const bool useBayesianModel = false;
+    const double epsilon = 0.1;
+    const double minLogP = 10.;
     const uint64_t longBubbleThreshold = 10000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
@@ -348,7 +355,7 @@ void CompressedPathGraph1B::run1(
         removeShortSuperbubbles(true, 1000, 3000);
         compress();
 
-        phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+        phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
         compress();
     }
 
@@ -363,7 +370,7 @@ void CompressedPathGraph1B::run1(
 
     write("D");
     writeGfaExpanded("D", false);
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     write("E");
     writeGfaExpanded("E", false);
     compress();
@@ -403,6 +410,9 @@ void CompressedPathGraph1B::run2(
     const uint64_t detangleToleranceHigh = 3;
     const uint64_t phasingThresholdLow = 1;
     const uint64_t phasingThresholdHigh = 3;
+    const bool useBayesianModel = false;
+    const double epsilon = 0.1;
+    const double minLogP = 10.;
     const uint64_t longBubbleThreshold = 20000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
@@ -415,7 +425,7 @@ void CompressedPathGraph1B::run2(
         detangleShortSuperbubblesGeneral(maxLength, detangleToleranceLow, detangleToleranceHigh);
         compress();
 
-        phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+        phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
         compress();
 
         maxLength = uint64_t(double(maxLength) / 1.2);
@@ -425,7 +435,7 @@ void CompressedPathGraph1B::run2(
         removeShortSuperbubbles(true, maxLength/3, maxLength);
         compress();
 
-        phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+        phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
         compress();
 
         maxLength = uint64_t(double(maxLength) * 1.2);
@@ -433,7 +443,7 @@ void CompressedPathGraph1B::run2(
 
     write("A");
     writeGfaExpanded("A", false);
-    phaseBubbleChains(true, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(true, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     write("B");
     writeGfaExpanded("B", false);
 
@@ -473,6 +483,9 @@ void CompressedPathGraph1B::run3(
     const uint64_t detangleToleranceHigh = 3;
     const uint64_t phasingThresholdLow = 1;
     const uint64_t phasingThresholdHigh = 6;
+    const bool useBayesianModel = false;
+    const double epsilon = 0.1;
+    const double minLogP = 10.;
     const uint64_t longBubbleThreshold = 5000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
@@ -502,12 +515,12 @@ void CompressedPathGraph1B::run3(
     detangleVerticesGeneral(false, 1, detangleToleranceHigh);
     compress();
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     writeGfaExpanded("A", false);
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     writeGfaExpanded("B", false);
@@ -522,7 +535,7 @@ void CompressedPathGraph1B::run3(
 
     writeGfaExpanded("D", false);
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     writeGfaExpanded("E", false);
@@ -532,7 +545,7 @@ void CompressedPathGraph1B::run3(
 
     writeGfaExpanded("F", false);
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     writeGfaExpanded("G", false);
@@ -542,7 +555,7 @@ void CompressedPathGraph1B::run3(
 
     writeGfaExpanded("H", false);
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     writeGfaExpanded("I", false);
@@ -552,7 +565,7 @@ void CompressedPathGraph1B::run3(
 
     writeGfaExpanded("J", false);
 
-    phaseBubbleChains(false, 1, 1, 4, longBubbleThreshold);
+    phaseBubbleChains(false, 1, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
     compress();
 
     writeGfaExpanded("K", false);
@@ -562,7 +575,7 @@ void CompressedPathGraph1B::run3(
 
     writeGfaExpanded("L", false);
 
-    phaseBubbleChains(false, 10, 1, 4, longBubbleThreshold);
+    phaseBubbleChains(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
 
     if(assembleSequence) {
 
@@ -3754,6 +3767,9 @@ void CompressedPathGraph1B::phaseBubbleChains(
     uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
     uint64_t lowThreshold,
     uint64_t highThreshold,
+    bool useBayesianModel,
+    double epsilon,
+    double minLogP,
     uint64_t longBubbleThreshold)
 {
     CompressedPathGraph1B& cGraph = *this;
@@ -3768,7 +3784,7 @@ void CompressedPathGraph1B::phaseBubbleChains(
     }
 
     for(const edge_descriptor ce: allEdges) {
-        phaseBubbleChain(ce, n, lowThreshold, highThreshold, longBubbleThreshold, debug);
+        phaseBubbleChain(ce, n, lowThreshold, highThreshold, useBayesianModel, epsilon, minLogP, longBubbleThreshold, debug);
     }
 
     if(debug) {
@@ -3783,6 +3799,9 @@ void CompressedPathGraph1B::phaseBubbleChain(
     uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
     uint64_t lowThreshold,
     uint64_t highThreshold,
+    bool useBayesianModel,
+    double epsilon,
+    double minLogP,
     uint64_t longBubbleThreshold,
     bool debug)
 {
@@ -3908,13 +3927,23 @@ void CompressedPathGraph1B::phaseBubbleChain(
             uint64_t minConcordant;
             uint64_t maxDiscordant;
             uint64_t total;
+            double logPInPhase;
+            double logPOutOfPhase;
             tangleMatrix.analyze(
                 lowThreshold,
                 highThreshold,
                 phase,
                 minConcordant,
                 maxDiscordant,
-                total);
+                total,
+                epsilon,
+                logPInPhase,
+                logPOutOfPhase);
+
+            // If no common reads, stop the loop on i1.
+            if(total == 0) {
+                break;
+            }
 
             if(detailedDebug) {
                 cout << "Tangle matrix " << i0 << " " << i1 << ": " <<
@@ -3924,11 +3953,24 @@ void CompressedPathGraph1B::phaseBubbleChain(
                     tangleMatrix[1][1] << endl;
                 cout << "minConcordant " << minConcordant << endl;
                 cout << "maxDiscordant " << maxDiscordant << endl;
+                cout << "log[p(in-phase)/p(random)] = " << logPInPhase <<
+                    " dB, log[p(out-of-phase)/p(random)] = " << logPOutOfPhase << " dB." << endl;
+            }
+
+            // If using the Bayesian model, redefine the phase based on logPInPhase and logPOutOfPhase.
+            if(useBayesianModel) {
+                if((logPInPhase > minLogP) and (logPInPhase - logPOutOfPhase) > minLogP) {
+                    phase = +1;
+                } else  if((logPOutOfPhase > minLogP) and (logPOutOfPhase - logPInPhase) > minLogP) {
+                    phase = -1;
+                } else {
+                    phase = 0;
+                }
             }
 
             // If not ambiguous, add an edge to the PhasingGraph.
             if(phase != 0) {
-                boost::add_edge(pv0, pv1, {phase, minConcordant, maxDiscordant}, phasingGraph);
+                boost::add_edge(pv0, pv1, {phase, minConcordant, maxDiscordant, logPInPhase, logPOutOfPhase}, phasingGraph);
 
                 if(detailedDebug) {
                     cout << " Added phasing graph edge " <<
@@ -3937,17 +3979,13 @@ void CompressedPathGraph1B::phaseBubbleChain(
                         minConcordant << ", maxDiscordant " << maxDiscordant << endl;
                 }
             } else {
-                if(false) {
+                if(detailedDebug) {
                     cout << " No phasing graph edge for " <<
                         phasingGraph[pv0].positionInBubbleChain << " " <<
                         phasingGraph[pv1].positionInBubbleChain << endl;
                 }
             }
 
-            // If no common reads, stop the loop on i1.
-            if(total == 0) {
-                break;
-            }
         }
     }
 
@@ -3960,7 +3998,7 @@ void CompressedPathGraph1B::phaseBubbleChain(
             " Average connectivity " << connectivity << endl;
     }
 
-    phasingGraph.phase1(false);
+    phasingGraph.phase1(false, useBayesianModel);
 
 
 
@@ -4413,11 +4451,75 @@ void CompressedPathGraph1B::PhasingGraph::phase(bool debug)
 
 
 
+// Sort edges in order of decreasing significance:
+// - If using the Bayesian model, logP.
+// - Otherwise, minConcordant/maxDiscordant.
+void CompressedPathGraph1B::PhasingGraph::sortEdges(
+    vector<edge_descriptor>& sortedEdges,
+    bool useBayesianModel) const
+{
+    const PhasingGraph& phasingGraph = *this;
+
+    if(useBayesianModel) {
+
+        // Gather edges and their logP.
+        vector< pair<edge_descriptor, double> > edgeTable;
+        BGL_FORALL_EDGES(pe, phasingGraph, PhasingGraph) {
+            const PhasingGraphEdge& edge = phasingGraph[pe];
+            edgeTable.push_back({pe, edge.logP()});
+        }
+
+        // Sort by decreasing logP.
+        sort(edgeTable.begin(), edgeTable.end(),
+            OrderPairsBySecondOnlyGreater<edge_descriptor, double>());
+        sortedEdges.clear();
+        for(const auto& p: edgeTable) {
+            sortedEdges.push_back(p.first);
+        }
+
+    } else {
+
+        // Gather edges by maxDiscordant and minConcordant.
+        // edgeTable[maxDiscordant][minConcordant] contains the
+        // edges with those values of maxDiscordant and minConcordant.
+        vector< vector< vector<edge_descriptor> > > edgeTable;
+        BGL_FORALL_EDGES(pe, phasingGraph, PhasingGraph) {
+            const PhasingGraphEdge& edge = phasingGraph[pe];
+            const uint64_t maxDiscordant = edge.maxDiscordant;
+            const uint64_t minConcordant = edge.minConcordant;
+            if(edgeTable.size() <= maxDiscordant) {
+                edgeTable.resize(maxDiscordant + 1);
+            }
+            vector< vector<edge_descriptor> >& v = edgeTable[maxDiscordant];
+            if(v.size() <= minConcordant) {
+                v.resize(minConcordant + 1);
+            }
+            v[minConcordant].push_back(pe);
+        }
+
+        // The sorted edges are in order of increasing maxDiscordant
+        // and decreasing minConcordant.
+        sortedEdges.clear();
+        for(uint64_t maxDiscordant=0; maxDiscordant<edgeTable.size(); maxDiscordant++) {
+            const vector< vector<edge_descriptor> >& v = edgeTable[maxDiscordant];
+            for(int64_t minConcordant=v.size()-1; minConcordant>=0; minConcordant--) {
+                const vector<edge_descriptor>& vv = v[minConcordant];
+                for(const edge_descriptor e: vv) {
+                    sortedEdges.push_back(e);
+                }
+            }
+        }
+
+    }
+}
+
+
+
 // To phase the PhasingGraph, we create an optimal spanning tree
 // using edges in order of decreasing "significance".
 // We do this iteratively. At each iteration we process the largest
 // connected component of the surviving PhasingGraph.
-void CompressedPathGraph1B::PhasingGraph::phase1(bool debug)
+void CompressedPathGraph1B::PhasingGraph::phase1(bool debug, bool useBayesianModel)
 {
     PhasingGraph& phasingGraph = *this;
     phasedComponents.clear();
@@ -4435,25 +4537,11 @@ void CompressedPathGraph1B::PhasingGraph::phase1(bool debug)
             phasingGraph[pe].isSpanningTreeEdge = false;
         }
 
-        // Gather edges by maxDiscordant and minConcordant.
-        // edgeTable[maxDiscordant][minConcordant] contains the
-        // edges with those values of maxDiscordant and minConcordant.
-        // This allows the code later to process edges in order
-        // of increasing maxDiscordant and decreasing minConcordant.
-        vector< vector< vector<edge_descriptor> > > edgeTable;
-        BGL_FORALL_EDGES(pe, phasingGraph, PhasingGraph) {
-            const PhasingGraphEdge& edge = phasingGraph[pe];
-            const uint64_t maxDiscordant = edge.maxDiscordant;
-            const uint64_t minConcordant = edge.minConcordant;
-            if(edgeTable.size() <= maxDiscordant) {
-                edgeTable.resize(maxDiscordant + 1);
-            }
-            vector< vector<edge_descriptor> >& v = edgeTable[maxDiscordant];
-            if(v.size() <= minConcordant) {
-                v.resize(minConcordant + 1);
-            }
-            v[minConcordant].push_back(pe);
-        }
+        // Sort edges in order of decreasing significance:
+        // - If using the Bayesian model, logP.
+        // - Otherwise, minConcordant/maxDiscordant.
+        vector<edge_descriptor> sortedEdges;
+        sortEdges(sortedEdges, useBayesianModel);
 
         // Map vertices to integers.
         // This is needed for the computation of the spanning tree and
@@ -4480,32 +4568,19 @@ void CompressedPathGraph1B::PhasingGraph::phase1(bool debug)
             disjointSets.make_set(i);
         }
         uint64_t spanningTreeEdgeCount = 0;
-        // Process edges in order of decreasing significance.
-        for(uint64_t maxDiscordant=0; maxDiscordant<edgeTable.size(); maxDiscordant++) {
-            const vector< vector<edge_descriptor> >& v = edgeTable[maxDiscordant];
-            for(int64_t minConcordant=v.size()-1; minConcordant>=0; minConcordant--) {
-                const vector<edge_descriptor>& vv = v[minConcordant];
-                if(false) {
-                    cout << "Processing " << vv.size() << " phasing graph edges with maxDiscordant=" <<
-                        maxDiscordant << ", minConcordant=" << minConcordant << endl;
-                }
-                for(const edge_descriptor e: vv) {
-                    PhasingGraphEdge& edge = phasingGraph[e];
-                    const vertex_descriptor pv0 = source(e, phasingGraph);
-                    const vertex_descriptor pv1 = target(e, phasingGraph);
-                    const uint64_t vertexIndex0 = vertexIndexMap[pv0];
-                    const uint64_t vertexIndex1 = vertexIndexMap[pv1];
-                    const uint64_t componentId0 = disjointSets.find_set(vertexIndex0);
-                    const uint64_t componentId1 = disjointSets.find_set(vertexIndex1);
-                    if(componentId0 != componentId1) {
-                        disjointSets.union_set(vertexIndex0, vertexIndex1);
-                        edge.isSpanningTreeEdge = true;
-                        ++spanningTreeEdgeCount;
-                    }
-                }
-                if(false) {
-                    cout << "Found " << spanningTreeEdgeCount << " spanning tree edges so far." << endl;
-                }
+
+        for(const edge_descriptor e: sortedEdges) {
+            PhasingGraphEdge& edge = phasingGraph[e];
+            const vertex_descriptor pv0 = source(e, phasingGraph);
+            const vertex_descriptor pv1 = target(e, phasingGraph);
+            const uint64_t vertexIndex0 = vertexIndexMap[pv0];
+            const uint64_t vertexIndex1 = vertexIndexMap[pv1];
+            const uint64_t componentId0 = disjointSets.find_set(vertexIndex0);
+            const uint64_t componentId1 = disjointSets.find_set(vertexIndex1);
+            if(componentId0 != componentId1) {
+                disjointSets.union_set(vertexIndex0, vertexIndex1);
+                edge.isSpanningTreeEdge = true;
+                ++spanningTreeEdgeCount;
             }
         }
 
@@ -4811,7 +4886,11 @@ void CompressedPathGraph1B::TangleMatrix::analyze(
     int64_t& phase,
     uint64_t& minConcordant,
     uint64_t& maxDiscordant,
-    uint64_t& total) const
+    uint64_t& total,
+    double epsilon,
+    double& logPin, // log[P(in-phase)/P(random)] in decibels
+    double& logPout // log[P(out-of-phase)/P(random)] in decibels
+    ) const
 {
     const TangleMatrix& m = *this;
 
@@ -4856,6 +4935,8 @@ void CompressedPathGraph1B::TangleMatrix::analyze(
         minConcordant = 0;
         maxDiscordant = 0;
     }
+
+    tie(logPin, logPout) = diploidBayesianPhase(m, epsilon);
 }
 
 
