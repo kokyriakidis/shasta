@@ -519,75 +519,75 @@ void CompressedPathGraph1B::run3(
     compress();
     splitTerminalHaploidBubbles();
 
-    writeGfaExpanded("A", false);
+    write("A");
 
     phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
     splitTerminalHaploidBubbles();
 
-    writeGfaExpanded("B", false);
+    write("B");
 
     detangleShortSuperbubbles(100000, 1, detangleToleranceHigh);
     compress();
 
-    writeGfaExpanded("C", false);
+    write("C");
 
     detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
     compress();
 
-    writeGfaExpanded("D", false);
+    write("D");
 
     phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
     splitTerminalHaploidBubbles();
 
-    writeGfaExpanded("E", false);
+    write("E");
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    writeGfaExpanded("F", false);
+    write("F");
 
     phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
     splitTerminalHaploidBubbles();
 
-    writeGfaExpanded("G", false);
+    write("G");
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    writeGfaExpanded("H", false);
+    write("H");
 
     phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
     splitTerminalHaploidBubbles();
 
-    writeGfaExpanded("I", false);
+    write("I");
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    writeGfaExpanded("J", false);
+    write("J");
 
     phaseBubbleChains(false, 1, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
     compress();
     splitTerminalHaploidBubbles();
 
-    writeGfaExpanded("K", false);
+    write("K");
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    writeGfaExpanded("L", false);
+    write("L");
 
     phaseBubbleChains(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
     compress();
     splitTerminalHaploidBubbles();
 
-    writeGfaExpanded("M", false);
+    write("M");
     detangleShortSuperbubblesGeneral(30000, 1, detangleToleranceHigh);
-    writeGfaExpanded("N", false);
+    write("N");
     compress();
     phaseBubbleChains(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
     compress();
@@ -606,15 +606,12 @@ void CompressedPathGraph1B::run3(
         assembleChains(threadCount0, threadCount1);
 
         // Final output.
-        write("Final");
-        writeGfaExpanded("Final", true);
-        writeFastaExpanded("Final");
+        write("Final", true);
 
     } else {
 
         // Skip sequence assembly.
         write("Final");
-        writeGfaExpanded("Final", false);
     }
 
 #if 0
@@ -1036,7 +1033,7 @@ bool CompressedPathGraph1B::compress()
 
 
 
-void CompressedPathGraph1B::write(const string& name) const
+void CompressedPathGraph1B::write(const string& name, bool writeSequence) const
 {
     const string fileNamePrefix = name + "-" + to_string(componentId);
 
@@ -1047,6 +1044,10 @@ void CompressedPathGraph1B::write(const string& name) const
     writeGraphviz(fileNamePrefix, true);
     writeGraphviz(fileNamePrefix, false);
     writeGfa(fileNamePrefix);
+    writeGfaExpanded(name, writeSequence);
+    if(writeSequence) {
+        writeFastaExpanded(name);
+    }
 }
 
 

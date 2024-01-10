@@ -597,7 +597,7 @@ private:
 
 
     // Output.
-    void write(const string& name) const;
+    void write(const string& name, bool writeSequence = false) const;
     void writeCsv(const string& fileNamePrefix) const;
     void writeBubbleChainsCsv(const string& fileNamePrefix) const;
     void writeBubblesCsv(const string& fileNamePrefix) const;
