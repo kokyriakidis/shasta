@@ -332,9 +332,11 @@ private:
 
     // Edge detangling.
     bool detangleEdges(
+        bool debug,
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
     bool detangleEdge(
+        bool debug,
         std::map<uint64_t, edge_descriptor>& edgeMap,
         std::map<uint64_t, edge_descriptor>::iterator&,
         uint64_t detangleToleranceLow,
@@ -431,6 +433,10 @@ private:
         uint64_t superbubbleId,
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
+
+    // Split terminal haploid bubbles out of bubble chains, to facilitate detangling.
+    void splitTerminalHaploidBubbles();
+    void splitTerminalHaploidBubbles(edge_descriptor);
 
 
     // Phasing of bubble chains.
