@@ -2,6 +2,7 @@
 #include "mode3b-PhasingTable.hpp"
 #include "mode3b-CompressedPathGraph1B.hpp"
 #include "Assembler.hpp"
+#include "html.hpp"
 #include "orderPairs.hpp"
 using namespace shasta;
 using namespace mode3b;
@@ -37,58 +38,8 @@ void CompressedPathGraph1B::writeBubbleChainsPhasingTables(const string& fileNam
             phasingTable.orientedReadCount() << " oriented reads." << endl;
 
         // Write to csv.
-        phasingTable.writeCsv(directoryName + "/" + bubbleChainStringId(ce));
+        phasingTable.write(directoryName + "/" + bubbleChainStringId(ce));
 
-#if 0
-        // Test indexing.
-        {
-            const OrientedReadId orientedReadId100(100, 0);
-            const OrientedReadId orientedReadId101(101, 0);
-            const OrientedReadId orientedReadId102(102, 0);
-            const OrientedReadId orientedReadId103(103, 0);
-            const OrientedReadId orientedReadId104(104, 0);
-
-            PhasingTable phasingTable;
-            phasingTable.insert({orientedReadId100, 1000, {0, 0}});
-            phasingTable.insert({orientedReadId100, 1001, {0, 0}});
-            phasingTable.insert({orientedReadId100, 1002, {0, 0}});
-            phasingTable.insert({orientedReadId100, 1003, {0, 0}});
-            phasingTable.insert({orientedReadId100, 1004, {0, 0}});
-            phasingTable.insert({orientedReadId101, 1000, {0, 0}});
-            phasingTable.insert({orientedReadId101, 1001, {0, 0}});
-            phasingTable.insert({orientedReadId101, 1002, {0, 0}});
-            phasingTable.insert({orientedReadId101, 1003, {0, 0}});
-            phasingTable.insert({orientedReadId101, 1004, {0, 0}});
-            phasingTable.insert({orientedReadId102, 1000, {0, 0}});
-            phasingTable.insert({orientedReadId102, 1001, {0, 0}});
-            phasingTable.insert({orientedReadId102, 1002, {0, 0}});
-            phasingTable.insert({orientedReadId102, 1003, {0, 0}});
-            phasingTable.insert({orientedReadId102, 1004, {0, 0}});
-
-            cout << "*** " << phasingTable.size() << endl;
-
-            const auto& indexByBoth = phasingTable.get<0>();
-            const auto& indexByOrientedReadId = phasingTable.get<1>();
-            const auto& indexByPosition = phasingTable.get<2>();
-
-            indexByBoth.find(make_tuple(orientedReadId101, 0));
-            indexByOrientedReadId.find(orientedReadId101);
-            indexByPosition.find(1002);
-
-            cout << "All entries for " << orientedReadId101 << endl;
-            for(auto it=indexByOrientedReadId.find(orientedReadId101); it->orientedReadId==orientedReadId101; ++it) {
-                const auto& entry = *it;
-                cout << entry.orientedReadId << " " << entry.positionInBubbleChain << endl;
-            }
-
-            const uint64_t positionInBubbleChain = 1002;
-            cout << "All entries for position " << positionInBubbleChain << endl;
-            for(auto it=indexByPosition.find(positionInBubbleChain); it->positionInBubbleChain==positionInBubbleChain; ++it) {
-                const auto& entry = *it;
-                cout << entry.orientedReadId << " " << entry.positionInBubbleChain << endl;
-            }
-        }
-#endif
     }
 }
 
@@ -158,6 +109,14 @@ void PhasingTable::fill(
 
 
 
+void PhasingTable::write(const string& fileNamePrefix) const
+{
+    writeCsv(fileNamePrefix);
+    writeHtml(fileNamePrefix);
+}
+
+
+
 void PhasingTable::writeCsv(const string& fileNamePrefix) const
 {
     writeOrientedReadsCsv(fileNamePrefix);
@@ -218,6 +177,39 @@ void PhasingTable::writeDetailsCsv(const string& fileNamePrefix) const
             csv << "\n";
         }
     }
+}
+
+
+
+void PhasingTable::writeHtml(const string& fileNamePrefix) const
+{
+    const auto& indexByBoth = get<0>();
+
+    ofstream html(fileNamePrefix + ".html");
+    writeHtmlBegin(html, "Phasing Table");
+
+    html << "<body><canvas id='canvas1' width='" << bubbleCount() <<
+        "' height='" << orientedReadCount() << "' style='border:1px solid #000000;'></canvas>\n";
+
+    html <<
+        "<script>\n"
+        "var canvas = document.getElementById('canvas1');\n"
+        "var c = canvas.getContext('2d');\n"
+        "c.fillStyle = 'white';\n"
+        "c.fillRect(0, 0, " << bubbleCount() << ", " << orientedReadCount() << ");\n"
+        "c.fillStyle = 'hsl(0, 100%, 50%)';\n";
+    for(const PhasingTableEntry& entry: indexByBoth) {
+        const double fraction = entry.fraction0();
+        const double angle = 360. - 120. * fraction;
+        uint64_t iAngle = uint64_t(std::round(angle));
+        iAngle = min(iAngle, 360UL);
+        html << "c.fillStyle = 'hsl(" << iAngle << ", 100%, 50%)';\n";
+        html << "c.fillRect(" << entry.bubbleIndex << ", " << entry.orientedReadIndex << ", 1, 1);\n";
+    }
+    html << "</script>";
+
+    html << "</body>";
+    writeHtmlEnd(html);
 }
 
 

@@ -49,6 +49,11 @@ public:
     // The two entries in the array corresponds to the two chains of the diploid Bubble.
     array<uint64_t, 2> frequency = {0, 0};
 
+    const double fraction0() const
+    {
+        return double(frequency[0]) / double(frequency[0] + frequency[1]);
+    }
+
     pair<OrientedReadId, uint64_t> key() const
     {
         return *reinterpret_cast< const pair<OrientedReadId, uint64_t>* >(&orientedReadId);
@@ -90,7 +95,7 @@ public:
         const BubbleChain&,
         const MarkerGraph&);
 
-    void writeCsv(const string& fileNamePrefix) const;
+    void write(const string& fileNamePrefix) const;
 
     uint64_t bubbleCount() const
     {
@@ -132,9 +137,11 @@ private:
     std::map<OrientedReadId, uint64_t> orientedReadIdsMap;
 
 
+    void writeCsv(const string& fileNamePrefix) const;
     void writeOrientedReadsCsv(const string& fileNamePrefix) const;
     void writeBubblesCsv(const string& fileNamePrefix) const;
     void writeDetailsCsv(const string& fileNamePrefix) const;
+    void writeHtml(const string& fileNamePrefix) const;
 };
 
 #endif
