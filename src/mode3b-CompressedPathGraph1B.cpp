@@ -150,7 +150,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
 
-    run3(threadCount0, threadCount1, true);
+    run3(threadCount0, threadCount1, false);
 }
 
 
@@ -164,7 +164,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     assembler(assembler)
 {
     load(fileName);
-    run3(threadCount0, threadCount1, true);
+    run3(threadCount0, threadCount1, false);
 }
 
 
@@ -514,6 +514,8 @@ void CompressedPathGraph1B::run3(
 
     detangleVerticesGeneral(false, 1, detangleToleranceHigh);
     compress();
+
+    writeBubbleChainsPhasingTables("AA");
 
     phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
@@ -1091,6 +1093,7 @@ void CompressedPathGraph1B::writeBubbleChainsCsv(const string& fileNamePrefix) c
         csv << "\n";
     }
 }
+
 
 
 

@@ -157,6 +157,7 @@ public:
     {
         ar & boost::serialization::base_object< vector<Bubble> >(*this);
     }
+
 };
 
 
@@ -600,6 +601,7 @@ private:
     void write(const string& name, bool writeSequence = false) const;
     void writeCsv(const string& fileNamePrefix) const;
     void writeBubbleChainsCsv(const string& fileNamePrefix) const;
+    void writeBubbleChainsPhasingTables(const string& fileNamePrefix) const;
     void writeBubblesCsv(const string& fileNamePrefix) const;
     void writeChainsCsv(const string& fileNamePrefix) const;
     void writeChainsDetailsCsv(const string& fileNamePrefix) const;
