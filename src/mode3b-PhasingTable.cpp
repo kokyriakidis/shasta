@@ -4,6 +4,7 @@
 #include "Assembler.hpp"
 #include "html.hpp"
 #include "orderPairs.hpp"
+#include "PngImage.hpp"
 using namespace shasta;
 using namespace mode3b;
 
@@ -113,6 +114,7 @@ void PhasingTable::write(const string& fileNamePrefix) const
 {
     writeCsv(fileNamePrefix);
     writeHtml(fileNamePrefix);
+    writePng(fileNamePrefix + ".png");
 }
 
 
@@ -199,17 +201,48 @@ void PhasingTable::writeHtml(const string& fileNamePrefix) const
         "c.fillRect(0, 0, " << bubbleCount() << ", " << orientedReadCount() << ");\n"
         "c.fillStyle = 'hsl(0, 100%, 50%)';\n";
     for(const PhasingTableEntry& entry: indexByBoth) {
-        const double fraction = entry.fraction0();
-        const double angle = 360. - 120. * fraction;
-        uint64_t iAngle = uint64_t(std::round(angle));
-        iAngle = min(iAngle, 360UL);
-        html << "c.fillStyle = 'hsl(" << iAngle << ", 100%, 50%)';\n";
+        html << "c.fillStyle = 'hsl(" << entry.hue() << ", 100%, 50%)';\n";
         html << "c.fillRect(" << entry.bubbleIndex << ", " << entry.orientedReadIndex << ", 1, 1);\n";
     }
     html << "</script>";
 
     html << "</body>";
     writeHtmlEnd(html);
+}
+
+
+
+void PhasingTable::writePng(const string& fileName) const
+{
+    const auto& indexByBoth = get<0>();
+
+    PngImage image{int(bubbleCount()), int(orientedReadCount())};
+    for(uint64_t x=0; x<bubbleCount(); x++) {
+        for(uint64_t y=0; y<orientedReadCount(); y++) {
+            image.setPixel(int(x), int(y), 255, 255, 255);
+        }
+    }
+
+    for(const PhasingTableEntry& entry: indexByBoth) {
+        const double fraction0 = entry.fraction0();
+
+        // Compute (r, g, b) values that give:
+        // - Red if fraction0 is 1.
+        // - Blue if fraction1 is 0.
+        int r, g, b;
+        if(fraction0 >= 0.5) {
+            r = 255;
+            g = 0;
+            b = int(std::round((1. - fraction0) * 510.));
+        } else {
+            r = int(std::round(fraction0 * 510.));;
+            g = 0;
+            b = 255;
+        }
+        image.setPixel(int(entry.bubbleIndex), int(entry.orientedReadIndex), r, g, b);
+    }
+
+    image.write(fileName);
 }
 
 

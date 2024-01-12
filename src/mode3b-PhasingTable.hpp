@@ -14,6 +14,7 @@
 // Standard libraries.
 #include "array.hpp"
 #include <map>
+#include <cmath>
 #include "utility.hpp"
 #include "vector.hpp"
 
@@ -52,6 +53,16 @@ public:
     const double fraction0() const
     {
         return double(frequency[0]) / double(frequency[0] + frequency[1]);
+    }
+
+    // The hue corresponding to fraction0().
+    // This is an in integer in [240,360} that can be use directly
+    // as the first argument of an hsl color definition.
+    // It is 360 (red) when fraction0() is 1 (frequency is 100% on side 0)
+    // and 240 (blue) when fraction0() is 0 (frequency is 100% on side 1).
+    uint64_t hue() const
+    {
+        return uint64_t(std::round(240. + 120. * fraction0()));
     }
 
     pair<OrientedReadId, uint64_t> key() const
@@ -96,6 +107,7 @@ public:
         const MarkerGraph&);
 
     void write(const string& fileNamePrefix) const;
+    void writePng(const string& fileName) const;
 
     uint64_t bubbleCount() const
     {
