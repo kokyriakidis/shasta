@@ -50,19 +50,16 @@ public:
     // The two entries in the array corresponds to the two chains of the diploid Bubble.
     array<uint64_t, 2> frequency = {0, 0};
 
-    const double fraction0() const
+    // The phase is:
+    // * +1 if this oriented read always appears in Chain 0 (that is, frequency[1] is 0).
+    // * -1 if this oriented read always appears in Chain 1 (that is, frequency[0] is 0).
+    // * 0 if this oriented appears with equal frequency on Chain 0 and Chain 1
+    //   (that is, frequency[0] = frequency[1]).
+    // This does not take into accoubnt possible flipping of the Bubble
+    // as stored in the PhasingTable.
+    double phase() const
     {
-        return double(frequency[0]) / double(frequency[0] + frequency[1]);
-    }
-
-    // The hue corresponding to fraction0().
-    // This is an in integer in [240,360} that can be use directly
-    // as the first argument of an hsl color definition.
-    // It is 360 (red) when fraction0() is 1 (frequency is 100% on side 0)
-    // and 240 (blue) when fraction0() is 0 (frequency is 100% on side 1).
-    uint64_t hue() const
-    {
-        return uint64_t(std::round(240. + 120. * fraction0()));
+        return 2. * double(frequency[0]) / double(frequency[0] + frequency[1]) - 1.;
     }
 
     pair<OrientedReadId, uint64_t> key() const
@@ -104,10 +101,17 @@ public:
 
     PhasingTable(
         const BubbleChain&,
-        const MarkerGraph&);
+        const MarkerGraph&,
+        double phaseError);
 
     void write(const string& fileNamePrefix) const;
-    void writePng(const string& fileName) const;
+    void writePng(const string& fileName, bool colorByType) const;
+
+    uint64_t entryCount() const
+    {
+        return size();
+    }
+    uint64_t unambiguousEntryCount() const;
 
     uint64_t bubbleCount() const
     {
@@ -119,7 +123,14 @@ public:
         return orientedReadInfos.size();
     }
 
+    void flipSweep();
+    uint64_t discordantCount() const;
+
 private:
+    double phaseError;
+    double phaseThresholdPlus;
+    double phaseThresholdMinus;
+
     void fill(
         const BubbleChain&,
         const MarkerGraph&);
@@ -127,9 +138,31 @@ private:
     class Bubble {
     public:
         uint64_t positionInBubbleChain;
+        bool flip = false;  // 0 and 1 sides should be swapped.
     };
     vector<Bubble> bubbles;
     void gatherBubbles();
+
+    // The phase of a PhasingTableEntry, taking into account possible flipping
+    // of the bubble.
+    // The phase is in [-1., 1.].
+    double phase(const PhasingTableEntry& phasingTableEntry) const
+    {
+        double p = phasingTableEntry.phase();
+        if(bubbles[phasingTableEntry.bubbleIndex].flip) {
+            p = -p;
+        }
+        return p;
+    }
+
+    // The hue corresponding to a phase. This is:
+    // 360 (red) if phase is +1 (that is, all frequency is on Chain 0).
+    // 300 (magenta) if phase is 0.
+    // 240 (blue) if phase is -1 (that is, all frequency is on Chain 1).
+    static uint64_t hue(double phase)
+    {
+        return uint64_t(std::round(300. + 60. * phase));
+    }
 
     // Map a positionInBubbleChain to an index in the bubbles vector.
     std::map<uint64_t, uint64_t> bubblesMap;
@@ -143,11 +176,19 @@ private:
     void gatherOrientedReads();
     vector<OrientedReadInfo> orientedReadInfos;
 
+    // Count the number of PhaseTableEntries for a given oriented read
+    // with phase +1 or -1, allowing a phaseError discrepancy up to phase Error.
+    // That is, count0 is the number of oriented read entries with phase >= 1 - phaseError,
+    // and count1 is the number of oriented read entries with phase <= -1 + phaseError.
+    void count(
+        OrientedReadId,
+        uint64_t& countPlus,
+        uint64_t& countMinus) const;
+
     void fillIndexes();
 
     // Map OrientedReadId to an index in the orientedReadInfos vector.
     std::map<OrientedReadId, uint64_t> orientedReadIdsMap;
-
 
     void writeCsv(const string& fileNamePrefix) const;
     void writeOrientedReadsCsv(const string& fileNamePrefix) const;

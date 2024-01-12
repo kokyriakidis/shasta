@@ -16,7 +16,9 @@ using namespace mode3b;
 #include "tuple.hpp"
 
 
-void CompressedPathGraph1B::writeBubbleChainsPhasingTables(const string& fileNamePrefix) const
+void CompressedPathGraph1B::writeBubbleChainsPhasingTables(
+    const string& fileNamePrefix,
+    double phaseError) const
 {
     const CompressedPathGraph1B& cGraph = *this;
 
@@ -32,14 +34,25 @@ void CompressedPathGraph1B::writeBubbleChainsPhasingTables(const string& fileNam
         const BubbleChain& bubbleChain = edge;
 
         // Create the phasing table for this bubble chain.
-        PhasingTable phasingTable(bubbleChain, assembler.markerGraph);
+        PhasingTable phasingTable(bubbleChain, assembler.markerGraph, phaseError);
 
         cout << "Phasing table for " << bubbleChainStringId(ce) <<
-            " has " << phasingTable.bubbleCount() << " bubbles and " <<
+            " has " << phasingTable.entryCount() <<
+            " entries (of which " << phasingTable.unambiguousEntryCount() <<
+            " unambiguous) for " <<
+             phasingTable.bubbleCount() << " bubbles and " <<
             phasingTable.orientedReadCount() << " oriented reads." << endl;
 
         // Write to csv.
         phasingTable.write(directoryName + "/" + bubbleChainStringId(ce));
+
+        for(uint64_t i=0; i<6; i++) {
+            cout << "Discordant count before sweep " << i << " = " << phasingTable.discordantCount() << endl;
+            phasingTable.flipSweep();
+        }
+        cout << "Final discordant count = " << phasingTable.discordantCount() << endl;
+        phasingTable.writePng(directoryName + "/" + bubbleChainStringId(ce) + "-sweep.png", false);
+        phasingTable.writePng(directoryName + "/" + bubbleChainStringId(ce) + "-sweep-byType.png", true);
 
     }
 }
@@ -48,7 +61,11 @@ void CompressedPathGraph1B::writeBubbleChainsPhasingTables(const string& fileNam
 
 PhasingTable::PhasingTable(
     const BubbleChain& bubbleChain,
-    const MarkerGraph& markerGraph)
+    const MarkerGraph& markerGraph,
+    double phaseError) :
+    phaseError(phaseError),
+    phaseThresholdPlus(1. - phaseError),
+    phaseThresholdMinus(-1. + phaseError)
 {
     fill(bubbleChain, markerGraph);
     gatherBubbles();
@@ -114,7 +131,7 @@ void PhasingTable::write(const string& fileNamePrefix) const
 {
     writeCsv(fileNamePrefix);
     writeHtml(fileNamePrefix);
-    writePng(fileNamePrefix + ".png");
+    writePng(fileNamePrefix + ".png", true);
 }
 
 
@@ -201,7 +218,8 @@ void PhasingTable::writeHtml(const string& fileNamePrefix) const
         "c.fillRect(0, 0, " << bubbleCount() << ", " << orientedReadCount() << ");\n"
         "c.fillStyle = 'hsl(0, 100%, 50%)';\n";
     for(const PhasingTableEntry& entry: indexByBoth) {
-        html << "c.fillStyle = 'hsl(" << entry.hue() << ", 100%, 50%)';\n";
+        const uint64_t h = hue(phase(entry));
+        html << "c.fillStyle = 'hsl(" << h << ", 100%, 50%)';\n";
         html << "c.fillRect(" << entry.bubbleIndex << ", " << entry.orientedReadIndex << ", 1, 1);\n";
     }
     html << "</script>";
@@ -212,9 +230,32 @@ void PhasingTable::writeHtml(const string& fileNamePrefix) const
 
 
 
-void PhasingTable::writePng(const string& fileName) const
+// For color by type:
+// - Green = concordant.
+// - Red = discordant.
+// - Yellow = ambiguous.
+void PhasingTable::writePng(const string& fileName, bool colorByType) const
 {
     const auto& indexByBoth = get<0>();
+
+    // Compute the phase (+1, 0, or -1) for each oriented read.
+    // Only needed if colorByType.
+    vector<int64_t> orientedReadsPhase(orientedReadInfos.size());
+    if(colorByType) {
+        orientedReadsPhase.resize(orientedReadInfos.size());
+        for(uint64_t i=0; i<orientedReadInfos.size(); i++) {
+            uint64_t countPlus;
+            uint64_t countMinus;
+            count(orientedReadInfos[i].orientedReadId, countPlus, countMinus);
+            if(countPlus > countMinus) {
+                orientedReadsPhase[i] = +1;
+            } else if(countPlus < countMinus) {
+                orientedReadsPhase[i] = -1;
+            } else {
+                orientedReadsPhase[i] = 0;
+            }
+        }
+    }
 
     PngImage image{int(bubbleCount()), int(orientedReadCount())};
     for(uint64_t x=0; x<bubbleCount(); x++) {
@@ -223,24 +264,51 @@ void PhasingTable::writePng(const string& fileName) const
         }
     }
 
+    uint64_t totalRed = 0;
     for(const PhasingTableEntry& entry: indexByBoth) {
-        const double fraction0 = entry.fraction0();
+        const double p = phase(entry);
 
-        // Compute (r, g, b) values that give:
-        // - Red if fraction0 is 1.
-        // - Blue if fraction1 is 0.
         int r, g, b;
-        if(fraction0 >= 0.5) {
-            r = 255;
-            g = 0;
-            b = int(std::round((1. - fraction0) * 510.));
+        if(colorByType) {
+            if(p>phaseThresholdMinus and p<phaseThresholdPlus) {
+                // Ambiguous
+                r = 255;
+                g = 255;
+                b = 0;
+            } else {
+                const int64_t iPhase = (p > phaseThresholdPlus) ? +1 : -1;
+                if(iPhase == orientedReadsPhase[entry.orientedReadIndex]) {
+                    // Concordant.
+                    r = 0;
+                    g = 255;
+                    b = 0;
+                } else {
+                    // Discordant.
+                    r = 255;
+                    g = 0;
+                    b = 0;
+                    ++totalRed;
+                }
+            }
+
         } else {
-            r = int(std::round(fraction0 * 510.));;
-            g = 0;
-            b = 255;
+
+            // Compute (r, g, b) values that give:
+            // - Red if p is 1.
+            // - Blue if p is -1.
+            if(p >= 0.) {
+                r = 255;
+                g = 0;
+                b = int(std::round((1. - p) * 255.));
+            } else {
+                r = int(std::round((1. + p) * 255.));
+                g = 0;
+                b = 255;
+            }
         }
         image.setPixel(int(entry.bubbleIndex), int(entry.orientedReadIndex), r, g, b);
     }
+    cout << "*** totalRed " << totalRed << endl;
 
     image.write(fileName);
 }
@@ -352,4 +420,111 @@ void PhasingTableEntry::writeCsv(ostream& csv) const
     csv << orientedReadIndex << ",";
     csv << frequency[0] << ",";
     csv << frequency[1] << ",";
+}
+
+
+
+void PhasingTable::flipSweep()
+{
+    const auto& indexByOrientedReadId = get<1>();
+
+    // Loop over oriented reads.
+    vector<uint64_t> plusBubbles;
+    vector<uint64_t> minusBubbles;
+    for(uint64_t i=0; i<orientedReadCount(); i++) {
+        const OrientedReadId orientedReadId = orientedReadInfos[i].orientedReadId;
+
+        // Gather the bubbles where this oriented read appears with phase +1 or -1
+        // (with tolerance equal to phaseError).
+        plusBubbles.clear();
+        minusBubbles.clear();
+        for(auto it=indexByOrientedReadId.find(orientedReadId);
+            it!=indexByOrientedReadId.end() and it->orientedReadId == orientedReadId; ++it) {
+            const PhasingTableEntry& phasingTableEntry = *it;
+
+            // Compute the phase for this entry, taking into account possible flip of the Bubble.
+            const double p = phase(phasingTableEntry);
+
+            if(p >= phaseThresholdPlus) {
+                plusBubbles.push_back(phasingTableEntry.bubbleIndex);
+            } else if(p <= phaseThresholdMinus) {
+                minusBubbles.push_back(phasingTableEntry.bubbleIndex);
+            }
+        }
+
+
+        // If there are more plusBubbles than minusBubbles, flip the minusBubbles.
+        // If there are more minusBubbles than plusBubbles, flip the plusBubbles.
+        if(plusBubbles.size() == minusBubbles.size()) {
+            continue;
+        }
+        const vector<uint64_t>& bubblesToFlip =
+            (plusBubbles.size() > minusBubbles.size()) ? minusBubbles : plusBubbles;
+        for(const uint64_t bubbleIndex: bubblesToFlip) {
+            Bubble& bubble = bubbles[bubbleIndex];
+            bubble.flip = not bubble.flip;
+        }
+    }
+}
+
+
+
+// Count the number of PhaseTableEntries for a given oriented read
+// with phase +1 or -1, allowing a phaseError discrepancy up to phase Error.
+// That is, countPlus is the number of oriented read entries with phase >= 1 - phaseError,
+// and countMinus is the number of oriented read entries with phase <= -1 + phaseError.
+void PhasingTable::count(
+    OrientedReadId orientedReadId,
+    uint64_t& countPlus,
+    uint64_t& countMinus) const
+{
+    countPlus = 0;
+    countMinus = 0;
+
+    const auto& indexByOrientedReadId = get<1>();
+
+    for(auto it=indexByOrientedReadId.find(orientedReadId);
+        it!=indexByOrientedReadId.end() and it->orientedReadId == orientedReadId; ++it) {
+        const PhasingTableEntry& phasingTableEntry = *it;
+
+        // Compute the phase for this entry, taking into account possible flip of the Bubble.
+        const double p = phase(phasingTableEntry);
+
+        if(p >= phaseThresholdPlus) {
+            ++countPlus;
+        } else if(p <= phaseThresholdMinus) {
+            ++countMinus;
+        }
+    }
+}
+
+
+
+uint64_t PhasingTable::discordantCount() const
+{
+    uint64_t n = 0;
+    for(uint64_t i=0; i<orientedReadCount(); i++) {
+        const OrientedReadId orientedReadId = orientedReadInfos[i].orientedReadId;
+        uint64_t countPlus;
+        uint64_t countMinus;
+        count(orientedReadId, countPlus, countMinus);
+        n += min(countPlus, countMinus);
+    }
+    return n;
+}
+
+
+
+uint64_t PhasingTable::unambiguousEntryCount() const
+{
+    const auto& indexByBoth = get<0>();
+
+    uint64_t n = 0;
+    for(const PhasingTableEntry& entry: indexByBoth) {
+        const double p = phase(entry);
+        if(p > phaseThresholdPlus or p < phaseThresholdMinus) {
+            ++n;
+        }
+    }
+    return n;
 }

@@ -489,6 +489,7 @@ void CompressedPathGraph1B::run3(
     const uint64_t longBubbleThreshold = 5000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
+    const double phaseError = 0.1;
 
     // const bool writeSnapshots = true;
     // uint64_t snapshotNumber = 0;
@@ -515,7 +516,7 @@ void CompressedPathGraph1B::run3(
     detangleVerticesGeneral(false, 1, detangleToleranceHigh);
     compress();
 
-    writeBubbleChainsPhasingTables("AA");
+    writeBubbleChainsPhasingTables("AA", phaseError);
 
     phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
