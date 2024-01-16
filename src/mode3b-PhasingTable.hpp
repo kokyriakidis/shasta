@@ -36,13 +36,23 @@ namespace shasta {
 // appears on non-terminal marker graph edges of the two Chains of the diploid Bubble.
 class shasta::mode3b::PhasingTableEntry {
 public:
+
+    PhasingTableEntry(
+        OrientedReadId orientedReadId,
+        uint64_t positionInBubbleChain) :
+        orientedReadId(orientedReadId),
+        positionInBubbleChain(positionInBubbleChain)
+        {}
+
+    // The OrientedReadId this PhasingTableEntry refers to,
+    // and its index in the PhasingTable::orientedReads vector.
     OrientedReadId orientedReadId;
+    uint64_t orientedReadIndex = invalid<uint64_t>;
 
     // The position in the bubble chain of the diploid bubble
-    // this PhasingTableEntry refers to.
+    // this PhasingTableEntry refers to,
+    // and its index in the PhasingTable::orientedReads vector.
     uint64_t positionInBubbleChain;
-
-    uint64_t orientedReadIndex = invalid<uint64_t>;
     uint64_t bubbleIndex = invalid<uint64_t>;
 
     // The number of times this oriented read
@@ -50,21 +60,33 @@ public:
     // The two entries in the array corresponds to the two chains of the diploid Bubble.
     array<uint64_t, 2> frequency = {0, 0};
 
-    // The phase is:
+    // The phase of this oriented read relative to this bubble
+    // is computed from the frequency array.
+
+    // The relative phase varies continuously between -1 and 1 and is:
     // * +1 if this oriented read always appears in Chain 0 (that is, frequency[1] is 0).
     // * -1 if this oriented read always appears in Chain 1 (that is, frequency[0] is 0).
     // * 0 if this oriented appears with equal frequency on Chain 0 and Chain 1
     //   (that is, frequency[0] = frequency[1]).
-    // This does not take into accoubnt possible flipping of the Bubble
-    // as stored in the PhasingTable.
-    double phase() const
-    {
-        return 2. * double(frequency[0]) / double(frequency[0] + frequency[1]) - 1.;
-    }
+    double relativePhase = invalid<double>;
 
-    pair<OrientedReadId, uint64_t> key() const
+    // The discrete relative phase can be:
+    // +1 if relativePhase > +1. - phaseErrorThreshold.
+    // -1 if relativePhase < -1. + phaseErrorThreshold.
+    // 0 otherwise.
+    int64_t discreteRelativePhase = invalid<int64_t>;
+
+    // Compute and store the relativePhase and discreteRelativePhase.
+    void storeRelativePhase(double phaseErrorThreshold)
     {
-        return *reinterpret_cast< const pair<OrientedReadId, uint64_t>* >(&orientedReadId);
+        relativePhase = 2. * double(frequency[0]) / double(frequency[0] + frequency[1]) - 1.;
+        if(relativePhase > 1. - phaseErrorThreshold) {
+            discreteRelativePhase = +1;
+        } else if(relativePhase < -1. + phaseErrorThreshold) {
+            discreteRelativePhase = -1;
+        } else {
+            discreteRelativePhase = 0;
+        }
     }
 
     void writeCsv(ostream&) const;
@@ -102,16 +124,14 @@ public:
     PhasingTable(
         const BubbleChain&,
         const MarkerGraph&,
-        double phaseError);
-
-    void write(const string& fileNamePrefix) const;
-    void writePng(const string& fileName, bool colorByType) const;
+        double phaseErrorThreshold);
 
     uint64_t entryCount() const
     {
         return size();
     }
     uint64_t unambiguousEntryCount() const;
+    uint64_t ambiguousEntryCount() const;
 
     uint64_t bubbleCount() const
     {
@@ -120,81 +140,92 @@ public:
 
     uint64_t orientedReadCount() const
     {
-        return orientedReadInfos.size();
+        return orientedReads.size();
     }
 
-    void flipSweep();
-    uint64_t discordantCount() const;
+    // Iteratively optimize the phases of the oriented reads and of the bubbles.
+    void simpleIterativePhasing1();
+    void simpleIterativePhasing2();
+
+    void writeCsv(const string& fileNamePrefix) const;
+    enum class ColoringMethod {
+        byRelativePhase,
+        byDiscreteRelativePhase,
+        byConsistency
+    };
+    void writePng(const string& fileName, ColoringMethod) const;
 
 private:
-    double phaseError;
-    double phaseThresholdPlus;
-    double phaseThresholdMinus;
+    const auto& indexByBoth() const {return get<0>();}
+    const auto& indexByOrientedReadId() const {return get<1>();}
+    const auto& indexByPositionInBubbleChain() const {return get<2>();}
 
     void fill(
         const BubbleChain&,
-        const MarkerGraph&);
+        const MarkerGraph&,
+        double phaseErrorThreshold);
 
+
+
+    // Information about the orientedReads that appears in the PhasingTable.
+    class OrientedRead {
+    public:
+        OrientedReadId id;
+        uint64_t minPositionInBubbleChain;
+        uint64_t maxPositionInBubbleChain;
+        int64_t phase = 0;  // -1, 0 or +1
+    };
+    void gatherOrientedReads();
+    vector<OrientedRead> orientedReads;
+
+    // Map OrientedReadId to an index in the orientedReadInfos vector.
+    std::map<OrientedReadId, uint64_t> orientedReadsMap;
+
+
+
+    // Information about the diploid bubbles in this PhasingTable.
     class Bubble {
     public:
         uint64_t positionInBubbleChain;
-        bool flip = false;  // 0 and 1 sides should be swapped.
+        int64_t phase = 0;  // -1, 0 or +1
     };
     vector<Bubble> bubbles;
     void gatherBubbles();
 
-    // The phase of a PhasingTableEntry, taking into account possible flipping
-    // of the bubble.
-    // The phase is in [-1., 1.].
-    double phase(const PhasingTableEntry& phasingTableEntry) const
-    {
-        double p = phasingTableEntry.phase();
-        if(bubbles[phasingTableEntry.bubbleIndex].flip) {
-            p = -p;
-        }
-        return p;
-    }
-
-    // The hue corresponding to a phase. This is:
-    // 360 (red) if phase is +1 (that is, all frequency is on Chain 0).
-    // 300 (magenta) if phase is 0.
-    // 240 (blue) if phase is -1 (that is, all frequency is on Chain 1).
-    static uint64_t hue(double phase)
-    {
-        return uint64_t(std::round(300. + 60. * phase));
-    }
-
     // Map a positionInBubbleChain to an index in the bubbles vector.
     std::map<uint64_t, uint64_t> bubblesMap;
 
-    class OrientedReadInfo {
-    public:
-        OrientedReadId orientedReadId;
-        uint64_t minPositionInBubbleChain;
-        uint64_t maxPositionInBubbleChain;
-    };
-    void gatherOrientedReads();
-    vector<OrientedReadInfo> orientedReadInfos;
 
-    // Count the number of PhaseTableEntries for a given oriented read
-    // with phase +1 or -1, allowing a phaseError discrepancy up to phase Error.
-    // That is, count0 is the number of oriented read entries with phase >= 1 - phaseError,
-    // and count1 is the number of oriented read entries with phase <= -1 + phaseError.
-    void count(
-        OrientedReadId,
-        uint64_t& countPlus,
-        uint64_t& countMinus) const;
 
+    // Fill the orientedReadIndex and bubbleIndex in all PhasingTableEntries.
+    // This can only be done after gatherOrientedReads and gatherBubbles
+    // have been called.
     void fillIndexes();
 
-    // Map OrientedReadId to an index in the orientedReadInfos vector.
-    std::map<OrientedReadId, uint64_t> orientedReadIdsMap;
+    // Compute the consistency state of a PhasingTableEntry relative
+    // to the current phases of its oriented read and bubble.
+    // It can be +1 (consistent), -1 (inconsistent), or 0 (unassigned or ambiguous).
+    // See the implementation for details.
+    int64_t consistencyState(const PhasingTableEntry&) const;
 
-    void writeCsv(const string& fileNamePrefix) const;
+    // Count the number of (consistent,inconsistent) PhasingTableEntries
+    // for an oriented read based on the phases currently assigned
+    // to bubbles and oriented reads.
+    pair<uint64_t, uint64_t> countConsistentEntriesForOrientedRead(OrientedReadId) const;
+
+    // Count the number of (consistent,inconsistent) PhasingTableEntries
+    // for the bubble at a given bubble chain position based on the phases currently assigned
+    // to bubbles and oriented reads.
+    pair<uint64_t, uint64_t> countConsistentEntriesForBubble(uint64_t positionInBubbleChain) const;
+
+    // Count the number of (consistent,inconsistent) PhasingTableEntries
+    // based on the phases currently assigned
+    // to bubbles and oriented reads.
+    pair<uint64_t, uint64_t> countConsistentEntries() const;
+
     void writeOrientedReadsCsv(const string& fileNamePrefix) const;
     void writeBubblesCsv(const string& fileNamePrefix) const;
     void writeDetailsCsv(const string& fileNamePrefix) const;
-    void writeHtml(const string& fileNamePrefix) const;
 };
 
 #endif

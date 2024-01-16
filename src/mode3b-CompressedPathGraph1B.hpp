@@ -601,7 +601,7 @@ private:
     void write(const string& name, bool writeSequence = false) const;
     void writeCsv(const string& fileNamePrefix) const;
     void writeBubbleChainsCsv(const string& fileNamePrefix) const;
-    void writeBubbleChainsPhasingTables(const string& fileNamePrefix, double phaseError) const;
+    void writeBubbleChainsPhasingTables(const string& fileNamePrefix, double phaseErrorThreshold) const;
     void writeBubblesCsv(const string& fileNamePrefix) const;
     void writeChainsCsv(const string& fileNamePrefix) const;
     void writeChainsDetailsCsv(const string& fileNamePrefix) const;
