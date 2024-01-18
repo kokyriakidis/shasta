@@ -2,6 +2,7 @@
 #include "mode3b-CompressedPathGraph1B.hpp"
 #include "mode3b-AssemblyPath.hpp"
 #include "mode3b-PathGraph1.hpp"
+#include "mode3b-PhasingTable.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
 #include "diploidBayesianPhase.hpp"
@@ -216,7 +217,7 @@ void CompressedPathGraph1B::run(
         writeSnapshot(snapshotNumber);
     }
 
-    phaseBubbleChains(true, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(true, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     if(writeSnapshots) {
         writeSnapshot(snapshotNumber);
     }
@@ -226,7 +227,7 @@ void CompressedPathGraph1B::run(
         writeSnapshot(snapshotNumber);
     }
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     detangleShortSuperbubbles(100000, 1, detangleToleranceHigh);
@@ -235,31 +236,31 @@ void CompressedPathGraph1B::run(
     detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
     compress();
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(false, 1, 1, 4, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(false, 1, 1, 4, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    phaseBubbleChains(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
 
     if(assembleSequence) {
 
@@ -355,7 +356,7 @@ void CompressedPathGraph1B::run1(
         removeShortSuperbubbles(true, 1000, 3000);
         compress();
 
-        phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+        phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
         compress();
     }
 
@@ -370,7 +371,7 @@ void CompressedPathGraph1B::run1(
 
     write("D");
     writeGfaExpanded("D", false);
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     write("E");
     writeGfaExpanded("E", false);
     compress();
@@ -425,7 +426,7 @@ void CompressedPathGraph1B::run2(
         detangleShortSuperbubblesGeneral(maxLength, detangleToleranceLow, detangleToleranceHigh);
         compress();
 
-        phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+        phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
         compress();
 
         maxLength = uint64_t(double(maxLength) / 1.2);
@@ -435,7 +436,7 @@ void CompressedPathGraph1B::run2(
         removeShortSuperbubbles(true, maxLength/3, maxLength);
         compress();
 
-        phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+        phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
         compress();
 
         maxLength = uint64_t(double(maxLength) * 1.2);
@@ -443,7 +444,7 @@ void CompressedPathGraph1B::run2(
 
     write("A");
     writeGfaExpanded("A", false);
-    phaseBubbleChains(true, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(true, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     write("B");
     writeGfaExpanded("B", false);
 
@@ -490,6 +491,7 @@ void CompressedPathGraph1B::run3(
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
     const double phaseErrorThreshold = 0.1;
+    const double bubbleErrorThreshold = 0.1;
 
     // const bool writeSnapshots = true;
     // uint64_t snapshotNumber = 0;
@@ -516,85 +518,65 @@ void CompressedPathGraph1B::run3(
     detangleVerticesGeneral(false, 1, detangleToleranceHigh);
     compress();
 
-    writeBubbleChainsPhasingTables("AA", phaseErrorThreshold);
-
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
-    compress();
-    splitTerminalHaploidBubbles();
-
-    return; // ******************** FOR DEBUGGING
-
+#if 0
     write("A");
+    phaseBubbleChainsUsingPhasingTable(
+        "A",
+        phaseErrorThreshold,
+        bubbleErrorThreshold,
+        longBubbleThreshold);
+    throw runtime_error("Missing code.");
+#endif
 
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
     splitTerminalHaploidBubbles();
 
-    write("B");
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    compress();
+    splitTerminalHaploidBubbles();
 
     detangleShortSuperbubbles(100000, 1, detangleToleranceHigh);
     compress();
 
-    write("C");
-
     detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
     compress();
 
-    write("D");
-
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
     splitTerminalHaploidBubbles();
-
-    write("E");
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    write("F");
-
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
     splitTerminalHaploidBubbles();
-
-    write("G");
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    write("H");
-
-    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
     splitTerminalHaploidBubbles();
-
-    write("I");
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    write("J");
-
-    phaseBubbleChains(false, 1, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
+    phaseBubbleChainsUsingPhasingGraph(false, 1, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
     compress();
     splitTerminalHaploidBubbles();
-
-    write("K");
 
     removeShortSuperbubbles(false, 30000, 100000);
     compress();
 
-    write("L");
-
-    phaseBubbleChains(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
+    phaseBubbleChainsUsingPhasingGraph(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
     compress();
     splitTerminalHaploidBubbles();
 
-    write("M");
     detangleShortSuperbubblesGeneral(30000, 1, detangleToleranceHigh);
-    write("N");
     compress();
-    phaseBubbleChains(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
+    phaseBubbleChainsUsingPhasingGraph(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
     compress();
 
     if(assembleSequence) {
@@ -700,10 +682,10 @@ void CompressedPathGraph1B::run3(
                         writeSnapshot(snapshotNumber);
                     }
 
-                    // For phaseBubbleChains it's not easy to figure out if changes were made.
-                    phaseBubbleChains(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+                    // For phaseBubbleChainsUsingPhasingGraph it's not easy to figure out if changes were made.
+                    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
                     compress();
-                    phaseBubbleChains(false, 10, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
+                    phaseBubbleChainsUsingPhasingGraph(false, 10, phasingThresholdLow, phasingThresholdHigh, longBubbleThreshold);
                     compress();
                     optimizeChains(
                         false,
@@ -3783,7 +3765,7 @@ bool CompressedPathGraph1B::detangleBackEdge(
 
 
 
-void CompressedPathGraph1B::phaseBubbleChains(
+void CompressedPathGraph1B::phaseBubbleChainsUsingPhasingGraph(
     bool debug,
     uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
     uint64_t lowThreshold,
@@ -3796,7 +3778,7 @@ void CompressedPathGraph1B::phaseBubbleChains(
     CompressedPathGraph1B& cGraph = *this;
 
     if(debug) {
-        cout << "phaseBubbleChains begins." << endl;
+        cout << "phaseBubbleChainsUsingPhasingGraph begins." << endl;
     }
 
     vector<edge_descriptor> allEdges;
@@ -3805,17 +3787,57 @@ void CompressedPathGraph1B::phaseBubbleChains(
     }
 
     for(const edge_descriptor ce: allEdges) {
-        phaseBubbleChain(ce, n, lowThreshold, highThreshold, useBayesianModel, epsilon, minLogP, longBubbleThreshold, debug);
+        phaseBubbleChainUsingPhasingGraph(ce, n, lowThreshold, highThreshold, useBayesianModel, epsilon, minLogP, longBubbleThreshold, debug);
     }
 
     if(debug) {
-        cout << "phaseBubbleChains ends." << endl;
+        cout << "phaseBubbleChainsUsingPhasingGraph ends." << endl;
     }
 }
 
 
 
-void CompressedPathGraph1B::phaseBubbleChain(
+void CompressedPathGraph1B::phaseBubbleChainsUsingPhasingTable(
+    const string& debugOutputFileNamePrefix,
+    double phaseErrorThreshold,
+    double bubbleErrorThreshold,
+    uint64_t longBubbleThreshold)
+{
+    CompressedPathGraph1B& cGraph = *this;
+
+    const bool debug = not debugOutputFileNamePrefix.empty();
+    if(debug) {
+        cout << "phaseBubbleChainsUsingPhasingTable begins." << endl;
+    }
+
+    // If debug output was requested, make sure we have a directory
+    // where the debug output files will go.
+    string directoryName;
+    if(debug) {
+        directoryName = debugOutputFileNamePrefix + "-PhasingTables";
+        std::filesystem::create_directory(directoryName);
+    }
+
+    vector<edge_descriptor> allEdges;
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
+        allEdges.push_back(ce);
+    }
+
+    for(const edge_descriptor ce: allEdges) {
+        phaseBubbleChainUsingPhasingTable(
+            debug ? (directoryName + "/" + bubbleChainStringId(ce)) : "",
+            ce, phaseErrorThreshold, bubbleErrorThreshold, longBubbleThreshold);
+    }
+
+    if(debug) {
+        cout << "phaseBubbleChainsUsingPhasingTable ends." << endl;
+    }
+
+}
+
+
+
+void CompressedPathGraph1B::phaseBubbleChainUsingPhasingGraph(
     edge_descriptor ce,
     uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
     uint64_t lowThreshold,
@@ -4123,6 +4145,84 @@ void CompressedPathGraph1B::phaseBubbleChain(
     // Replace the old BubbleChain with the new one, leaving the id of the edge unchanged.
     newBubbleChain.compress();
     bubbleChain = newBubbleChain;
+}
+
+
+
+void CompressedPathGraph1B::phaseBubbleChainUsingPhasingTable(
+    const string& debugOutputFileNamePrefix,
+    edge_descriptor e,
+    double phaseErrorThreshold,
+    double bubbleErrorThreshold,
+    uint64_t longBubbleThreshold)
+{
+    CompressedPathGraph1B& cGraph = *this;
+    BubbleChain& bubbleChain = cGraph[e];
+
+    const bool debug = not debugOutputFileNamePrefix.empty();
+
+    if(debug) {
+        cout << "Phasing " << bubbleChainStringId(e) << endl;
+    }
+
+    // If this bubble chain has a single bubble, there is nothing to do.
+    if(bubbleChain.size() == 1) {
+        if(debug) {
+            cout << "Not phased because it has only one bubble." << endl;
+        }
+        return;
+    }
+
+    // Create the phasing table for this bubble chain.
+    PhasingTable phasingTable(bubbleChain, assembler.markerGraph, phaseErrorThreshold);
+
+    if(phasingTable.empty()) {
+        return;
+    }
+    if(phasingTable.bubbleCount() < 2) {
+        return;
+    }
+
+    if(debug) {
+        const uint64_t totalCount = phasingTable.entryCount();
+        const uint64_t ambiguousCount = phasingTable.ambiguousEntryCount();
+        const uint64_t unambiguousCount = totalCount - ambiguousCount;
+        const uint64_t bubbleCount = phasingTable.bubbleCount();
+        const uint64_t orientedReadCount = phasingTable.orientedReadCount();
+        const double coverage = double(unambiguousCount) / double(bubbleCount);
+
+        cout << "Phasing table summary for " << bubbleChainStringId(e) << ":" << endl;
+        cout << bubbleCount << " bubbles." << endl;
+        cout << orientedReadCount << " oriented reads." << endl;
+        cout << unambiguousCount << " unambiguous entries." << endl;
+        cout << ambiguousCount << " ambiguous entries." << endl;
+        cout << "Average coverage " << std::round(coverage) << endl;
+        cout << "Average number of bubbles seen by each oriented read " <<
+            std::round(double(unambiguousCount)/double(orientedReadCount)) << endl;
+
+        phasingTable.writeCsv(debugOutputFileNamePrefix);
+        phasingTable.writePng(debugOutputFileNamePrefix + "-RelativePhase.png",
+            PhasingTable::ColoringMethod::byRelativePhase);
+        phasingTable.writePng(debugOutputFileNamePrefix + "-DiscreteRelativePhase.png",
+            PhasingTable::ColoringMethod::byDiscreteRelativePhase);
+    }
+
+    // Phasing of the phasing table.
+    phasingTable.greedyPhasing();
+    if(debug) {
+        uint64_t consistentCount;
+        uint64_t inconsistentCount;
+        tie(consistentCount, inconsistentCount) = phasingTable.countConsistentEntries();
+
+        cout << "After greedy phasing, the phasing table has " << consistentCount <<
+            " consistent entries and " << inconsistentCount <<
+            " inconsistent entries (" << consistentCount + inconsistentCount <<
+            " total)." << endl;
+        phasingTable.writePng(debugOutputFileNamePrefix + "-Consistency.png",
+            PhasingTable::ColoringMethod::byConsistency);
+    }
+
+    throw runtime_error("Not implemented.");
 }
 
 

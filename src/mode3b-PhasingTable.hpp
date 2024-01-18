@@ -223,11 +223,13 @@ private:
     // to bubbles and oriented reads.
     pair<uint64_t, uint64_t> countConsistentEntriesForBubble(uint64_t positionInBubbleChain) const;
 
+public:
     // Count the number of (consistent,inconsistent) PhasingTableEntries
     // based on the phases currently assigned
     // to bubbles and oriented reads.
     pair<uint64_t, uint64_t> countConsistentEntries() const;
 
+private:
     void writeOrientedReadsCsv(const string& fileNamePrefix) const;
     void writeBubblesCsv(const string& fileNamePrefix) const;
     void writeDetailsCsv(const string& fileNamePrefix) const;

@@ -440,8 +440,8 @@ private:
     void splitTerminalHaploidBubbles(edge_descriptor);
 
 
-    // Phasing of bubble chains.
-    void phaseBubbleChains(
+    // Phasing of bubble chains using the PhasingGraph.
+    void phaseBubbleChainsUsingPhasingGraph(
         bool debug,
         uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
         uint64_t lowThreshold,
@@ -450,7 +450,7 @@ private:
         double epsilon,
         double minLogP,
         uint64_t longBubbleThreshold);
-    void phaseBubbleChain(
+    void phaseBubbleChainUsingPhasingGraph(
         edge_descriptor e,
         uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
         uint64_t lowThreshold,
@@ -573,6 +573,23 @@ private:
         // - Otherwise, minConcordant/maxDiscordant.
         void sortEdges(vector<edge_descriptor>& sortedEdges, bool useBayesianModel) const;
     };
+
+
+
+    // Phasing of bubble chains using the PhasingTable.
+    void phaseBubbleChainsUsingPhasingTable(
+        const string& debugOutputFileNamePrefix,
+        double phaseErrorThreshold,
+        double bubbleErrorThreshold,
+        uint64_t longBubbleThreshold);
+    void phaseBubbleChainUsingPhasingTable(
+        const string& debugOutputFileNamePrefix,
+        edge_descriptor e,
+        double phaseErrorThreshold,
+        double bubbleErrorThreshold,
+        uint64_t longBubbleThreshold);
+
+
 
     // Optimize chains before assembly, to remove assembly steps with
     // less that minCommon reads.
