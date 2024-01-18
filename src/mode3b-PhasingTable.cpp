@@ -1,11 +1,29 @@
 // Shasta.
-#include "mode3b-PhasingTable.hpp"
-#include "mode3b-CompressedPathGraph1B.hpp"
-#include "Assembler.hpp"
-#include "html.hpp"
-#include "orderPairs.hpp"
-#include "PngImage.hpp"
-#include "timestamp.hpp"
+
+#include <Assembler.hpp>
+#include <bits/stdint-uintn.h>
+#include <boost/graph/graph_traits.hpp>
+#include <boost/multi_index/detail/bidir_node_iterator.hpp>
+#include <boost/multi_index/detail/ord_index_impl.hpp>
+#include <boost/operators.hpp>
+#include <mode3b-CompressedPathGraph1B.hpp>
+#include <mode3b-PhasingTable.hpp>
+#include <MarkerGraph.hpp>
+#include <MarkerInterval.hpp>
+#include <orderPairs.hpp>
+#include <PngImage.hpp>
+#include <shastaTypes.hpp>
+#include <SHASTA_ASSERT.hpp>
+#include <algorithm>
+#include <iostream>
+#include <limits>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
 using namespace shasta;
 using namespace mode3b;
 
@@ -37,6 +55,13 @@ void CompressedPathGraph1B::writeBubbleChainsPhasingTables(
         // Create the phasing table for this bubble chain.
         PhasingTable phasingTable(bubbleChain, assembler.markerGraph, phaseErrorThreshold);
 
+        if(phasingTable.empty()) {
+            continue;
+        }
+        if(phasingTable.bubbleCount() < 2) {
+            continue;
+        }
+
         cout << "Phasing table for " << bubbleChainStringId(ce) <<
             " has " << phasingTable.entryCount() <<
             " entries (of which " << phasingTable.ambiguousEntryCount() <<
@@ -51,7 +76,7 @@ void CompressedPathGraph1B::writeBubbleChainsPhasingTables(
         phasingTable.writePng(fileNamePrefix + "-DiscreteRelativePhase.png",
             PhasingTable::ColoringMethod::byDiscreteRelativePhase);
 
-        phasingTable.simpleIterativePhasing2();
+        phasingTable.greedyPhasing();
         phasingTable.writePng(fileNamePrefix + "-Consistency.png",
             PhasingTable::ColoringMethod::byConsistency);
 
@@ -333,39 +358,6 @@ void PhasingTableEntry::writeCsv(ostream& csv) const
 
 
 
-#if 0
-void PhasingTable::writeHtml(const string& fileNamePrefix) const
-{
-    const auto& indexByBoth = get<0>();
-
-    ofstream html(fileNamePrefix + ".html");
-    writeHtmlBegin(html, "Phasing Table");
-
-    html << "<body><canvas id='canvas1' width='" << bubbleCount() <<
-        "' height='" << orientedReadCount() << "' style='border:1px solid #000000;'></canvas>\n";
-
-    html <<
-        "<script>\n"
-        "var canvas = document.getElementById('canvas1');\n"
-        "var c = canvas.getContext('2d');\n"
-        "c.fillStyle = 'white';\n"
-        "c.fillRect(0, 0, " << bubbleCount() << ", " << orientedReadCount() << ");\n"
-        "c.fillStyle = 'hsl(0, 100%, 50%)';\n";
-    for(const PhasingTableEntry& entry: indexByBoth) {
-        const uint64_t h = hue(phase(entry));
-        html << "c.fillStyle = 'hsl(" << h << ", 100%, 50%)';\n";
-        html << "c.fillRect(" << entry.bubbleIndex << ", " << entry.orientedReadIndex << ", 1, 1);\n";
-    }
-    html << "</script>";
-
-    html << "</body>";
-    writeHtmlEnd(html);
-}
-#endif
-
-
-
-
 void PhasingTable::writePng(const string& fileName, ColoringMethod coloringMethod) const
 {
     PngImage image{int(bubbleCount()), int(orientedReadCount())};
@@ -381,22 +373,22 @@ void PhasingTable::writePng(const string& fileName, ColoringMethod coloringMetho
         if(coloringMethod == ColoringMethod::byDiscreteRelativePhase) {
             switch(entry.discreteRelativePhase) {
             case 0:
-                // Ambiguous: yellow
-                r = 255;
-                g = 255;
+                // Ambiguous: black
+                r = 0;
+                g = 0;
                 b = 0;
                 break;
             case +1:
-                // In-phase: green.
-                r = 0;
-                g = 255;
-                b = 0;
-                break;
-            case -1:
-                // Out-of-phase: red.
+                // In-phase: red.
                 r = 255;
                 g = 0;
                 b = 0;
+                break;
+            case -1:
+                // Out-of-phase: blue.
+                r = 0;
+                g = 0;
+                b = 255;
                 break;
             default:
                 SHASTA_ASSERT(0);
@@ -408,13 +400,13 @@ void PhasingTable::writePng(const string& fileName, ColoringMethod coloringMetho
             // - Green if relativePhase is 1 (in-phase).
             // - Red if relativePhase is -1 (out-of-phase).
             if(entry.relativePhase >= 0.) {
-                r = int(std::round((1. - entry.relativePhase) * 255.));
-                g = 255;
-                b = 0;
-            } else {
                 r = 255;
-                g = int(std::round((1. +  entry.relativePhase) * 255.));
-                b = 0;
+                g = 0;
+                b = int(std::round((1. - entry.relativePhase) * 255.));
+            } else {
+                r = int(std::round((1. +  entry.relativePhase) * 255.));
+                g = 0;
+                b = 255;
             }
         } else if(coloringMethod == ColoringMethod::byConsistency) {
             const int64_t state = consistencyState(entry);
@@ -447,99 +439,6 @@ void PhasingTable::writePng(const string& fileName, ColoringMethod coloringMetho
 
     image.write(fileName);
 }
-
-
-
-#if 0
-void PhasingTable::flipSweep()
-{
-    const auto& indexByOrientedReadId = get<1>();
-
-    // Loop over oriented reads.
-    vector<uint64_t> plusBubbles;
-    vector<uint64_t> minusBubbles;
-    for(uint64_t i=0; i<orientedReadCount(); i++) {
-        const OrientedReadId orientedReadId = orientedReadInfos[i].orientedReadId;
-
-        // Gather the bubbles where this oriented read appears with phase +1 or -1
-        // (with tolerance equal to phaseError).
-        plusBubbles.clear();
-        minusBubbles.clear();
-        for(auto it=indexByOrientedReadId.find(orientedReadId);
-            it!=indexByOrientedReadId.end() and it->orientedReadId == orientedReadId; ++it) {
-            const PhasingTableEntry& phasingTableEntry = *it;
-
-            // Compute the phase for this entry, taking into account possible flip of the Bubble.
-            const double p = phase(phasingTableEntry);
-
-            if(p >= phaseThresholdPlus) {
-                plusBubbles.push_back(phasingTableEntry.bubbleIndex);
-            } else if(p <= phaseThresholdMinus) {
-                minusBubbles.push_back(phasingTableEntry.bubbleIndex);
-            }
-        }
-
-
-        // If there are more plusBubbles than minusBubbles, flip the minusBubbles.
-        // If there are more minusBubbles than plusBubbles, flip the plusBubbles.
-        if(plusBubbles.size() == minusBubbles.size()) {
-            continue;
-        }
-        const vector<uint64_t>& bubblesToFlip =
-            (plusBubbles.size() > minusBubbles.size()) ? minusBubbles : plusBubbles;
-        for(const uint64_t bubbleIndex: bubblesToFlip) {
-            Bubble& bubble = bubbles[bubbleIndex];
-            bubble.flip = not bubble.flip;
-        }
-    }
-}
-
-
-
-// Count the number of PhaseTableEntries for a given oriented read
-// with phase +1 or -1, allowing a phaseError discrepancy up to phase Error.
-// That is, countPlus is the number of oriented read entries with phase >= 1 - phaseError,
-// and countMinus is the number of oriented read entries with phase <= -1 + phaseError.
-void PhasingTable::count(
-    OrientedReadId orientedReadId,
-    uint64_t& countPlus,
-    uint64_t& countMinus) const
-{
-    countPlus = 0;
-    countMinus = 0;
-
-    const auto& indexByOrientedReadId = get<1>();
-
-    for(auto it=indexByOrientedReadId.find(orientedReadId);
-        it!=indexByOrientedReadId.end() and it->orientedReadId == orientedReadId; ++it) {
-        const PhasingTableEntry& phasingTableEntry = *it;
-
-        // Compute the phase for this entry, taking into account possible flip of the Bubble.
-        const double p = phase(phasingTableEntry);
-
-        if(p >= phaseThresholdPlus) {
-            ++countPlus;
-        } else if(p <= phaseThresholdMinus) {
-            ++countMinus;
-        }
-    }
-}
-
-
-
-uint64_t PhasingTable::discordantCount() const
-{
-    uint64_t n = 0;
-    for(uint64_t i=0; i<orientedReadCount(); i++) {
-        const OrientedReadId orientedReadId = orientedReadInfos[i].orientedReadId;
-        uint64_t countPlus;
-        uint64_t countMinus;
-        count(orientedReadId, countPlus, countMinus);
-        n += min(countPlus, countMinus);
-    }
-    return n;
-}
-#endif
 
 
 
@@ -707,6 +606,7 @@ pair<uint64_t, uint64_t> PhasingTable::countConsistentEntries() const
 
 
 // Iteratively optimize the phases of the oriented reads and of the bubbles.
+// Experimental. Do not use.
 void PhasingTable::simpleIterativePhasing1()
 {
     // Start with the phases of all oriented reads and bubbles set to +1.
@@ -782,6 +682,7 @@ void PhasingTable::simpleIterativePhasing1()
 
 
 // Iteratively optimize the phases of the oriented reads and of the bubbles.
+// Experimental. Do not use.
 void PhasingTable::simpleIterativePhasing2()
 {
     // Start with the phases of all oriented reads and bubbles set to +1.
@@ -848,6 +749,268 @@ void PhasingTable::simpleIterativePhasing2()
             ": consistent " << consistentCount <<
             ", inconsistent " << inconsistentCount <<
             ", unassigned " << unassignedCount << endl;
+    }
+}
+
+
+
+void PhasingTable::greedyPhasing()
+{
+    const bool debug = false;
+
+    class OrientedReadInfo {
+    public:
+
+        // Index of this oriented read in the orientedReads vector.
+        uint64_t orientedReadIndex;
+
+        // The total number of unambiguous PhasingTableEntries for this oriented read.
+        uint64_t unambiguousBubbleCount = 0;
+
+        // The number of bubbles that have already been phased and that have an
+        // unambiguous PhasingTableEntry with this oriented read.
+        uint64_t phasedUnambiguousBubbleCount = 0;
+
+        OrientedReadInfo(uint64_t orientedReadIndex) :
+            orientedReadIndex(orientedReadIndex) {}
+    };
+
+    // The OrientedReadTable is a container of OrientedReadInfo
+    // used to keep track of unphased oriented reads by various criteria.
+    class OrientedReadTable : public boost::multi_index_container<OrientedReadInfo,
+        boost::multi_index::indexed_by <
+
+        // Index by orientedReadIndex (unique).
+        boost::multi_index::ordered_unique<boost::multi_index::member<
+            OrientedReadInfo,
+            uint64_t,
+            &OrientedReadInfo::orientedReadIndex> >,
+
+            // Index by unambiguousBubbleCount (non-unique, largest first).
+            boost::multi_index::ordered_non_unique<boost::multi_index::member<
+                OrientedReadInfo,
+                uint64_t,
+                &OrientedReadInfo::unambiguousBubbleCount>,
+                std::greater<uint64_t> >,
+
+            // Index by phasedUnambiguousBubbleCount (non-unique, largest first).
+            boost::multi_index::ordered_non_unique<boost::multi_index::member<
+                OrientedReadInfo,
+                uint64_t,
+                &OrientedReadInfo::phasedUnambiguousBubbleCount>,
+                std::greater<uint64_t> >
+        > > {
+    };
+    OrientedReadTable orientedReadTable;
+
+
+
+    // Initialize the OrientedReadTable.
+    for(uint64_t orientedReadIndex=0; orientedReadIndex<orientedReadCount(); orientedReadIndex++) {
+        const OrientedReadId orientedReadId = orientedReads[orientedReadIndex].id;
+
+        OrientedReadInfo orientedReadInfo(orientedReadIndex);
+        for(auto it=indexByOrientedReadId().find(orientedReadId);
+            it!=indexByOrientedReadId().end() and it->orientedReadId == orientedReadId; ++it) {
+            const PhasingTableEntry& phasingTableEntry = *it;
+            if(phasingTableEntry.discreteRelativePhase != 0) {
+                ++orientedReadInfo.unambiguousBubbleCount;
+            }
+        }
+        orientedReadTable.insert(orientedReadInfo);
+    }
+
+
+    // Initialize the phases and phasing components of all oriented reads and bubbles.
+    for(OrientedRead& orientedRead: orientedReads) {
+        orientedRead.phase = 0;
+        orientedRead.phasingComponent = invalid<uint64_t>;
+    }
+    for(Bubble& bubble: bubbles) {
+        bubble.phase = 0;
+        bubble.phasingComponent = invalid<uint64_t>;
+    }
+
+
+
+    // Outer loop is over phasing components.
+    for(uint64_t phasingComponent=0; ; phasingComponent++) {
+        if(orientedReadTable.empty()) {
+            break;
+        }
+
+        // Find the starting oriented read for this phasing component.
+        const auto it = orientedReadTable.get<1>().begin();
+        const OrientedReadInfo& orientedReadInfo = *it;
+        OrientedRead& orientedRead = orientedReads[orientedReadInfo.orientedReadIndex];
+
+        const uint64_t minPositionInBubbleChain = orientedRead.minPositionInBubbleChain;
+        const uint64_t maxPositionInBubbleChain = orientedRead.maxPositionInBubbleChain;
+        const uint64_t minBubbleIndex = bubblesMap[minPositionInBubbleChain];
+        const uint64_t maxBubbleIndex = bubblesMap[maxPositionInBubbleChain];
+
+        if(debug) {
+            cout << "Begin phasing component " << phasingComponent << endl;
+            cout << "Phasing group begins at " << orientedRead.id <<
+                ", index " << orientedReadInfo.orientedReadIndex <<
+                " with " << orientedReadInfo.unambiguousBubbleCount << " unambiguous bubbles." << endl;
+            cout << "Bubble index range for this oriented read is [" <<
+                minBubbleIndex << "," << maxBubbleIndex << "]." << endl;
+        }
+
+        if(orientedReadInfo.unambiguousBubbleCount == 0) {
+            break;
+        }
+
+        // Assign phase +1 in this phasing group to this starting read for this phasing component.
+        SHASTA_ASSERT(orientedRead.phase == 0);
+        SHASTA_ASSERT(orientedRead.phasingComponent ==  invalid<uint64_t>);
+        orientedRead.phase = +1;
+        orientedRead.phasingComponent = phasingComponent;
+
+        // Assign to all unambiguous bubbles of this oriented read a phase consistent with it.
+        for(auto it=indexByOrientedReadId().find(orientedRead.id);
+            it!=indexByOrientedReadId().end() and it->orientedReadId == orientedRead.id; ++it) {
+            const PhasingTableEntry& phasingTableEntry = *it;
+            Bubble& bubble = bubbles[phasingTableEntry.bubbleIndex];
+            SHASTA_ASSERT(bubble.phase == 0);
+            SHASTA_ASSERT(bubble.phasingComponent == invalid<uint64_t>);
+
+            // Skip it if it is ambiguous.
+            if(phasingTableEntry.discreteRelativePhase == 0) {
+                continue;
+            }
+
+            // Set the phase of this bubble to a phase consistent with the +1 phase
+            // we assigned to the starting oriented read.
+            bubble.phase = phasingTableEntry.discreteRelativePhase;
+            bubble.phasingComponent = phasingComponent;
+
+            // Update the OrientedReadTable to reflect the fact that this bubble was just phased.
+            for(auto it=indexByPositionInBubbleChain().find(bubble.positionInBubbleChain);
+                it!=indexByPositionInBubbleChain().end() and it->positionInBubbleChain == bubble.positionInBubbleChain; ++it) {
+                const PhasingTableEntry& phasingTableEntry = *it;
+                if(phasingTableEntry.discreteRelativePhase == 0) {
+                    continue;
+                }
+
+                auto jt = orientedReadTable.get<0>().find(phasingTableEntry.orientedReadIndex);
+                SHASTA_ASSERT(jt != orientedReadTable.get<0>().end());
+                OrientedReadInfo info = *jt;
+                info.phasedUnambiguousBubbleCount++;
+                orientedReadTable.get<0>().replace(jt, info);
+            }
+        }
+
+        // Remove the starting oriented read from the orientedReadTable.
+        orientedReadTable.get<1>().erase(it);
+
+
+
+        // The inner loop phases one oriented read at a time, adding it to the current
+        // phasing component.
+        while(not orientedReadTable.empty()) {
+
+            // Find the oriented read with the most phased bubbles.
+            const auto it = orientedReadTable.get<2>().begin();
+            const OrientedReadInfo& orientedReadInfo = *it;
+            OrientedRead& orientedRead = orientedReads[orientedReadInfo.orientedReadIndex];
+
+            const uint64_t minPositionInBubbleChain = orientedRead.minPositionInBubbleChain;
+            const uint64_t maxPositionInBubbleChain = orientedRead.maxPositionInBubbleChain;
+            const uint64_t minBubbleIndex = bubblesMap[minPositionInBubbleChain];
+            const uint64_t maxBubbleIndex = bubblesMap[maxPositionInBubbleChain];
+
+            if(orientedReadInfo.phasedUnambiguousBubbleCount == 0) {
+                // Finish this phasing component.
+                break;
+            }
+
+            if(debug) {
+                cout << "Adding to phasing group " << orientedRead.id <<
+                    ", index " << orientedReadInfo.orientedReadIndex <<
+                    " with " << orientedReadInfo.unambiguousBubbleCount << " unambiguous bubbles," <<
+                    " of which " << orientedReadInfo.phasedUnambiguousBubbleCount << " already phased ." << endl;
+                cout << "Bubble index range for this oriented read is [" <<
+                    minBubbleIndex << "," << maxBubbleIndex << "]." << endl;
+            }
+
+            // Use the bubbles that are already phased to assign a phase to this oriented read.
+            uint64_t plusCount = 0;
+            uint64_t minusCount = 0;
+            for(auto it=indexByOrientedReadId().find(orientedRead.id);
+                it!=indexByOrientedReadId().end() and it->orientedReadId == orientedRead.id; ++it) {
+                const PhasingTableEntry& phasingTableEntry = *it;
+                if(phasingTableEntry.discreteRelativePhase == 0) {
+                    continue;
+                }
+                Bubble& bubble = bubbles[phasingTableEntry.bubbleIndex];
+                if(bubble.phase == 0) {
+                    continue;
+                }
+                int64_t phase;
+                if(phasingTableEntry.discreteRelativePhase == +1) {
+                    phase = bubble.phase;
+                } else {
+                    phase = - bubble.phase;
+                }
+                if(phase == +1) {
+                    ++plusCount;
+                } else if(phase == -1) {
+                    ++minusCount;
+                }
+            }
+
+            SHASTA_ASSERT(plusCount + minusCount == orientedReadInfo.phasedUnambiguousBubbleCount);
+
+            // Phase this oriented read in this phasing component.
+            SHASTA_ASSERT(orientedRead.phase == 0);
+            SHASTA_ASSERT(orientedRead.phasingComponent ==  invalid<uint64_t>);
+            orientedRead.phase = (plusCount >= minusCount) ? +1 : -1;
+            orientedRead.phasingComponent = phasingComponent;
+
+            // Assign to all unambiguous bubbles of this oriented read
+            // that are not already phased a phase consistent with it.
+            for(auto it=indexByOrientedReadId().find(orientedRead.id);
+                it!=indexByOrientedReadId().end() and it->orientedReadId == orientedRead.id; ++it) {
+                const PhasingTableEntry& phasingTableEntry = *it;
+
+                // Skip it if it is ambiguous.
+                if(phasingTableEntry.discreteRelativePhase == 0) {
+                    continue;
+                }
+                Bubble& bubble = bubbles[phasingTableEntry.bubbleIndex];
+
+                // If already phased, skip it.
+                if(bubble.phase != 0) {
+                    continue;
+                }
+
+                // Phase this bubble to a phase consistent with this oriented read.
+                bubble.phase = (phasingTableEntry.discreteRelativePhase == +1) ? orientedRead.phase : -orientedRead.phase;
+                bubble.phasingComponent = phasingComponent;
+
+                // Update the OrientedReadTable to reflect the fact that this bubble was just phased.
+                for(auto it=indexByPositionInBubbleChain().find(bubble.positionInBubbleChain);
+                    it!=indexByPositionInBubbleChain().end() and it->positionInBubbleChain == bubble.positionInBubbleChain; ++it) {
+                    const PhasingTableEntry& phasingTableEntry = *it;
+                    if(phasingTableEntry.discreteRelativePhase == 0) {
+                        continue;
+                    }
+
+                    auto jt = orientedReadTable.get<0>().find(phasingTableEntry.orientedReadIndex);
+                    if(jt == orientedReadTable.get<0>().end()) {
+                        continue;
+                    }
+                    OrientedReadInfo info = *jt;
+                    info.phasedUnambiguousBubbleCount++;
+                    orientedReadTable.get<0>().replace(jt, info);
+                }
+            }
+
+            // Remove the oriented read from the orientedReadTable.
+            orientedReadTable.get<2>().erase(it);
+        }
     }
 }
 

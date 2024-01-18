@@ -143,9 +143,12 @@ public:
         return orientedReads.size();
     }
 
-    // Iteratively optimize the phases of the oriented reads and of the bubbles.
+    // Experimental. Do not use.
     void simpleIterativePhasing1();
     void simpleIterativePhasing2();
+
+    // Optimize the phases of the oriented reads and of the bubbles.
+    void greedyPhasing();
 
     void writeCsv(const string& fileNamePrefix) const;
     enum class ColoringMethod {
@@ -174,6 +177,7 @@ private:
         uint64_t minPositionInBubbleChain;
         uint64_t maxPositionInBubbleChain;
         int64_t phase = 0;  // -1, 0 or +1
+        uint64_t phasingComponent = invalid<uint64_t>;
     };
     void gatherOrientedReads();
     vector<OrientedRead> orientedReads;
@@ -188,6 +192,7 @@ private:
     public:
         uint64_t positionInBubbleChain;
         int64_t phase = 0;  // -1, 0 or +1
+        uint64_t phasingComponent = invalid<uint64_t>;
     };
     vector<Bubble> bubbles;
     void gatherBubbles();
