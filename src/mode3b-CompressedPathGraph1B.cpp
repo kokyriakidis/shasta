@@ -4161,14 +4161,17 @@ void CompressedPathGraph1B::phaseBubbleChainUsingPhasingTable(
 
     const bool debug = not debugOutputFileNamePrefix.empty();
 
-    if(debug) {
-        cout << "Phasing " << bubbleChainStringId(e) << endl;
-    }
+    cleanupBubbleChainUsingPhasingTable(
+        debugOutputFileNamePrefix + "-PreCleanup",
+        e,
+        phaseErrorThreshold,
+        bubbleErrorThreshold,
+        longBubbleThreshold);
 
     // If this bubble chain has a single bubble, there is nothing to do.
     if(bubbleChain.size() == 1) {
         if(debug) {
-            cout << "Not phased because it has only one bubble." << endl;
+            cout << "Skipped because it has only one bubble." << endl;
         }
         return;
     }
@@ -4192,19 +4195,13 @@ void CompressedPathGraph1B::phaseBubbleChainUsingPhasingTable(
         const double coverage = double(unambiguousCount) / double(bubbleCount);
 
         cout << "Phasing table summary for " << bubbleChainStringId(e) << ":" << endl;
-        cout << bubbleCount << " bubbles." << endl;
+        cout << bubbleCount << " diploid bubbles." << endl;
         cout << orientedReadCount << " oriented reads." << endl;
         cout << unambiguousCount << " unambiguous entries." << endl;
         cout << ambiguousCount << " ambiguous entries." << endl;
         cout << "Average coverage " << std::round(coverage) << endl;
-        cout << "Average number of bubbles seen by each oriented read " <<
+        cout << "Average number of diploid bubbles seen by each oriented read " <<
             std::round(double(unambiguousCount)/double(orientedReadCount)) << endl;
-
-        phasingTable.writeCsv(debugOutputFileNamePrefix);
-        phasingTable.writePng(debugOutputFileNamePrefix + "-RelativePhase.png",
-            PhasingTable::ColoringMethod::byRelativePhase);
-        phasingTable.writePng(debugOutputFileNamePrefix + "-DiscreteRelativePhase.png",
-            PhasingTable::ColoringMethod::byDiscreteRelativePhase);
     }
 
     // Phasing of the phasing table.
@@ -4218,11 +4215,148 @@ void CompressedPathGraph1B::phaseBubbleChainUsingPhasingTable(
             " consistent entries and " << inconsistentCount <<
             " inconsistent entries (" << consistentCount + inconsistentCount <<
             " total)." << endl;
+
         phasingTable.writePng(debugOutputFileNamePrefix + "-Consistency.png",
             PhasingTable::ColoringMethod::byConsistency);
+        phasingTable.writeCsv(debugOutputFileNamePrefix);
+        phasingTable.writePng(debugOutputFileNamePrefix + "-RelativePhase.png",
+            PhasingTable::ColoringMethod::byRelativePhase);
+        phasingTable.writePng(debugOutputFileNamePrefix + "-DiscreteRelativePhase.png",
+            PhasingTable::ColoringMethod::byDiscreteRelativePhase);
     }
 
     throw runtime_error("Not implemented.");
+}
+
+
+
+void CompressedPathGraph1B::cleanupBubbleChainUsingPhasingTable(
+    const string& debugOutputFileNamePrefix,
+    edge_descriptor e,
+    double phaseErrorThreshold,
+    double bubbleErrorThreshold,
+    uint64_t longBubbleThreshold)
+{
+
+    CompressedPathGraph1B& cGraph = *this;
+    BubbleChain& bubbleChain = cGraph[e];
+
+    const bool debug = not debugOutputFileNamePrefix.empty();
+    if(debug) {
+        cout << "Before bubble clean up, bubble chain " <<
+            bubbleChainStringId(e) << " has " << cGraph[e].size() << " bubbles." << endl;
+    }
+
+    // If this bubble chain has a single bubble, there is nothing to do.
+    if(bubbleChain.size() == 1) {
+        if(debug) {
+            cout << "Skipped because it has only one bubble." << endl;
+        }
+        return;
+    }
+
+    // Create the phasing table for this bubble chain.
+    PhasingTable phasingTable(bubbleChain, assembler.markerGraph, phaseErrorThreshold);
+
+    if(phasingTable.empty()) {
+        return;
+    }
+    if(phasingTable.bubbleCount() < 2) {
+        return;
+    }
+
+    if(debug) {
+        const uint64_t totalCount = phasingTable.entryCount();
+        const uint64_t ambiguousCount = phasingTable.ambiguousEntryCount();
+        const uint64_t unambiguousCount = totalCount - ambiguousCount;
+        const uint64_t bubbleCount = phasingTable.bubbleCount();
+        const uint64_t orientedReadCount = phasingTable.orientedReadCount();
+        const double coverage = double(unambiguousCount) / double(bubbleCount);
+
+        cout << "Phasing table summary (for bubble cleanup) " << bubbleChainStringId(e) << ":" << endl;
+        cout << bubbleCount << " diploid bubbles." << endl;
+        cout << orientedReadCount << " oriented reads." << endl;
+        cout << unambiguousCount << " unambiguous entries." << endl;
+        cout << ambiguousCount << " ambiguous entries." << endl;
+        cout << "Average coverage " << std::round(coverage) << endl;
+        cout << "Average number of diploid bubbles seen by each oriented read " <<
+            std::round(double(unambiguousCount)/double(orientedReadCount)) << endl;
+    }
+
+    // Phasing of the phasing table.
+    phasingTable.greedyPhasing();
+    if(debug) {
+        uint64_t consistentCount;
+        uint64_t inconsistentCount;
+        tie(consistentCount, inconsistentCount) = phasingTable.countConsistentEntries();
+
+        cout << "After greedy phasing, the phasing table (for bubble cleanup) has " << consistentCount <<
+            " consistent entries and " << inconsistentCount <<
+            " inconsistent entries (" << consistentCount + inconsistentCount <<
+            " total)." << endl;
+
+        phasingTable.writePng(debugOutputFileNamePrefix + "-Consistency.png",
+            PhasingTable::ColoringMethod::byConsistency);
+        phasingTable.writeCsv(debugOutputFileNamePrefix);
+        phasingTable.writePng(debugOutputFileNamePrefix + "-RelativePhase.png",
+            PhasingTable::ColoringMethod::byRelativePhase);
+        phasingTable.writePng(debugOutputFileNamePrefix + "-DiscreteRelativePhase.png",
+            PhasingTable::ColoringMethod::byDiscreteRelativePhase);
+    }
+
+
+    // Use the PhasingTable to create a new BubbleChain that will replace the existing one.
+    // In the new bubble chain, we remove:
+    // - All diploid bubbles that have a high error rate in the PhasingTable,
+    //   unless they are longer than longBubbleThreshold.
+    // - All bubbles with ploidy greater than 2,
+    //   unless they are longer than longBubbleThreshold.
+    // Each bubble that is removed is replaced by a haploid bubble consisting
+    // of only the terminal MarkerGraphEdgeIds.
+    BubbleChain newBubbleChain;
+    for(uint64_t positionInBubbleChain = 0; positionInBubbleChain < bubbleChain.size();
+        positionInBubbleChain++) {
+        const Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+        // Decide whether this Bubble will be copied verbatim to the new bubble chain.
+        bool copyVerbatim = false;
+        if(bubble.isHaploid()) {
+            copyVerbatim = true;
+        } else if(bubble.isDiploid()) {
+            const double bubbleErrorRate = phasingTable.bubbleErrorRate(positionInBubbleChain);
+            if(bubbleErrorRate <= bubbleErrorThreshold) {
+                copyVerbatim = true;
+            }
+        }
+        if(not copyVerbatim) {
+            uint64_t averageOffset;
+            uint64_t minOffset;
+            uint64_t maxOffset;
+            bubbleOffset(bubble, averageOffset, minOffset, maxOffset);
+            copyVerbatim = maxOffset >= longBubbleThreshold;
+        }
+
+        if(copyVerbatim) {
+            newBubbleChain.push_back(bubble);
+        } else {
+            // Just add a simple haploid bubble with only the source
+            // and target MarkerGraphEdgeIds.
+            Bubble newBubble;
+            newBubble.resize(1);    // Make it haploid
+            Chain& newChain = newBubble.front();    // Its only chain.
+            newChain.push_back(bubble.front().front()); // Source MarkerGraphEdgeId
+            newChain.push_back(bubble.front().back());  // Target MarkerGraphEdgeId
+            newBubbleChain.push_back(newBubble);
+        }
+    }
+
+    // Replace the old BubbleChain with the new one, leaving the id of the edge unchanged.
+    newBubbleChain.compress();
+    bubbleChain = newBubbleChain;
+    if(debug) {
+        cout << "After bubble clean up, bubble chain " <<
+            bubbleChainStringId(e) << " has " << bubbleChain.size() << " bubbles." << endl;
+    }
 }
 
 

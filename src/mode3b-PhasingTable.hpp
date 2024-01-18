@@ -158,6 +158,8 @@ public:
     };
     void writePng(const string& fileName, ColoringMethod) const;
 
+    double bubbleErrorRate(uint64_t positionInBubbleChain) const;
+
 private:
     const auto& indexByBoth() const {return get<0>();}
     const auto& indexByOrientedReadId() const {return get<1>();}
@@ -223,6 +225,11 @@ private:
     // to bubbles and oriented reads.
     pair<uint64_t, uint64_t> countConsistentEntriesForBubble(uint64_t positionInBubbleChain) const;
 
+    // Count the number of (unambiguous, ambiguous) PhasingTableEntries
+    // for the bubble at a given bubble chain position based on the phases currently assigned
+    // to bubbles and oriented reads.
+    pair<uint64_t, uint64_t> countEntriesForBubble(uint64_t positionInBubbleChain) const;
+
 public:
     // Count the number of (consistent,inconsistent) PhasingTableEntries
     // based on the phases currently assigned
@@ -231,7 +238,7 @@ public:
 
 private:
     void writeOrientedReadsCsv(const string& fileNamePrefix) const;
-    void writeBubblesCsv(const string& fileNamePrefix) const;
+    void writeBubblesCsv(const string& fileNamePrefix, bool writePhasingInformation) const;
     void writeDetailsCsv(const string& fileNamePrefix) const;
 };
 

@@ -588,6 +588,12 @@ private:
         double phaseErrorThreshold,
         double bubbleErrorThreshold,
         uint64_t longBubbleThreshold);
+    void cleanupBubbleChainUsingPhasingTable(
+        const string& debugOutputFileNamePrefix,
+        edge_descriptor e,
+        double phaseErrorThreshold,
+        double bubbleErrorThreshold,
+        uint64_t longBubbleThreshold);
 
 
 

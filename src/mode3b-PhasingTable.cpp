@@ -284,7 +284,7 @@ void PhasingTable::write(const string& fileNamePrefix) const
 void PhasingTable::writeCsv(const string& fileNamePrefix) const
 {
     writeOrientedReadsCsv(fileNamePrefix);
-    writeBubblesCsv(fileNamePrefix);
+    writeBubblesCsv(fileNamePrefix, true);
     writeDetailsCsv(fileNamePrefix);
 }
 
@@ -310,14 +310,36 @@ void PhasingTable::writeOrientedReadsCsv(const string& fileNamePrefix) const
 
 
 
-void PhasingTable::writeBubblesCsv(const string& fileNamePrefix) const
+void PhasingTable::writeBubblesCsv(
+    const string& fileNamePrefix,
+    bool writePhasingInformation) const
 {
     ofstream csv(fileNamePrefix + "-Bubbles.csv");
-    csv << "Position in bubble chain,Bubble index,\n";
+    csv << "Position in bubble chain,Bubble index,Unambiguous,Ambiguous,";
+    if(writePhasingInformation) {
+        csv << "Consistent,Inconsistent,Error rate,";
+    }
+    csv << "\n";
 
     for(uint64_t i=0; i<bubbles.size(); i++) {
         csv << bubbles[i].positionInBubbleChain << ",";
         csv << i << ",";
+
+        uint64_t unambiguous;
+        uint64_t ambiguous;
+        tie(unambiguous, ambiguous) = countEntriesForBubble(bubbles[i].positionInBubbleChain);
+        csv << unambiguous << ",";
+        csv << ambiguous << ",";
+
+        if(writePhasingInformation) {
+            uint64_t consistent;
+            uint64_t inconsistent;
+            tie(consistent, inconsistent) = countConsistentEntriesForBubble(bubbles[i].positionInBubbleChain);
+            csv << consistent << ",";
+            csv << inconsistent << ",";
+            csv << double(inconsistent) / double(consistent + inconsistent) << ",";
+        }
+
         csv << "\n";
     }
 }
@@ -572,6 +594,27 @@ pair<uint64_t, uint64_t> PhasingTable::countConsistentEntriesForBubble(uint64_t 
 
 }
 
+
+
+pair<uint64_t, uint64_t> PhasingTable::countEntriesForBubble(uint64_t positionInBubbleChain) const
+{
+    uint64_t unambiguous = 0;
+    uint64_t ambiguous = 0;
+
+    for(auto it=indexByPositionInBubbleChain().find(positionInBubbleChain);
+        it!=indexByPositionInBubbleChain().end() and it->positionInBubbleChain == positionInBubbleChain; ++it) {
+        const PhasingTableEntry& entry = *it;
+
+        if(entry.discreteRelativePhase == 0) {
+            ++ambiguous;
+        } else {
+            ++unambiguous;
+        }
+    }
+
+    return {unambiguous, ambiguous};
+
+}
 
 
 // Count the number of (consistent,inconsistent) PhasingTableEntries
@@ -1015,3 +1058,21 @@ void PhasingTable::greedyPhasing()
 }
 
 
+
+double PhasingTable::bubbleErrorRate(uint64_t positionInBubbleChain) const
+{
+    // Must be called for a diploid bubble
+    auto it = bubblesMap.find(positionInBubbleChain);
+    SHASTA_ASSERT(it != bubblesMap.end());
+    const Bubble& bubble = bubbles[it->second];
+
+    if(bubble.phase == 0) {
+        return 1.;
+    }
+
+    // This bubble is diploid and phased.
+    uint64_t consistent;
+    uint64_t inconsistent;
+    tie(consistent, inconsistent) = countConsistentEntriesForBubble(positionInBubbleChain);
+    return double(inconsistent) / double(consistent+ inconsistent);
+}
