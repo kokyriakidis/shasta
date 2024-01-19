@@ -461,6 +461,11 @@ private:
         double minLogP,
         uint64_t longBubbleThreshold,
         bool debug);
+    void phaseBubbleChainUsingPhasedComponents(
+        bool debug,
+        edge_descriptor e,
+        const vector< shared_ptr<PhasedComponent> >&,
+        uint64_t longBubbleThreshold);
 
     // In the phasing graph, each vertex corresponds to a diploid bubble
     // in the BubbleChain being phased.

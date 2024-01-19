@@ -151,7 +151,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
 
-    run3(threadCount0, threadCount1, false);
+    run3(threadCount0, threadCount1, true);
 }
 
 
@@ -165,7 +165,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     assembler(assembler)
 {
     load(fileName);
-    run3(threadCount0, threadCount1, false);
+    run3(threadCount0, threadCount1, true);
 }
 
 
@@ -4045,24 +4045,40 @@ void CompressedPathGraph1B::phaseBubbleChainUsingPhasingGraph(
 
 
 
-    // Use the PhasingGraph to create a new BubbleChain that will replace the existing one.
+    // Use the PhasedComponents in the PhasingGraph to create
+    // a new BubbleChain that will replace the existing one.
+    phaseBubbleChainUsingPhasedComponents(debug, ce, phasingGraph.phasedComponents, longBubbleThreshold);
+}
+
+
+
+// Use PhasedComponents to create a new BubbleChain that will replace the existing one.
+void CompressedPathGraph1B::phaseBubbleChainUsingPhasedComponents(
+    bool debug,
+    edge_descriptor e,
+    const vector<shared_ptr<PhasedComponent> >& phasedComponents,
+    uint64_t longBubbleThreshold)
+{
+    CompressedPathGraph1B& cGraph = *this;
+    BubbleChain& bubbleChain = cGraph[e];
+
     BubbleChain newBubbleChain;
     if(debug) {
-        cout << "Creating the new bubble chain for " << bubbleChainStringId(ce) << endl;
+        cout << "Creating the new bubble chain for " << bubbleChainStringId(e) << endl;
     }
 
-    // Loop over the phased components stored in the phased graph.
+    // Loop over the phased components.
     for(uint64_t i=0; /* Check later */; i++) {
 
         // Bubbles in-between phased components, or before the first phased component,
         // or after the last phased component.
         {
             const uint64_t beginPositionInBubbleChain =
-                (i == 0) ? 0 : phasingGraph.phasedComponents[i-1]->maxPositionInBubbleChain + 1;
+                (i == 0) ? 0 : phasedComponents[i-1]->maxPositionInBubbleChain + 1;
             const uint64_t endPositionInBubbleChain =
-                (i == phasingGraph.phasedComponents.size()) ?
+                (i == phasedComponents.size()) ?
                 bubbleChain.size() :
-                phasingGraph.phasedComponents[i]->minPositionInBubbleChain;
+                phasedComponents[i]->minPositionInBubbleChain;
 
 
             if(debug) {
@@ -4102,12 +4118,12 @@ void CompressedPathGraph1B::phaseBubbleChainUsingPhasingGraph(
 
 
         // If we are past the last phased component, we are done.
-        if(i == phasingGraph.phasedComponents.size()) {
+        if(i == phasedComponents.size()) {
             break;
         }
 
         // Add a diploid bubble for the i-th phased component.
-        const PhasedComponent& phasedComponent = *phasingGraph.phasedComponents[i];
+        const PhasedComponent& phasedComponent = *phasedComponents[i];
         const uint64_t minPositionInBubbleChain = phasedComponent.minPositionInBubbleChain;
         const uint64_t maxPositionInBubbleChain = phasedComponent.maxPositionInBubbleChain;
         if(debug) {

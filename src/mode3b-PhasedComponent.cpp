@@ -1,0 +1,17 @@
+#include "mode3b-PhasedComponent.hpp"
+#include "orderPairs.hpp"
+#include "SHASTA_ASSERT.hpp"
+using namespace shasta;
+using namespace mode3b;
+
+#include "algorithm.hpp"
+
+
+
+void PhasedComponent::sort()
+{
+    SHASTA_ASSERT(size() > 1);
+    std::sort(begin(), end(), OrderPairsByFirstOnly<uint64_t, int64_t>());
+    minPositionInBubbleChain = front().first;
+    maxPositionInBubbleChain = back().first;
+}
