@@ -490,8 +490,8 @@ void CompressedPathGraph1B::run3(
     const uint64_t longBubbleThreshold = 5000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
-    const double phaseErrorThreshold = 0.1;
-    const double bubbleErrorThreshold = 0.1;
+    // const double phaseErrorThreshold = 0.1;
+    // const double bubbleErrorThreshold = 0.1;
 
     // const bool writeSnapshots = true;
     // uint64_t snapshotNumber = 0;
@@ -5073,16 +5073,6 @@ void CompressedPathGraph1B::PhasingGraph::phase1(bool debug, bool useBayesianMod
         }
         // phasingGraph.writeGraphviz("PhasingGraph.dot");
     }
-}
-
-
-
-void CompressedPathGraph1B::PhasedComponent::sort()
-{
-    SHASTA_ASSERT(size() > 1);
-    std::sort(begin(), end(), OrderPairsByFirstOnly<uint64_t, int64_t>());
-    minPositionInBubbleChain = front().first;
-    maxPositionInBubbleChain = back().first;
 }
 
 

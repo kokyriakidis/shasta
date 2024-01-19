@@ -4,6 +4,7 @@
 // Shasta
 #include "Base.hpp"
 #include "invalid.hpp"
+#include "mode3b-PhasedComponent.hpp"
 #include "shastaTypes.hpp"
 #include "SHASTA_ASSERT.hpp"
 
@@ -500,19 +501,6 @@ private:
         vector<OrientedReadId>&) const;
 
 
-
-    // A PhasedComponent is a set of phased diploid bubbles
-    // in a BubbleChain.
-    // It is a vector of (bubble position in bubble chain, phase),
-    // sorted by bubble position in bubble chain.
-    // PhasedComponents are created in such a way that their position ranges
-    // in the bubble chain are not overlapping.
-    class PhasedComponent : public vector< pair<uint64_t, int64_t> > {
-    public:
-        uint64_t minPositionInBubbleChain;
-        uint64_t maxPositionInBubbleChain;
-        void sort();
-    };
 
     class PhasingGraphVertex {
     public:
