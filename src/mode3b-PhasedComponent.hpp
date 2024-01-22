@@ -25,6 +25,7 @@ public:
     uint64_t minPositionInBubbleChain;
     uint64_t maxPositionInBubbleChain;
     void sort();
+    void computePositionRange();
 };
 
 #endif

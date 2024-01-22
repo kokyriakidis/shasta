@@ -1076,3 +1076,118 @@ double PhasingTable::bubbleErrorRate(uint64_t positionInBubbleChain) const
     tie(consistent, inconsistent) = countConsistentEntriesForBubble(positionInBubbleChain);
     return double(inconsistent) / double(consistent+ inconsistent);
 }
+
+
+
+// Use the phases stored in the Bubbles to consruct the PhasedComponents.
+// The PhasedComponents must be non-overlapping and sorted by position.
+void PhasingTable::constructPhasedComponents(bool debug)
+{
+    phasedComponents.clear();
+
+    // Create an initial version of PhasedComponents without
+    // worrying about ordering by position and about overlap between PhasedComponents.
+    for(const Bubble& bubble: bubbles) {
+        if(bubble.phase == 0) {
+            continue;
+        }
+        const uint64_t phasedComponentId = bubble.phasingComponent;
+        if(phasedComponentId >= phasedComponents.size()) {
+            for(uint64_t i=phasedComponents.size(); i<=phasedComponentId; i++) {
+                phasedComponents.push_back(make_shared<PhasedComponent>());
+            }
+        }
+        phasedComponents[phasedComponentId]->push_back({bubble.positionInBubbleChain, bubble.phase});
+    }
+
+    if(debug) {
+        uint64_t totalPhasedBubbleCount = 0;
+        for(const auto& phasedComponent: phasedComponents) {
+            totalPhasedBubbleCount += phasedComponent->size();
+        }
+        cout << "Created " << phasedComponents.size() << " initial phased components "
+            "with a total " << totalPhasedBubbleCount << " phased diploid bubbles." << endl;
+    }
+
+
+
+    // If there is more than one PhasedComponent, we have to eliminate overlaps.
+    // We do this by removing bubbles from overlapping PhasedComponents, giving
+    // priority to larger PhasedComponents.
+    if(phasedComponents.size() > 1) {
+
+        // Sort the phased components by decreasing size.
+        class SortHelper {
+        public:
+            bool operator()(
+                const shared_ptr<PhasedComponent>& p0,
+                const shared_ptr<PhasedComponent>& p1
+                ) const
+            {
+                return p0->size() > p1->size();
+            }
+        };
+        sort(phasedComponents.begin(), phasedComponents.end(), SortHelper());
+
+        for(const auto& phasedComponent: phasedComponents) {
+            phasedComponent->computePositionRange();
+        }
+
+        // Process the PhasedComponents in order of decreasing size.
+        vector< pair<uint64_t, uint64_t> > forbiddenRanges; // (min, max)
+        for(const auto& phasedComponent: phasedComponents) {
+
+            // See if it overlaps any of the forbidden ranges.
+            bool overlaps = false;
+            for(const auto& forbiddenRange: forbiddenRanges) {
+                const bool disjointLeft  = phasedComponent->maxPositionInBubbleChain < forbiddenRange.first;
+                const bool disjointRight = phasedComponent->minPositionInBubbleChain > forbiddenRange.second;
+                if(not(disjointLeft or disjointRight)) {
+                    overlaps = true;
+                    break;
+                }
+            }
+
+            if(not overlaps) {
+                forbiddenRanges.push_back(
+                    {phasedComponent->minPositionInBubbleChain, phasedComponent->maxPositionInBubbleChain});
+                continue;
+            }
+
+            // This PhasedComponent overlaps a forbiddenRange.
+            // We need to remove the offending bubbles.
+            SHASTA_ASSERT(0);   // Missing code.
+        }
+    }
+
+
+
+    // Compute the position ranges.
+    for(const auto& phasedComponent: phasedComponents) {
+        phasedComponent->computePositionRange();
+    }
+
+    // Sort the phased components in order of increasing position.
+    class SortHelper {
+    public:
+        bool operator()(
+            const shared_ptr<PhasedComponent>& p0,
+            const shared_ptr<PhasedComponent>& p1
+            ) const
+        {
+            return p0->minPositionInBubbleChain < p1->minPositionInBubbleChain;
+        }
+    };
+    sort(phasedComponents.begin(), phasedComponents.end(), SortHelper());
+
+    if(debug) {
+        cout << phasedComponents.size() << " phased components:" << endl;
+        for(const auto& phasedComponent: phasedComponents) {
+            cout  << phasedComponent->size() << " diploid bubbles at positions " <<
+                phasedComponent->minPositionInBubbleChain << "..." <<
+                phasedComponent->maxPositionInBubbleChain << " in bubble chain." << endl;
+
+        }
+        // phasingGraph.writeGraphviz("PhasingGraph.dot");
+    }
+}

@@ -490,8 +490,8 @@ void CompressedPathGraph1B::run3(
     const uint64_t longBubbleThreshold = 5000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
-    // const double phaseErrorThreshold = 0.1;
-    // const double bubbleErrorThreshold = 0.1;
+    const double phaseErrorThreshold = 0.1;
+    const double bubbleErrorThreshold = 0.03;
 
     // const bool writeSnapshots = true;
     // uint64_t snapshotNumber = 0;
@@ -525,10 +525,16 @@ void CompressedPathGraph1B::run3(
         phaseErrorThreshold,
         bubbleErrorThreshold,
         longBubbleThreshold);
-    throw runtime_error("Missing code.");
-#endif
+    optimizeChains(
+        false,
+        optimizeChainsMinCommon,
+        optimizeChainsK);
+    write("B");
+    // return;
+#else
 
     phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+#endif
     compress();
     splitTerminalHaploidBubbles();
 
@@ -4184,23 +4190,35 @@ void CompressedPathGraph1B::phaseBubbleChainUsingPhasingTable(
         bubbleErrorThreshold,
         longBubbleThreshold);
 
+#if 0
     // If this bubble chain has a single bubble, there is nothing to do.
+    // NOT TRUE, WE STILL MAY HAVE TO REMOVE SOME BUBBLES.
     if(bubbleChain.size() == 1) {
         if(debug) {
             cout << "Skipped because it has only one bubble." << endl;
         }
         return;
     }
+#endif
 
     // Create the phasing table for this bubble chain.
     PhasingTable phasingTable(bubbleChain, assembler.markerGraph, phaseErrorThreshold);
 
     if(phasingTable.empty()) {
+        if(debug) {
+            cout << "Not phasing because the phasing table is empty." << endl;
+        }
         return;
     }
+#if 0
+    // WE STILL MAY HAVE TO REMOVE SOME BUBBLES.
     if(phasingTable.bubbleCount() < 2) {
+        if(debug) {
+            cout << "Not phasing because the phasing table has less than 2 bubbles." << endl;
+        }
         return;
     }
+#endif
 
     if(debug) {
         const uint64_t totalCount = phasingTable.entryCount();
@@ -4241,7 +4259,45 @@ void CompressedPathGraph1B::phaseBubbleChainUsingPhasingTable(
             PhasingTable::ColoringMethod::byDiscreteRelativePhase);
     }
 
-    throw runtime_error("Not implemented.");
+    // Create the PhasedComponents.
+    phasingTable.constructPhasedComponents(debug);
+
+
+
+    // Remove PhasedComponents consisting of only one short bubble.
+    {
+        vector< shared_ptr<PhasedComponent> > newPhasedComponents;
+        for(const auto& phasedComponent: phasingTable.phasedComponents) {
+            bool keep = true;
+            if(phasedComponent->size() == 1) {
+                const uint64_t positionInBubbleChain = phasedComponent->front().first;
+                const Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+                uint64_t averageOffset;
+                uint64_t minOffset;
+                uint64_t maxOffset;
+                bubbleOffset(bubble, averageOffset, minOffset, maxOffset);
+
+                if(maxOffset < longBubbleThreshold) {
+                    keep = false;
+                }
+            }
+            if(keep) {
+                newPhasedComponents.push_back(phasedComponent);
+            }
+        }
+        phasingTable.phasedComponents.swap(newPhasedComponents);
+    }
+
+
+
+    //  Use the phased components to phase the BubbleChain.
+    phaseBubbleChainUsingPhasedComponents(
+        debug,
+        e,
+        phasingTable.phasedComponents,
+        longBubbleThreshold);
+
 }
 
 
@@ -4340,6 +4396,15 @@ void CompressedPathGraph1B::cleanupBubbleChainUsingPhasingTable(
             copyVerbatim = true;
         } else if(bubble.isDiploid()) {
             const double bubbleErrorRate = phasingTable.bubbleErrorRate(positionInBubbleChain);
+            if(debug) {
+                cout << "Bubble at position in bubble chain " << positionInBubbleChain <<
+                    " has error rate " << bubbleErrorRate;
+                if(bubbleErrorRate <= bubbleErrorThreshold) {
+                    cout << " and will be kept." << endl;
+                } else {
+                    cout << " and will be removed." << endl;
+                }
+            }
             if(bubbleErrorRate <= bubbleErrorThreshold) {
                 copyVerbatim = true;
             }
@@ -4365,13 +4430,21 @@ void CompressedPathGraph1B::cleanupBubbleChainUsingPhasingTable(
             newBubbleChain.push_back(newBubble);
         }
     }
+    if(debug) {
+        cout << "After bubble clean up, bubble chain " <<
+            bubbleChainStringId(e) << " has " << newBubbleChain.size() <<
+            " bubbles of which " <<
+            newBubbleChain.diploidBubbleCount() << " diploid." << endl;
+    }
 
     // Replace the old BubbleChain with the new one, leaving the id of the edge unchanged.
     newBubbleChain.compress();
     bubbleChain = newBubbleChain;
     if(debug) {
-        cout << "After bubble clean up, bubble chain " <<
-            bubbleChainStringId(e) << " has " << bubbleChain.size() << " bubbles." << endl;
+        cout << "After bubble clean up and compression, bubble chain " <<
+            bubbleChainStringId(e) << " has " << newBubbleChain.size() <<
+            " bubbles of which " <<
+            newBubbleChain.diploidBubbleCount() << " diploid." << endl;
     }
 }
 

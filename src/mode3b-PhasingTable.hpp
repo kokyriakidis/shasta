@@ -20,6 +20,7 @@
 
 namespace shasta {
     namespace mode3b {
+        class PhasingComponent;
         class PhasingTable;
         class PhasingTableEntry;
 
@@ -159,6 +160,9 @@ public:
     void writePng(const string& fileName, ColoringMethod) const;
 
     double bubbleErrorRate(uint64_t positionInBubbleChain) const;
+
+    vector< shared_ptr<PhasedComponent> > phasedComponents;
+    void constructPhasedComponents(bool debug);
 
 private:
     const auto& indexByBoth() const {return get<0>();}

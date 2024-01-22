@@ -129,6 +129,17 @@ public:
         return back();
     }
 
+    uint64_t diploidBubbleCount() const
+    {
+        uint64_t n = 0;
+        for(const Bubble& bubble: *this) {
+            if(bubble.isDiploid()) {
+                ++n;
+            }
+        }
+        return n;
+    }
+
     // Collapse consecutive haploid bubbles.
     void compress();
 
