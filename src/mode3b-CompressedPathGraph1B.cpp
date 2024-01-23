@@ -472,7 +472,7 @@ void CompressedPathGraph1B::run2(
 
 
 
-// Experiment with the detangling strategy.
+// Run3 uses the PhasingGraph.
 void CompressedPathGraph1B::run3(
     uint64_t threadCount0,
     uint64_t threadCount1,
@@ -490,8 +490,6 @@ void CompressedPathGraph1B::run3(
     const uint64_t longBubbleThreshold = 5000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
-    const double phaseErrorThreshold = 0.1;
-    const double bubbleErrorThreshold = 0.03;
 
     // const bool writeSnapshots = true;
     // uint64_t snapshotNumber = 0;
@@ -519,6 +517,7 @@ void CompressedPathGraph1B::run3(
     compress();
 
 #if 0
+    // Moved to run4.
     write("A");
     phaseBubbleChainsUsingPhasingTable(
         "A",
@@ -532,7 +531,6 @@ void CompressedPathGraph1B::run3(
     write("B");
     // return;
 #else
-
     phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
 #endif
     compress();
@@ -742,6 +740,139 @@ void CompressedPathGraph1B::run3(
         writeGfaExpanded("Final", false);
     }
 #endif
+}
+
+
+
+// Run4 uses the PhasingTable.
+void CompressedPathGraph1B::run4(
+    uint64_t threadCount0,
+    uint64_t threadCount1,
+    bool assembleSequence)
+{
+    // *** EXPOSE WHEN CODE STABILIZES
+    const vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
+    {{300, 1000}, {1000, 3000}, {3000, 10000}, {10000, 30000}};
+    const uint64_t detangleToleranceHigh = 3;
+    const uint64_t longBubbleThreshold = 5000;
+    const uint64_t optimizeChainsMinCommon = 3;
+    const uint64_t optimizeChainsK = 100;
+    const double phaseErrorThreshold = 0.1;
+    const double bubbleErrorThreshold = 0.03;
+
+    // const bool writeSnapshots = true;
+    // uint64_t snapshotNumber = 0;
+
+
+    write("Initial");
+
+    detangleVertices(false, 0, detangleToleranceHigh);
+    compress();
+
+    for(const auto& p: superbubbleRemovalMaxOffsets) {
+        removeShortSuperbubbles(false, p.first, p.second);
+        compress();
+    }
+
+    detangleEdges(false, 0, detangleToleranceHigh);
+    detangleEdges(false, 0, detangleToleranceHigh);
+    detangleEdges(false, 1, detangleToleranceHigh);
+    detangleVertices(false, 0, detangleToleranceHigh);
+
+    detangleVerticesGeneral(false, 1, detangleToleranceHigh);
+    compress();
+
+    for(uint64_t iteration=0; iteration<3; iteration++) {
+        write("A-" + to_string(iteration));
+        phaseBubbleChainsUsingPhasingTable(
+            "A-" + to_string(iteration),
+            phaseErrorThreshold,
+            bubbleErrorThreshold,
+            longBubbleThreshold);
+        optimizeChains(
+            true,
+            optimizeChainsMinCommon,
+            optimizeChainsK);
+        write("B-" + to_string(iteration));
+        compress();
+        write("C-" + to_string(iteration));
+        splitTerminalHaploidBubbles();
+        write("D-" + to_string(iteration));
+    }
+
+#if 0
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    compress();
+    splitTerminalHaploidBubbles();
+
+    detangleShortSuperbubbles(100000, 1, detangleToleranceHigh);
+    compress();
+
+    detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
+    compress();
+
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    compress();
+    splitTerminalHaploidBubbles();
+
+    removeShortSuperbubbles(false, 30000, 100000);
+    compress();
+
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    compress();
+    splitTerminalHaploidBubbles();
+
+    removeShortSuperbubbles(false, 30000, 100000);
+    compress();
+
+    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
+    compress();
+    splitTerminalHaploidBubbles();
+
+    removeShortSuperbubbles(false, 30000, 100000);
+    compress();
+
+    phaseBubbleChainsUsingPhasingGraph(false, 1, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
+    compress();
+    splitTerminalHaploidBubbles();
+
+    removeShortSuperbubbles(false, 30000, 100000);
+    compress();
+
+    phaseBubbleChainsUsingPhasingGraph(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
+    compress();
+    splitTerminalHaploidBubbles();
+
+    detangleShortSuperbubblesGeneral(30000, 1, detangleToleranceHigh);
+    compress();
+    phaseBubbleChainsUsingPhasingGraph(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
+    compress();
+#endif
+
+    // Optimize the chains.
+    optimizeChains(
+        true,
+        optimizeChainsMinCommon,
+        optimizeChainsK);
+
+    if(assembleSequence) {
+
+        // Before final output, renumber the edges contiguously.
+        renumberEdges();
+
+        // Assemble sequence.
+        assembleChains(threadCount0, threadCount1);
+
+        // Final output.
+        write("Final", true);
+
+    } else {
+
+        // Skip sequence assembly.
+        write("Final");
+    }
+
+
 }
 
 
@@ -1172,45 +1303,60 @@ void CompressedPathGraph1B::writeChainsDetailsCsv(const string& fileNamePrefix) 
     csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,"
         "Index in bubble,Position in chain,MarkerGraphEdgeId,Coverage,Common,Offset\n";
 
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
-        const BubbleChain& bubbleChain = cGraph[ce];
+    BGL_FORALL_EDGES(e, cGraph, CompressedPathGraph1B) {
+        writeChainDetailsCsv(csv, e, false);
+    }
+}
 
-        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
-            const Bubble& bubble = bubbleChain[positionInBubbleChain];
-            const uint64_t ploidy = bubble.size();
 
-            for(uint64_t indexInBubble=0; indexInBubble<ploidy; indexInBubble++) {
-                const Chain& chain = bubble[indexInBubble];
-                SHASTA_ASSERT(chain.size() >= 2);
 
-                for(uint64_t positionInChain=0; positionInChain<chain.size(); positionInChain++) {
-                    const MarkerGraphEdgeId markerGraphEdgeId = chain[positionInChain];
-                    const uint64_t coverage = assembler.markerGraph.edgeCoverage(markerGraphEdgeId);
-                    csv << chainStringId(ce, positionInBubbleChain, indexInBubble) << ",";
-                    csv << componentId << ",";
-                    csv << cGraph[ce].id << ",";
-                    csv << positionInBubbleChain << ",";
-                    csv << indexInBubble << ",";
-                    csv << positionInChain << ",";
-                    csv << markerGraphEdgeId << ",";
-                    csv << coverage << ",";
+void CompressedPathGraph1B::writeChainDetailsCsv(
+    ostream& csv,
+    edge_descriptor e,
+    bool writeHeader) const
+{
+    const CompressedPathGraph1B& cGraph = *this;
+    const BubbleChain& bubbleChain = cGraph[e];
 
-                    if(positionInChain != 0) {
-                        const MarkerGraphEdgeId previousMarkerGraphEdgeId = chain[positionInChain - 1];
-                        MarkerGraphEdgePairInfo info;
-                        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
-                            previousMarkerGraphEdgeId, markerGraphEdgeId, info));
-                        csv << info.common << ",";
-                        if(info.common != 0) {
-                            csv << info.offsetInBases << ",";
-                        }
+    if(writeHeader) {
+        csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,"
+            "Index in bubble,Position in chain,MarkerGraphEdgeId,Coverage,Common,Offset\n";
+    }
+
+    for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+        const Bubble& bubble = bubbleChain[positionInBubbleChain];
+        const uint64_t ploidy = bubble.size();
+
+        for(uint64_t indexInBubble=0; indexInBubble<ploidy; indexInBubble++) {
+            const Chain& chain = bubble[indexInBubble];
+            SHASTA_ASSERT(chain.size() >= 2);
+
+            for(uint64_t positionInChain=0; positionInChain<chain.size(); positionInChain++) {
+                const MarkerGraphEdgeId markerGraphEdgeId = chain[positionInChain];
+                const uint64_t coverage = assembler.markerGraph.edgeCoverage(markerGraphEdgeId);
+                csv << chainStringId(e, positionInBubbleChain, indexInBubble) << ",";
+                csv << componentId << ",";
+                csv << cGraph[e].id << ",";
+                csv << positionInBubbleChain << ",";
+                csv << indexInBubble << ",";
+                csv << positionInChain << ",";
+                csv << markerGraphEdgeId << ",";
+                csv << coverage << ",";
+
+                if(positionInChain != 0) {
+                    const MarkerGraphEdgeId previousMarkerGraphEdgeId = chain[positionInChain - 1];
+                    MarkerGraphEdgePairInfo info;
+                    SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
+                        previousMarkerGraphEdgeId, markerGraphEdgeId, info));
+                    csv << info.common << ",";
+                    if(info.common != 0) {
+                        csv << info.offsetInBases << ",";
                     }
-                    csv << "\n";
                 }
+                csv << "\n";
             }
         }
     }
-
 }
 
 
@@ -1530,6 +1676,31 @@ uint64_t CompressedPathGraph1B::chainOffset(const Chain& chain) const
 
 
 
+uint64_t CompressedPathGraph1B::chainOffsetNoException(const Chain& chain) const
+{
+    const uint64_t length = chain.size();
+    SHASTA_ASSERT(length >= 2);
+
+    uint64_t offset = 0;
+    for(uint64_t i=1; i<length; i++) {
+        const MarkerGraphEdgeId edgeId0 = chain[i-1];
+        const MarkerGraphEdgeId edgeId1 = chain[i];
+
+        MarkerGraphEdgePairInfo info;
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+        if(info.common == 0) {
+            return invalid<uint64_t>;
+        }
+        SHASTA_ASSERT(info.common > 0);
+        if(info.offsetInBases > 0) {
+            offset += info.offsetInBases;
+        }
+    }
+    return offset;
+}
+
+
+
 void CompressedPathGraph1B::bubbleOffset(
     const Bubble& bubble,
     uint64_t& averageOffset,
@@ -1549,6 +1720,33 @@ void CompressedPathGraph1B::bubbleOffset(
         maxOffset = max(maxOffset, offset);
     }
     averageOffset /= bubble.size();
+}
+
+
+
+bool CompressedPathGraph1B::bubbleOffsetNoException(
+    const Bubble& bubble,
+    uint64_t& averageOffset,
+    uint64_t& minOffset,
+    uint64_t& maxOffset
+    ) const
+{
+    averageOffset = 0;
+    minOffset = std::numeric_limits<uint64_t>::max();
+    maxOffset = 0;
+
+    for(const Chain& chain: bubble) {
+        const uint64_t offset = chainOffsetNoException(chain);
+        if(offset == invalid<uint64_t>) {
+            return false;
+        }
+
+        averageOffset += offset;
+        minOffset = min(minOffset, offset);
+        maxOffset = max(maxOffset, offset);
+    }
+    averageOffset /= bubble.size();
+    return true;
 }
 
 
@@ -4102,8 +4300,16 @@ void CompressedPathGraph1B::phaseBubbleChainUsingPhasedComponents(
                     uint64_t averageOffset;
                     uint64_t minOffset;
                     uint64_t maxOffset;
+#if 0
+                    if(bubbleOffsetNoException(bubble, averageOffset, minOffset, maxOffset)) {
+                        copyVerbatim = maxOffset >= longBubbleThreshold;
+                    } else {
+                        copyVerbatim = false;
+                    }
+#else
                     bubbleOffset(bubble, averageOffset, minOffset, maxOffset);
                     copyVerbatim = maxOffset >= longBubbleThreshold;
+#endif
                 }
 
                 if(copyVerbatim) {
@@ -4184,11 +4390,12 @@ void CompressedPathGraph1B::phaseBubbleChainUsingPhasingTable(
     const bool debug = not debugOutputFileNamePrefix.empty();
 
     cleanupBubbleChainUsingPhasingTable(
-        debugOutputFileNamePrefix + "-PreCleanup",
+        debug ? (debugOutputFileNamePrefix + "-PreCleanup") : "",
         e,
         phaseErrorThreshold,
         bubbleErrorThreshold,
         longBubbleThreshold);
+
 
 #if 0
     // If this bubble chain has a single bubble, there is nothing to do.
@@ -4277,7 +4484,6 @@ void CompressedPathGraph1B::phaseBubbleChainUsingPhasingTable(
                 uint64_t minOffset;
                 uint64_t maxOffset;
                 bubbleOffset(bubble, averageOffset, minOffset, maxOffset);
-
                 if(maxOffset < longBubbleThreshold) {
                     keep = false;
                 }
@@ -4394,10 +4600,15 @@ void CompressedPathGraph1B::cleanupBubbleChainUsingPhasingTable(
         bool copyVerbatim = false;
         if(bubble.isHaploid()) {
             copyVerbatim = true;
+            if(debug) {
+                cout << "Bubble at position in bubble chain " << positionInBubbleChain <<
+                    " is haploid and will be kept." << endl;
+            }
         } else if(bubble.isDiploid()) {
             const double bubbleErrorRate = phasingTable.bubbleErrorRate(positionInBubbleChain);
             if(debug) {
-                cout << "Bubble at position in bubble chain " << positionInBubbleChain <<
+                cout << "Bubble at phasing table index " << phasingTable.bubblesMap[positionInBubbleChain] <<
+                    " position in bubble chain " << positionInBubbleChain <<
                     " has error rate " << bubbleErrorRate;
                 if(bubbleErrorRate <= bubbleErrorThreshold) {
                     cout << " and will be kept." << endl;
@@ -4407,6 +4618,11 @@ void CompressedPathGraph1B::cleanupBubbleChainUsingPhasingTable(
             }
             if(bubbleErrorRate <= bubbleErrorThreshold) {
                 copyVerbatim = true;
+            }
+        } else {
+            if(debug) {
+                cout << "Bubble at position in bubble chain " << positionInBubbleChain <<
+                    " has ploidy " << bubble.size() << " and will be removed." << endl;
             }
         }
         if(not copyVerbatim) {
@@ -4419,6 +4635,10 @@ void CompressedPathGraph1B::cleanupBubbleChainUsingPhasingTable(
 
         if(copyVerbatim) {
             newBubbleChain.push_back(bubble);
+            if(debug) {
+                cout << "Bubble at position in bubble chain " << positionInBubbleChain <<
+                    " was copied to the new bubble chain." << endl;
+            }
         } else {
             // Just add a simple haploid bubble with only the source
             // and target MarkerGraphEdgeIds.
@@ -4428,23 +4648,38 @@ void CompressedPathGraph1B::cleanupBubbleChainUsingPhasingTable(
             newChain.push_back(bubble.front().front()); // Source MarkerGraphEdgeId
             newChain.push_back(bubble.front().back());  // Target MarkerGraphEdgeId
             newBubbleChain.push_back(newBubble);
+            if(debug) {
+                cout << "Bubble at position in bubble chain " << positionInBubbleChain <<
+                    " was replaced by a simple haploid bubble in the new bubble chain: " <<
+                    bubble.front().front() << " " << bubble.front().back() << endl;
+            }
         }
     }
+    bubbleChain = newBubbleChain;
+
     if(debug) {
         cout << "After bubble clean up, bubble chain " <<
             bubbleChainStringId(e) << " has " << newBubbleChain.size() <<
             " bubbles of which " <<
             newBubbleChain.diploidBubbleCount() << " diploid." << endl;
+        const string csvFileName = debugOutputFileNamePrefix + "-ChainsDetails-PostBubbleCleanup.csv";
+        ofstream csv(csvFileName);
+        cout << "For chain details after bubble cleanup, see " << csvFileName << endl;
+        writeChainDetailsCsv(csv, e, true);
     }
 
     // Replace the old BubbleChain with the new one, leaving the id of the edge unchanged.
-    newBubbleChain.compress();
-    bubbleChain = newBubbleChain;
+    bubbleChain.compress();
     if(debug) {
         cout << "After bubble clean up and compression, bubble chain " <<
             bubbleChainStringId(e) << " has " << newBubbleChain.size() <<
             " bubbles of which " <<
             newBubbleChain.diploidBubbleCount() << " diploid." << endl;
+        const string csvFileName = debugOutputFileNamePrefix +
+            "-ChainsDetails-PostBubbleCleanupSAndCompress.csv";
+        ofstream csv(csvFileName);
+        cout << "For chain details after bubble cleanup and compress, see " << csvFileName << endl;
+        writeChainDetailsCsv(csv, e, true);
     }
 }
 

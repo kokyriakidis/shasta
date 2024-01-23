@@ -204,7 +204,9 @@ private:
     void gatherBubbles();
 
     // Map a positionInBubbleChain to an index in the bubbles vector.
+public:
     std::map<uint64_t, uint64_t> bubblesMap;
+private:
 
 
 

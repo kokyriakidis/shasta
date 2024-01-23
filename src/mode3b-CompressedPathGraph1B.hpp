@@ -253,10 +253,20 @@ private:
         uint64_t threadCount0,
         uint64_t threadCount1,
         bool assembleSequence);
+
+    // Run3 uses the PhasingGraph.
     void run3(
         uint64_t threadCount0,
         uint64_t threadCount1,
         bool assembleSequence);
+
+    // Run4 uses the PhasingTable.
+    void run4(
+        uint64_t threadCount0,
+        uint64_t threadCount1,
+        bool assembleSequence);
+
+
 
     // Initial creation from the PathGraph1.
     // Each linear chain of edges in the PathGraph1 after transitive reduction generates
@@ -632,6 +642,7 @@ private:
     void writeBubblesCsv(const string& fileNamePrefix) const;
     void writeChainsCsv(const string& fileNamePrefix) const;
     void writeChainsDetailsCsv(const string& fileNamePrefix) const;
+    void writeChainDetailsCsv(ostream&, edge_descriptor, bool writeHeader) const;
     void writeGraphviz(const string& fileNamePrefix, bool labels) const;
     void writeGfa(const string& fileNamePrefix) const;
     void writeGfaExpanded(const string& fileNamePrefix, bool includeSequence) const;
@@ -643,7 +654,14 @@ private:
     string chainStringId(edge_descriptor, uint64_t positionInBubbleChain, uint64_t indexInBubble) const;
 
     uint64_t chainOffset(const Chain&) const;
+    uint64_t chainOffsetNoException(const Chain&) const;
     void bubbleOffset(
+        const Bubble&,
+        uint64_t& averageOffset,
+        uint64_t& minOffset,
+        uint64_t& maxOffset
+        ) const;
+    bool bubbleOffsetNoException(
         const Bubble&,
         uint64_t& averageOffset,
         uint64_t& minOffset,
