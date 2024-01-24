@@ -732,7 +732,9 @@ MarkerGraphEdgeId MarkerGraph::locateMarkerIntervalWithOffset(
 bool MarkerGraph::edgeHasDuplicateOrientedReadIds(EdgeId edgeId) const
 {
     const auto markerIntervals = edgeMarkerIntervals[edgeId];
-    SHASTA_ASSERT(markerIntervals.size() > 0);
+    if(markerIntervals.size() < 2) {
+        return false;
+    }
     for(uint64_t i=1; i<markerIntervals.size(); i++) {
         if(markerIntervals[i-1].orientedReadId == markerIntervals[i].orientedReadId) {
             return true;
@@ -750,7 +752,9 @@ bool MarkerGraph::vertexHasDuplicateOrientedReadIds(
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) const
 {
     const span<const MarkerId> vertexMarkerIds = vertices()[vertexId];
-    SHASTA_ASSERT(vertexMarkerIds.size() > 0);
+    if(vertexMarkerIds.size() < 2) {
+        return false;
+    }
 
     // The markers are sorted, so we only have to check each marker
     // against the previous one.
