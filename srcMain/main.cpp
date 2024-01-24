@@ -1073,35 +1073,27 @@ void shasta::main::mode3Assembly(
     // The marker length must be even.
     SHASTA_ASSERT((assembler.assemblerInfo->k %2) == 0);
 
-    // Mode 3 assembly uses a complete marker graph.
-    // Set marker graph vertex and edge options to achieve that.
-    // The corresponding command line options are ignored.
-    // Don't set minVertexCoverage to 0 because that would trigger
-    // automated thresholding.
-    const uint64_t minVertexCoverage = 1;
-    const uint64_t maxVertexCoverage = std::numeric_limits<uint64_t>::max();
-    const uint64_t minVertexCoveragePerStrand = 0;
-    const uint64_t minEdgeCoverage = 0;
-    const uint64_t minEdgeCoveragePerStrand = 0;
-    const bool allowDuplicateMarkers = true;
-
     // Create marker graph vertices.
+    // To create a complete marker graph, generate all vertices
+    // regardless of coverage, and allow duplicate markers on vertices.
     assembler.createMarkerGraphVertices(
-        minVertexCoverage,
-        maxVertexCoverage,
-        minVertexCoveragePerStrand,
-        allowDuplicateMarkers,
-        assemblerOptions.markerGraphOptions.peakFinderMinAreaFraction,
-        assemblerOptions.markerGraphOptions.peakFinderAreaStartIndex,
+        1,                                              // minVertexCoverage
+        std::numeric_limits<uint64_t>::max(),           // maxVertexCoverage
+        0,                                              // minVertexCoveragePerStrand
+        true,                                           // allowDuplicateMarkers
+        std::numeric_limits<double>::signaling_NaN(),   // For peak finder, unused because minVertexCoverage is not 0.
+        invalid<uint64_t>,                              // For peak finder, unused because minVertexCoverage is not 0.
         threadCount);
     assembler.findMarkerGraphReverseComplementVertices(threadCount);
 
     // Create marker graph edges.
-    // For assembly mode 3 we use createMarkerGraphEdgesStrict
-    // so all oriented reads on an edge have the same sequence.
+    // Use createMarkerGraphEdgesStrict so all oriented reads on an edge
+    // have exactly the same sequence.
+    // To create a complete marker graph, generate all edges
+    // regardless of coverage.
     assembler.createMarkerGraphEdgesStrict(
-        minEdgeCoverage,
-        minEdgeCoveragePerStrand,
+        0,                      // minEdgeCoverage
+        0,                      // minEdgeCoveragePerStrand
         threadCount);
     assembler.findMarkerGraphReverseComplementEdges(threadCount);
 
@@ -1111,9 +1103,12 @@ void shasta::main::mode3Assembly(
     // Assemble sequence for marker graph edges.
     // This assembles MarkerGraph::edgeSequence which is
     // different from what happens in other assembly modes.
-    // see the comments before MarkerGraph::edgeSequence
+    // See the comments before MarkerGraph::edgeSequence
     // for more information.
     assembler.assembleMarkerGraphEdgesMode3();
+
+    // Use the complete marker graph to run Mode 3 assembly.
+    assembler.findMode3bPaths(threadCount, threadCount);
 }
 
 
