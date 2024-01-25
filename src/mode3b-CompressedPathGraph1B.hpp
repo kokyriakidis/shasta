@@ -308,6 +308,9 @@ private:
     // Call compressParallelEdges and compressSequentialEdges iteratively until nothing changes.
     bool compress();
 
+    // Call compress on all BubbleChains to merge adjacent haploid bubbles.
+    void compressBubbleChains();
+
     // Compute the tangle matrix given in-edges and out-edges.
     // The last bubble of each in-edge and the first bubble
     // of each out-edge must be haploid.
@@ -435,10 +438,12 @@ private:
 
     // Detangle short superbubbles with any number of entrances and exits.
     bool detangleShortSuperbubbles(
+        bool debug,
         uint64_t maxOffset1,    // Used to define superbubbles
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
     bool detangleShortSuperbubble(
+        bool debug,
         const Superbubbles&,
         uint64_t superbubbleId,
         uint64_t detangleToleranceLow,
@@ -448,10 +453,12 @@ private:
     // and the first bubble of superbubble out-edges to be haploid.
     // This version does not.
     bool detangleShortSuperbubblesGeneral(
+        bool debug,
         uint64_t maxOffset1,    // Used to define superbubbles
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
     bool detangleShortSuperbubbleGeneral(
+        bool debug,
         const Superbubbles&,
         uint64_t superbubbleId,
         uint64_t detangleToleranceLow,

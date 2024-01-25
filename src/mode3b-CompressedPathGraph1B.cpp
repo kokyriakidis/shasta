@@ -151,7 +151,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
 
-    run3(threadCount0, threadCount1, true);
+    run3(threadCount0, threadCount1, false);
 }
 
 
@@ -165,7 +165,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     assembler(assembler)
 {
     load(fileName);
-    run3(threadCount0, threadCount1, true);
+    run3(threadCount0, threadCount1, false);
 }
 
 
@@ -230,10 +230,10 @@ void CompressedPathGraph1B::run(
     phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
     compress();
 
-    detangleShortSuperbubbles(100000, 1, detangleToleranceHigh);
+    detangleShortSuperbubbles(false, 100000, 1, detangleToleranceHigh);
     compress();
 
-    detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
+    detangleShortSuperbubblesGeneral(false, 100000, 1, detangleToleranceHigh);
     compress();
 
     phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
@@ -333,14 +333,14 @@ void CompressedPathGraph1B::run1(
     for(uint64_t iteration=0; iteration<3; iteration++) {
         write("A-" + to_string(iteration));
         writeGfaExpanded("A-" + to_string(iteration), false);
-        detangleShortSuperbubblesGeneral(1000, detangleToleranceLow, detangleToleranceHigh);
+        detangleShortSuperbubblesGeneral(false, 1000, detangleToleranceLow, detangleToleranceHigh);
         compress();
     }
 
     for(uint64_t iteration=0; iteration<3; iteration++) {
         write("B-" + to_string(iteration));
         writeGfaExpanded("B-" + to_string(iteration), false);
-        detangleShortSuperbubblesGeneral(10000, detangleToleranceLow, detangleToleranceHigh);
+        detangleShortSuperbubblesGeneral(false, 10000, detangleToleranceLow, detangleToleranceHigh);
         compress();
     }
 
@@ -350,7 +350,7 @@ void CompressedPathGraph1B::run1(
     for(uint64_t iteration=0; iteration<3; iteration++) {
         write("C-" + to_string(iteration));
         writeGfaExpanded("C-" + to_string(iteration), false);
-        detangleShortSuperbubblesGeneral(10000, detangleToleranceLow, detangleToleranceHigh);
+        detangleShortSuperbubblesGeneral(false, 10000, detangleToleranceLow, detangleToleranceHigh);
         compress();
 
         removeShortSuperbubbles(true, 1000, 3000);
@@ -360,11 +360,11 @@ void CompressedPathGraph1B::run1(
         compress();
     }
 
-    detangleShortSuperbubblesGeneral(30000, detangleToleranceLow, detangleToleranceHigh);
+    detangleShortSuperbubblesGeneral(false, 30000, detangleToleranceLow, detangleToleranceHigh);
     compress();
     detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
     compress();
-    detangleShortSuperbubblesGeneral(30000, detangleToleranceLow, detangleToleranceHigh);
+    detangleShortSuperbubblesGeneral(false, 30000, detangleToleranceLow, detangleToleranceHigh);
     compress();
     removeShortSuperbubbles(true, 10000, 30000);
     removeShortSuperbubbles(true, 10000, 30000);
@@ -423,7 +423,7 @@ void CompressedPathGraph1B::run2(
 
     uint64_t maxLength = 100000;
     for(uint64_t iteration=0; iteration<20; iteration++) {
-        detangleShortSuperbubblesGeneral(maxLength, detangleToleranceLow, detangleToleranceHigh);
+        detangleShortSuperbubblesGeneral(false, maxLength, detangleToleranceLow, detangleToleranceHigh);
         compress();
 
         phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
@@ -490,6 +490,9 @@ void CompressedPathGraph1B::run3(
     const uint64_t longBubbleThreshold = 5000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
+    const double phaseErrorThreshold = 0.1;
+    const double bubbleErrorThreshold = 0.03;
+    const bool usePhasingTable = false;
 
     // const bool writeSnapshots = true;
     // uint64_t snapshotNumber = 0;
@@ -516,23 +519,18 @@ void CompressedPathGraph1B::run3(
     detangleVerticesGeneral(false, 1, detangleToleranceHigh);
     compress();
 
-#if 0
-    // Moved to run4.
-    write("A");
-    phaseBubbleChainsUsingPhasingTable(
-        "A",
-        phaseErrorThreshold,
-        bubbleErrorThreshold,
-        longBubbleThreshold);
-    optimizeChains(
-        false,
-        optimizeChainsMinCommon,
-        optimizeChainsK);
-    write("B");
-    // return;
-#else
-    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
-#endif
+    if(usePhasingTable) {
+        phaseBubbleChainsUsingPhasingTable(
+            "A",
+            phaseErrorThreshold,
+            bubbleErrorThreshold,
+            longBubbleThreshold);
+    } else {
+        phaseBubbleChainsUsingPhasingGraph(
+            false,
+            1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon,
+            minLogP, longBubbleThreshold);
+    }
     compress();
     splitTerminalHaploidBubbles();
 
@@ -540,10 +538,10 @@ void CompressedPathGraph1B::run3(
     compress();
     splitTerminalHaploidBubbles();
 
-    detangleShortSuperbubbles(100000, 1, detangleToleranceHigh);
+    detangleShortSuperbubbles(false, 100000, 1, detangleToleranceHigh);
     compress();
 
-    detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
+    detangleShortSuperbubblesGeneral(false, 100000, 1, detangleToleranceHigh);
     compress();
 
     phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
@@ -578,7 +576,7 @@ void CompressedPathGraph1B::run3(
     compress();
     splitTerminalHaploidBubbles();
 
-    detangleShortSuperbubblesGeneral(30000, 1, detangleToleranceHigh);
+    detangleShortSuperbubblesGeneral(false, 30000, 1, detangleToleranceHigh);
     compress();
     phaseBubbleChainsUsingPhasingGraph(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
     compress();
@@ -752,7 +750,8 @@ void CompressedPathGraph1B::run4(
 {
     // *** EXPOSE WHEN CODE STABILIZES
     const vector< pair<uint64_t, uint64_t> > superbubbleRemovalMaxOffsets =
-    {{300, 1000}, {1000, 3000}, {3000, 10000}, {10000, 30000}};
+    {{300, 1000}, {1000, 3000}, {3000, 10000}};
+    const uint64_t detangleToleranceLow = 1;
     const uint64_t detangleToleranceHigh = 3;
     const uint64_t longBubbleThreshold = 5000;
     const uint64_t optimizeChainsMinCommon = 3;
@@ -760,98 +759,42 @@ void CompressedPathGraph1B::run4(
     const double phaseErrorThreshold = 0.1;
     const double bubbleErrorThreshold = 0.03;
 
-    // const bool writeSnapshots = true;
-    // uint64_t snapshotNumber = 0;
 
 
-    write("Initial");
-
-    detangleVertices(false, 0, detangleToleranceHigh);
-    compress();
-
+    // Loop over larger and larger superbubbles.
     for(const auto& p: superbubbleRemovalMaxOffsets) {
-        removeShortSuperbubbles(false, p.first, p.second);
+
+        // Detangle what we can.
+        detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
         compress();
-    }
+        compressBubbleChains();
+        detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh);
+        compress();
+        compressBubbleChains();
+        detangleShortSuperbubblesGeneral(false, p.second, detangleToleranceLow, detangleToleranceHigh);
+        compress();
+        compressBubbleChains();
 
-    detangleEdges(false, 0, detangleToleranceHigh);
-    detangleEdges(false, 0, detangleToleranceHigh);
-    detangleEdges(false, 1, detangleToleranceHigh);
-    detangleVertices(false, 0, detangleToleranceHigh);
-
-    detangleVerticesGeneral(false, 1, detangleToleranceHigh);
-    compress();
-
-    for(uint64_t iteration=0; iteration<3; iteration++) {
-        write("A-" + to_string(iteration));
+        // Phase.
         phaseBubbleChainsUsingPhasingTable(
-            "A-" + to_string(iteration),
+            "",
             phaseErrorThreshold,
             bubbleErrorThreshold,
             longBubbleThreshold);
-        optimizeChains(
-            true,
-            optimizeChainsMinCommon,
-            optimizeChainsK);
-        write("B-" + to_string(iteration));
-        compress();
-        write("C-" + to_string(iteration));
         splitTerminalHaploidBubbles();
-        write("D-" + to_string(iteration));
-    }
 
 #if 0
-    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
-    compress();
-    splitTerminalHaploidBubbles();
-
-    detangleShortSuperbubbles(100000, 1, detangleToleranceHigh);
-    compress();
-
-    detangleShortSuperbubblesGeneral(100000, 1, detangleToleranceHigh);
-    compress();
-
-    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
-    compress();
-    splitTerminalHaploidBubbles();
-
-    removeShortSuperbubbles(false, 30000, 100000);
-    compress();
-
-    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
-    compress();
-    splitTerminalHaploidBubbles();
-
-    removeShortSuperbubbles(false, 30000, 100000);
-    compress();
-
-    phaseBubbleChainsUsingPhasingGraph(false, 1, phasingThresholdLow, phasingThresholdHigh, useBayesianModel, epsilon, minLogP, longBubbleThreshold);
-    compress();
-    splitTerminalHaploidBubbles();
-
-    removeShortSuperbubbles(false, 30000, 100000);
-    compress();
-
-    phaseBubbleChainsUsingPhasingGraph(false, 1, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
-    compress();
-    splitTerminalHaploidBubbles();
-
-    removeShortSuperbubbles(false, 30000, 100000);
-    compress();
-
-    phaseBubbleChainsUsingPhasingGraph(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
-    compress();
-    splitTerminalHaploidBubbles();
-
-    detangleShortSuperbubblesGeneral(30000, 1, detangleToleranceHigh);
-    compress();
-    phaseBubbleChainsUsingPhasingGraph(false, 10, 1, 4, useBayesianModel, epsilon, minLogP, 30000);
-    compress();
+        // Remove superbubbles.
+        removeShortSuperbubbles(false, p.first, p.second);
+        compress();
+        compressBubbleChains();
 #endif
+    }
 
     // Optimize the chains.
+    compress();
     optimizeChains(
-        true,
+        false,
         optimizeChainsMinCommon,
         optimizeChainsK);
 
@@ -1155,6 +1098,16 @@ bool CompressedPathGraph1B::compress()
     return changesWereMade;
 }
 
+
+
+// Call compress on all BubbleChains to merge adjacent haploid bubbles.
+void CompressedPathGraph1B::compressBubbleChains()
+{
+    CompressedPathGraph1B& cGraph = *this;
+    BGL_FORALL_EDGES(e, cGraph, CompressedPathGraph1B) {
+        cGraph[e].compress();
+    }
+}
 
 
 void CompressedPathGraph1B::write(const string& name, bool writeSequence) const
@@ -3197,6 +3150,7 @@ bool CompressedPathGraph1B::detangleEdge(
 
 // Detangle short superbubbles with any number of entrances and exits.
 bool CompressedPathGraph1B::detangleShortSuperbubbles(
+    bool debug,
     uint64_t maxOffset1,    // Used to define superbubbles
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
@@ -3209,7 +3163,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubbles(
     // Loop over the superbubbles.
     bool changesWereMade = false;
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        if(detangleShortSuperbubble(
+        if(detangleShortSuperbubble(debug,
             superbubbles, superbubbleId, detangleToleranceLow, detangleToleranceHigh)) {
             changesWereMade = true;
         }
@@ -3221,6 +3175,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubbles(
 
 
 bool CompressedPathGraph1B::detangleShortSuperbubble(
+    bool debug,
     const Superbubbles& superbubbles,
     uint64_t superbubbleId,
     uint64_t detangleToleranceLow,
@@ -3228,7 +3183,6 @@ bool CompressedPathGraph1B::detangleShortSuperbubble(
 {
     CompressedPathGraph1B& cGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
-    const bool debug = false;
 
     if(debug) {
         cout << "Found a superbubble with " << superbubble.size() <<
@@ -3517,6 +3471,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubble(
 // and the first bubble of superbubble out-edges to be haploid.
 // This version does not.
 bool CompressedPathGraph1B::detangleShortSuperbubblesGeneral(
+    bool debug,
     uint64_t maxOffset1,    // Used to define superbubbles
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
@@ -3529,7 +3484,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubblesGeneral(
     // Loop over the superbubbles.
     bool changesWereMade = false;
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        if(detangleShortSuperbubbleGeneral(
+        if(detangleShortSuperbubbleGeneral(debug,
             superbubbles, superbubbleId, detangleToleranceLow, detangleToleranceHigh)) {
             changesWereMade = true;
         }
@@ -3542,6 +3497,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubblesGeneral(
 
 
 bool CompressedPathGraph1B::detangleShortSuperbubbleGeneral(
+    bool debug,
     const Superbubbles& superbubbles,
     uint64_t superbubbleId,
     uint64_t detangleToleranceLow,
@@ -3549,7 +3505,6 @@ bool CompressedPathGraph1B::detangleShortSuperbubbleGeneral(
 {
     CompressedPathGraph1B& cGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
-    const bool debug = false;
 
     if(debug) {
         cout << "General detangling of a superbubble with " << superbubble.size() <<
@@ -3616,7 +3571,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubbleGeneral(
         if(debug) {
             cout << "Simple case: calling detangleShortSuperbubble." << endl;
         }
-        return detangleShortSuperbubble(superbubbles, superbubbleId,
+        return detangleShortSuperbubble(debug, superbubbles, superbubbleId,
             detangleToleranceLow, detangleToleranceHigh);
     }
     if(debug) {
@@ -3799,7 +3754,7 @@ bool CompressedPathGraph1B::detangleShortSuperbubbleGeneral(
     if(debug) {
         cout << "Calling detangleShortSuperbubble after splitting some edges." << endl;
     }
-    return detangleShortSuperbubble(superbubbles, superbubbleId,
+    return detangleShortSuperbubble(debug, superbubbles, superbubbleId,
         detangleToleranceLow, detangleToleranceHigh);
 }
 
@@ -4468,6 +4423,94 @@ void CompressedPathGraph1B::phaseBubbleChainUsingPhasingTable(
 
     // Create the PhasedComponents.
     phasingTable.constructPhasedComponents(debug);
+
+
+
+    // Split each PhasedComponent at locations where this is necessary.
+    // Check pairs of adjacent consecutive bubbles in the same phased component.
+    vector< shared_ptr<PhasedComponent> > splitComponents;
+    for(const auto& phasedComponentPointer: phasingTable.phasedComponents) {
+        const PhasedComponent& phasedComponent = *phasedComponentPointer;
+        if(phasedComponent.size() < 2) {
+            break;
+        }
+        if(debug) {
+            cout << "Checking for splitting a PhasedComponent of size " << phasedComponent.size() << endl;
+        }
+        vector<uint64_t> splitComponentsBegin(1, 0);
+        for(uint64_t i=1; i<phasedComponent.size(); i++) {
+            const auto& p0 = phasedComponent[i-1];
+            const auto& p1 = phasedComponent[i];
+            const uint64_t positionInBubbleChain0 = p0.first;
+            const uint64_t positionInBubbleChain1 = p1.first;
+            const int64_t phase0 = p0.second;
+            const int64_t phase1 = p1.second;
+
+            const Bubble& bubble0 = bubbleChain[positionInBubbleChain0];
+            const Bubble& bubble1 = bubbleChain[positionInBubbleChain1];
+            SHASTA_ASSERT(bubble0.isDiploid());
+            SHASTA_ASSERT(bubble1.isDiploid());
+
+            const Chain& chain00 = bubble0[0];
+            const Chain& chain01 = bubble0[1];
+            const Chain& chain10 = (phase0 == phase1) ? bubble1[0] : bubble1[1];
+            const Chain& chain11 = (phase0 == phase1) ? bubble1[1] : bubble1[0];
+
+            MarkerGraphEdgeId e00 = chain00.secondToLast();
+            MarkerGraphEdgeId e01 = chain01.secondToLast();
+            MarkerGraphEdgeId e10 = chain10.second();
+            MarkerGraphEdgeId e11 = chain11.second();
+
+            MarkerGraphEdgePairInfo info;
+            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(e00, e10, info));
+            const uint64_t common0 = info.common;
+            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(e01, e11, info));
+            const uint64_t common1 = info.common;
+
+            if(debug) {
+                cout << "Bubble pair: " <<
+                    positionInBubbleChain0 << " " <<
+                    positionInBubbleChain1 << " " <<
+                    common0 << " " <<
+                    common1;
+                if(common0 == 0 or common1 == 0) {
+                    cout << " no common oriented reads";
+                }
+                cout << endl;
+            }
+
+            if(common0 == 0 or common1 == 0) {
+                splitComponentsBegin.push_back(i);
+            }
+        }
+        splitComponentsBegin.push_back(phasedComponent.size());
+
+
+        // Split this phased component, if necessary.
+        if(splitComponentsBegin.size() == 2) {
+            // No splitting necessary.
+            splitComponents.push_back(phasedComponentPointer);
+            if(debug) {
+                cout << "No splitting was necessary." << endl;
+            }
+        } else {
+            // Split at the split points.
+            for(uint64_t i=0; i<splitComponentsBegin.size()-1; i++) {
+                const uint64_t begin = splitComponentsBegin[i];
+                const uint64_t end = splitComponentsBegin[i+1];
+                shared_ptr<PhasedComponent> splitComponentPointer = make_shared<PhasedComponent>();
+                copy(phasedComponent.begin() + begin, phasedComponent.begin() + end,
+                    back_inserter(*splitComponentPointer));
+                splitComponentPointer->computePositionRange();
+                splitComponents.push_back(splitComponentPointer);
+                if(debug) {
+                    cout << "Created a split component at " << begin << " to " << end-1 << " (inclusive)." << endl;
+                }
+            }
+        }
+    }
+    phasingTable.phasedComponents.swap(splitComponents);
+
 
 
 
