@@ -98,6 +98,9 @@ public:
         return size() > 2;
     }
 
+    // Remove duplicate chains.
+    void deduplicate();
+
     template<class Archive> void serialize(Archive & ar, const unsigned int version)
     {
         ar & boost::serialization::base_object< vector<Chain> >(*this);
@@ -297,7 +300,7 @@ private:
     // Create a new edge connecting cv0 and cv1.
     // The new edge will consist of a simple BubbleChain with a single
     // haploid Bubble with a Chain of length 2.
-    void connect(vertex_descriptor cv0, vertex_descriptor cv1);
+    edge_descriptor connect(vertex_descriptor cv0, vertex_descriptor cv1);
 
     // Compress parallel edges into bubbles, where possible.
     bool compressParallelEdges();

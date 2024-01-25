@@ -791,6 +791,8 @@ void CompressedPathGraph1B::run4(
 #endif
     }
 
+
+
     // Optimize the chains.
     compress();
     optimizeChains(
@@ -1016,6 +1018,7 @@ bool CompressedPathGraph1B::compressParallelEdges()
             newEdge.resize(1);  // Make it a single bubble.
             Bubble& newEdgeBubble = newEdge.front();
             newEdgeBubble = newBubble;
+            newEdgeBubble.deduplicate();
 
             // Remove the old edges.
             for(const edge_descriptor e: edgesToBeRemoved) {
@@ -1025,6 +1028,14 @@ bool CompressedPathGraph1B::compressParallelEdges()
         }
     }
     return changesWereMade;
+}
+
+
+
+// Remove duplicate chains.
+void Bubble::deduplicate()
+{
+    shasta::deduplicate(*this);
 }
 
 
@@ -3108,7 +3119,10 @@ bool CompressedPathGraph1B::detangleEdge(
     for(uint64_t i0=0; i0<inEdges.size(); i0++) {
         for(uint64_t i1=0; i1<outEdges.size(); i1++) {
             if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
-                connect(inVertices[i0], outVertices[i1]);
+                const edge_descriptor ceNew = connect(inVertices[i0], outVertices[i1]);
+                if(debug) {
+                    cout << "Created " << bubbleChainStringId(ceNew) << endl;
+                }
             }
         }
     }
@@ -5825,7 +5839,7 @@ CompressedPathGraph1B::vertex_descriptor
 // Create a new edge connecting the cv0 and cv1.
 // The new edge will consist of a simple BubbleChain with a single
 // haploid Bubble with a Chain of length 2.
-void CompressedPathGraph1B::connect(vertex_descriptor cv0, vertex_descriptor cv1)
+CompressedPathGraph1B::edge_descriptor CompressedPathGraph1B::connect(vertex_descriptor cv0, vertex_descriptor cv1)
 {
     CompressedPathGraph1B& cGraph = *this;
 
@@ -5847,6 +5861,8 @@ void CompressedPathGraph1B::connect(vertex_descriptor cv0, vertex_descriptor cv1
     Chain& chain = bubble.front();
     chain.push_back(cGraph[cv0].edgeId);
     chain.push_back(cGraph[cv1].edgeId);
+
+    return ceNew;
 
 }
 
