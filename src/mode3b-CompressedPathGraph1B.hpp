@@ -334,23 +334,35 @@ private:
     // bool detangleVertexStrict(vertex_descriptor, bool debug);
     bool detangleVertices(bool debug,
         uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
+        uint64_t detangleToleranceHigh,
+        bool useBayesianModel,
+        double epsilon,
+        double minLogP);
     bool detangleVertex(
         vertex_descriptor,
         bool debug,
         uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
+        uint64_t detangleToleranceHigh,
+        bool useBayesianModel,
+        double epsilon,
+        double minLogP);
 
     // Vertex detangling that can deal with non-haploid bubbles adjacent to the
     // vertex to be detangled.
     bool detangleVerticesGeneral(bool debug,
         uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
+        uint64_t detangleToleranceHigh,
+        bool useBayesianModel,
+        double epsilon,
+        double minLogP);
     bool detangleVertexGeneral(
         vertex_descriptor,
         bool debug,
         uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
+        uint64_t detangleToleranceHigh,
+        bool useBayesianModel,
+        double epsilon,
+        double minLogP);
 
     // Split the first/last bubble of a bubble chain.
     // Used by detangleVertexGeneral to eliminate

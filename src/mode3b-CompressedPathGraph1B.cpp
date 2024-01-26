@@ -194,7 +194,7 @@ void CompressedPathGraph1B::run(
 
     write("Initial");
 
-    detangleVertices(false, 0, detangleToleranceHigh);
+    detangleVertices(false, 0, detangleToleranceHigh, false, epsilon, minLogP);
     compress();
 
     for(const auto& p: superbubbleRemovalMaxOffsets) {
@@ -205,12 +205,12 @@ void CompressedPathGraph1B::run(
     detangleEdges(false, 0, detangleToleranceHigh);
     detangleEdges(false, 0, detangleToleranceHigh);
     detangleEdges(false, 1, detangleToleranceHigh);
-    detangleVertices(false, 0, detangleToleranceHigh);
+    detangleVertices(false, 0, detangleToleranceHigh, false, epsilon, minLogP);
 
     // detangleBackEdges(1, detangleToleranceHigh);
     // compress();
 
-    detangleVerticesGeneral(false, 1, detangleToleranceHigh);
+    detangleVerticesGeneral(false, 1, detangleToleranceHigh, false, epsilon, minLogP);
     compress();
 
     if(writeSnapshots) {
@@ -314,7 +314,8 @@ void CompressedPathGraph1B::run1(
     removeSelfComplementaryEdges();
 
     while(true) {
-        const bool detangledSomeVertices = detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh);
+        const bool detangledSomeVertices = detangleVerticesGeneral(
+            false, detangleToleranceLow, detangleToleranceHigh, false, epsilon, minLogP);
         if(detangledSomeVertices) {
             compress();
         }
@@ -500,7 +501,7 @@ void CompressedPathGraph1B::run3(
 
     write("Initial");
 
-    detangleVertices(false, 0, detangleToleranceHigh);
+    detangleVertices(false, 0, detangleToleranceHigh, false, epsilon, minLogP);
     compress();
 
     for(const auto& p: superbubbleRemovalMaxOffsets) {
@@ -511,12 +512,12 @@ void CompressedPathGraph1B::run3(
     detangleEdges(false, 0, detangleToleranceHigh);
     detangleEdges(false, 0, detangleToleranceHigh);
     detangleEdges(false, 1, detangleToleranceHigh);
-    detangleVertices(false, 0, detangleToleranceHigh);
+    detangleVertices(false, 0, detangleToleranceHigh, false, epsilon, minLogP);
 
     // detangleBackEdges(1, detangleToleranceHigh);
     // compress();
 
-    detangleVerticesGeneral(false, 1, detangleToleranceHigh);
+    detangleVerticesGeneral(false, 1, detangleToleranceHigh, false, epsilon, minLogP);
     compress();
 
     if(usePhasingTable) {
@@ -753,13 +754,77 @@ void CompressedPathGraph1B::run4(
     {{300, 1000}, {1000, 3000}, {3000, 10000}};
     const uint64_t detangleToleranceLow = 1;
     const uint64_t detangleToleranceHigh = 3;
+    const bool useBayesianModel = true;
+    const double epsilon = 0.1;
+    const double minLogP = 8.;
     const uint64_t longBubbleThreshold = 5000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 100;
     const double phaseErrorThreshold = 0.1;
     const double bubbleErrorThreshold = 0.03;
 
+    write("Initial");
 
+    // Initial phasing.
+    phaseBubbleChainsUsingPhasingTable(
+        "",
+        phaseErrorThreshold,
+        bubbleErrorThreshold,
+        longBubbleThreshold);
+    compress();
+
+    // Remove very short superbubbles.
+    removeShortSuperbubbles(false, 100, 300);
+    compress();
+    compressBubbleChains();
+
+    // Phase again.
+    phaseBubbleChainsUsingPhasingTable(
+        "",
+        phaseErrorThreshold,
+        bubbleErrorThreshold,
+        longBubbleThreshold);
+    compress();
+
+    // Remove very short superbubbles.
+    removeShortSuperbubbles(false, 100, 300);
+    compress();
+    compressBubbleChains();
+
+    // Phase again.
+    phaseBubbleChainsUsingPhasingTable(
+        "",
+        phaseErrorThreshold,
+        bubbleErrorThreshold,
+        longBubbleThreshold);
+    compress();
+
+    // Some detangling.
+    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
+    compress();
+    compressBubbleChains();
+    detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    compress();
+    compressBubbleChains();
+    detangleShortSuperbubblesGeneral(false, 10000, detangleToleranceLow, detangleToleranceHigh);
+    compress();
+    compressBubbleChains();
+
+    // Some detangling.
+    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
+    compress();
+    compressBubbleChains();
+    detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    compress();
+    compressBubbleChains();
+    detangleShortSuperbubblesGeneral(false, 10000, detangleToleranceLow, detangleToleranceHigh);
+    compress();
+    compressBubbleChains();
+
+    detangleVerticesGeneral(true, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+
+
+    #if 0
 
     // Loop over larger and larger superbubbles.
     for(const auto& p: superbubbleRemovalMaxOffsets) {
@@ -790,7 +855,7 @@ void CompressedPathGraph1B::run4(
         compressBubbleChains();
 #endif
     }
-
+#endif
 
 
     // Optimize the chains.
@@ -2008,7 +2073,10 @@ bool CompressedPathGraph1B::detangleVerticesStrict(bool debug)
 bool CompressedPathGraph1B::detangleVertices(
     bool debug,
     uint64_t detangleToleranceLow,
-    uint64_t detangleToleranceHigh)
+    uint64_t detangleToleranceHigh,
+    bool useBayesianModel,
+    double epsilon,
+    double minLogP)
 {
     if(debug) {
         cout << "Detangling vertices." << endl;
@@ -2022,7 +2090,8 @@ bool CompressedPathGraph1B::detangleVertices(
 
     uint64_t detangledCount = 0;
     for(const vertex_descriptor cv: allVertices) {
-        if(detangleVertex(cv, debug, detangleToleranceLow, detangleToleranceHigh)) {
+        if(detangleVertex(cv, debug, detangleToleranceLow, detangleToleranceHigh,
+            useBayesianModel, epsilon, minLogP)) {
             ++detangledCount;
         }
     }
@@ -2039,7 +2108,10 @@ bool CompressedPathGraph1B::detangleVertices(
 bool CompressedPathGraph1B::detangleVerticesGeneral(
     bool debug,
     uint64_t detangleToleranceLow,
-    uint64_t detangleToleranceHigh)
+    uint64_t detangleToleranceHigh,
+    bool useBayesianModel,
+    double epsilon,
+    double minLogP)
 {
     if(debug) {
         cout << "Detangling vertices (general detangling)." << endl;
@@ -2053,7 +2125,8 @@ bool CompressedPathGraph1B::detangleVerticesGeneral(
 
     uint64_t detangledCount = 0;
     for(const vertex_descriptor cv: allVertices) {
-        if(detangleVertexGeneral(cv, debug, detangleToleranceLow, detangleToleranceHigh)) {
+        if(detangleVertexGeneral(cv, debug, detangleToleranceLow, detangleToleranceHigh,
+            useBayesianModel, epsilon, minLogP)) {
             ++detangledCount;
         }
     }
@@ -2287,7 +2360,10 @@ bool CompressedPathGraph1B::detangleVertex(
     vertex_descriptor cv,
     bool debug,
     uint64_t detangleToleranceLow,
-    uint64_t detangleToleranceHigh)
+    uint64_t detangleToleranceHigh,
+    bool useBayesianModel,
+    double epsilon,
+    double minLogP)
 {
     CompressedPathGraph1B& cGraph = *this;
 
@@ -2365,87 +2441,155 @@ bool CompressedPathGraph1B::detangleVertex(
         }
     }
 
-    // Count the number of significant, ambiguous, and negligible elements
-    // in the tangle matrix.
-    uint64_t significantCount = 0;
-    uint64_t ambiguousCount = 0;
-    uint64_t negligibleCount = 0;
-    for(uint64_t i0=0; i0<inEdges.size(); i0++) {
-        for(uint64_t i1=0; i1<outEdges.size(); i1++) {
-            const uint64_t t = tangleMatrix[i0][i1];
-            if(t <= detangleToleranceLow) {
-                ++negligibleCount;
-            } else if(t >= detangleToleranceHigh) {
-                ++significantCount;
+
+
+    // Do the detangling based on the tangle matrix.
+    if(useBayesianModel and inEdges.size() == 2 and outEdges.size() == 2) {
+
+        // Use the 2 by 2 Bayesian model for detangling.
+        array< array<uint64_t, 2>, 2> tangleMatrix22;
+        for(uint64_t i=0; i<2; i++) {
+            for(uint64_t j=0; j<2; j++) {
+                tangleMatrix22[i][j] = tangleMatrix[i][j];
+            }
+        }
+
+        // Compute logarithmic probability ratio of in-phase and out-of-phase
+        // against random.
+        double logPin;
+        double logPout;
+        tie(logPin, logPout) = diploidBayesianPhase(tangleMatrix22, epsilon);
+        if(debug) {
+            cout << "logPin = " << logPin << ", logPout = " << logPout << endl;
+        }
+
+        const bool isInPhase    = (logPin  >= minLogP) and ((logPin - logPout) >= minLogP);
+        const bool isOutOfPhase = (logPout >= minLogP) and ((logPout - logPin) >= minLogP);
+
+        if(isInPhase or isOutOfPhase) {
+
+            // We can detangle.
+
+            // Create truncated versions of the inEdges and outEdges.
+            vector<vertex_descriptor> inVertices;
+            for(const edge_descriptor ce: inEdges) {
+                inVertices.push_back(cloneAndTruncateAtEnd(ce));
+            }
+            vector<vertex_descriptor> outVertices;
+            for(const edge_descriptor ce: outEdges) {
+                outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+            }
+
+            if(isInPhase) {
+                connect(inVertices[0], outVertices[0]);
+                connect(inVertices[1], outVertices[1]);
             } else {
-                ++ambiguousCount;
+                connect(inVertices[0], outVertices[1]);
+                connect(inVertices[1], outVertices[0]);
             }
-        }
-    }
 
-    // If the tangle matrix contains any ambiguous elements, do nothing.
-    if(ambiguousCount > 0) {
-        return false;
-    }
+            // Now we can remove cv and all of its in-edges and out-edges.
+            clear_vertex(cv, cGraph);
+            cGraph.removeVertex(cv);
+            return true;
 
-    // There are no ambiguous elements.
-    // If there are no negligible element, that is all elements of the tangle matrix are significant,
-    // there is nothing to do.
-    if(negligibleCount == 0) {
-        return false;
-    }
+        } else {
 
-    // To avoid breaking contiguity, we require each column and each row of the
-    // tangle matrix to have at least one significant element.
-    // This means that each in-edge will be "merged" with at least one out-edge,
-    // and each out-edge will be "merged" with at least one in-edge.
-    for(uint64_t i0=0; i0<inEdges.size(); i0++) {
-        bool foundSignificant = false;
-        for(uint64_t i1=0; i1<outEdges.size(); i1++) {
-            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
-                foundSignificant = true;
-                break;
-            }
-        }
-        if(not foundSignificant) {
+            // Ambiguous. Don't detangle.
             return false;
         }
-    }
-    for(uint64_t i1=0; i1<outEdges.size(); i1++) {
-        bool foundSignificant = false;
+
+    } else {
+
+        // Don't use the Bayesian model.
+        // Instead, do simple counting of tangle matrix elements.
+
+        // Count the number of significant, ambiguous, and negligible elements
+        // in the tangle matrix.
+        uint64_t significantCount = 0;
+        uint64_t ambiguousCount = 0;
+        uint64_t negligibleCount = 0;
         for(uint64_t i0=0; i0<inEdges.size(); i0++) {
-            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
-                foundSignificant = true;
-                break;
+            for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+                const uint64_t t = tangleMatrix[i0][i1];
+                if(t <= detangleToleranceLow) {
+                    ++negligibleCount;
+                } else if(t >= detangleToleranceHigh) {
+                    ++significantCount;
+                } else {
+                    ++ambiguousCount;
+                }
             }
         }
-        if(not foundSignificant) {
+
+        // If the tangle matrix contains any ambiguous elements, do nothing.
+        if(ambiguousCount > 0) {
             return false;
         }
-    }
 
-    if(debug) {
-        cout << "This vertex will be detangled " << inEdges.size() << " by " << outEdges.size() << endl;
-    }
+        // There are no ambiguous elements.
+        // If there are no negligible element, that is all elements of the tangle matrix are significant,
+        // there is nothing to do.
+        if(negligibleCount == 0) {
+            return false;
+        }
 
-
-    // Create truncated versions of the inEdges and outEdges.
-    vector<vertex_descriptor> inVertices;
-    for(const edge_descriptor ce: inEdges) {
-        inVertices.push_back(cloneAndTruncateAtEnd(ce));
-    }
-    vector<vertex_descriptor> outVertices;
-    for(const edge_descriptor ce: outEdges) {
-        outVertices.push_back(cloneAndTruncateAtBeginning(ce));
-    }
-
-    // Each significant element of the tangle matrix generates a new edge.
-    for(uint64_t i0=0; i0<inEdges.size(); i0++) {
-        for(uint64_t i1=0; i1<outEdges.size(); i1++) {
-            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
-                connect(inVertices[i0], outVertices[i1]);
+        // To avoid breaking contiguity, we require each column and each row of the
+        // tangle matrix to have at least one significant element.
+        // This means that each in-edge will be "merged" with at least one out-edge,
+        // and each out-edge will be "merged" with at least one in-edge.
+        for(uint64_t i0=0; i0<inEdges.size(); i0++) {
+            bool foundSignificant = false;
+            for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+                if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                    foundSignificant = true;
+                    break;
+                }
+            }
+            if(not foundSignificant) {
+                return false;
             }
         }
+        for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+            bool foundSignificant = false;
+            for(uint64_t i0=0; i0<inEdges.size(); i0++) {
+                if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                    foundSignificant = true;
+                    break;
+                }
+            }
+            if(not foundSignificant) {
+                return false;
+            }
+        }
+
+        if(debug) {
+            cout << "This vertex will be detangled " << inEdges.size() << " by " << outEdges.size() << endl;
+        }
+
+        // Create truncated versions of the inEdges and outEdges.
+        vector<vertex_descriptor> inVertices;
+        for(const edge_descriptor ce: inEdges) {
+            inVertices.push_back(cloneAndTruncateAtEnd(ce));
+        }
+        vector<vertex_descriptor> outVertices;
+        for(const edge_descriptor ce: outEdges) {
+            outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+        }
+
+        // Each significant element of the tangle matrix generates a new edge.
+        for(uint64_t i0=0; i0<inEdges.size(); i0++) {
+            for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+                if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                    connect(inVertices[i0], outVertices[i1]);
+                }
+            }
+        }
+
+        // Now we can remove cv and all of its in-edges and out-edges.
+        clear_vertex(cv, cGraph);
+        cGraph.removeVertex(cv);
+        return true;
     }
 
 
@@ -2510,11 +2654,8 @@ bool CompressedPathGraph1B::detangleVertex(
     }
 #endif
 
-    // Now we can remove cv and all of its in-edges and out-edges.
-    clear_vertex(cv, cGraph);
-    cGraph.removeVertex(cv);
 
-    return true;
+    SHASTA_ASSERT(0);
 }
 
 
@@ -2535,7 +2676,10 @@ bool CompressedPathGraph1B::detangleVertexGeneral(
     vertex_descriptor cv,
     bool debug,
     uint64_t detangleToleranceLow,
-    uint64_t detangleToleranceHigh)
+    uint64_t detangleToleranceHigh,
+    bool useBayesianModel,
+    double epsilon,
+    double minLogP)
 {
     CompressedPathGraph1B& cGraph = *this;
 
@@ -2646,64 +2790,100 @@ bool CompressedPathGraph1B::detangleVertexGeneral(
 
     }
 
-    // Count the number of significant, ambiguous, and negligible elements
-    // in the tangle matrix.
-    uint64_t significantCount = 0;
-    uint64_t ambiguousCount = 0;
-    uint64_t negligibleCount = 0;
-    for(uint64_t i0=0; i0<inChains.size(); i0++) {
-        for(uint64_t i1=0; i1<outChains.size(); i1++) {
-            const uint64_t t = tangleMatrix[i0][i1];
-            if(t <= detangleToleranceLow) {
-                ++negligibleCount;
-            } else if(t >= detangleToleranceHigh) {
-                ++significantCount;
-            } else {
-                ++ambiguousCount;
+
+    // Figure out if we can detangle.
+    if(useBayesianModel and
+        (inChains.size() == 2) and
+        (outChains.size() == 2)) {
+
+        // Use the 2 by 2 Bayesian model for detangling.
+        array< array<uint64_t, 2>, 2> tangleMatrix22;
+        for(uint64_t i=0; i<2; i++) {
+            for(uint64_t j=0; j<2; j++) {
+                tangleMatrix22[i][j] = tangleMatrix[i][j];
             }
         }
-    }
 
-    // If the tangle matrix contains any ambiguous elements, do nothing.
-    if(ambiguousCount > 0) {
+        // Compute logarithmic probability ratio of in-phase and out-of-phase
+        // against random.
+        double logPin;
+        double logPout;
+        tie(logPin, logPout) = diploidBayesianPhase(tangleMatrix22, epsilon);
         if(debug) {
-            cout << "Tangle matrix is ambiguous." << endl;
+            cout << "logPin = " << logPin << ", logPout = " << logPout << endl;
         }
-        return false;
-    }
-    // There are no ambiguous elements.
-    // If there are no negligible element, that is all elements of the tangle matrix are significant,
-    // there is nothing to do.
-    if(negligibleCount == 0) {
-        return false;
-    }
 
-    // To avoid breaking contiguity, we require each column and each row of the
-    // tangle matrix to have at least one significant element.
-    // This means that each in-edge will be "merged" with at least one out-edge,
-    // and each out-edge will be "merged" with at least one in-edge.
-    for(uint64_t i0=0; i0<inChains.size(); i0++) {
-        bool foundSignificant = false;
-        for(uint64_t i1=0; i1<outChains.size(); i1++) {
-            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
-                foundSignificant = true;
-                break;
+        const bool isInPhase    = (logPin  >= minLogP) and ((logPin - logPout) >= minLogP);
+        const bool isOutOfPhase = (logPout >= minLogP) and ((logPout - logPin) >= minLogP);
+        if(not (isInPhase or isOutOfPhase)) {
+            if(debug) {
+                cout << "Ambiguous, don't detangle." << endl;
             }
-        }
-        if(not foundSignificant) {
             return false;
         }
-    }
-    for(uint64_t i1=0; i1<outChains.size(); i1++) {
-        bool foundSignificant = false;
+
+    } else {
+
+        // Not using the Bayesian model.
+        // Count the number of significant, ambiguous, and negligible elements
+        // in the tangle matrix.
+        uint64_t significantCount = 0;
+        uint64_t ambiguousCount = 0;
+        uint64_t negligibleCount = 0;
         for(uint64_t i0=0; i0<inChains.size(); i0++) {
-            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
-                foundSignificant = true;
-                break;
+            for(uint64_t i1=0; i1<outChains.size(); i1++) {
+                const uint64_t t = tangleMatrix[i0][i1];
+                if(t <= detangleToleranceLow) {
+                    ++negligibleCount;
+                } else if(t >= detangleToleranceHigh) {
+                    ++significantCount;
+                } else {
+                    ++ambiguousCount;
+                }
             }
         }
-        if(not foundSignificant) {
+
+        // If the tangle matrix contains any ambiguous elements, do nothing.
+        if(ambiguousCount > 0) {
+            if(debug) {
+                cout << "Tangle matrix is ambiguous." << endl;
+            }
             return false;
+        }
+        // There are no ambiguous elements.
+        // If there are no negligible element, that is all elements of the tangle matrix are significant,
+        // there is nothing to do.
+        if(negligibleCount == 0) {
+            return false;
+        }
+
+        // To avoid breaking contiguity, we require each column and each row of the
+        // tangle matrix to have at least one significant element.
+        // This means that each in-edge will be "merged" with at least one out-edge,
+        // and each out-edge will be "merged" with at least one in-edge.
+        for(uint64_t i0=0; i0<inChains.size(); i0++) {
+            bool foundSignificant = false;
+            for(uint64_t i1=0; i1<outChains.size(); i1++) {
+                if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                    foundSignificant = true;
+                    break;
+                }
+            }
+            if(not foundSignificant) {
+                return false;
+            }
+        }
+        for(uint64_t i1=0; i1<outChains.size(); i1++) {
+            bool foundSignificant = false;
+            for(uint64_t i0=0; i0<inChains.size(); i0++) {
+                if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                    foundSignificant = true;
+                    break;
+                }
+            }
+            if(not foundSignificant) {
+                return false;
+            }
         }
     }
 
@@ -2748,7 +2928,8 @@ bool CompressedPathGraph1B::detangleVertexGeneral(
     if(debug) {
         cout << "Calling detangleVertex." << endl;
     }
-    return detangleVertex(cv, debug, detangleToleranceLow, detangleToleranceHigh);
+    return detangleVertex(cv, debug, detangleToleranceLow, detangleToleranceHigh,
+        useBayesianModel, epsilon, minLogP);
 }
 
 
