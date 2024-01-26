@@ -151,7 +151,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
 
-    run3(threadCount0, threadCount1, false);
+    run4(threadCount0, threadCount1, false);
 }
 
 
@@ -165,7 +165,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     assembler(assembler)
 {
     load(fileName);
-    run3(threadCount0, threadCount1, false);
+    run4(threadCount0, threadCount1, false);
 }
 
 
@@ -765,7 +765,7 @@ void CompressedPathGraph1B::run4(
 
     write("Initial");
 
-    // Initial phasing.
+    // Phase.
     phaseBubbleChainsUsingPhasingTable(
         "",
         phaseErrorThreshold,
@@ -778,7 +778,7 @@ void CompressedPathGraph1B::run4(
     compress();
     compressBubbleChains();
 
-    // Phase again.
+    // Phase.
     phaseBubbleChainsUsingPhasingTable(
         "",
         phaseErrorThreshold,
@@ -791,7 +791,7 @@ void CompressedPathGraph1B::run4(
     compress();
     compressBubbleChains();
 
-    // Phase again.
+    // Phase .
     phaseBubbleChainsUsingPhasingTable(
         "",
         phaseErrorThreshold,
@@ -799,7 +799,8 @@ void CompressedPathGraph1B::run4(
         longBubbleThreshold);
     compress();
 
-    // Some detangling.
+    // Detangle.
+    splitTerminalHaploidBubbles();
     detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
     compress();
     compressBubbleChains();
@@ -810,7 +811,8 @@ void CompressedPathGraph1B::run4(
     compress();
     compressBubbleChains();
 
-    // Some detangling.
+    // Detangle.
+    splitTerminalHaploidBubbles();
     detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
     compress();
     compressBubbleChains();
@@ -821,41 +823,38 @@ void CompressedPathGraph1B::run4(
     compress();
     compressBubbleChains();
 
-    detangleVerticesGeneral(true, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
 
+    // Phase.
+    phaseBubbleChainsUsingPhasingTable(
+        "",
+        phaseErrorThreshold,
+        bubbleErrorThreshold,
+        longBubbleThreshold);
 
-    #if 0
+    // Detangle edges.
+    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
+    compress();
+    compressBubbleChains();
 
-    // Loop over larger and larger superbubbles.
-    for(const auto& p: superbubbleRemovalMaxOffsets) {
+    // Phase.
+    phaseBubbleChainsUsingPhasingTable(
+        "",
+        phaseErrorThreshold,
+        bubbleErrorThreshold,
+        longBubbleThreshold);
+    compress();
+    compressBubbleChains();
 
-        // Detangle what we can.
-        detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
-        compress();
-        compressBubbleChains();
-        detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh);
-        compress();
-        compressBubbleChains();
-        detangleShortSuperbubblesGeneral(false, p.second, detangleToleranceLow, detangleToleranceHigh);
-        compress();
-        compressBubbleChains();
-
-        // Phase.
-        phaseBubbleChainsUsingPhasingTable(
-            "",
-            phaseErrorThreshold,
-            bubbleErrorThreshold,
-            longBubbleThreshold);
-        splitTerminalHaploidBubbles();
-
-#if 0
-        // Remove superbubbles.
-        removeShortSuperbubbles(false, p.first, p.second);
-        compress();
-        compressBubbleChains();
-#endif
-    }
-#endif
+    // Phase.
+    write("A");
+    phaseBubbleChainsUsingPhasingTable(
+        "A",
+        phaseErrorThreshold,
+        bubbleErrorThreshold,
+        longBubbleThreshold);
+    write("B");
+    compress();
+    compressBubbleChains();
 
 
     // Optimize the chains.
@@ -4665,13 +4664,12 @@ void CompressedPathGraph1B::phaseBubbleChainUsingPhasingTable(
             if(debug) {
                 cout << "Bubble pair: " <<
                     positionInBubbleChain0 << " " <<
-                    positionInBubbleChain1 << " " <<
-                    common0 << " " <<
-                    common1;
+                    positionInBubbleChain1 <<
+                    ": side 0 " << e00 << " " << e10 << " " << common0 << " " <<
+                    ", side 1 " << e01 << " " << e11 << " " << common1 << endl;
                 if(common0 == 0 or common1 == 0) {
-                    cout << " no common oriented reads";
+                    cout << "No common oriented reads." << endl;
                 }
-                cout << endl;
             }
 
             if(common0 == 0 or common1 == 0) {
