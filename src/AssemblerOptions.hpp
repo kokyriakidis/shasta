@@ -245,6 +245,8 @@ public:
     int minCoveragePerStrand;
     uint64_t minEdgeCoverage;
     uint64_t minEdgeCoveragePerStrand;
+    uint64_t minPrimaryEdgeCoverage;
+    uint64_t maxPrimaryEdgeCoverage;
     bool allowDuplicateMarkers;
     bool cleanupDuplicateMarkers;
     double duplicateMarkersPattern1Threshold;

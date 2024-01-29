@@ -2332,7 +2332,7 @@ public:
 
 
 
-    // Mode 3 assembly (new code in namespace mode3a).
+    // Mode 3 assembly (code in namespace mode3a).
     void mode3aAssembly(size_t threadCount);
     class Mode3aAssemblyData {
     public:
@@ -2356,6 +2356,10 @@ public:
         uint64_t direction              // 0=forward, 1=backward, 2=bidirectional
         ) const;
     void findCompleteMarkerGraphPaths(uint64_t threadCount) const;
+    void flagPrimaryMarkerGraphEdges(
+        uint64_t minEdgeCoverage,
+        uint64_t maxEdgeCoverage,
+        uint64_t threadCount);
 
     // Given two consecutive primary edges, find the secondary edges
     // in between.

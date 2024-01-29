@@ -773,3 +773,98 @@ bool MarkerGraph::vertexHasDuplicateOrientedReadIds(
 
     return false;
 }
+
+
+
+// Flag primary edges (only used for Mode 3 assembly).
+void MarkerGraph::flagPrimaryEdges(
+    uint64_t minPrimaryEdgeCoverage,
+    uint64_t maxPrimaryEdgeCoverage,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+    uint64_t threadCount)
+{
+    // Store the arguments so the threads can see them.
+    flagPrimaryEdgesData.minPrimaryEdgeCoverage = minPrimaryEdgeCoverage;
+    flagPrimaryEdgesData.maxPrimaryEdgeCoverage = maxPrimaryEdgeCoverage;
+    flagPrimaryEdgesData.markersPointer = &markers;
+
+    // Adjust the numbers of threads, if necessary.
+    if(threadCount == 0) {
+        threadCount = std::thread::hardware_concurrency();
+    }
+
+    // Clear the flags on all edges.
+    for(Edge& edge: edges) {
+        edge.isPrimary = 0;
+    }
+
+    // Multithreaded code to flag primary edges.
+    const uint64_t batchCount = 10000;
+    setupLoadBalancing(edges.size(), batchCount);
+    runThreads(&MarkerGraph::flagPrimaryEdgesThreadFunction, threadCount);
+
+    uint64_t primaryEdgeCount = 0;
+    for(Edge& edge: edges) {
+        if(edge.isPrimary == 1) {
+            ++primaryEdgeCount;
+        }
+    }
+    cout << "Found " << primaryEdgeCount <<
+        " primary marker graph edges out of " << edges.size() << " total." << endl;
+}
+
+
+
+void MarkerGraph::flagPrimaryEdgesThreadFunction(uint64_t threadId)
+{
+    const uint64_t minPrimaryEdgeCoverage = flagPrimaryEdgesData.minPrimaryEdgeCoverage;
+    const uint64_t maxPrimaryEdgeCoverage = flagPrimaryEdgesData.maxPrimaryEdgeCoverage;
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers =
+        *flagPrimaryEdgesData.markersPointer;
+
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+        for(EdgeId edgeId=begin; edgeId!=end; ++edgeId) {
+            if(isPrimaryEdge(edgeId, minPrimaryEdgeCoverage, maxPrimaryEdgeCoverage, markers)) {
+                edges[edgeId].isPrimary = 1;
+            }
+        }
+    }
+}
+
+
+
+// Find out if a marker graph edge is a primary edge.
+// Only used for Mode 3 assembly.
+bool MarkerGraph::isPrimaryEdge(
+    MarkerGraphEdgeId edgeId,
+    uint64_t minPrimaryEdgeCoverage,
+    uint64_t maxPrimaryEdgeCoverage,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) const
+{
+    // Check coverage.
+    const uint64_t coverage = edgeCoverage(edgeId);
+    if(coverage < minPrimaryEdgeCoverage) {
+        return false;
+    }
+    if(coverage > maxPrimaryEdgeCoverage) {
+        return false;
+    }
+
+    // Check for duplicate oriented reads on the edge.
+    if(edgeHasDuplicateOrientedReadIds(edgeId)) {
+        return false;
+    }
+
+    // Check for duplicate oriented reads on its vertices.
+    const MarkerGraph::Edge& edge = edges[edgeId];
+    if(
+        vertexHasDuplicateOrientedReadIds(edge.source, markers) or
+        vertexHasDuplicateOrientedReadIds(edge.target, markers)) {
+        return false;
+    }
+
+    // If all above checks passed, this is a primary edge.
+    return true;
+}
+

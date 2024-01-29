@@ -604,7 +604,7 @@ void AssemblerOptions::addConfigurableOptions()
         default_value(6),
         "Minimum edge coverage (number of supporting oriented reads) "
         "for a marker graph edge to be created."
-        "Experimental. Only used with --Assembly.mode 1.")
+        "Only used with --Assembly.mode 2.")
 
         ("MarkerGraph.minEdgeCoveragePerStrand",
         value<uint64_t>(&markerGraphOptions.minEdgeCoveragePerStrand)->
@@ -612,7 +612,19 @@ void AssemblerOptions::addConfigurableOptions()
         "Minimum edge coverage (number of supporting oriented reads) "
         "on each strand "
         "for a marker graph edge to be created."
-        "Experimental. Only used with --Assembly.mode 1.")
+        "Only used with --Assembly.mode 2.")
+
+        ("MarkerGraph.minPrimaryEdgeCoverage",
+        value<uint64_t>(&markerGraphOptions.minPrimaryEdgeCoverage)->
+        default_value(8),
+        "Minimum edge coverage for a primary marker graph edge. "
+        "Only used with --Assembly.mode 3.")
+
+        ("MarkerGraph.maxPrimaryEdgeCoverage",
+        value<uint64_t>(&markerGraphOptions.maxPrimaryEdgeCoverage)->
+        default_value(60),
+        "Maximum edge coverage for a primary marker graph edge. "
+        "Only used with --Assembly.mode 3.")
 
         ("MarkerGraph.allowDuplicateMarkers",
         bool_switch(&markerGraphOptions.allowDuplicateMarkers)->
@@ -1049,6 +1061,8 @@ void MarkerGraphOptions::write(ostream& s) const
     s << "minCoveragePerStrand = " << minCoveragePerStrand << "\n";
     s << "minEdgeCoverage = " << minEdgeCoverage << "\n";
     s << "minEdgeCoveragePerStrand = " << minEdgeCoveragePerStrand << "\n";
+    s << "minPrimaryEdgeCoverage = " << minPrimaryEdgeCoverage << "\n";
+    s << "maxPrimaryEdgeCoverage = " << maxPrimaryEdgeCoverage << "\n";
     s << "allowDuplicateMarkers = " <<
         convertBoolToPythonString(allowDuplicateMarkers) << "\n";
     s << "cleanupDuplicateMarkers = " <<

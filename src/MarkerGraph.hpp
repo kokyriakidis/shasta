@@ -235,8 +235,8 @@ public:
         // Assembly mode 2 only.
         uint8_t wasRemovedWhileSplittingSecondaryEdges : 1;
 
-        // Unused.
-        uint8_t flag6 : 1;
+        // This is set for primary edges (Mode 3 assembly only).
+        uint8_t isPrimary : 1;
 
         void clearFlags()
         {
@@ -247,7 +247,7 @@ public:
             wasAssembled = 0;
             isSecondary = 0;
             wasRemovedWhileSplittingSecondaryEdges = 0;
-            flag6 = 0;
+            isPrimary = 0;
         }
         Edge() :
             source(MarkerGraph::invalidCompressedVertexId),
@@ -381,6 +381,27 @@ public:
     //   even when adjacent markers overlap. And the sequence of a path can
     //   be obtained by just concatenating the edge sequences.
     MemoryMapped::VectorOfVectors<Base, uint64_t> edgeSequence;
+
+    // Flag primary edges (only used for Mode 3 assembly).
+    void flagPrimaryEdges(
+        uint64_t minPrimaryEdgeCoverage,
+        uint64_t maxPrimaryEdgeCoverage,
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+        uint64_t threadCount);
+private:
+    void flagPrimaryEdgesThreadFunction(uint64_t threadId);
+    bool isPrimaryEdge(
+        EdgeId,
+        uint64_t minPrimaryEdgeCoverage,
+        uint64_t maxPrimaryEdgeCoverage,
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) const;
+    class FlagPrimaryEdgesData {
+    public:
+        uint64_t minPrimaryEdgeCoverage;
+        uint64_t maxPrimaryEdgeCoverage;
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>* markersPointer;
+    };
+    FlagPrimaryEdgesData flagPrimaryEdgesData;
 };
 
 #endif

@@ -630,8 +630,8 @@ PYBIND11_MODULE(shasta, shastaModule)
             arg("threadCount1"))
         .def("loadAndAssembleCompressedPathGraph1B",
             &Assembler::loadAndAssembleCompressedPathGraph1B)
-
-
+        .def("flagPrimaryMarkerGraphEdges",
+            &Assembler::flagPrimaryMarkerGraphEdges)
 
 
 

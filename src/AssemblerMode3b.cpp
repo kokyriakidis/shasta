@@ -59,6 +59,25 @@ void Assembler::findCompleteMarkerGraphPaths(uint64_t threadCount) const
 
 
 
+void Assembler::flagPrimaryMarkerGraphEdges(
+    uint64_t minPrimaryEdgeCoverage,
+    uint64_t maxPrimaryEdgeCoverage,
+    uint64_t threadCount)
+{
+    // Check that we have what we need.
+    SHASTA_ASSERT(markers.isOpen());
+    checkMarkerGraphVerticesAreAvailable();
+    SHASTA_ASSERT(markerGraph.edges.isOpenWithWriteAccess);
+
+    markerGraph.flagPrimaryEdges(
+        minPrimaryEdgeCoverage,
+        maxPrimaryEdgeCoverage,
+        markers,
+        threadCount);
+}
+
+
+
 void Assembler::findMode3bPaths(
     uint64_t threadCount0,  // High level parallelization
     uint64_t threadCount1   // Low level parallelization
