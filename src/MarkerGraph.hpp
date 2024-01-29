@@ -402,6 +402,30 @@ private:
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>* markersPointer;
     };
     FlagPrimaryEdgesData flagPrimaryEdgesData;
+
+
+
+    // The primary journey of an oriented read is the sequence of primary
+    // marker graph edges encountered by the oriented read.
+    // Indexed by OrientedReadId::getValue().
+    // Only used for mode 3 assembly.
+public:
+    class PrimaryJourneyEntry {
+    public:
+        array<uint32_t, 2> ordinals;
+        EdgeId edgeId;
+        bool operator<(const PrimaryJourneyEntry& that) const {
+            return ordinals[0] < that.ordinals[0];
+        }
+    };
+    MemoryMapped::VectorOfVectors<PrimaryJourneyEntry, uint64_t> primaryJourneys;
+    void createPrimaryJourneys(uint64_t orientedReadCount, uint64_t threadCount);
+private:
+    void createPrimaryJourneysThreadFunction1(uint64_t threadId);
+    void createPrimaryJourneysThreadFunction2(uint64_t threadId);
+    void createPrimaryJourneysThreadFunction12(uint64_t pass);
+    void createPrimaryJourneysThreadFunction3(uint64_t threadId);
+
 };
 
 #endif

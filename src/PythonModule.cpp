@@ -632,6 +632,10 @@ PYBIND11_MODULE(shasta, shastaModule)
             &Assembler::loadAndAssembleCompressedPathGraph1B)
         .def("flagPrimaryMarkerGraphEdges",
             &Assembler::flagPrimaryMarkerGraphEdges)
+        .def("createMarkerGraphPrimaryJourneys",
+            &Assembler::createMarkerGraphPrimaryJourneys)
+        .def("accessMarkerGraphPrimaryJourneys",
+            &Assembler::accessMarkerGraphPrimaryJourneys)
 
 
 

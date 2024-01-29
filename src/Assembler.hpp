@@ -2361,6 +2361,9 @@ public:
         uint64_t maxEdgeCoverage,
         uint64_t threadCount);
 
+    void createMarkerGraphPrimaryJourneys(uint64_t threadCount);
+    void accessMarkerGraphPrimaryJourneys();
+
     // Given two consecutive primary edges, find the secondary edges
     // in between.
     void fillMode3bAssemblyPathStep(const vector<string>&, ostream&);

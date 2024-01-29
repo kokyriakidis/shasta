@@ -868,3 +868,121 @@ bool MarkerGraph::isPrimaryEdge(
     return true;
 }
 
+
+
+void MarkerGraph::createPrimaryJourneys(
+    uint64_t orientedReadCount,
+    uint64_t threadCount)
+{
+    // Adjust the numbers of threads, if necessary.
+    if(threadCount == 0) {
+        threadCount = std::thread::hardware_concurrency();
+    }
+
+    primaryJourneys.clear();
+
+    const uint64_t batchCount = 100;
+
+    primaryJourneys.beginPass1(orientedReadCount);
+    setupLoadBalancing(edges.size(), batchCount);
+    runThreads(&MarkerGraph::createPrimaryJourneysThreadFunction1, threadCount);
+    primaryJourneys.beginPass2();
+    setupLoadBalancing(edges.size(), batchCount);
+    runThreads(&MarkerGraph::createPrimaryJourneysThreadFunction2, threadCount);
+    primaryJourneys.endPass2(false, true);
+    setupLoadBalancing(orientedReadCount, 1);
+    runThreads(&MarkerGraph::createPrimaryJourneysThreadFunction3, threadCount);
+
+    cout << "Found " << primaryJourneys.totalSize() <<
+        " marker graph primary journey entries for " << orientedReadCount <<
+        " oriented reads." << endl;
+    cout << "Average number of marker graph primary journey entries per oriented read is " <<
+        double(primaryJourneys.totalSize()) / double(orientedReadCount) << endl;
+
+
+
+    // Write the journeys to csv.
+    if(false) {
+        ofstream csv("MarkerGraphPrimaryJourneys.csv");
+        for(ReadId readId=0; readId<orientedReadCount/2; readId++) {
+            for(Strand strand=0; strand<2; strand++) {
+                const OrientedReadId orientedReadId(readId, strand);
+                csv << orientedReadId << ",";
+                for(const auto& primaryJourneyEntry: primaryJourneys[orientedReadId.getValue()]) {
+                    csv << primaryJourneyEntry.edgeId << ",";
+                }
+                csv << "\n";
+            }
+        }
+    }
+
+}
+
+
+
+void MarkerGraph::createPrimaryJourneysThreadFunction1(uint64_t threadId)
+{
+    createPrimaryJourneysThreadFunction12(1);
+}
+
+
+
+void MarkerGraph::createPrimaryJourneysThreadFunction2(uint64_t threadId)
+{
+    createPrimaryJourneysThreadFunction12(2);
+}
+
+
+
+void MarkerGraph::createPrimaryJourneysThreadFunction12(uint64_t  pass)
+{
+    // Loop over batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over marker graph edges assigned to this batch.
+        for(EdgeId edgeId=begin; edgeId!=end; ++edgeId) {
+            const Edge& edge = edges[edgeId];
+
+            // If this is not a primary edge, skip it.
+            if(edge.isPrimary == 0) {
+                continue;
+            }
+
+            PrimaryJourneyEntry primaryJourneyEntry;
+            primaryJourneyEntry.edgeId = edgeId;
+
+            // Loop over the MarkerIntervals of this edge.
+            span<MarkerInterval> markerIntervals = edgeMarkerIntervals[edgeId];
+            for(const MarkerInterval& markerInterval: markerIntervals) {
+                const uint64_t orientedReadIdValue = markerInterval.orientedReadId.getValue();
+
+                if(pass == 1) {
+                    primaryJourneys.incrementCountMultithreaded(orientedReadIdValue);
+                } else {
+                    primaryJourneyEntry.ordinals = markerInterval.ordinals;
+                    primaryJourneys.storeMultithreaded(orientedReadIdValue, primaryJourneyEntry);
+                }
+
+            }
+
+        }
+    }
+}
+
+
+
+void MarkerGraph::createPrimaryJourneysThreadFunction3(uint64_t threadId)
+{
+    // Loop over batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over oriented reads assigned to this batch.
+        for(uint64_t orientedReadIdValue=begin; orientedReadIdValue!=end; orientedReadIdValue++) {
+            auto journey = primaryJourneys[orientedReadIdValue];
+            sort(journey.begin(), journey.end());
+        }
+    }
+}
+

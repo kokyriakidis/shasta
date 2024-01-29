@@ -78,6 +78,28 @@ void Assembler::flagPrimaryMarkerGraphEdges(
 
 
 
+void Assembler::createMarkerGraphPrimaryJourneys(uint64_t threadCount)
+{
+    checkMarkersAreOpen();
+    checkMarkerGraphVerticesAreAvailable();
+    checkMarkerGraphEdgesIsOpen();
+
+
+    markerGraph.primaryJourneys.createNew(
+        largeDataName("MarkerGraphPrimaryJourneys"), largeDataPageSize);
+    markerGraph.createPrimaryJourneys(markers.size(), threadCount);
+}
+
+
+
+void Assembler::accessMarkerGraphPrimaryJourneys()
+{
+    markerGraph.primaryJourneys.accessExistingReadOnly(
+        largeDataName("MarkerGraphPrimaryJourneys"));
+}
+
+
+
 void Assembler::findMode3bPaths(
     uint64_t threadCount0,  // High level parallelization
     uint64_t threadCount1   // Low level parallelization
