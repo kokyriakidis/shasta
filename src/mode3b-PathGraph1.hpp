@@ -442,12 +442,6 @@ private:
         const string& baseName,
         const GlobalPathGraph1DisplayOptions&) const;
 
-    static void assemble0(const Assembler&);
-
-    static void assemble1(
-        const Assembler&,
-        uint64_t threadCount0,
-        uint64_t threadCount1);
     static void assemble1(
         GlobalPathGraph1&,
         uint64_t threadCount0,

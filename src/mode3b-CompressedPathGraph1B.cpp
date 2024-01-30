@@ -151,7 +151,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph1B-" + to_string(componentId) + ".data");
 
-    run4(threadCount0, threadCount1, false);
+    run3(threadCount0, threadCount1, false);
 }
 
 
@@ -165,7 +165,7 @@ CompressedPathGraph1B::CompressedPathGraph1B(
     assembler(assembler)
 {
     load(fileName);
-    run4(threadCount0, threadCount1, false);
+    run3(threadCount0, threadCount1, false);
 }
 
 
