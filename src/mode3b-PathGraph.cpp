@@ -188,9 +188,7 @@ void GlobalPathGraph::computeOrientedReadJourneys()
 
 
 
-void GlobalPathGraph::createEdges(
-    uint64_t minEdgeCoverage,
-    double minCorrectedJaccard)
+void GlobalPathGraph::createEdges(double minCorrectedJaccard)
 {
     // Candidate edges are pairs of vertices that appear near each other
     // in oriented read journeys.
@@ -203,14 +201,11 @@ void GlobalPathGraph::createEdges(
             candidateEdges.push_back({journey[position0].second, journey[position1].second});
         }
     }
-    // cout << timestamp << "Found " << candidateEdges.size() << " candidate edges, including duplicates." << endl;
 
     // Deduplicate the candidate edges and count the number of times
-    // each of them was found. Keep only the ones that occurred at least
-    // minEdgeCoverage times.
+    // each of them was found.
     vector<uint64_t> coverage;
-    deduplicateAndCountWithThreshold(candidateEdges, coverage, minEdgeCoverage);
-    // cout << timestamp << "After deduplication, there are " << candidateEdges.size() << " candidate edges." << endl;
+    deduplicateAndCount(candidateEdges, coverage);
     SHASTA_ASSERT(candidateEdges.size() == coverage.size());
     candidateEdges.shrink_to_fit();
     coverage.shrink_to_fit();
@@ -220,7 +215,6 @@ void GlobalPathGraph::createEdges(
     edges.clear();
     for(uint64_t i=0; i<candidateEdges.size(); i++) {
         const uint64_t c = coverage[i];
-        SHASTA_ASSERT(c >= minEdgeCoverage);
         const auto& p = candidateEdges[i];
         const uint64_t vertexId0 = p.first;
         const uint64_t vertexId1 = p.second;

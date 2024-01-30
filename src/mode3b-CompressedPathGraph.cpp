@@ -42,7 +42,6 @@ void GlobalPathGraph::assemble(
     const uint64_t maxPrimaryCoverage = 40;
 #endif
 
-    const uint64_t minEdgeCoverage = 1;
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
     const uint64_t transitiveReductionDistance = 5000;
@@ -55,7 +54,7 @@ void GlobalPathGraph::assemble(
     GlobalPathGraph graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
     graph.computeOrientedReadJourneys();
-    graph.createEdges(minEdgeCoverage, minCorrectedJaccard);
+    graph.createEdges(minCorrectedJaccard);
 
     graph.createComponents(minCorrectedJaccard, minComponentSize);
 

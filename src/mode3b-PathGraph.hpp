@@ -241,9 +241,7 @@ private:
     void computeOrientedReadJourneys();
 
     vector<GlobalPathGraphEdge> edges;
-    void createEdges(
-        uint64_t minEdgeCoverage,
-        double minCorrectedJaccard);
+    void createEdges(double minCorrectedJaccard);
 
     // The connected components of the GlobalPathGraph.
     // Stored sorted by decreasing size, as measured by number of vertices.
