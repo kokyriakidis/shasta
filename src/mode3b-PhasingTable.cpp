@@ -35,11 +35,11 @@ using namespace mode3b;
 #include "tuple.hpp"
 
 
-void CompressedPathGraph1B::writeBubbleChainsPhasingTables(
+void CompressedPathGraph::writeBubbleChainsPhasingTables(
     const string& fileNamePrefix,
     double phaseErrorThreshold) const
 {
-    const CompressedPathGraph1B& cGraph = *this;
+    const CompressedPathGraph& cGraph = *this;
 
     const string directoryName = fileNamePrefix + "-PhasingTables";
     if(not std::filesystem::create_directory(directoryName)) {
@@ -48,8 +48,8 @@ void CompressedPathGraph1B::writeBubbleChainsPhasingTables(
 
 
     // Loop over all BubbleChains.
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph1B) {
-        const CompressedPathGraph1BEdge& edge = cGraph[ce];
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+        const CompressedPathGraphEdge& edge = cGraph[ce];
         const BubbleChain& bubbleChain = edge;
 
         // Create the phasing table for this bubble chain.
