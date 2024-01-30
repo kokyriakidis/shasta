@@ -242,7 +242,6 @@ private:
 
     vector<GlobalPathGraphEdge> edges;
     void createEdges(
-        uint64_t maxDistanceInJourney,
         uint64_t minEdgeCoverage,
         double minCorrectedJaccard);
 

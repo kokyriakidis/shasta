@@ -55,7 +55,7 @@ void GlobalPathGraph::assemble(
     GlobalPathGraph graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
     graph.computeOrientedReadJourneys();
-    graph.createEdges(1, minEdgeCoverage, minCorrectedJaccard);
+    graph.createEdges(minEdgeCoverage, minCorrectedJaccard);
 
     graph.createComponents(minCorrectedJaccard, minComponentSize);
 
@@ -151,7 +151,7 @@ CompressedPathGraph::CompressedPathGraph(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph-" + to_string(componentId) + ".data");
 
-    run3(threadCount0, threadCount1, false);
+    run3(threadCount0, threadCount1, true);
 }
 
 
@@ -165,7 +165,7 @@ CompressedPathGraph::CompressedPathGraph(
     assembler(assembler)
 {
     load(fileName);
-    run3(threadCount0, threadCount1, false);
+    run3(threadCount0, threadCount1, true);
 }
 
 

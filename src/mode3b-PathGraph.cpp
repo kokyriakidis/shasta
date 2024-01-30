@@ -189,7 +189,6 @@ void GlobalPathGraph::computeOrientedReadJourneys()
 
 
 void GlobalPathGraph::createEdges(
-    uint64_t maxDistanceInJourney,
     uint64_t minEdgeCoverage,
     double minCorrectedJaccard)
 {
@@ -199,14 +198,9 @@ void GlobalPathGraph::createEdges(
     for(uint64_t i=0; i<orientedReadJourneys.size(); i++) {
         const auto& journey = orientedReadJourneys[i];
 
-        for(uint64_t position0=0; position0 < journey.size(); position0++) {
-            for(uint64_t distance = 1; distance <= maxDistanceInJourney; distance++) {
-                const uint64_t position1 = position0 + distance;
-                if(position1 >= journey.size()) {
-                    break;
-                }
-                candidateEdges.push_back({journey[position0].second, journey[position1].second});
-            }
+        for(uint64_t position1=1; position1 < journey.size(); position1++) {
+            const uint64_t position0 = position1 - 1;
+            candidateEdges.push_back({journey[position0].second, journey[position1].second});
         }
     }
     // cout << timestamp << "Found " << candidateEdges.size() << " candidate edges, including duplicates." << endl;
