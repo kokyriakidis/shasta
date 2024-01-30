@@ -134,10 +134,6 @@ public:
         const string& name,
         const GlobalPathGraphDisplayOptions&) const;
 
-    // For each vertex, only keep the best k outgoing and k incoming edges.
-    // "Best" as defined by correctedJaccard of the edges.
-    void knn(uint64_t k);
-
     // Create the connected components of this PathGraph,
     // without changing the PathGraph itself.
     vector< shared_ptr<PathGraph> > createConnectedComponents(uint64_t minComponentSize) const;

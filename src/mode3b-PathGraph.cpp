@@ -610,66 +610,6 @@ void PathGraph::writeGraphviz(
 
 
 
-// For each vertex, only keep the best k outgoing and k incoming edges.
-// "Best" as defined by correctedJaccard of the edges.
-void PathGraph::knn(uint64_t k)
-{
-    PathGraph& graph = *this;
-
-    // Store here the edges we want to keep.
-    std::set<edge_descriptor> edgesToBeKept;
-
-    // For each vertex, mark as to be kept the best k outgoing
-    // and incoming edges.
-    vector< pair<edge_descriptor, double> > adjacentEdges;  // With correctedJaccard.
-    BGL_FORALL_VERTICES(v, graph, PathGraph) {
-
-        // Loop over both directions.
-        for(uint64_t direction=0; direction<2; direction++) {
-            adjacentEdges.clear();
-
-            if(direction == 0) {
-                BGL_FORALL_OUTEDGES(v, e, graph, PathGraph) {
-                    adjacentEdges.push_back({e, graph[e].info.correctedJaccard()});
-                }
-            } else {
-                BGL_FORALL_INEDGES(v, e, graph, PathGraph) {
-                    adjacentEdges.push_back({e, graph[e].info.correctedJaccard()});
-                }
-            }
-
-            // Only keep the k best.
-            if(adjacentEdges.size() > k) {
-                std::nth_element(
-                    adjacentEdges.begin(),
-                    adjacentEdges.begin() + k,
-                    adjacentEdges.end(),
-                    OrderPairsBySecondOnlyGreater<edge_descriptor, double>());
-                adjacentEdges.resize(k);
-            }
-
-            // Mark them as to be kept.
-            for(const auto& p:adjacentEdges) {
-                const edge_descriptor e = p.first;
-                edgesToBeKept.insert(e);
-            }
-        }
-    }
-
-    // Remove edges not marked as to be kept.
-    vector<edge_descriptor> edgesToBeRemoved;
-    BGL_FORALL_EDGES(e, graph, PathGraph) {
-        if(not edgesToBeKept.contains(e)) {
-            edgesToBeRemoved.push_back(e);
-        }
-    }
-    for(const edge_descriptor e: edgesToBeRemoved) {
-        boost::remove_edge(e, graph);
-    }
-}
-
-
-
 // Create the connected components of this PathGraph,
 // without changing the PathGraph itself.
 vector< shared_ptr<PathGraph> > PathGraph::createConnectedComponents(
