@@ -6,7 +6,7 @@
 #include <boost/multi_index/detail/bidir_node_iterator.hpp>
 #include <boost/multi_index/detail/ord_index_impl.hpp>
 #include <boost/operators.hpp>
-#include <mode3b-CompressedPathGraph1B.hpp>
+#include <mode3b-CompressedPathGraph.hpp>
 #include <mode3b-PhasingTable.hpp>
 #include <MarkerGraph.hpp>
 #include <MarkerInterval.hpp>
