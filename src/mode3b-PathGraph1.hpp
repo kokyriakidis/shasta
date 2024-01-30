@@ -43,17 +43,17 @@ namespace shasta {
         class GlobalPathGraphVertex;
         class GlobalPathGraphEdge;
 
-        // A subset of the GlobalPathGraph1, for example
+        // A subset of the GlobalPathGraph, for example
         // a single connected component, represented as a Boost graph.
-        class PathGraph1Vertex;
-        class PathGraph1Edge;
-        class PathGraph1;
-        using PathGraph1GraphBaseClass = boost::adjacency_list<
+        class PathGraphVertex;
+        class PathGraphEdge;
+        class PathGraph;
+        using PathGraphGraphBaseClass = boost::adjacency_list<
             boost::listS,
             boost::vecS,
             boost::bidirectionalS,
-            PathGraph1Vertex,
-            PathGraph1Edge>;
+            PathGraphVertex,
+            PathGraphEdge>;
 
         class GlobalPathGraphDisplayOptions;
 
@@ -62,7 +62,7 @@ namespace shasta {
 
 
 
-// Class to control Graphviz output of GlobalPathGraph1 and PathGraph1.
+// Class to control Graphviz output of GlobalPathGraph and PathGraph.
 class shasta::mode3b::GlobalPathGraphDisplayOptions {
 public:
     bool labels = true;
@@ -92,10 +92,10 @@ public:
 
 
 
-class shasta::mode3b::PathGraph1Vertex {
+class shasta::mode3b::PathGraphVertex {
 public:
 
-    // The corresponding GlobalPathGraph1 vertexId.
+    // The corresponding GlobalPathGraph vertexId.
     uint64_t vertexId;
 
     // The corresponding marker graph edgeId.
@@ -104,7 +104,7 @@ public:
 
 
 
-class shasta::mode3b::PathGraph1Edge {
+class shasta::mode3b::PathGraphEdge {
 public:
     MarkerGraphEdgePairInfo info;
     uint64_t coverage;
@@ -115,7 +115,7 @@ public:
 
 // A subset of the GlobalPathGraph, for example
 // a single connected component, represented as a Boost graph.
-class shasta::mode3b::PathGraph1 : public PathGraph1GraphBaseClass {
+class shasta::mode3b::PathGraph : public PathGraphGraphBaseClass {
 public:
 
     std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
@@ -138,9 +138,9 @@ public:
     // "Best" as defined by correctedJaccard of the edges.
     void knn(uint64_t k);
 
-    // Create the connected components of this PathGraph1,
-    // without changing the PathGraph1 itself.
-    vector< shared_ptr<PathGraph1> > createConnectedComponents(uint64_t minComponentSize) const;
+    // Create the connected components of this PathGraph,
+    // without changing the PathGraph itself.
+    vector< shared_ptr<PathGraph> > createConnectedComponents(uint64_t minComponentSize) const;
 
     void localTransitiveReduction(
         uint64_t distance,
@@ -250,9 +250,9 @@ private:
         uint64_t minEdgeCoverage,
         double minCorrectedJaccard);
 
-    // The connected components of the GlobalPathGraph1.
+    // The connected components of the GlobalPathGraph.
     // Stored sorted by decreasing size, as measured by number of vertices.
-    vector< shared_ptr<PathGraph1> > components;
+    vector< shared_ptr<PathGraph> > components;
 
     // Create connected components.
     // This only considers edges with corrected Jaccard at least equal to

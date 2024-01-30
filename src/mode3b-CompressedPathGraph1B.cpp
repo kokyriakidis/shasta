@@ -86,7 +86,7 @@ void GlobalPathGraph::assembleComponent(
     uint64_t threadCount1)
 {
     cout << "Assembly begins for connected component " << componentId << endl;
-    PathGraph1& component = *components[componentId];
+    PathGraph& component = *components[componentId];
 
     // Graphviz output.
     if(true) {
@@ -136,9 +136,9 @@ void GlobalPathGraph::loadAndAssemble(
 
 
 
-// Create from a PathGraph1, then call run.
+// Create from a PathGraph, then call run.
 CompressedPathGraph1B::CompressedPathGraph1B(
-    const PathGraph1& graph,
+    const PathGraph& graph,
     uint64_t componentId,
     const Assembler& assembler,
     uint64_t threadCount0,
@@ -886,39 +886,39 @@ void CompressedPathGraph1B::run4(
 
 
 
-// Initial creation from the PathGraph1.
-// Each linear chain of edges in the PathGraph1 after transitive reduction generates
+// Initial creation from the PathGraph.
+// Each linear chain of edges in the PathGraph after transitive reduction generates
 // a CompressedPathGraph1BEdge (BubbleChain) consisting of a single haploid bubble.
-void CompressedPathGraph1B::create(const PathGraph1& graph)
+void CompressedPathGraph1B::create(const PathGraph& graph)
 {
     CompressedPathGraph1B& cGraph = *this;
 
-    // Create a filtered version of the PathGraph1, containing only the
+    // Create a filtered version of the PathGraph, containing only the
     // transitive reduction edges.
     class EdgePredicate {
     public:
-        bool operator()(const PathGraph1::edge_descriptor e) const
+        bool operator()(const PathGraph::edge_descriptor e) const
         {
             return not (*graph)[e].isNonTransitiveReductionEdge;
         }
-        EdgePredicate(const PathGraph1& graph) : graph(&graph) {}
+        EdgePredicate(const PathGraph& graph) : graph(&graph) {}
         EdgePredicate() : graph(0) {}
     private:
-        const PathGraph1* graph;
+        const PathGraph* graph;
     };
-    using FilteredPathGraph1 = boost::filtered_graph<PathGraph1, EdgePredicate>;
-    FilteredPathGraph1 filteredGraph(graph, EdgePredicate(graph));
+    using FilteredPathGraph = boost::filtered_graph<PathGraph, EdgePredicate>;
+    FilteredPathGraph filteredGraph(graph, EdgePredicate(graph));
 
-    // Find linear chains in the PathGraph1 after transitive reduction.
-    vector< vector<PathGraph1::edge_descriptor> > inputChains;
+    // Find linear chains in the PathGraph after transitive reduction.
+    vector< vector<PathGraph::edge_descriptor> > inputChains;
     findLinearChains(filteredGraph, 0, inputChains);
 
     // Each chain generates an edge.
     // Vertices are added as needed.
     std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
-    for(const vector<PathGraph1::edge_descriptor>& inputChain: inputChains) {
-        const PathGraph1::vertex_descriptor v0 = source(inputChain.front(), graph);
-        const PathGraph1::vertex_descriptor v1 = target(inputChain.back(), graph);
+    for(const vector<PathGraph::edge_descriptor>& inputChain: inputChains) {
+        const PathGraph::vertex_descriptor v0 = source(inputChain.front(), graph);
+        const PathGraph::vertex_descriptor v1 = target(inputChain.back(), graph);
         const MarkerGraphEdgeId markerGraphEdgeId0 = graph[v0].edgeId;
         const MarkerGraphEdgeId markerGraphEdgeId1 = graph[v1].edgeId;
         const vertex_descriptor cv0 = getVertex(markerGraphEdgeId0, vertexMap);
@@ -937,12 +937,12 @@ void CompressedPathGraph1B::create(const PathGraph1& graph)
 
         // Store the chain.
         Chain& chain = bubble.front();
-        for(const PathGraph1::edge_descriptor e: inputChain) {
-            const PathGraph1::vertex_descriptor v = source(e, graph);
+        for(const PathGraph::edge_descriptor e: inputChain) {
+            const PathGraph::vertex_descriptor v = source(e, graph);
             chain.push_back(graph[v].edgeId);
         }
-        const PathGraph1::edge_descriptor eLast = inputChain.back();
-        const PathGraph1::vertex_descriptor vLast = target(eLast, graph);
+        const PathGraph::edge_descriptor eLast = inputChain.back();
+        const PathGraph::vertex_descriptor vLast = target(eLast, graph);
         chain.push_back(graph[vLast].edgeId);
     }
 }

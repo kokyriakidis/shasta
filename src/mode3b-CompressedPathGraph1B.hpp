@@ -50,7 +50,7 @@ namespace shasta {
             CompressedPathGraph1BVertex,
             CompressedPathGraph1BEdge>;
 
-        class PathGraph1;
+        class PathGraph;
     }
     class Assembler;
     class OrientedReadId;
@@ -216,7 +216,7 @@ public:
 
     // Create from a PathGraph1, then call run.
     CompressedPathGraph1B(
-        const PathGraph1&,
+        const PathGraph&,
         uint64_t componentId,
         const Assembler&,
         uint64_t threadCount0,
@@ -271,10 +271,10 @@ private:
 
 
 
-    // Initial creation from the PathGraph1.
-    // Each linear chain of edges in the PathGraph1 after transitive reduction generates
+    // Initial creation from the PathGraph.
+    // Each linear chain of edges in the PathGraph after transitive reduction generates
     // a CompressedPathGraph1BEdge (BubbleChain) consisting of a single haploid bubble.
-    void create(const PathGraph1&);
+    void create(const PathGraph&);
     uint64_t nextEdgeId = 0;
     void renumberEdges();
 
