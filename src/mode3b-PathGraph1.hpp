@@ -246,24 +246,10 @@ private:
     void computeOrientedReadJourneys();
 
     vector<GlobalPathGraph1Edge> edges;
-    void createEdges0(
+    void createEdges(
         uint64_t maxDistanceInJourney,
         uint64_t minEdgeCoverage,
         double minCorrectedJaccard);
-
-    // Find children edges of vertexId0.
-    // The first element of each pair of the children vector
-    // is the vertexId of the child vertex.
-    void findChildren(
-        uint64_t vertexId0,
-        uint64_t minEdgeCoverage,
-        double minCorrectedJaccard,
-        vector< pair<uint64_t, MarkerGraphEdgePairInfo> >& children);
-    void findParents(
-        uint64_t vertexId0,
-        uint64_t minEdgeCoverage,
-        double minCorrectedJaccard,
-        vector< pair<uint64_t, MarkerGraphEdgePairInfo> >& parents);
 
     // The connected components of the GlobalPathGraph1.
     // Stored sorted by decreasing size, as measured by number of vertices.
@@ -292,11 +278,7 @@ private:
         const string& baseName,
         const GlobalPathGraph1DisplayOptions&) const;
 
-    static void assemble2(
-        const Assembler&,
-        uint64_t threadCount0,
-        uint64_t threadCount1);
-    void assemble2(
+    void assembleComponent(
         uint64_t componentId,
         uint64_t transitiveReductionDistance,
         uint64_t transitiveReductionMaxCoverage,

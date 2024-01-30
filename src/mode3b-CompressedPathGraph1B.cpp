@@ -28,7 +28,7 @@ using namespace mode3b;
 
 
 
-void GlobalPathGraph1::assemble2(
+void GlobalPathGraph1::assemble(
     const Assembler& assembler,
     uint64_t threadCount0,
     uint64_t threadCount1)
@@ -55,13 +55,13 @@ void GlobalPathGraph1::assemble2(
     GlobalPathGraph1 graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
     graph.computeOrientedReadJourneys();
-    graph.createEdges0(1, minEdgeCoverage, minCorrectedJaccard);
+    graph.createEdges(1, minEdgeCoverage, minCorrectedJaccard);
 
     graph.createComponents(minCorrectedJaccard, minComponentSize);
 
     // Assemble each connected component separately.
     for(uint64_t componentId=0; componentId<graph.components.size(); componentId++) {
-        graph.assemble2(
+        graph.assembleComponent(
             componentId,
             transitiveReductionDistance,
             transitiveReductionMaxCoverage,
@@ -75,7 +75,7 @@ void GlobalPathGraph1::assemble2(
 
 
 
-void GlobalPathGraph1::assemble2(
+void GlobalPathGraph1::assembleComponent(
     uint64_t componentId,
     uint64_t transitiveReductionDistance,
     uint64_t transitiveReductionMaxCoverage,

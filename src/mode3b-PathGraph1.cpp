@@ -24,16 +24,6 @@ using namespace mode3b;
 
 
 
-void GlobalPathGraph1::assemble(
-    const Assembler& assembler,
-    uint64_t threadCount0,
-    uint64_t threadCount1)
-{
-    assemble2(assembler, threadCount0, threadCount1);
-}
-
-
-
 GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
     assembler(assembler)
 {
@@ -207,7 +197,7 @@ void GlobalPathGraph1::computeOrientedReadJourneys()
 
 
 
-void GlobalPathGraph1::createEdges0(
+void GlobalPathGraph1::createEdges(
     uint64_t maxDistanceInJourney,
     uint64_t minEdgeCoverage,
     double minCorrectedJaccard)
@@ -261,89 +251,6 @@ void GlobalPathGraph1::createEdges0(
         }
     }
 
-}
-
-
-
-// Find children edges of vertexId0.
-// The first element of each pair of the children vector
-// is the vertexId of the child vertex.
-void GlobalPathGraph1::findChildren(
-    uint64_t vertexId0,
-    uint64_t minEdgeCoverage,
-    double minCorrectedJaccard,
-    vector< pair<uint64_t, MarkerGraphEdgePairInfo> >& children)
-{
-    const GlobalPathGraph1Vertex& vertex0 = verticesVector[vertexId0];
-    const MarkerGraphEdgeId edgeId0 = vertex0.edgeId;
-
-    // Find vertices encountered later on journeys that go through here.
-    vector<uint64_t> candidateChildren;
-    for(const auto& journeyInfoItem: vertex0.journeyInfoItems) {
-        const OrientedReadId orientedReadId = journeyInfoItem.orientedReadId;
-        const auto& journey = orientedReadJourneys[orientedReadId.getValue()];
-        for(uint64_t position = journeyInfoItem.positionInJourney+1;
-            position < journey.size(); position++) {
-            candidateChildren.push_back(journey[position].second);
-        }
-    }
-
-    // Count the candidate children and only keep the ones
-    // that occurred at least minEdgeCoverage times.
-    vector<uint64_t> coverage;
-    deduplicateAndCountWithThreshold(candidateChildren, coverage, minEdgeCoverage);
-
-    // Store the ones that have sufficient correctedJaccard.
-    children.clear();
-    MarkerGraphEdgePairInfo info;
-    for(const uint64_t vertexId1: candidateChildren) {
-        const GlobalPathGraph1Vertex& vertex1 = verticesVector[vertexId1];
-        const MarkerGraphEdgeId edgeId1 = vertex1.edgeId;
-        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
-        if(info.correctedJaccard() >= minCorrectedJaccard) {
-            children.push_back({vertexId1, info});
-        }
-    }
-}
-
-
-
-void GlobalPathGraph1::findParents(
-    uint64_t vertexId0,
-    uint64_t minEdgeCoverage,
-    double minCorrectedJaccard,
-    vector< pair<uint64_t, MarkerGraphEdgePairInfo> >& parents)
-{
-    const GlobalPathGraph1Vertex& vertex0 = verticesVector[vertexId0];
-    const MarkerGraphEdgeId edgeId0 = vertex0.edgeId;
-
-    // Find vertices encountered earlier on journeys that go through here.
-    vector<uint64_t> candidateParents;
-    for(const auto& journeyInfoItem: vertex0.journeyInfoItems) {
-        const OrientedReadId orientedReadId = journeyInfoItem.orientedReadId;
-        const auto& journey = orientedReadJourneys[orientedReadId.getValue()];
-        for(int64_t position = int64_t(journeyInfoItem.positionInJourney)-1;
-            position>=0; position--) {
-            candidateParents.push_back(journey[position].second);
-        }
-    }
-
-    // Count the candidate parents and only keep the ones
-    // that occurred at least minEdgeCoverage times.
-    vector<uint64_t> coverage;
-    deduplicateAndCountWithThreshold(candidateParents, coverage, minEdgeCoverage);
-
-    // Store the ones that have sufficient correctedJaccard.
-    parents.clear();
-    MarkerGraphEdgePairInfo info;
-    for(const uint64_t vertexId1: candidateParents) {
-        const GlobalPathGraph1Vertex& vertex1 = verticesVector[vertexId1];
-        const MarkerGraphEdgeId edgeId1 = vertex1.edgeId;
-        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId1, edgeId0, info));
-        if(info.correctedJaccard() >= minCorrectedJaccard) {
-            parents.push_back({vertexId1, info});
-        }
-    }
 }
 
 
