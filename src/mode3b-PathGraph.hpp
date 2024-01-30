@@ -223,9 +223,7 @@ private:
     // It cannot be named "vertices" because of name conflicts with the Boost graph
     // iteration macros.
     vector<GlobalPathGraphVertex> verticesVector;
-    void createVertices(
-        uint64_t minPrimaryCoverage,
-        uint64_t maxPrimaryCoverage);
+    void createVertices();
 
     // Return the vertexId corresponding to a given MarkerGraphEdgeId, or
     // invalid<MarkerGraphEdgeId> if no such a vertex exists.

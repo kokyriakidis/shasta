@@ -34,14 +34,6 @@ void GlobalPathGraph::assemble(
     uint64_t threadCount1)
 {
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
-#if 1
-    const uint64_t minPrimaryCoverage = 8;
-    const uint64_t maxPrimaryCoverage = 60;
-#else
-    const uint64_t minPrimaryCoverage = 6;
-    const uint64_t maxPrimaryCoverage = 40;
-#endif
-
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
     const uint64_t transitiveReductionDistance = 5000;
@@ -52,7 +44,7 @@ void GlobalPathGraph::assemble(
 
 
     GlobalPathGraph graph(assembler);
-    graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
+    graph.createVertices();
     graph.computeOrientedReadJourneys();
     graph.createEdges();
 

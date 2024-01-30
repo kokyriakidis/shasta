@@ -83,16 +83,14 @@ bool GlobalPathGraph::isPrimary(
 
 
 
-void GlobalPathGraph::createVertices(
-    uint64_t minPrimaryCoverage,
-    uint64_t maxPrimaryCoverage)
+void GlobalPathGraph::createVertices()
 {
     const MarkerGraph& markerGraph = assembler.markerGraph;
 
     verticesVector.clear();
 
     for(MarkerGraphEdgeId edgeId=0; edgeId<markerGraph.edges.size(); edgeId++) {
-        if(isPrimary(edgeId, minPrimaryCoverage, maxPrimaryCoverage)) {
+        if(markerGraph.edges[edgeId].isPrimary == 1) {
             verticesVector.push_back(GlobalPathGraphVertex(edgeId));
         }
     }
