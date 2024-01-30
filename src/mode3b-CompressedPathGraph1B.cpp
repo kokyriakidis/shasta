@@ -28,7 +28,7 @@ using namespace mode3b;
 
 
 
-void GlobalPathGraph1::assemble(
+void GlobalPathGraph::assemble(
     const Assembler& assembler,
     uint64_t threadCount0,
     uint64_t threadCount1)
@@ -52,7 +52,7 @@ void GlobalPathGraph1::assemble(
     const uint64_t crossEdgesMinOffset = 0;
 
 
-    GlobalPathGraph1 graph(assembler);
+    GlobalPathGraph graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
     graph.computeOrientedReadJourneys();
     graph.createEdges(1, minEdgeCoverage, minCorrectedJaccard);
@@ -75,7 +75,7 @@ void GlobalPathGraph1::assemble(
 
 
 
-void GlobalPathGraph1::assembleComponent(
+void GlobalPathGraph::assembleComponent(
     uint64_t componentId,
     uint64_t transitiveReductionDistance,
     uint64_t transitiveReductionMaxCoverage,
@@ -90,7 +90,7 @@ void GlobalPathGraph1::assembleComponent(
 
     // Graphviz output.
     if(true) {
-        GlobalPathGraph1DisplayOptions options;
+        GlobalPathGraphDisplayOptions options;
         options.showNonTransitiveReductionEdges = true;
         component.writeGraphviz(verticesVector,
             "PathGraphInitial" + to_string(componentId), options);
@@ -112,7 +112,7 @@ void GlobalPathGraph1::assembleComponent(
         crossEdgesMinOffset);
 
     // Graphviz output.
-    GlobalPathGraph1DisplayOptions options;
+    GlobalPathGraphDisplayOptions options;
     options.showNonTransitiveReductionEdges = false;
     component.writeGraphviz(verticesVector,
         "PathGraph" + to_string(componentId), options);
@@ -125,7 +125,7 @@ void GlobalPathGraph1::assembleComponent(
 
 
 
-void GlobalPathGraph1::loadAndAssemble(
+void GlobalPathGraph::loadAndAssemble(
     const Assembler& assembler,
     const string& fileName,
     uint64_t threadCount0,

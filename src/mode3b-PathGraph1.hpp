@@ -3,7 +3,7 @@
 
 /*******************************************************************************
 
-In the mode3b::GlobalPathGraph1, each vertex corresponds to a primary edge of
+In the mode3b::GlobalPathGraph, each vertex corresponds to a primary edge of
 of the marker graph, which is believed to correspond to a single copy
 of sequence. It is characterized as follows:
 - minPrimaryCoverage <= coverage <= maxPrimaryCoverage
@@ -39,9 +39,9 @@ namespace shasta {
 
         // The global path graph.
         // Each vertex corresponds to a primary marker graph edge.
-        class GlobalPathGraph1;
-        class GlobalPathGraph1Vertex;
-        class GlobalPathGraph1Edge;
+        class GlobalPathGraph;
+        class GlobalPathGraphVertex;
+        class GlobalPathGraphEdge;
 
         // A subset of the GlobalPathGraph1, for example
         // a single connected component, represented as a Boost graph.
@@ -55,16 +55,15 @@ namespace shasta {
             PathGraph1Vertex,
             PathGraph1Edge>;
 
-        class GlobalPathGraph1DisplayOptions;
+        class GlobalPathGraphDisplayOptions;
 
-        class AssemblyPath;
     }
 }
 
 
 
 // Class to control Graphviz output of GlobalPathGraph1 and PathGraph1.
-class shasta::mode3b::GlobalPathGraph1DisplayOptions {
+class shasta::mode3b::GlobalPathGraphDisplayOptions {
 public:
     bool labels = true;
     bool tooltips = true;
@@ -79,7 +78,7 @@ public:
     double redJ;
     double greenJ;
 
-    GlobalPathGraph1DisplayOptions(double redJ = 0., double greenJ = 1.) :
+    GlobalPathGraphDisplayOptions(double redJ = 0., double greenJ = 1.) :
         redJ(redJ), greenJ(greenJ) {}
 
     void makeCompact()
@@ -114,7 +113,7 @@ public:
 
 
 
-// A subset of the GlobalPathGraph1, for example
+// A subset of the GlobalPathGraph, for example
 // a single connected component, represented as a Boost graph.
 class shasta::mode3b::PathGraph1 : public PathGraph1GraphBaseClass {
 public:
@@ -131,9 +130,9 @@ public:
         uint64_t coverage);
 
     void writeGraphviz(
-        const vector<GlobalPathGraph1Vertex>& globalVertices,
+        const vector<GlobalPathGraphVertex>& globalVertices,
         const string& name,
-        const GlobalPathGraph1DisplayOptions&) const;
+        const GlobalPathGraphDisplayOptions&) const;
 
     // For each vertex, only keep the best k outgoing and k incoming edges.
     // "Best" as defined by correctedJaccard of the edges.
@@ -162,11 +161,11 @@ public:
 
 
 
-class shasta::mode3b::GlobalPathGraph1Vertex {
+class shasta::mode3b::GlobalPathGraphVertex {
 public:
     MarkerGraphEdgeId edgeId;
 
-    GlobalPathGraph1Vertex(MarkerGraphEdgeId edgeId) : edgeId(edgeId) {}
+    GlobalPathGraphVertex(MarkerGraphEdgeId edgeId) : edgeId(edgeId) {}
 
     // Information on the oriented reads that visit this vertex.
     class JourneyInfoItem {
@@ -177,7 +176,7 @@ public:
     vector<JourneyInfoItem> journeyInfoItems;
 
     // Compare by edgeId only.
-    bool operator<(const GlobalPathGraph1Vertex& that) const
+    bool operator<(const GlobalPathGraphVertex& that) const
     {
         return edgeId < that.edgeId;
     }
@@ -186,7 +185,7 @@ public:
 
 
 
-class shasta::mode3b::GlobalPathGraph1Edge {
+class shasta::mode3b::GlobalPathGraphEdge {
 public:
     uint64_t vertexId0;
     uint64_t vertexId1;
@@ -200,7 +199,7 @@ public:
 
 
 
-class shasta::mode3b::GlobalPathGraph1 {
+class shasta::mode3b::GlobalPathGraph {
 public:
     static void assemble(
         const Assembler&,
@@ -212,7 +211,7 @@ public:
         uint64_t threadCount0,
         uint64_t threadCount1);
 private:
-    GlobalPathGraph1(const Assembler&);
+    GlobalPathGraph(const Assembler&);
     const Assembler& assembler;
 
     // Find out if a marker graph edge is a primary edge.
@@ -227,7 +226,7 @@ private:
     // The table is sorted by MarkerGraphEdgeId.
     // It cannot be named "vertices" because of name conflicts with the Boost graph
     // iteration macros.
-    vector<GlobalPathGraph1Vertex> verticesVector;
+    vector<GlobalPathGraphVertex> verticesVector;
     void createVertices(
         uint64_t minPrimaryCoverage,
         uint64_t maxPrimaryCoverage);
@@ -245,7 +244,7 @@ private:
     vector < vector< pair<uint32_t, uint64_t> > > orientedReadJourneys;
     void computeOrientedReadJourneys();
 
-    vector<GlobalPathGraph1Edge> edges;
+    vector<GlobalPathGraphEdge> edges;
     void createEdges(
         uint64_t maxDistanceInJourney,
         uint64_t minEdgeCoverage,
@@ -276,7 +275,7 @@ private:
     // Write each connected component in graphviz format.
     void writeComponentsGraphviz(
         const string& baseName,
-        const GlobalPathGraph1DisplayOptions&) const;
+        const GlobalPathGraphDisplayOptions&) const;
 
     void assembleComponent(
         uint64_t componentId,

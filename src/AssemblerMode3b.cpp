@@ -105,7 +105,7 @@ void Assembler::findMode3bPaths(
     uint64_t threadCount1   // Low level parallelization
     ) const
 {
-    mode3b::GlobalPathGraph1::assemble(*this, threadCount0, threadCount1);
+    mode3b::GlobalPathGraph::assemble(*this, threadCount0, threadCount1);
 }
 
 
@@ -116,7 +116,7 @@ void Assembler::loadAndAssembleCompressedPathGraph1B(
     uint64_t threadCount1   // Low level parallelization
     ) const
 {
-    mode3b::GlobalPathGraph1::loadAndAssemble(*this, fileName, threadCount0, threadCount1);
+    mode3b::GlobalPathGraph::loadAndAssemble(*this, fileName, threadCount0, threadCount1);
 }
 
 

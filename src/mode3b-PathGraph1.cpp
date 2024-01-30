@@ -24,7 +24,7 @@ using namespace mode3b;
 
 
 
-GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
+GlobalPathGraph::GlobalPathGraph(const Assembler& assembler) :
     assembler(assembler)
 {
 }
@@ -32,9 +32,9 @@ GlobalPathGraph1::GlobalPathGraph1(const Assembler& assembler) :
 
 
 // Write each connected component in graphviz format.
-void GlobalPathGraph1::writeComponentsGraphviz(
+void GlobalPathGraph::writeComponentsGraphviz(
     const string& baseName,
-    const GlobalPathGraph1DisplayOptions& options) const
+    const GlobalPathGraphDisplayOptions& options) const
 {
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         const PathGraph1& component = *components[componentRank];
@@ -48,7 +48,7 @@ void GlobalPathGraph1::writeComponentsGraphviz(
 
 
 // Find out if a marker graph edge is a primary edge.
-bool GlobalPathGraph1::isPrimary(
+bool GlobalPathGraph::isPrimary(
     MarkerGraphEdgeId edgeId,
     uint64_t minPrimaryCoverage,
     uint64_t maxPrimaryCoverage) const
@@ -77,22 +77,13 @@ bool GlobalPathGraph1::isPrimary(
         return false;
     }
 
-#if 0
-    // Check that is also is a branch edge.
-    // Requiring this is too strict and removes opportunities for
-    // finding paths.
-    if(not isBranchEdge(edgeId, minPrimaryCoverage)) {
-        return false;
-    }
-#endif
-
     // If all above checks passed, this is a primary edge.
     return true;
 }
 
 
 
-void GlobalPathGraph1::createVertices(
+void GlobalPathGraph::createVertices(
     uint64_t minPrimaryCoverage,
     uint64_t maxPrimaryCoverage)
 {
@@ -102,7 +93,7 @@ void GlobalPathGraph1::createVertices(
 
     for(MarkerGraphEdgeId edgeId=0; edgeId<markerGraph.edges.size(); edgeId++) {
         if(isPrimary(edgeId, minPrimaryCoverage, maxPrimaryCoverage)) {
-            verticesVector.push_back(GlobalPathGraph1Vertex(edgeId));
+            verticesVector.push_back(GlobalPathGraphVertex(edgeId));
         }
     }
 }
@@ -111,9 +102,9 @@ void GlobalPathGraph1::createVertices(
 
 // Return the vertexId corresponding to a given MarkerGraphEdgeId, or
 // invalid<MarkerGraphEdgeId> if no such a vertex exists.
-uint64_t GlobalPathGraph1::getVertexId(MarkerGraphEdgeId edgeId) const
+uint64_t GlobalPathGraph::getVertexId(MarkerGraphEdgeId edgeId) const
 {
-    GlobalPathGraph1Vertex targetVertex(edgeId);
+    GlobalPathGraphVertex targetVertex(edgeId);
     auto it = std::lower_bound(verticesVector.begin(), verticesVector.end(), targetVertex);
 
     if((it == verticesVector.end()) or (it->edgeId != edgeId)) {
@@ -137,7 +128,7 @@ uint64_t GlobalPathGraph1::getVertexId(MarkerGraphEdgeId edgeId) const
 // The vertexId is the index in verticesVector.
 // Indexed by OrientedReadId::getValue.
 // Journeys are used to generate edges by "following the reads".
-void GlobalPathGraph1::computeOrientedReadJourneys()
+void GlobalPathGraph::computeOrientedReadJourneys()
 {
     orientedReadJourneys.clear();
     orientedReadJourneys.resize(assembler.markers.size());
@@ -197,7 +188,7 @@ void GlobalPathGraph1::computeOrientedReadJourneys()
 
 
 
-void GlobalPathGraph1::createEdges(
+void GlobalPathGraph::createEdges(
     uint64_t maxDistanceInJourney,
     uint64_t minEdgeCoverage,
     double minCorrectedJaccard)
@@ -239,7 +230,7 @@ void GlobalPathGraph1::createEdges(
         const auto& p = candidateEdges[i];
         const uint64_t vertexId0 = p.first;
         const uint64_t vertexId1 = p.second;
-        GlobalPathGraph1Edge edge;
+        GlobalPathGraphEdge edge;
         const MarkerGraphEdgeId edgeId0 = verticesVector[vertexId0].edgeId;
         const MarkerGraphEdgeId edgeId1 = verticesVector[vertexId1].edgeId;
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, edge.info));
@@ -256,12 +247,12 @@ void GlobalPathGraph1::createEdges(
 
 
 // Write the entire GlobalPathGraph in graphviz format.
-void GlobalPathGraph1::writeGraphviz() const
+void GlobalPathGraph::writeGraphviz() const
 {
     ofstream out("GlobalPathGraph.dot");
     out << "digraph GlobalPathGraph {\n";
 
-    for(const GlobalPathGraph1Edge& edge: edges) {
+    for(const GlobalPathGraphEdge& edge: edges) {
         const MarkerGraphEdgeId edgeId0 = verticesVector[edge.vertexId0].edgeId;
         const MarkerGraphEdgeId edgeId1 = verticesVector[edge.vertexId1].edgeId;
         out << edgeId0 << "->";
@@ -277,7 +268,7 @@ void GlobalPathGraph1::writeGraphviz() const
 // This only considers edges with corrected Jaccard at least equal to
 // minCorrectedJaccard, and only stores connected components with at
 // least minComponentSize vertices.
-void GlobalPathGraph1::createComponents(
+void GlobalPathGraph::createComponents(
     double minCorrectedJaccard,
     uint64_t minComponentSize)
 {
@@ -289,7 +280,7 @@ void GlobalPathGraph1::createComponents(
     for(uint64_t vertexId=0; vertexId<n; vertexId++) {
         disjointSets.make_set(vertexId);
     }
-    for(const GlobalPathGraph1Edge& edge: edges) {
+    for(const GlobalPathGraphEdge& edge: edges) {
         if(edge.info.correctedJaccard() < minCorrectedJaccard) {
             continue;
         }
@@ -302,13 +293,13 @@ void GlobalPathGraph1::createComponents(
         allComponents.push_back(make_shared<PathGraph1>());
     }
     for(uint64_t vertexId=0; vertexId<n; vertexId++) {
-        const GlobalPathGraph1Vertex& vertex = verticesVector[vertexId];
+        const GlobalPathGraphVertex& vertex = verticesVector[vertexId];
         const uint64_t componentId = disjointSets.find_set(vertexId);
         allComponents[componentId]->addVertex(vertexId, vertex.edgeId);
     }
 
     // Create edges of each connected component.
-    for(const GlobalPathGraph1Edge& edge: edges) {
+    for(const GlobalPathGraphEdge& edge: edges) {
         if(edge.info.correctedJaccard() < minCorrectedJaccard) {
             continue;
         }
@@ -350,7 +341,7 @@ void GlobalPathGraph1::createComponents(
 
 
 // Local transitive reduction of each connected component.
-void GlobalPathGraph1::localTransitiveReduction(
+void GlobalPathGraph::localTransitiveReduction(
     uint64_t distance,
     uint64_t maxCoverage)
 {
@@ -510,9 +501,9 @@ void PathGraph1::addEdge(
 
 // Write a PathGraph1 in graphviz format.
 void PathGraph1::writeGraphviz(
-    const vector<GlobalPathGraph1Vertex>& globalVertices,
+    const vector<GlobalPathGraphVertex>& globalVertices,
     const string& name,
-    const GlobalPathGraph1DisplayOptions& options) const
+    const GlobalPathGraphDisplayOptions& options) const
 {
     ofstream out(name + ".dot");
 
@@ -521,7 +512,7 @@ void PathGraph1::writeGraphviz(
 
     BGL_FORALL_VERTICES(v, graph, PathGraph1) {
         const PathGraph1Vertex& vertex = graph[v];
-        const GlobalPathGraph1Vertex& globalVertex = globalVertices[vertex.vertexId];
+        const GlobalPathGraphVertex& globalVertex = globalVertices[vertex.vertexId];
         out << vertex.edgeId;
 
         if(options.labels or options.tooltips or options.colorVertices) {
