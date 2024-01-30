@@ -188,7 +188,7 @@ void GlobalPathGraph::computeOrientedReadJourneys()
 
 
 
-void GlobalPathGraph::createEdges(double minCorrectedJaccard)
+void GlobalPathGraph::createEdges()
 {
     // Candidate edges are pairs of vertices that appear near each other
     // in oriented read journeys.
@@ -202,16 +202,14 @@ void GlobalPathGraph::createEdges(double minCorrectedJaccard)
         }
     }
 
-    // Deduplicate the candidate edges and count the number of times
-    // each of them was found.
+    // Deduplicate the candidate edges and count the number of times each of them was found.
     vector<uint64_t> coverage;
     deduplicateAndCount(candidateEdges, coverage);
     SHASTA_ASSERT(candidateEdges.size() == coverage.size());
     candidateEdges.shrink_to_fit();
     coverage.shrink_to_fit();
 
-    // For each candidate edge, compute correctedJaccard, and if high enough
-    // generate an edge.
+    // Now we can generate the edges.
     edges.clear();
     for(uint64_t i=0; i<candidateEdges.size(); i++) {
         const uint64_t c = coverage[i];
@@ -219,15 +217,10 @@ void GlobalPathGraph::createEdges(double minCorrectedJaccard)
         const uint64_t vertexId0 = p.first;
         const uint64_t vertexId1 = p.second;
         GlobalPathGraphEdge edge;
-        const MarkerGraphEdgeId edgeId0 = verticesVector[vertexId0].edgeId;
-        const MarkerGraphEdgeId edgeId1 = verticesVector[vertexId1].edgeId;
-        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, edge.info));
-        if(edge.info.correctedJaccard() >= minCorrectedJaccard) {
-            edge.vertexId0 = vertexId0;
-            edge.vertexId1 = vertexId1;
-            edge.coverage = c;
-            edges.push_back(edge);
-        }
+        edge.vertexId0 = vertexId0;
+        edge.vertexId1 = vertexId1;
+        edge.coverage = c;
+        edges.push_back(edge);
     }
 
 }

@@ -54,7 +54,7 @@ void GlobalPathGraph::assemble(
     GlobalPathGraph graph(assembler);
     graph.createVertices(minPrimaryCoverage, maxPrimaryCoverage);
     graph.computeOrientedReadJourneys();
-    graph.createEdges(minCorrectedJaccard);
+    graph.createEdges();
 
     graph.createComponents(minCorrectedJaccard, minComponentSize);
 
