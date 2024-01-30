@@ -1,7 +1,7 @@
 // Shasta.
 #include "mode3b-CompressedPathGraph1B.hpp"
 #include "mode3b-AssemblyPath.hpp"
-#include "mode3b-PathGraph1.hpp"
+#include "mode3b-PathGraph.hpp"
 #include "mode3b-PhasingTable.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"

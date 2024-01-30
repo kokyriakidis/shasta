@@ -5,7 +5,7 @@
 #include "mode3b-PathFiller2.hpp"
 #include "mode3b-PathFiller3.hpp"
 #include "mode3b-PathFinder.hpp"
-#include "mode3b-PathGraph1.hpp"
+#include "mode3b-PathGraph.hpp"
 #include "mode3b-AssemblyPath.hpp"
 #include "Reads.hpp"
 using namespace shasta;

@@ -1,5 +1,5 @@
 // Shasta.
-#include "mode3b-PathGraph1.hpp"
+#include "mode3b-PathGraph.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
 #include "longestPath.hpp"
