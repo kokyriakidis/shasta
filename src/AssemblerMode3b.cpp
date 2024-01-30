@@ -110,7 +110,7 @@ void Assembler::findMode3bPaths(
 
 
 
-void Assembler::loadAndAssembleCompressedPathGraph1B(
+void Assembler::loadAndAssembleCompressedPathGraph(
     const string& fileName,
     uint64_t threadCount0,  // High level parallelization
     uint64_t threadCount1   // Low level parallelization
