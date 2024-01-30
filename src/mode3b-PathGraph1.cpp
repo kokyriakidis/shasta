@@ -102,49 +102,6 @@ bool GlobalPathGraph1::isPrimary(
 
 
 
-// Find out if a marker graph edge is a branch edge.
-// A marker graph edge is a branch edge if:
-// - Its source vertex has more than one outgoing edge with coverage at least minPrimaryCoverage.
-// OR
-// - Its target vertex has more than one incoming edge with coverage at least minPrimaryCoverage.
-bool GlobalPathGraph1::isBranchEdge(
-    MarkerGraphEdgeId edgeId,
-    uint64_t minEdgeCoverage) const
-{
-    // Access this marker graph edge and its vertices.
-    const MarkerGraph::Edge& edge = assembler.markerGraph.edges[edgeId];
-    const MarkerGraphVertexId vertexId0 = edge.source;
-    const MarkerGraphVertexId vertexId1 = edge.target;
-
-    // Check outgoing edges of vertexId0.
-    const auto outgoingEdges0 = assembler.markerGraph.edgesBySource[vertexId0];
-    uint64_t count0 = 0;
-    for(const MarkerGraphEdgeId edgeId0: outgoingEdges0) {
-        if(assembler.markerGraph.edgeCoverage(edgeId0) >= minEdgeCoverage) {
-            ++count0;
-        }
-    }
-    if(count0 > 1) {
-        return true;
-    }
-
-    // Check incoming edges of vertexId1.
-    const auto incomingEdges1 = assembler.markerGraph.edgesByTarget[vertexId1];
-    uint64_t count1 = 0;
-    for(const MarkerGraphEdgeId edgeId1: incomingEdges1) {
-        if(assembler.markerGraph.edgeCoverage(edgeId1) >= minEdgeCoverage) {
-            ++count1;
-        }
-    }
-    if(count1 > 1) {
-        return true;
-    }
-
-    return false;
-}
-
-
-
 void GlobalPathGraph1::createVertices(
     uint64_t minPrimaryCoverage,
     uint64_t maxPrimaryCoverage)
@@ -485,20 +442,6 @@ void GlobalPathGraph1::createComponents(
 
 
 
-// K-nn of each connected component:
-// for each vertex, keep only the k best outgoing and incoming edges,
-// as measured by correctedJaccard of each edge.
-// This can break contiguity of the connected component.
-void GlobalPathGraph1::knn(uint64_t k)
-{
-    for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
-        PathGraph1& component = *components[componentRank];
-        component.knn(k);
-    }
-}
-
-
-
 // Local transitive reduction of each connected component.
 void GlobalPathGraph1::localTransitiveReduction(
     uint64_t distance,
@@ -681,46 +624,13 @@ void PathGraph1::writeGraphviz(
         if(options.labels) {
             out << "label=\"";
             out << vertex.edgeId << "\\n" << globalVertex.journeyInfoItems.size();
-            if(globalVertex.chainId != invalid<uint64_t>) {
-                out << "\\n" << globalVertex.chainId << ":" << globalVertex.positionInChain;
-                if(globalVertex.isFirstInChain) {
-                    out << "\\nFirst in chain";
-                }
-                if(globalVertex.isLastInChain) {
-                    out << "\\nLast in chain";
-                }
-            }
             out << "\" ";
         }
 
         if(options.tooltips) {
             out << "tooltip=\"";
             out << vertex.edgeId;
-            if(globalVertex.chainId != invalid<uint64_t>) {
-                out << " " << globalVertex.chainId << ":" << globalVertex.positionInChain;
-                if(globalVertex.isFirstInChain) {
-                    out << " first in chain";
-                }
-                if(globalVertex.isLastInChain) {
-                    out << " last in chain";
-                }
-            }
             out << "\" ";
-        }
-
-        // If it belongs to a chain, color it.
-        if(options.colorVertices) {
-            if(globalVertex.chainId != invalid<uint64_t>) {
-                if(globalVertex.isFirstInChain) {
-                    out << " style=filled fillcolor=blue ";
-                } else if(globalVertex.isLastInChain) {
-                    out << " style=filled fillcolor=orange ";
-                } else {
-                    // const uint32_t hue = MurmurHash2(&vertex.chainId, sizeof(vertex.chainId), 231) % 100;
-                    // out << " color=\"" << 0.01 * double(hue) << ",0.4,1\"";
-                    out << " style=filled fillcolor=cyan ";
-                }
-            }
         }
 
         if(options.labels or options.tooltips or options.colorVertices) {
@@ -858,37 +768,6 @@ void PathGraph1::knn(uint64_t k)
     for(const edge_descriptor e: edgesToBeRemoved) {
         boost::remove_edge(e, graph);
     }
-}
-
-
-
-// Compute total base offset for this chain.
-uint64_t GlobalPathGraph1::Chain::totalOffset() const
-{
-    uint64_t totalBaseOffset = 0;
-    for(const MarkerGraphEdgePairInfo& info: infos) {
-        totalBaseOffset += info.offsetInBases;
-    }
-    return totalBaseOffset;
-}
-
-
-
-uint64_t GlobalPathGraph1::ChainConnector::totalOffset() const
-{
-    uint64_t totalBaseOffset = 0;
-    for(const MarkerGraphEdgePairInfo& info: infos) {
-        totalBaseOffset += info.offsetInBases;
-    }
-    return totalBaseOffset;
-}
-
-
-
-void GlobalPathGraph1::ChainConnector::reverse()
-{
-    std::reverse(vertexIds.begin(), vertexIds.end());
-    std::reverse(infos.begin(), infos.end());
 }
 
 

@@ -191,10 +191,6 @@ public:
 class shasta::mode3b::GlobalPathGraph1Vertex {
 public:
     MarkerGraphEdgeId edgeId;
-    uint64_t chainId = invalid<uint64_t>;
-    uint64_t positionInChain = invalid<uint64_t>;
-    bool isFirstInChain = false;
-    bool isLastInChain = false;
 
     GlobalPathGraph1Vertex(MarkerGraphEdgeId edgeId) : edgeId(edgeId) {}
 
@@ -225,7 +221,6 @@ public:
     // The number of oriented reads for which the journey contains
     // a transition from vertexId0 to vertexId1.
     // This is less than or equal to info.common.
-    // Only filled in by createEdges0.
     uint64_t coverage = invalid<uint64_t>;
 };
 
@@ -252,20 +247,11 @@ private:
         uint64_t minPrimaryCoverage,
         uint64_t maxPrimaryCoverage) const;
 
-    // Find out if a marker graph edge is a branch edge.
-    // A marker graph edge is a branch edge if:
-    // - Its source vertex has more than one outgoing edge with coverage at least minEdgeCoverage.
-    // OR
-    // - Its target vertex has more than one incoming edge with coverage at least minEdgeCoverage.
-    bool isBranchEdge(
-        MarkerGraphEdgeId,
-        uint64_t minEdgeCoverage) const;
-
     // Each vertex corresponds to a primary marker graph edge.
     // Store them here.
     // The index in this table is the vertexId.
     // The table is sorted by MarkerGraphEdgeId.
-    // It cannot be names "vertices" because of name conflicts with the Boost graph
+    // It cannot be named "vertices" because of name conflicts with the Boost graph
     // iteration macros.
     vector<GlobalPathGraph1Vertex> verticesVector;
     void createVertices(
@@ -274,6 +260,7 @@ private:
 
     // Return the vertexId corresponding to a given MarkerGraphEdgeId, or
     // invalid<MarkerGraphEdgeId> if no such a vertex exists.
+    // This uses a binary search in the verticesVector (via std::lower_bound).
     uint64_t getVertexId(MarkerGraphEdgeId) const;
 
     // The "journey" of each oriented read is the sequence of vertices it encounters.
@@ -316,52 +303,12 @@ private:
         double minCorrectedJaccard,
         uint64_t minComponentSize);
 
-    // K-nn of each connected component:
-    // for each vertex, keep only the k best outgoing and incoming edges,
-    // as measured by correctedJaccard of each edge.
-    // This can break contiguity of the connected component.
-    void knn(uint64_t k);
-
     // Local transitive reduction of each connected component.
     // Only edges with coverage up to maxCoverage are subject to flagging
     // as removed during transitive reduction.
     void localTransitiveReduction(
         uint64_t distance,
         uint64_t maxCoverage);
-
-
-
-    // A chain is a sequence of vertices (not necessarily a path)
-    // that can be used to generate an AssemblyPath.
-    class Chain {
-    public:
-
-        // The vertexIds (indices in the verticesVector) of
-        // the vertices of this chain.
-        vector<uint64_t> vertexIds;
-
-        // The corresponding MarkerGraphEdgeIds.
-        vector<MarkerGraphEdgeId> edgeIds;
-
-        // The MarkerGraphEdgePairInfos in between the vertices.
-        // infos.size() is always vertexIds.size() - 1;
-        vector<MarkerGraphEdgePairInfo> infos;
-
-        uint64_t totalOffset() const;
-    };
-
-
-
-    // Connect seed chains by walking the graph.
-    class ChainConnector {
-    public:
-        uint64_t chainId0;
-        uint64_t chainId1;
-        vector<uint64_t> vertexIds;
-        vector<MarkerGraphEdgePairInfo> infos;
-        void reverse();
-        uint64_t totalOffset() const;
-    };
 
     // Write the entire PathGraph in graphviz format.
     void writeGraphviz() const;
