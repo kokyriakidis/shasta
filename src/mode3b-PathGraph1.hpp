@@ -289,9 +289,6 @@ private:
         uint64_t maxDistanceInJourney,
         uint64_t minEdgeCoverage,
         double minCorrectedJaccard);
-    void createEdges1(
-        uint64_t minEdgeCoverage,
-        double minCorrectedJaccard);
 
     // Find children edges of vertexId0.
     // The first element of each pair of the children vector
@@ -355,25 +352,6 @@ private:
 
 
 
-    // For each connected component, use the longest path
-    // to create a Chain. Only keep the ones that are sufficiently long.
-    // This also stores chain information in the vertices.
-    void createChainsFromComponents(
-        uint64_t minEstimatedLength,
-        vector<Chain>&);
-
-    // Seed chains.
-    vector<Chain> seedChains;
-    void writeSeedChains() const;
-    void writeSeedChainsDetails() const;
-    void writeSeedChainsStatistics() const;
-
-    // Store in this PathGraph1 the seed chains found in another PathGraph1
-    void storeSeedChains(const vector<Chain>&);
-
-    // Connect seed chains by following reads.
-    void connectSeedChains0();
-
     // Connect seed chains by walking the graph.
     class ChainConnector {
     public:
@@ -384,55 +362,6 @@ private:
         void reverse();
         uint64_t totalOffset() const;
     };
-    void connectSeedChains1(
-        uint64_t minEdgeCoverage,
-        double minCorrectedJaccard,
-        vector<ChainConnector>&
-        );
-    void connectSeedChain1(
-        uint64_t chainId,
-        uint64_t direction, // 0 = forward, 1 = backward
-        uint64_t minEdgeCoverage,
-        double minCorrectedJaccard,
-        vector<ChainConnector>&,
-        ostream& out
-        );
-    void connectSeedChains2(
-        uint64_t minCommonCount,
-        double minCorrectedJaccard,
-        vector<ChainConnector>&);
-    void connectSeedChains2(
-        uint64_t componentId,
-        const PathGraph1& component,
-        uint64_t minCommonCount,
-        double minCorrectedJaccard,
-        ostream&,
-        vector<ChainConnector>&);
-    void writeConnectors(const vector<ChainConnector>&) const;
-
-    // Extend a chain forward until we bump into another chain.
-    // This returns the chainId of the chain we found, or invalid<uint64_t>
-    // if none found.
-    uint64_t extendChainForward(
-        uint64_t chainId,
-        Chain&,
-        const PathGraph1& component,
-        uint64_t minCommonCount,
-        double minCorrectedJaccard) const;
-
-    // Use the ChainConnectors to stitch together the seed chains.
-    // The replaces the connected components with the connected
-    // components of the stitched graph.
-    void stitchSeedChains(
-        const vector<ChainConnector>&,
-        uint64_t minComponentSize);
-
-    // This generates an AssemblyPath for each of the Chains passed in,
-    // then assembles the AssemblyPath and writes assembled sequence to fasta.
-    void assembleChains(
-        const vector<Chain>&,
-        ostream& fasta,
-        const string& csvPrefix) const;
 
     // Write the entire PathGraph in graphviz format.
     void writeGraphviz() const;
@@ -441,17 +370,6 @@ private:
     void writeComponentsGraphviz(
         const string& baseName,
         const GlobalPathGraph1DisplayOptions&) const;
-
-    static void assemble1(
-        GlobalPathGraph1&,
-        uint64_t threadCount0,
-        uint64_t threadCount1,
-        uint64_t componentId,
-        uint64_t transitiveReductionDistance,
-        uint64_t transitiveReductionMaxCoverage,
-        uint64_t crossEdgesLowCoverageThreshold,
-        uint64_t crossEdgesHighCoverageThreshold,
-        uint64_t crossEdgesMinOffset);
 
     static void assemble2(
         const Assembler&,
