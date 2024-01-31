@@ -1380,6 +1380,20 @@ public:
         const MarkerGraphEdgePairInfo&
         ) const;
 
+    // Count the number of common oriented reads between two marker graph edges.
+    // This assumes, WITHOUT CHECKING, that each of the two edges has no duplicate
+    // oriented reads. This assumption is satisfied for primary marker graph edges
+    // in Mode 3 assembly.
+    uint64_t countCommonOrientedReadsUnsafe(MarkerGraphEdgeId, MarkerGraphEdgeId) const;
+
+    // Estimate the offset, in bases, between two marker graph edges.
+    // This assumes, WITHOUT CHECKING, that each of the two edges has no duplicate
+    // oriented reads. This assumption is satisfied for primary marker graph edges
+    // in Mode 3 assembly.
+    // If there are common oriented reads between the two edges, this uses
+    // countCommonOrientedReadsUnsafe.
+    // This can fail, in which case it returns invalid<uint64_t>.
+    uint64_t estimateBaseOffsetUnsafe(MarkerGraphEdgeId, MarkerGraphEdgeId) const;
 
 
     // Function createMarkerGraphSecondaryEdges can be called after createMarkerGraphEdgesStrict

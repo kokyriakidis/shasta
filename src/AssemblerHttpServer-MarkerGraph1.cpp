@@ -412,6 +412,15 @@ void Assembler::exploreMarkerGraphEdgePair(
     MarkerGraphEdgePairInfo info;
     SHASTA_ASSERT(analyzeMarkerGraphEdgePair(edgeIdA, edgeIdB, info));
     writeHtmlMarkerGraphEdgePairInfo(html, edgeIdA, edgeIdB, info);
+
+    if( markerGraph.edges[edgeIdA].isPrimary==1 and
+        markerGraph.edges[edgeIdB].isPrimary==1 and
+        info.common == 0) {
+        const uint64_t estimatedOffset = estimateBaseOffsetUnsafe(edgeIdA, edgeIdB);
+        if(estimatedOffset != invalid<uint64_t>) {
+            html << "<p>Estimated offset is " << estimatedOffset << " bases.";
+        }
+    }
 }
 
 

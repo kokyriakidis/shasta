@@ -726,6 +726,16 @@ void Assembler::accessAllSoft()
         allDataAreAvailable = false;
     }
 
+    if(assemblerInfo->assemblyMode == 3) {
+        try {
+            accessMarkerGraphPrimaryJourneys();
+        } catch(const exception& e) {
+            cout << "MarkerGraph graph primary journeys are not accessible." << endl;
+            allDataAreAvailable = false;
+        }
+
+    }
+
     try {
         accessCompressedAlignments();
     } catch(const exception& e) {

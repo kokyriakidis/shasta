@@ -1158,3 +1158,317 @@ bool Assembler::analyzeMarkerGraphEdgePair(
     return true;
 }
 
+
+
+#if 0
+// More detailed analysis for a pair of marker graph edges,
+// both of which must be primary.
+void Assembler::analyzePrimaryMarkerGraphEdgePair(
+    MarkerGraphEdgeId edgeIdA,
+    MarkerGraphEdgeId edgeIdB) const
+{
+    cout << "analyzePrimaryMarkerGraphEdgePair begins for " << edgeIdA << " " << edgeIdB << endl;
+
+    // Sanity checks.
+    SHASTA_ASSERT(markerGraph.edges[edgeIdA].isPrimary == 1);
+    SHASTA_ASSERT(markerGraph.edges[edgeIdB].isPrimary == 1);
+
+    // The MarkerIntervals on these two edges.
+    const auto markerIntervalsA = markerGraph.edgeMarkerIntervals[edgeIdA];
+    const auto markerIntervalsB = markerGraph.edgeMarkerIntervals[edgeIdB];
+
+    // Find the position of edgeA on the primary journey of each oriented read on edgeA.
+    vector<uint64_t> positionInJourneyA(markerIntervalsA.size(), invalid<uint64_t>);
+    for(uint64_t i=0; i<markerIntervalsA.size(); i++) {
+        const OrientedReadId orientedReadId = markerIntervalsA[i].orientedReadId;
+        const auto journey = markerGraph.primaryJourneys[orientedReadId.getValue()];
+        for(uint64_t position=0; position<journey.size(); position++) {
+            if(journey[position].edgeId == edgeIdA) {
+                positionInJourneyA[i] = position;
+                break;
+            }
+        }
+        SHASTA_ASSERT(positionInJourneyA[i] != invalid<uint64_t>);
+    }
+
+    // Find the position of edgeB on the primary journey of each oriented read on edgeB.
+    vector<uint64_t> positionInJourneyB(markerIntervalsB.size(), invalid<uint64_t>);
+    for(uint64_t i=0; i<markerIntervalsB.size(); i++) {
+        const OrientedReadId orientedReadId = markerIntervalsB[i].orientedReadId;
+        const auto journey = markerGraph.primaryJourneys[orientedReadId.getValue()];
+        for(uint64_t position=0; position<journey.size(); position++) {
+            if(journey[position].edgeId == edgeIdB) {
+                positionInJourneyB[i] = position;
+                break;
+            }
+        }
+        SHASTA_ASSERT(positionInJourneyB[i] != invalid<uint64_t>);
+    }
+
+
+    // The MarkerGraphEdgeIds that we encountered so far by moving forward from edgeA on
+    // the primary journeys of oriented reads on edgeA.
+    std::set<MarkerGraphEdgeId> edgeIdsForwardA;
+
+    // The MarkerGraphEdgeIds that we encountered so far by moving backward from edgeB on
+    // the primary journeys of oriented reads on edgeB.
+    std::set<MarkerGraphEdgeId> edgeIdsBackwardB;
+
+    // Iterate over offsets in the primary journeys.
+    // For journeys of the oriented reads on edgeA, we use positive offsets.
+    // For journeys of the oriented reads on edgeB, we use negative offsets.
+    for(uint64_t offset=1; ; ++offset) {
+
+        uint64_t activeCountA = 0;
+        for(uint64_t i=0; i<markerIntervalsA.size(); i++) {
+            const OrientedReadId orientedReadId = markerIntervalsA[i].orientedReadId;
+            const auto journey = markerGraph.primaryJourneys[orientedReadId.getValue()];
+            const uint64_t position = positionInJourneyA[i] + offset;
+            if(position >= journey.size()) {
+                continue;
+            }
+            ++activeCountA;
+            const MarkerGraphEdgeId edgeId = journey[position].edgeId;
+
+            if(not edgeIdsForwardA.contains(edgeId)) {
+                edgeIdsForwardA.insert(edgeId);
+
+                if(edgeIdsBackwardB.contains(edgeId)) {
+                    MarkerGraphEdgePairInfo infoA;
+                    analyzeMarkerGraphEdgePair(edgeIdA, edgeId, infoA);
+                    MarkerGraphEdgePairInfo infoB;
+                    analyzeMarkerGraphEdgePair(edgeId, edgeIdB, infoB);
+                    cout << "At offset " << offset << " found " << edgeId <<
+                        ", common " << infoA.common << " " << infoB.common << ", total offset " <<
+                        infoA.offsetInBases+ infoB.offsetInBases << endl;
+                }
+            }
+        }
+
+        uint64_t activeCountB = 0;
+        for(uint64_t i=0; i<markerIntervalsB.size(); i++) {
+            const OrientedReadId orientedReadId = markerIntervalsB[i].orientedReadId;
+            const auto journey = markerGraph.primaryJourneys[orientedReadId.getValue()];
+            if(offset > positionInJourneyB[i]) {
+                continue;
+            }
+            const uint64_t position = positionInJourneyB[i] - offset;
+            ++activeCountB;
+            const MarkerGraphEdgeId edgeId = journey[position].edgeId;
+
+            if(not edgeIdsBackwardB.contains(edgeId)) {
+                edgeIdsBackwardB.insert(edgeId);
+
+                if(edgeIdsForwardA.contains(edgeId)) {
+                    MarkerGraphEdgePairInfo infoA;
+                    analyzeMarkerGraphEdgePair(edgeIdA, edgeId, infoA);
+                    MarkerGraphEdgePairInfo infoB;
+                    analyzeMarkerGraphEdgePair(edgeId, edgeIdB, infoB);
+                    cout << "At offset " << offset << " found " << edgeId <<
+                        ", common " << infoA.common << " " << infoB.common << endl;
+                }
+            }
+        }
+
+        if(activeCountA == 0 or activeCountB == 0) {
+            break;
+        }
+    }
+}
+#endif
+
+
+
+// Estimate the offset, in bases, between two marker graph edges.
+// This assumes, WITHOUT CHECKING, that each of the two edges has no duplicate
+// oriented reads. This assumption is satisfied for primary marker graph edges
+// in Mode 3 assembly.
+// If there are common oriented reads between the two edges, this uses
+// analyzeMarkerGraphEdgePair.
+// This can fail, in which case it returns invalid<uint64_t>.
+uint64_t Assembler::estimateBaseOffsetUnsafe(
+    MarkerGraphEdgeId edgeIdA,
+    MarkerGraphEdgeId edgeIdB) const
+{
+    // If there are common oriented reads between the two edges, use
+    // analyzeMarkerGraphEdgePair. This is the most common case.
+    if(countCommonOrientedReadsUnsafe(edgeIdA, edgeIdB) > 0) {
+        MarkerGraphEdgePairInfo info;
+        SHASTA_ASSERT(analyzeMarkerGraphEdgePair(edgeIdA, edgeIdB, info));
+        return info.offsetInBases;
+    }
+
+    // There are no common oriented reads between the two edges.
+    // Find a primary marker graph edge in-between that has common
+    // oriented reads with both edgeIdA and edgeIdB.
+
+    // Sanity checks.
+    SHASTA_ASSERT(markerGraph.edges[edgeIdA].isPrimary == 1);
+    SHASTA_ASSERT(markerGraph.edges[edgeIdB].isPrimary == 1);
+
+    // The MarkerIntervals on these two edges.
+    const auto markerIntervalsA = markerGraph.edgeMarkerIntervals[edgeIdA];
+    const auto markerIntervalsB = markerGraph.edgeMarkerIntervals[edgeIdB];
+
+    // Find the position of edgeA on the primary journey of each oriented read on edgeA.
+    vector<uint64_t> positionInJourneyA(markerIntervalsA.size(), invalid<uint64_t>);
+    for(uint64_t i=0; i<markerIntervalsA.size(); i++) {
+        const OrientedReadId orientedReadId = markerIntervalsA[i].orientedReadId;
+        const auto journey = markerGraph.primaryJourneys[orientedReadId.getValue()];
+        for(uint64_t position=0; position<journey.size(); position++) {
+            if(journey[position].edgeId == edgeIdA) {
+                positionInJourneyA[i] = position;
+                break;
+            }
+        }
+        SHASTA_ASSERT(positionInJourneyA[i] != invalid<uint64_t>);
+    }
+
+    // Find the position of edgeB on the primary journey of each oriented read on edgeB.
+    vector<uint64_t> positionInJourneyB(markerIntervalsB.size(), invalid<uint64_t>);
+    for(uint64_t i=0; i<markerIntervalsB.size(); i++) {
+        const OrientedReadId orientedReadId = markerIntervalsB[i].orientedReadId;
+        const auto journey = markerGraph.primaryJourneys[orientedReadId.getValue()];
+        for(uint64_t position=0; position<journey.size(); position++) {
+            if(journey[position].edgeId == edgeIdB) {
+                positionInJourneyB[i] = position;
+                break;
+            }
+        }
+        SHASTA_ASSERT(positionInJourneyB[i] != invalid<uint64_t>);
+    }
+
+
+    // The MarkerGraphEdgeIds that we encountered so far by moving forward from edgeA on
+    // the primary journeys of oriented reads on edgeA.
+    std::set<MarkerGraphEdgeId> edgeIdsForwardA;
+
+    // The MarkerGraphEdgeIds that we encountered so far by moving backward from edgeB on
+    // the primary journeys of oriented reads on edgeB.
+    std::set<MarkerGraphEdgeId> edgeIdsBackwardB;
+
+    // The best edgeId we found, and the lowest of its common oriented reads
+    // with edgeIdA and edgeIdB.
+    uint64_t edgeIdBest = invalid<uint64_t>;
+    uint64_t commonBest = 0;
+
+    // Iterate over offsets in the primary journeys.
+    // For journeys of the oriented reads on edgeA, we use positive offsets.
+    // For journeys of the oriented reads on edgeB, we use negative offsets.
+    for(uint64_t offset=1; ; ++offset) {
+
+        uint64_t activeCountA = 0;
+        for(uint64_t i=0; i<markerIntervalsA.size(); i++) {
+            const OrientedReadId orientedReadId = markerIntervalsA[i].orientedReadId;
+            const auto journey = markerGraph.primaryJourneys[orientedReadId.getValue()];
+            const uint64_t position = positionInJourneyA[i] + offset;
+            if(position >= journey.size()) {
+                continue;
+            }
+            ++activeCountA;
+            const MarkerGraphEdgeId edgeId = journey[position].edgeId;
+
+            if(not edgeIdsForwardA.contains(edgeId)) {
+                edgeIdsForwardA.insert(edgeId);
+
+                if(edgeIdsBackwardB.contains(edgeId)) {
+                    const uint64_t commonCountA = countCommonOrientedReadsUnsafe(edgeIdA, edgeId);
+                    const uint64_t commonCountB = countCommonOrientedReadsUnsafe(edgeId, edgeIdB);
+                    const uint64_t commonCountMin = min(commonCountA, commonCountB);
+                    if(commonCountMin > commonBest) {
+                        edgeIdBest = edgeId;
+                        commonBest = commonCountMin;
+                    }
+                }
+            }
+        }
+
+        uint64_t activeCountB = 0;
+        for(uint64_t i=0; i<markerIntervalsB.size(); i++) {
+            const OrientedReadId orientedReadId = markerIntervalsB[i].orientedReadId;
+            const auto journey = markerGraph.primaryJourneys[orientedReadId.getValue()];
+            if(offset > positionInJourneyB[i]) {
+                continue;
+            }
+            const uint64_t position = positionInJourneyB[i] - offset;
+            ++activeCountB;
+            const MarkerGraphEdgeId edgeId = journey[position].edgeId;
+
+            if(not edgeIdsBackwardB.contains(edgeId)) {
+                edgeIdsBackwardB.insert(edgeId);
+
+                if(edgeIdsForwardA.contains(edgeId)) {
+                    const uint64_t commonCountA = countCommonOrientedReadsUnsafe(edgeIdA, edgeId);
+                    const uint64_t commonCountB = countCommonOrientedReadsUnsafe(edgeId, edgeIdB);
+                    const uint64_t commonCountMin = min(commonCountA, commonCountB);
+                    if(commonCountMin > commonBest) {
+                        edgeIdBest = edgeId;
+                        commonBest = commonCountMin;
+                    }
+                }
+            }
+        }
+
+        if(activeCountA == 0 or activeCountB == 0) {
+            break;
+        }
+    }
+
+    if(commonBest == 0) {
+        return invalid<uint64_t>;
+    }
+
+    // edgeIdBest has common oriented reads with both edgeIdA and edgeIdB.
+    MarkerGraphEdgePairInfo infoA;
+    MarkerGraphEdgePairInfo infoB;
+    SHASTA_ASSERT(analyzeMarkerGraphEdgePair(edgeIdA, edgeIdBest, infoA));
+    SHASTA_ASSERT(analyzeMarkerGraphEdgePair(edgeIdBest, edgeIdB, infoB));
+    SHASTA_ASSERT(infoA.common > 0);
+    SHASTA_ASSERT(infoB.common > 0);
+    return infoA.offsetInBases + infoB.offsetInBases;
+}
+
+
+
+// Count the number of common oriented reads between two marker graph edges.
+// This assumes, WITHOUT CHECKING, that each of the two edges has no duplicate
+// oriented reads. This assumption is satisfied for primary marker graph edges
+// in Mode 3 assembly.
+uint64_t Assembler::countCommonOrientedReadsUnsafe(
+    MarkerGraphEdgeId edgeIdA,
+    MarkerGraphEdgeId edgeIdB) const
+{
+    // Prepare for the joint loop over OrientedReadIds of the two edges.
+    const auto markerIntervalsA = markerGraph.edgeMarkerIntervals[edgeIdA];
+    const auto markerIntervalsB = markerGraph.edgeMarkerIntervals[edgeIdB];
+    const auto beginA = markerIntervalsA.begin();
+    const auto beginB = markerIntervalsB.begin();
+    const auto endA = markerIntervalsA.end();
+    const auto endB = markerIntervalsB.end();
+
+
+    // Joint loop over the MarkerIntervals of the two edges,
+    // to count the common  reads and compute average offsets.
+    // This assumes that there are no duplicate oriented reads
+    // on the two edges.
+    uint64_t n = 0;
+    auto itA = beginA;
+    auto itB = beginB;
+    while(itA != endA and itB != endB) {
+
+        if(itA->orientedReadId < itB->orientedReadId) {
+            ++itA;
+        } else if(itB->orientedReadId < itA->orientedReadId) {
+            ++itB;
+            continue;
+        } else {
+            // We found a common OrientedReadId.
+            ++n;
+            ++itA;
+            ++itB;
+        }
+
+    }
+    return n;
+}
+
