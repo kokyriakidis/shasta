@@ -130,7 +130,6 @@ public:
         uint64_t coverage);
 
     void writeGraphviz(
-        const vector<GlobalPathGraphVertex>& globalVertices,
         const string& name,
         const GlobalPathGraphDisplayOptions&) const;
 
@@ -162,14 +161,6 @@ public:
     MarkerGraphEdgeId edgeId;
 
     GlobalPathGraphVertex(MarkerGraphEdgeId edgeId) : edgeId(edgeId) {}
-
-    // Information on the oriented reads that visit this vertex.
-    class JourneyInfoItem {
-    public:
-        OrientedReadId orientedReadId;
-        uint64_t positionInJourney;
-    };
-    vector<JourneyInfoItem> journeyInfoItems;
 
     // Compare by edgeId only.
     bool operator<(const GlobalPathGraphVertex& that) const

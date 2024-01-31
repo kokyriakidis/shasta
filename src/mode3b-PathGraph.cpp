@@ -39,7 +39,6 @@ void GlobalPathGraph::writeComponentsGraphviz(
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
         const PathGraph& component = *components[componentRank];
         component.writeGraphviz(
-            verticesVector,
             baseName + "_Component_" + to_string(componentRank),
             options);
     }
@@ -147,22 +146,6 @@ void GlobalPathGraph::computeOrientedReadJourneys()
     for(auto& orientedReadJourney: orientedReadJourneys) {
         sort(orientedReadJourney.begin(), orientedReadJourney.end(),
             OrderPairsByFirstOnly<uint32_t, uint64_t>());
-    }
-
-
-
-    // Store journey information in the vertices.
-    for(ReadId readId=0; readId<assembler.markers.size()/2; readId++) {
-        for(Strand strand=0; strand<2; strand++) {
-            const OrientedReadId orientedReadId(readId, strand);
-            const auto journey = orientedReadJourneys[orientedReadId.getValue()];
-
-            for(uint64_t position=0; position<journey.size(); position++) {
-                const auto& p = journey[position];
-                const uint64_t vertexId = p.second;
-                verticesVector[vertexId].journeyInfoItems.push_back({orientedReadId, position});
-            }
-        }
     }
 
 
@@ -480,7 +463,6 @@ void PathGraph::addEdge(
 
 // Write a PathGraph in graphviz format.
 void PathGraph::writeGraphviz(
-    const vector<GlobalPathGraphVertex>& globalVertices,
     const string& name,
     const GlobalPathGraphDisplayOptions& options) const
 {
@@ -491,7 +473,6 @@ void PathGraph::writeGraphviz(
 
     BGL_FORALL_VERTICES(v, graph, PathGraph) {
         const PathGraphVertex& vertex = graph[v];
-        const GlobalPathGraphVertex& globalVertex = globalVertices[vertex.vertexId];
         out << vertex.edgeId;
 
         if(options.labels or options.tooltips or options.colorVertices) {
@@ -500,7 +481,7 @@ void PathGraph::writeGraphviz(
 
         if(options.labels) {
             out << "label=\"";
-            out << vertex.edgeId << "\\n" << globalVertex.journeyInfoItems.size();
+            out << vertex.edgeId /* << "\\n" << markerGraph.edgeCoverage(vertex.edgeId)*/;
             out << "\" ";
         }
 

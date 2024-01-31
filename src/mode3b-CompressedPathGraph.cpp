@@ -83,10 +83,10 @@ void GlobalPathGraph::assembleComponent(
     if(true) {
         GlobalPathGraphDisplayOptions options;
         options.showNonTransitiveReductionEdges = true;
-        component.writeGraphviz(verticesVector,
+        component.writeGraphviz(
             "PathGraphInitial" + to_string(componentId), options);
         options.makeCompact();
-        component.writeGraphviz(verticesVector,
+        component.writeGraphviz(
             "PathGraphCompactInitial" + to_string(componentId), options);
     }
 
@@ -105,10 +105,10 @@ void GlobalPathGraph::assembleComponent(
     // Graphviz output.
     GlobalPathGraphDisplayOptions options;
     options.showNonTransitiveReductionEdges = false;
-    component.writeGraphviz(verticesVector,
+    component.writeGraphviz(
         "PathGraph" + to_string(componentId), options);
     options.makeCompact();
-    component.writeGraphviz(verticesVector,
+    component.writeGraphviz(
         "PathGraphCompact" + to_string(componentId), options);
 
     CompressedPathGraph cGraph(component, componentId, assembler, threadCount0, threadCount1);
