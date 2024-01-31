@@ -46,42 +46,6 @@ void GlobalPathGraph::writeComponentsGraphviz(
 
 
 
-// Find out if a marker graph edge is a primary edge.
-bool GlobalPathGraph::isPrimary(
-    MarkerGraphEdgeId edgeId,
-    uint64_t minPrimaryCoverage,
-    uint64_t maxPrimaryCoverage) const
-{
-    // Check coverage.
-    const MarkerGraph& markerGraph = assembler.markerGraph;
-    const uint64_t coverage = markerGraph.edgeCoverage(edgeId);
-    if(coverage < minPrimaryCoverage) {
-        return false;
-    }
-    if(coverage > maxPrimaryCoverage) {
-        return false;
-    }
-
-    // Check for duplicate oriented reads on the edge.
-    if(markerGraph.edgeHasDuplicateOrientedReadIds(edgeId)) {
-        return false;
-    }
-
-    // Check for duplicate oriented reads on its vertices.
-    const MarkerGraph::Edge& edge = markerGraph.edges[edgeId];
-    if(
-        const auto& markers = assembler.markers;
-        markerGraph.vertexHasDuplicateOrientedReadIds(edge.source, markers) or
-        markerGraph.vertexHasDuplicateOrientedReadIds(edge.target, markers)) {
-        return false;
-    }
-
-    // If all above checks passed, this is a primary edge.
-    return true;
-}
-
-
-
 void GlobalPathGraph::createVertices()
 {
     const MarkerGraph& markerGraph = assembler.markerGraph;
@@ -119,98 +83,7 @@ uint64_t GlobalPathGraph::getVertexId(MarkerGraphEdgeId edgeId) const
 
 
 
-
-// The "journey" of each oriented read is the sequence of vertices it encounters.
-// It stores pairs (ordinal0, vertexId) for each oriented read, sorted by ordinal0.
-// The vertexId is the index in verticesVector.
-// Indexed by OrientedReadId::getValue.
-// Journeys are used to generate edges by "following the reads".
-void GlobalPathGraph::computeOrientedReadJourneys()
-{
-    orientedReadJourneys.clear();
-    orientedReadJourneys.resize(assembler.markers.size());
-
-    for(uint64_t vertexId=0; vertexId<verticesVector.size(); vertexId++) {
-        const MarkerGraphEdgeId edgeId = verticesVector[vertexId].edgeId;
-
-        // Loop over MarkerIntervals of this primary marker graph edge.
-        const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
-        for(const MarkerInterval& markerInterval: markerIntervals) {
-            const OrientedReadId orientedReadId = markerInterval.orientedReadId;
-            const uint32_t ordinal0 = markerInterval.ordinals[0];
-            orientedReadJourneys[orientedReadId.getValue()].push_back(make_pair(ordinal0, vertexId));
-        }
-    }
-
-    // Now sort them, for each oriented read.
-    for(auto& orientedReadJourney: orientedReadJourneys) {
-        sort(orientedReadJourney.begin(), orientedReadJourney.end(),
-            OrderPairsByFirstOnly<uint32_t, uint64_t>());
-    }
-
-
-
-    // Write the journeys to csv.
-    ofstream csv("GlobalPathGraphJourneys.csv");
-    for(ReadId readId=0; readId<assembler.markers.size()/2; readId++) {
-        for(Strand strand=0; strand<2; strand++) {
-            const OrientedReadId orientedReadId(readId, strand);
-            const auto journey = orientedReadJourneys[orientedReadId.getValue()];
-            csv << orientedReadId << ",";
-            for(const auto& p: journey) {
-                const uint64_t vertexId = p.second;
-                const MarkerGraphEdgeId edgeId = verticesVector[vertexId].edgeId;
-                csv << edgeId << ",";
-            }
-            csv << "\n";
-        }
-    }
-}
-
-
-// The old version of createEdges uses the journeys stored in the GlobalPathGraph.
-#if 0
-void GlobalPathGraph::createEdges()
-{
-    // Candidate edges are pairs of vertices that appear near each other
-    // in oriented read journeys.
-    vector< pair<uint64_t, uint64_t> > candidateEdges;
-    for(uint64_t i=0; i<orientedReadJourneys.size(); i++) {
-        const auto& journey = orientedReadJourneys[i];
-
-        for(uint64_t position1=1; position1 < journey.size(); position1++) {
-            const uint64_t position0 = position1 - 1;
-            candidateEdges.push_back({journey[position0].second, journey[position1].second});
-        }
-    }
-
-    // Deduplicate the candidate edges and count the number of times each of them was found.
-    vector<uint64_t> coverage;
-    deduplicateAndCount(candidateEdges, coverage);
-    SHASTA_ASSERT(candidateEdges.size() == coverage.size());
-    candidateEdges.shrink_to_fit();
-    coverage.shrink_to_fit();
-
-    // Now we can generate the edges.
-    edges.clear();
-    for(uint64_t i=0; i<candidateEdges.size(); i++) {
-        const uint64_t c = coverage[i];
-        const auto& p = candidateEdges[i];
-        const uint64_t vertexId0 = p.first;
-        const uint64_t vertexId1 = p.second;
-        GlobalPathGraphEdge edge;
-        edge.vertexId0 = vertexId0;
-        edge.vertexId1 = vertexId1;
-        edge.coverage = c;
-        edges.push_back(edge);
-    }
-
-}
-#endif
-
-
-
-// The new version of createEdges uses the journeys stored in the MarkerGraph.
+// Use the journeys stored in the MarkerGraph to create edges.
 // This can be converted to multithreaded code and use mapped memory.
 void GlobalPathGraph::createEdges()
 {

@@ -201,12 +201,6 @@ private:
     GlobalPathGraph(const Assembler&);
     const Assembler& assembler;
 
-    // Find out if a marker graph edge is a primary edge.
-    bool isPrimary(
-        MarkerGraphEdgeId,
-        uint64_t minPrimaryCoverage,
-        uint64_t maxPrimaryCoverage) const;
-
     // Each vertex corresponds to a primary marker graph edge.
     // Store them here.
     // The index in this table is the vertexId.
@@ -220,14 +214,6 @@ private:
     // invalid<MarkerGraphEdgeId> if no such a vertex exists.
     // This uses a binary search in the verticesVector (via std::lower_bound).
     uint64_t getVertexId(MarkerGraphEdgeId) const;
-
-    // The "journey" of each oriented read is the sequence of vertices it encounters.
-    // It stores pairs (ordinal0, vertexId) for each oriented read, sorted by ordinal0.
-    // The vertexId is the index in verticesVector.
-    // Indexed by OrientedReadId::getValue.
-    // Journeys are used to generate edges by "following the reads".
-    vector < vector< pair<uint32_t, uint64_t> > > orientedReadJourneys;
-    void computeOrientedReadJourneys();
 
     vector<GlobalPathGraphEdge> edges;
     void createEdges();
