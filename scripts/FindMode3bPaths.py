@@ -20,6 +20,7 @@ a.accessMarkerGraphVertices()
 a.accessMarkerGraphEdges()
 a.accessMarkerGraphReverseComplementEdge()
 a.accessMarkerGraphConsensus()
+a.accessMarkerGraphPrimaryJourneys()
 shasta.openPerformanceLog('FindMode3Paths.log')
 a.findMode3bPaths(arguments.threadCount0, arguments.threadCount1)
  

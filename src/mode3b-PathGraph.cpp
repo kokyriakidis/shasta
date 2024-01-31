@@ -168,7 +168,8 @@ void GlobalPathGraph::computeOrientedReadJourneys()
 }
 
 
-
+// The old version of createEdges uses the journeys stored in the GlobalPathGraph.
+#if 0
 void GlobalPathGraph::createEdges()
 {
     // Candidate edges are pairs of vertices that appear near each other
@@ -204,6 +205,69 @@ void GlobalPathGraph::createEdges()
         edges.push_back(edge);
     }
 
+}
+#endif
+
+
+
+// The new version of createEdges uses the journeys stored in the MarkerGraph.
+// This can be converted to multithreaded code and use mapped memory.
+void GlobalPathGraph::createEdges()
+{
+    // Gather pairs of consecutive edges in oriented read primary journeys.
+    vector< pair<MarkerGraphEdgeId, MarkerGraphEdgeId> > edgePairs;
+
+    // Loop over all primary journeys.
+    const auto& primaryJourneys = assembler.markerGraph.primaryJourneys;
+    for(uint64_t i=0; i<primaryJourneys.size(); i++) {
+        const auto journey = primaryJourneys[i];
+
+        // Loop over pairs of consecutive MarkerGraphEdgeIds in this journey.
+        for(uint64_t position1=1; position1<journey.size(); position1++) {
+            const uint64_t position0 = position1 - 1;
+            edgePairs.push_back({journey[position0].edgeId, journey[position1].edgeId});
+        }
+    }
+
+    // Deduplicate the edge pairs and count the number of times each of them was found.
+    vector<uint64_t> coverage;
+    deduplicateAndCount(edgePairs, coverage);
+    SHASTA_ASSERT(edgePairs.size() == coverage.size());
+    edgePairs.shrink_to_fit();
+    coverage.shrink_to_fit();
+
+    // To generate edges, we need a table to map MarkerGraphEdgeIds
+    // to vertex ids in the GlobalPathGraph.
+    vector<uint64_t> primaryEdgeTable(assembler.markerGraph.edges.size(), invalid<uint64_t>);
+    for(uint64_t vertexId=0; vertexId<verticesVector.size(); vertexId++) {
+        const GlobalPathGraphVertex& vertex = verticesVector[vertexId];
+        primaryEdgeTable[vertex.edgeId] = vertexId;
+    }
+
+
+
+    // Now we can generate the edges.
+    edges.clear();
+    for(uint64_t i=0; i<edgePairs.size(); i++) {
+        const uint64_t c = coverage[i];
+        const auto& p = edgePairs[i];
+
+        // Get the GlobalPathGraph vertex ids corresponding to
+        // the MarkerGraphedgeIds in this pair.
+        const MarkerGraphEdgeId edgeId0 = p.first;
+        const MarkerGraphEdgeId edgeId1 = p.second;
+        const uint64_t vertexId0 = primaryEdgeTable[edgeId0];
+        const uint64_t vertexId1 = primaryEdgeTable[edgeId1];
+        SHASTA_ASSERT(vertexId0 != invalid<uint64_t>);
+        SHASTA_ASSERT(vertexId1 != invalid<uint64_t>);
+
+        // Create the edge.
+        GlobalPathGraphEdge edge;
+        edge.vertexId0 = vertexId0;
+        edge.vertexId1 = vertexId1;
+        edge.coverage = c;
+        edges.push_back(edge);
+    }
 }
 
 
