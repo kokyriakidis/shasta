@@ -2377,6 +2377,7 @@ public:
 
     void createMarkerGraphPrimaryJourneys(uint64_t threadCount);
     void accessMarkerGraphPrimaryJourneys();
+    void writeMarkerGraphPrimaryJourneys();
 
     // Given two consecutive primary edges, find the secondary edges
     // in between.

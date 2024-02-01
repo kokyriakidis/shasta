@@ -634,6 +634,8 @@ PYBIND11_MODULE(shasta, shastaModule)
             &Assembler::flagPrimaryMarkerGraphEdges)
         .def("createMarkerGraphPrimaryJourneys",
             &Assembler::createMarkerGraphPrimaryJourneys)
+        .def("writeMarkerGraphPrimaryJourneys",
+            &Assembler::writeMarkerGraphPrimaryJourneys)
         .def("accessMarkerGraphPrimaryJourneys",
             &Assembler::accessMarkerGraphPrimaryJourneys)
 

@@ -420,6 +420,7 @@ public:
     };
     MemoryMapped::VectorOfVectors<PrimaryJourneyEntry, uint64_t> primaryJourneys;
     void createPrimaryJourneys(uint64_t orientedReadCount, uint64_t threadCount);
+    void writePrimaryJourneys();
 private:
     void createPrimaryJourneysThreadFunction1(uint64_t threadId);
     void createPrimaryJourneysThreadFunction2(uint64_t threadId);

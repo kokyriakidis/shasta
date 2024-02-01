@@ -898,24 +898,26 @@ void MarkerGraph::createPrimaryJourneys(
         " oriented reads." << endl;
     cout << "Average number of marker graph primary journey entries per oriented read is " <<
         double(primaryJourneys.totalSize()) / double(orientedReadCount) << endl;
+}
 
 
 
-    // Write the journeys to csv.
-    if(false) {
-        ofstream csv("MarkerGraphPrimaryJourneys.csv");
-        for(ReadId readId=0; readId<orientedReadCount/2; readId++) {
-            for(Strand strand=0; strand<2; strand++) {
-                const OrientedReadId orientedReadId(readId, strand);
-                csv << orientedReadId << ",";
-                for(const auto& primaryJourneyEntry: primaryJourneys[orientedReadId.getValue()]) {
-                    csv << primaryJourneyEntry.edgeId << ",";
-                }
-                csv << "\n";
+void MarkerGraph::writePrimaryJourneys()
+{
+    const uint64_t orientedReadCount = primaryJourneys.size();
+
+    ofstream csv("MarkerGraphPrimaryJourneys.csv");
+
+    for(ReadId readId=0; readId<orientedReadCount/2; readId++) {
+        for(Strand strand=0; strand<2; strand++) {
+            const OrientedReadId orientedReadId(readId, strand);
+            csv << orientedReadId << ",";
+            for(const auto& primaryJourneyEntry: primaryJourneys[orientedReadId.getValue()]) {
+                csv << primaryJourneyEntry.edgeId << ",";
             }
+            csv << "\n";
         }
     }
-
 }
 
 

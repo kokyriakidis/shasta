@@ -100,6 +100,14 @@ void Assembler::accessMarkerGraphPrimaryJourneys()
 
 
 
+void Assembler::writeMarkerGraphPrimaryJourneys()
+{
+    SHASTA_ASSERT(markerGraph.primaryJourneys.isOpen());
+    markerGraph.writePrimaryJourneys();
+}
+
+
+
 void Assembler::findMode3bPaths(
     uint64_t threadCount0,  // High level parallelization
     uint64_t threadCount1   // Low level parallelization
