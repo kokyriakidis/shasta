@@ -141,7 +141,7 @@ CompressedPathGraph::CompressedPathGraph(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph-" + to_string(componentId) + ".data");
 
-    run3(threadCount0, threadCount1, true);
+    run4(threadCount0, threadCount1, true);
 }
 
 
@@ -155,7 +155,7 @@ CompressedPathGraph::CompressedPathGraph(
     assembler(assembler)
 {
     load(fileName);
-    run3(threadCount0, threadCount1, true);
+    run4(threadCount0, threadCount1, true);
 }
 
 
@@ -1679,14 +1679,21 @@ uint64_t CompressedPathGraph::chainOffset(const Chain& chain) const
         const MarkerGraphEdgeId edgeId0 = chain[i-1];
         const MarkerGraphEdgeId edgeId1 = chain[i];
 
+#if 0
         MarkerGraphEdgePairInfo info;
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
         if(info.common == 0) {
             cout << "No common oriented reads for " << edgeId0 << " " << edgeId1 << endl;
         }
         SHASTA_ASSERT(info.common > 0);
-        if(info.offsetInBases > 0) {
-            offset += info.offsetInBases;
+#endif
+
+        const uint64_t offsetThisPair = assembler.estimateBaseOffsetUnsafe(edgeId0, edgeId1);
+
+        if(offsetThisPair == invalid<uint64_t>) {
+            SHASTA_ASSERT(0);
+        } else if(offsetThisPair > 0) {
+            offset += offsetThisPair;
         }
     }
     return offset;
@@ -4609,7 +4616,7 @@ void CompressedPathGraph::phaseBubbleChainUsingPhasingTable(
     phasingTable.constructPhasedComponents(debug);
 
 
-
+#if 0
     // Split each PhasedComponent at locations where this is necessary.
     // Check pairs of adjacent consecutive bubbles in the same phased component.
     vector< shared_ptr<PhasedComponent> > splitComponents;
@@ -4693,7 +4700,7 @@ void CompressedPathGraph::phaseBubbleChainUsingPhasingTable(
         }
     }
     phasingTable.phasedComponents.swap(splitComponents);
-
+#endif
 
 
 
