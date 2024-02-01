@@ -73,6 +73,15 @@ PathFiller3::PathFiller3(
     vertexIdA = edgeA.target;
     vertexIdB = edgeB.source;
 
+    // If the edges are adjacent, stop here, leaving the AssembnlyPath empty.
+    // This results in empty secondary sequence.
+    if(vertexIdA == vertexIdB) {
+        if(html) {
+            html << "<br>The two edges are adjacent. Intervening sequence is empty.";
+        }
+        return;
+    }
+
     // Check assumptions here as this used vertexIdA and vertexIdB.
     checkAssumptions();
 
@@ -162,6 +171,14 @@ PathFiller3::PathFiller3(
             fasta << ">PathFiller3 " << sequence.size() << endl;
             copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(fasta));
 
+            getCompleteSequence(sequence);
+
+            html <<
+                "Assembled sequence including the first and last edge is " <<
+                sequence.size() << " bases long."
+                "<pre style='font-family:monospace'>\n";
+            copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(html));
+            html << "</pre>";
         }
 
         break;
@@ -1818,7 +1835,6 @@ void PathFiller3::getSecondarySequence(
 void PathFiller3::getCompleteSequence(
     vector<Base>& sequence) const
 {
-    SHASTA_ASSERT(assemblyPath.size() >= 2);
     const PathFiller3& graph = *this;
 
     sequence.clear();
