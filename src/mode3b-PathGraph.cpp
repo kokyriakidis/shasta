@@ -139,6 +139,7 @@ void GlobalPathGraph::createEdges()
         edge.vertexId0 = vertexId0;
         edge.vertexId1 = vertexId1;
         edge.coverage = c;
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, edge.info));
         edges.push_back(edge);
     }
 }
