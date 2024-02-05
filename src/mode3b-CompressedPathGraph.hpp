@@ -263,8 +263,12 @@ private:
         uint64_t threadCount1,
         bool assembleSequence);
 
-    // Run4 uses the PhasingTable.
+    // Run4 and run5 use the PhasingTable.
     void run4(
+        uint64_t threadCount0,
+        uint64_t threadCount1,
+        bool assembleSequence);
+    void run5(
         uint64_t threadCount0,
         uint64_t threadCount1,
         bool assembleSequence);
@@ -405,6 +409,10 @@ private:
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
 
+    // Bubble cleanup, with the purpose of eliminating most bubbles caused by errors.
+    // See the code for details of what this does.
+    void cleanupBubbles(bool debug, uint64_t maxOffset);
+    void cleanupBubbles(bool debug, edge_descriptor ce, uint64_t maxOffset);
 
 
     // Find short superbubbles in the CompressedPathGraph.

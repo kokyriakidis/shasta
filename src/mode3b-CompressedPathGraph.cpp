@@ -4,6 +4,7 @@
 #include "mode3b-PathGraph.hpp"
 #include "mode3b-PhasingTable.hpp"
 #include "Assembler.hpp"
+#include "copyNumber.hpp"
 #include "deduplicate.hpp"
 #include "diploidBayesianPhase.hpp"
 #include "dominatorTree.hpp"
@@ -141,7 +142,7 @@ CompressedPathGraph::CompressedPathGraph(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph-" + to_string(componentId) + ".data");
 
-    run4(threadCount0, threadCount1, false);
+    run5(threadCount0, threadCount1, false);
 }
 
 
@@ -155,7 +156,7 @@ CompressedPathGraph::CompressedPathGraph(
     assembler(assembler)
 {
     load(fileName);
-    run4(threadCount0, threadCount1, false);
+    run5(threadCount0, threadCount1, false);
 }
 
 
@@ -849,6 +850,96 @@ void CompressedPathGraph::run4(
     detangleEdgesGeneral(false, detangleToleranceLow, detangleToleranceHigh);
     compress();
     compressBubbleChains();
+
+    // Optimize the chains.
+    compress();
+    optimizeChains(
+        false,
+        optimizeChainsMinCommon,
+        optimizeChainsK);
+
+    if(assembleSequence) {
+
+        // Before final output, renumber the edges contiguously.
+        renumberEdges();
+
+        // Assemble sequence.
+        assembleChains(threadCount0, threadCount1);
+
+        // Final output.
+        write("Final", true);
+
+    } else {
+
+        // Skip sequence assembly.
+        write("Final");
+    }
+
+
+}
+
+
+
+// Run5 uses the PhasingTable.
+void CompressedPathGraph::run5(
+    uint64_t threadCount0,
+    uint64_t threadCount1,
+    bool assembleSequence)
+{
+    // *** EXPOSE WHEN CODE STABILIZES
+    const uint64_t detangleToleranceLow = 1;
+    const uint64_t detangleToleranceHigh = 3;
+    const bool useBayesianModel = true;
+    const double epsilon = 0.1;
+    const double minLogP = 8.;
+    const uint64_t longBubbleThreshold = 5000;
+    const double phaseErrorThreshold = 0.1;
+    const double bubbleErrorThreshold = 0.03;
+    const uint64_t optimizeChainsMinCommon = 3;
+    const uint64_t optimizeChainsK = 100;
+
+    write("Initial");
+
+    // Detangle.
+    detangleVertices(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
+    compress();
+
+    // Cleanup bubbles.
+    cleanupBubbles(true, 1000);
+    compressBubbleChains();
+
+    // Phase.
+    compressBubbleChains();
+    phaseBubbleChainsUsingPhasingTable(
+        "",
+        phaseErrorThreshold,
+        bubbleErrorThreshold,
+        longBubbleThreshold);
+    compress();
+
+    // Remove very short superbubbles.
+    removeShortSuperbubbles(false, 100, 300);
+    compress();
+    compressBubbleChains();
+
+    // Detangle.
+    detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    compress();
+    splitTerminalHaploidBubbles();
+    detangleEdgesGeneral(false, detangleToleranceLow, detangleToleranceHigh);
+    compress();
+
+    // Phase.
+    compressBubbleChains();
+    phaseBubbleChainsUsingPhasingTable(
+        "",
+        phaseErrorThreshold,
+        bubbleErrorThreshold,
+        longBubbleThreshold);
+    compress();
+
+
 
     // Optimize the chains.
     compress();
@@ -6073,7 +6164,10 @@ void CompressedPathGraph::assembleChain(
 
     AssemblyPath assemblyPath(assembler, chain, infos, threadCount1);
     assemblyPath.getSequence(chain.sequence);
-    assemblyPath.writeCsv(csv, chainName);
+
+    if(csv) {
+        assemblyPath.writeCsv(csv, chainName);
+    }
 }
 
 
@@ -6831,4 +6925,112 @@ void CompressedPathGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
     // Now we can remove the old BubbleChain we just split.
     boost::remove_edge(ce, cGraph);
 
+}
+
+
+
+// Bubble cleanup (all bubbles), with the purpose of eliminating most bubbles caused by errors.
+void CompressedPathGraph::cleanupBubbles(bool debug, uint64_t maxOffset)
+{
+    const CompressedPathGraph& cGraph = *this;
+
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+        cleanupBubbles(debug, ce, maxOffset);
+    }
+}
+
+
+
+// Bubble cleanup for a bubble chain, with the purpose of eliminating most bubbles caused by errors.
+void CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uint64_t maxOffset)
+{
+    CompressedPathGraph& cGraph = *this;
+    BubbleChain& bubbleChain = cGraph[ce];
+    BubbleChain newBubbleChain;
+
+    for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+        Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+        bool keepBubble = false;
+
+        if(bubble.isHaploid()) {
+
+            // The bubble is haploid. Keep it.
+            keepBubble = true;
+
+        } else {
+
+            // The bubble is not haploid. Compute its maxOffset.
+            uint64_t averageOffset;
+            uint64_t minOffset;
+            uint64_t bubbleMaxOffset;
+            const uint64_t offsetWasComputed = bubbleOffsetNoException(bubble, averageOffset, minOffset, bubbleMaxOffset);
+
+            if((not offsetWasComputed) or bubbleMaxOffset>maxOffset) {
+
+                // The bubble is not haploid but the offset is large. Keep it.
+                keepBubble = true;
+
+            } else {
+
+                // The bubble is not haploid and has a small offset.
+
+                if(bubble.size() > 2) {
+
+                    // The bubble has a small offset and ploidy greater than 2. Remove it.
+                    keepBubble = false;
+
+                } else {
+
+                    // The bubble has a small offset and ploidy 2.
+                    // Assemble the sequence of its two sides.
+                    ofstream noCsv;
+                    for(Chain& chain: bubble) {
+                        assembleChain(chain, 1, "", noCsv);
+                    }
+
+                    if(debug) {
+                        for(uint64_t indexInBubble=0; indexInBubble<2; indexInBubble++) {
+                            const auto& sequence = bubble[indexInBubble].sequence;
+                            cout << ">" << chainStringId(ce, positionInBubbleChain, indexInBubble) <<
+                                " " << sequence.size() << "\n";
+                            copy(sequence.begin(), sequence.end(), ostream_iterator<shasta::Base>(cout));
+                            cout << "\n";
+                        }
+                    }
+                    if(bubble[0].sequence == bubble[1].sequence) {
+                        keepBubble = false;
+                        if(debug) {
+                            cout << "The two sides have identical sequence." << endl;
+                        }
+                    } else {
+
+                        // Figure out if they differ by a copy number of short periodicity.
+                        const uint64_t period = isCopyNumberDifference(bubble[0].sequence, bubble[1].sequence, 4);
+                        if(debug) {
+                            cout << "Period " << period << "\n";
+                        }
+                        keepBubble = (period == 0);
+                    }
+                }
+            }
+
+
+        }
+
+        if(keepBubble) {
+            newBubbleChain.push_back(bubble);
+        } else {
+            // Remove the bubble and replace it with a haploid bubble
+            // consisting of only the terminal MarkerGraphEdgeIds.
+            Chain newChain;
+            newChain.push_back(bubble.front().front());
+            newChain.push_back(bubble.front().back());
+            Bubble newBubble;
+            newBubble.push_back(newChain);
+            newBubbleChain.push_back(newBubble);
+        }
+    }
+
+    bubbleChain.swap(newBubbleChain);
 }
