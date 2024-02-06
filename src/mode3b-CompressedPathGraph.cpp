@@ -900,14 +900,15 @@ void CompressedPathGraph::run5(
 
     write("Initial");
 
+    // Cleanup bubbles.
+    cleanupBubbles(false, 1000);
+    compressBubbleChains();
+
     // Detangle.
     detangleVertices(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    compress();
     detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
     compress();
-
-    // Cleanup bubbles.
-    cleanupBubbles(true, 1000);
-    compressBubbleChains();
 
     // Phase.
     compressBubbleChains();
@@ -923,6 +924,7 @@ void CompressedPathGraph::run5(
     compress();
     compressBubbleChains();
 
+#if 0
     // Detangle.
     detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
     compress();
@@ -938,8 +940,7 @@ void CompressedPathGraph::run5(
         bubbleErrorThreshold,
         longBubbleThreshold);
     compress();
-
-
+#endif
 
     // Optimize the chains.
     compress();
@@ -3298,6 +3299,12 @@ bool CompressedPathGraph::detangleEdge(
         }
         return false;
     }
+    if(inEdges.size() != outEdges.size()) {
+        if(debug) {
+            cout << "Not detangling due to degree (case 3)." << endl;
+        }
+        return false;
+    }
 
     // Compute the tangle matrix.
     vector< vector<uint64_t> > tangleMatrix;
@@ -3369,27 +3376,26 @@ bool CompressedPathGraph::detangleEdge(
     // tangle matrix to have at least one significant element.
     // This means that each in-edge will be "merged" with at least one out-edge,
     // and each out-edge will be "merged" with at least one in-edge.
+    // ACTUALY, FOR MORE ROBUSTNESS REQUIRE EXACTLY OEN SIGNIFICANT ELEMENT PER ROW AND COLUMN.
     for(uint64_t i0=0; i0<inEdges.size(); i0++) {
-        bool foundSignificant = false;
+        uint64_t significantCount = 0;
         for(uint64_t i1=0; i1<outEdges.size(); i1++) {
             if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
-                foundSignificant = true;
-                break;
+                ++significantCount;
             }
         }
-        if(not foundSignificant) {
+        if(significantCount != 1) {
             return false;
         }
     }
     for(uint64_t i1=0; i1<outEdges.size(); i1++) {
-        bool foundSignificant = false;
+        uint64_t significantCount = 0;
         for(uint64_t i0=0; i0<inEdges.size(); i0++) {
             if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
-                foundSignificant = true;
-                break;
+                ++significantCount;
             }
         }
-        if(not foundSignificant) {
+        if(significantCount != 1) {
             return false;
         }
     }
@@ -3539,6 +3545,14 @@ bool CompressedPathGraph::detangleEdgeGeneral(
                 chainInfo.edgeId << endl;
         }
     }
+
+    if(inChains.size() != outChains.size()) {
+        if(debug) {
+            cout << "Not detangling due to degree." << endl;
+        }
+        return false;
+    }
+
 
     // Compute a generalized tangle matrix.
     vector<vector<uint64_t> > tangleMatrix(inChains.size(), vector<uint64_t>(outChains.size()));
