@@ -900,15 +900,28 @@ void CompressedPathGraph::run5(
 
     write("Initial");
 
-    // Cleanup bubbles.
-    cleanupBubbles(false, 1000);
-    compressBubbleChains();
-
     // Detangle.
     detangleVertices(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
     compress();
     detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
     compress();
+
+    // Cleanup bubbles.
+    for(uint64_t iteration=0; ; iteration ++) {
+        const uint64_t cleanedUpBubbleCount = cleanupBubbles(false, 1000);
+        cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
+        if(cleanedUpBubbleCount == 0) {
+            break;
+        }
+        compressBubbleChains();
+        compress();
+    }
+    write("A");
+
+    // Remove very short superbubbles.
+    removeShortSuperbubbles(false, 100, 300);
+    compress();
+    compressBubbleChains();
 
     // Phase.
     compressBubbleChains();
@@ -919,10 +932,6 @@ void CompressedPathGraph::run5(
         longBubbleThreshold);
     compress();
 
-    // Remove very short superbubbles.
-    removeShortSuperbubbles(false, 100, 300);
-    compress();
-    compressBubbleChains();
 
 #if 0
     // Detangle.
@@ -6944,24 +6953,28 @@ void CompressedPathGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
 
 
 // Bubble cleanup (all bubbles), with the purpose of eliminating most bubbles caused by errors.
-void CompressedPathGraph::cleanupBubbles(bool debug, uint64_t maxOffset)
+uint64_t CompressedPathGraph::cleanupBubbles(bool debug, uint64_t maxOffset)
 {
     const CompressedPathGraph& cGraph = *this;
 
+    uint64_t removedCount = 0;
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
-        cleanupBubbles(debug, ce, maxOffset);
+        removedCount += cleanupBubbles(debug, ce, maxOffset);
     }
+
+    return removedCount;
 }
 
 
 
 // Bubble cleanup for a bubble chain, with the purpose of eliminating most bubbles caused by errors.
-void CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uint64_t maxOffset)
+uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uint64_t maxOffset)
 {
     CompressedPathGraph& cGraph = *this;
     BubbleChain& bubbleChain = cGraph[ce];
     BubbleChain newBubbleChain;
 
+    uint64_t removedCount = 0;
     for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
         Bubble& bubble = bubbleChain[positionInBubbleChain];
 
@@ -7043,8 +7056,10 @@ void CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uint64_
             Bubble newBubble;
             newBubble.push_back(newChain);
             newBubbleChain.push_back(newBubble);
+            ++removedCount;
         }
     }
 
     bubbleChain.swap(newBubbleChain);
+    return removedCount;
 }
