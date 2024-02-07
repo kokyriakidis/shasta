@@ -916,24 +916,7 @@ void CompressedPathGraph::run5(
         compressBubbleChains();
         compress();
     }
-    write("A");
 
-    // Remove very short superbubbles.
-    removeShortSuperbubbles(false, 100, 300);
-    compress();
-    compressBubbleChains();
-
-    // Phase.
-    compressBubbleChains();
-    phaseBubbleChainsUsingPhasingTable(
-        "",
-        phaseErrorThreshold,
-        bubbleErrorThreshold,
-        longBubbleThreshold);
-    compress();
-
-
-#if 0
     // Detangle.
     detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
     compress();
@@ -941,6 +924,11 @@ void CompressedPathGraph::run5(
     detangleEdgesGeneral(false, detangleToleranceLow, detangleToleranceHigh);
     compress();
 
+    // Remove short superbubbles.
+    removeShortSuperbubbles(false, 1000, 10000);
+    compress();
+    compressBubbleChains();
+
     // Phase.
     compressBubbleChains();
     phaseBubbleChainsUsingPhasingTable(
@@ -949,7 +937,24 @@ void CompressedPathGraph::run5(
         bubbleErrorThreshold,
         longBubbleThreshold);
     compress();
-#endif
+
+    // Detangle.
+    detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    compress();
+    splitTerminalHaploidBubbles();
+    detangleEdgesGeneral(false, detangleToleranceLow, detangleToleranceHigh);
+    compress();
+    detangleShortSuperbubblesGeneral(false, 1000, detangleToleranceLow, detangleToleranceHigh);
+    compress();
+
+    // Phase.
+    compressBubbleChains();
+    phaseBubbleChainsUsingPhasingTable(
+        "",
+        phaseErrorThreshold,
+        bubbleErrorThreshold,
+        longBubbleThreshold);
+    compress();
 
     // Optimize the chains.
     compress();
