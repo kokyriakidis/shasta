@@ -900,13 +900,18 @@ void CompressedPathGraph::run5(
 
     write("Initial");
 
+#if 0
+    // Better not to do any detangling before cleanup of bubbles and superbubbles.
     // Detangle.
     detangleVertices(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
     compress();
     detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
     compress();
+#endif
 
     // Cleanup bubbles and superbubbles.
+    // Must do compress to make sure all bubbles are in bubble chains.
+    compress();
     for(uint64_t iteration=0; ; iteration ++) {
         const uint64_t cleanedUpBubbleCount = cleanupBubbles(false, 1000);
         cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
@@ -916,7 +921,9 @@ void CompressedPathGraph::run5(
         compressBubbleChains();
         compress();
     }
+    write("A");
     cleanupSuperbubbles(false, 1000, 10000);
+    write("B");
     compress();
 
 
@@ -940,15 +947,21 @@ void CompressedPathGraph::run5(
         bubbleErrorThreshold,
         longBubbleThreshold);
     compress();
+    write("C");
 
     // Detangle.
     detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    write("C1");
     compress();
     splitTerminalHaploidBubbles();
     detangleEdgesGeneral(false, detangleToleranceLow, detangleToleranceHigh);
+    write("C2");
     compress();
+    write("C2a");
     detangleShortSuperbubblesGeneral(false, 1000, detangleToleranceLow, detangleToleranceHigh);
+    write("C3");
     compress();
+    write("D");
 
     // Phase.
     compressBubbleChains();
@@ -958,6 +971,7 @@ void CompressedPathGraph::run5(
         bubbleErrorThreshold,
         longBubbleThreshold);
     compress();
+    write("E");
 
     // Optimize the chains.
     compress();
@@ -4360,6 +4374,9 @@ bool CompressedPathGraph::detangleShortSuperbubble(
             }
         }
     }
+    if(debug) {
+        cout << "After creating new edges, nextEdgeId is " << nextEdgeId << endl;
+    }
 
 
 #if 0
@@ -4478,6 +4495,7 @@ bool CompressedPathGraph::detangleShortSuperbubbleGeneral(
             cout << " " << cGraph[cv].edgeId;
         }
         cout << endl;
+        cout << "nextEdgeId is " << nextEdgeId << endl;
     }
 
     // Gather the in-edges and out-edges.
@@ -4713,6 +4731,9 @@ bool CompressedPathGraph::detangleShortSuperbubbleGeneral(
             }
             splitBubbleChainAtBeginning(ce);
         }
+    }
+    if(debug) {
+        cout << "After splitting of edges, nextEdgeId is " << nextEdgeId << endl;
     }
 
     // Now we can call detangleShortSuperbubble.
@@ -7393,6 +7414,11 @@ uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uin
     uint64_t removedCount = 0;
     for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
         Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+        if(debug) {
+            cout << "cleanupBubbles working on Bubble " << bubbleStringId(ce, positionInBubbleChain) << endl;
+            cout << "Entrance " << bubble.front().front() << ", exit " << bubble.front().back() << endl;
+        }
 
         bool keepBubble = false;
 
