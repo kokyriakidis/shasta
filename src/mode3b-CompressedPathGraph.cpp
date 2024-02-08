@@ -906,7 +906,7 @@ void CompressedPathGraph::run5(
     detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
     compress();
 
-    // Cleanup bubbles.
+    // Cleanup bubbles and superbubbles.
     for(uint64_t iteration=0; ; iteration ++) {
         const uint64_t cleanedUpBubbleCount = cleanupBubbles(false, 1000);
         cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
@@ -916,6 +916,9 @@ void CompressedPathGraph::run5(
         compressBubbleChains();
         compress();
     }
+    cleanupSuperbubbles(false, 1000, 10000);
+    compress();
+
 
     // Detangle.
     detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
@@ -2140,6 +2143,409 @@ bool CompressedPathGraph::removeShortSuperbubbles(
     }
 
     return changesWereMade;
+}
+
+
+
+// Cleanup/simplify superbubbles that are likely to ba caused by errors,
+// completely or in part.
+void CompressedPathGraph::cleanupSuperbubbles(
+    bool debug,
+    uint64_t maxOffset1,    // Used to define superbubbles
+    uint64_t maxOffset2)    // Compared against the offset between entry and exit
+{
+    CompressedPathGraph& cGraph = *this;
+
+    if(debug) {
+        cout << "cleanupSuperbubbles begins." << endl;
+    }
+
+    // Find the superbubbles.
+    Superbubbles superbubbles(cGraph, maxOffset1);
+
+    // Loop over the superbubbles.
+    for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
+        cleanupSuperbubble(debug, superbubbles, superbubbleId, maxOffset2);
+    }
+    if(debug) {
+        cout << "cleanupSuperbubbles ends." << endl;
+    }
+}
+
+
+
+// Cleanup/simplify a superbubble that is likely to be caused by errors,
+// completely or in part.
+// This handles superbubbles caused by two marker graph bubbles with
+// no primary edges in between.
+void CompressedPathGraph::cleanupSuperbubble(
+    bool debug,
+    const Superbubbles& superbubbles,
+    uint64_t superbubbleId,
+    uint64_t maxOffset2)    // Compared against the offset between entry and exit
+{
+    CompressedPathGraph& cGraph = *this;
+    const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
+
+#if 0
+    debug = (superbubble.entrances.size() == 1 and
+        (cGraph[superbubble.entrances.front()].edgeId == 16093908 or
+        cGraph[superbubble.entrances.front()].edgeId == 9555933));
+#endif
+
+    if(debug) {
+        cout << "Working on a superbubble with " << superbubble.size() << " vertices:";
+        for(const vertex_descriptor v: superbubble) {
+            cout << " " << cGraph[v].edgeId;
+        }
+        cout << endl;
+    }
+
+    // Skip it if it has more than one entrance or exit.
+    if(not(superbubble.entrances.size()==1 and superbubble.exits.size()==1)) {
+        if(debug) {
+            cout << "This superbubble will be skipped because it has " <<
+                superbubble.entrances.size() << " entrances and " <<
+                superbubble.exits.size() << " exits." << endl;
+        }
+        return;
+    }
+
+    const vertex_descriptor entrance = superbubble.entrances.front();
+    const vertex_descriptor exit = superbubble.exits.front();
+    if(debug) {
+        cout << "Entrance " << cGraph[entrance].edgeId << endl;
+        cout << "Exit " << cGraph[exit].edgeId << endl;
+    }
+
+    if(entrance == exit) {
+        if(debug) {
+            cout << "This superbubble will be skipped because the entrance vertex"
+                " is the same as the exit vertex." << endl;
+        }
+        return;
+    }
+
+    // Check the base offset between the entrance and the exit.
+    MarkerGraphEdgePairInfo info;
+    SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(cGraph[entrance].edgeId, cGraph[exit].edgeId, info));
+    if(info.common == 0) {
+        if(debug) {
+            cout << "This superbubble will be skipped because "
+                "there are no common oriented reads between the entrance and the exit." << endl;
+        }
+        return;
+    }
+    if(info.offsetInBases > int64_t(maxOffset2)) {
+        if(debug) {
+            cout << "This superbubble will be skipped because offsetInBases is " <<
+                info.offsetInBases << endl;
+        }
+        return;
+    }
+
+    // If a trivial superbubble, skip it.
+    // Trivial means:
+    // - Has two vertices of which one is the entrance and one is the exit.
+    // - There is only one edge between the two.
+    if(superbubble.size() == 2) {
+        uint64_t edgeCount = 0;
+        BGL_FORALL_OUTEDGES(entrance, e, cGraph, CompressedPathGraph) {
+            if(target(e, cGraph) == exit) {
+                ++edgeCount;
+            }
+        }
+        if(edgeCount == 1) {
+            if(debug) {
+                cout << "This superbubble be skipped because it is trivial." << endl;
+            }
+            return;
+        }
+    }
+
+    // Find the out-edges of the entrance that go inside the superbubble.
+    vector<edge_descriptor> entranceOutEdges;
+    BGL_FORALL_OUTEDGES(entrance, ce, cGraph, CompressedPathGraph) {
+        const vertex_descriptor cv = target(ce, cGraph);
+        if(superbubbles.isInSuperbubble(superbubbleId, cv)) {
+            entranceOutEdges.push_back(ce);
+        }
+    }
+    sort(entranceOutEdges.begin(), entranceOutEdges.end());
+
+    // Find the in-edges of the exit that come from inside the superbubble.
+    vector<edge_descriptor> exitInEdges;
+    BGL_FORALL_INEDGES(exit, ce, cGraph, CompressedPathGraph) {
+        const vertex_descriptor cv = source(ce, cGraph);
+        if(superbubbles.isInSuperbubble(superbubbleId, cv)) {
+            exitInEdges.push_back(ce);
+        }
+    }
+    sort(exitInEdges.begin(), exitInEdges.end());
+
+    if(debug) {
+        cout << "Entrance out-edges to inside the superbubble:";
+        for(const edge_descriptor ce: entranceOutEdges) {
+            cout << " " << bubbleChainStringId(ce);
+        }
+        cout << endl;
+        cout << "Exit in-edges from inside the superbubble:";
+        for(const edge_descriptor ce: exitInEdges) {
+            cout << " " << bubbleChainStringId(ce);
+        }
+        cout << endl;
+    }
+    SHASTA_ASSERT(entranceOutEdges.size() > 1);
+    SHASTA_ASSERT(exitInEdges.size() > 1);
+
+    // If there are common edges between the entranceOutEdges and exitInEdges,
+    // skip this superbubble.
+    {
+        vector<edge_descriptor> commonEdges;
+        std::set_intersection(
+            entranceOutEdges.begin(), entranceOutEdges.end(),
+            exitInEdges.begin(), exitInEdges.end(),
+            back_inserter(commonEdges));
+
+        if(not commonEdges.empty()) {
+            if(debug) {
+                cout << "This superbubble will be skipped because there are " <<
+                    commonEdges.size() << " common edges between the out-edges of the entrance "
+                    "and the in-edges of the exit." << endl;
+            }
+            return;
+        }
+    }
+
+
+    // We will consider replacing this superbubble with either its "entrance bubble"
+    // or its "exit bubble":
+    // - The "entrance bubble" is obtained by removing all edges
+    //   except for the out-edges of the entrance, and joining them directly with the exit.
+    // - The "exit bubble" is obtained by removing all edges
+    //   except for the in-edges of the exit, and joining the entry directly with them.
+
+
+
+    // If there are exactly two entranceOutEdges, construct the entrance bubble.
+    // This can only be done if the two entranceOutEdges consist of simple chains.
+    Bubble entranceBubble;
+    if(entranceOutEdges.size() == 2) {
+
+        // See if the two entranceOutEdges consist of simple chains.
+        bool canDo = true;
+        for(const edge_descriptor ce: entranceOutEdges) {
+            if(not cGraph[ce].isSimpleChain()) {
+                canDo = false;
+                break;
+            }
+        }
+
+        // Only continue creating the entranceBubble if both entranceOutEdges
+        // consist of single chains.
+        if(canDo) {
+
+            // Construct the two chains of the entranceBubble and assemble their sequence.
+            entranceBubble.resize(2);
+            ofstream noCsv;
+            for(uint64_t i=0; i<2; i++) {
+                const edge_descriptor entranceOutEdge = entranceOutEdges[i];
+                Chain& chain = entranceBubble[i];
+                chain = cGraph[entranceOutEdge].getOnlyChain();
+                chain.push_back(cGraph[exit].edgeId);
+                assembleChain(chain, 1, "", false, noCsv);
+            }
+
+            if(debug) {
+                cout << "Entrance bubble:" << endl;
+                for(uint64_t i=0; i<2; i++) {
+                    const Chain& chain = entranceBubble[i];
+                    cout << "Entrance bubble chain " << i << ":";
+                    for (const MarkerGraphEdgeId edgeId: chain) {
+                        cout << " " << edgeId;
+                    }
+                    cout << endl;
+                }
+                for(uint64_t i=0; i<2; i++) {
+                    const Chain& chain = entranceBubble[i];
+                    cout << ">Entrance-" << i << " " << chain.sequence.size() << "\n";
+                    copy(chain.sequence.begin(), chain.sequence.end(), ostream_iterator<shasta::Base>(cout));
+                    cout << "\n";
+                }
+            }
+
+            // If the sequences differ just by a copy number of short periodicity,
+            // the entrance bubble is probably causes by errors and so we don't wat to use it.
+            const uint64_t period = isCopyNumberDifference(entranceBubble[0].sequence, entranceBubble[1].sequence, 4);
+            if(debug) {
+                cout << "Period " << period << "\n";
+            }
+            if(period != 0) {
+                entranceBubble.clear();
+            }
+        }
+    }
+
+
+
+    // If there are exactly two exitEdges, construct the exit bubble.
+    // This can only be done if the two exitInEdges consist of simple chains.
+    Bubble exitBubble;
+    if(exitInEdges.size() == 2) {
+
+        // See if the two exitInEdges consist of simple chains.
+        bool canDo = true;
+        for(const edge_descriptor ce: exitInEdges) {
+            if(not cGraph[ce].isSimpleChain()) {
+                canDo = false;
+                break;
+            }
+        }
+
+        // Only continue creating the exitBubble if both exitInEdges
+        // consist of single chains.
+        if(canDo) {
+
+            // Construct the two chains of the exitBubble and assemble their sequence.
+            exitBubble.resize(2);
+            ofstream noCsv;
+            for(uint64_t i=0; i<2; i++) {
+                const edge_descriptor exitInEdge = exitInEdges[i];
+                Chain& chain = exitBubble[i];
+                chain.push_back(cGraph[entrance].edgeId);
+                const Chain& exitChain = cGraph[exitInEdge].getOnlyChain();
+                copy(exitChain.begin(), exitChain.end(), back_inserter(chain));
+                assembleChain(chain, 1, "", false, noCsv);
+            }
+
+            if(debug) {
+                cout << "Exit bubble:" << endl;
+                for(uint64_t i=0; i<2; i++) {
+                    const Chain& chain = exitBubble[i];
+                    cout << "Exit bubble chain " << i << ":";
+                    for (const MarkerGraphEdgeId edgeId: chain) {
+                        cout << " " << edgeId;
+                    }
+                    cout << endl;
+                }
+                for(uint64_t i=0; i<2; i++) {
+                    const Chain& chain = exitBubble[i];
+                    cout << ">Exit-" << i << " " << chain.sequence.size() << "\n";
+                    copy(chain.sequence.begin(), chain.sequence.end(), ostream_iterator<shasta::Base>(cout));
+                    cout << "\n";
+                }
+            }
+
+            // If the sequences differ just by a copy number of short periodicity,
+            // the exit bubble is probably causes by errors and so we don't wat to use it.
+            const uint64_t period = isCopyNumberDifference(exitBubble[0].sequence, exitBubble[1].sequence, 4);
+            if(debug) {
+                cout << "Period " << period << "\n";
+            }
+            if(period != 0) {
+                exitBubble.clear();
+            }
+        }
+    }
+
+
+    // Handle the case where both the entrance and the exit bubble look usable.
+    if(entranceBubble.size() == 2 and exitBubble.size() == 2) {
+
+        // If the entrance and exit bubbles have the same assembled sequences, we can just keep one of them.
+        const auto& entrance0 = entranceBubble[0].sequence;
+        const auto& entrance1 = entranceBubble[1].sequence;
+        const auto& exit0 = exitBubble[0].sequence;
+        const auto& exit1 = exitBubble[1].sequence;
+        if(
+            (entrance0 == exit0 and entrance1 == exit1)
+            or
+            (entrance0 == exit1 and entrance1 == exit0)) {
+            if(debug) {
+                cout << "The entrance and exit bubbles are equivalent." << endl;
+                cout << "Keeping only the entrance bubble." << endl;
+            }
+            exitBubble.clear();
+        } else {
+
+            // In other cases it is difficult to pick which bubble is best to keep,
+            // so we remove both of them.
+            // This is no worse than letting removeShortBubbles remove it.
+            // The sequence assembly process will still pick the best sequence
+            // for each haplotype, but these bubbles are excluded from the
+            // phasing/detangling process.
+            entranceBubble.clear();
+            exitBubble.clear();
+
+            if(debug) {
+                cout << "Both the entrance and the exit bubble are usable but both will be removed." << endl;
+            }
+
+        }
+    }
+
+
+
+    // Figure out which ones of the entrance/exit bubbles is usable.
+    SHASTA_ASSERT(entranceBubble.size() == 0 or entranceBubble.size() == 2);
+    SHASTA_ASSERT(exitBubble.size() == 0 or exitBubble.size() == 2);
+    const bool entranceBubbleIsGood = (entranceBubble.size() == 2);
+    const bool exitBubbleIsGood = (exitBubble.size() == 2);
+
+
+    if(entranceBubbleIsGood) {
+        if(exitBubbleIsGood) {
+            if(debug) {
+                cout << "Both the entrance bubble and the exit bubble are good." << endl;
+            }
+            SHASTA_ASSERT(0);
+        } else {
+            if(debug) {
+                cout << "Only the entrance bubble is good." << endl;
+            }
+        }
+    } else {
+        if(exitBubbleIsGood) {
+            if(debug) {
+                cout << "Only the exit bubble is good." << endl;
+            }
+        } else {
+            if(debug) {
+                cout << "Neither the entrance bubble nor the exit bubble are good." << endl;
+            }
+        }
+    }
+
+
+    // Remove all vertices and edges internal to the superbubble.
+    for(const vertex_descriptor cv: superbubble) {
+        if(cv != entrance and cv != exit) {
+            clear_vertex(cv, cGraph);
+            remove_vertex(cv, cGraph);
+        }
+    }
+
+    // Create the new edge and bubble chain between the entrance and the exit that will replace
+    // the superbubble.
+    edge_descriptor ce;
+    tie(ce, ignore) = add_edge(entrance, exit, cGraph);
+    CompressedPathGraphEdge& edge = cGraph[ce];
+    edge.id = nextEdgeId++;
+    BubbleChain& bubbleChain = edge;
+    SHASTA_ASSERT(not (entranceBubbleIsGood and exitBubbleIsGood));
+    if(entranceBubbleIsGood or exitBubbleIsGood) {
+        const Bubble& newBubble = entranceBubbleIsGood ? entranceBubble : exitBubble;
+        SHASTA_ASSERT(newBubble.size() == 2);
+        bubbleChain.push_back(newBubble);
+    } else {
+        Chain newChain;
+        newChain.push_back(cGraph[entrance].edgeId);
+        newChain.push_back(cGraph[exit].edgeId);
+        Bubble newBubble;
+        newBubble.push_back(newChain);
+        bubbleChain.push_back(newBubble);
+    }
+
 }
 
 
@@ -6165,7 +6571,7 @@ void CompressedPathGraph::assembleChains(
             for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
                 Chain& chain = bubble[indexInBubble];
                 const string chainName = chainStringId(ce, positionInBubbleChain, indexInBubble);
-                assembleChain(chain, threadCount1, chainName, csv);
+                assembleChain(chain, threadCount1, chainName, false, csv);
             }
         }
     }
@@ -6179,6 +6585,7 @@ void CompressedPathGraph::assembleChain(
     Chain& chain,
     uint64_t threadCount1,
     const string& chainName,
+    bool internalSequenceOnly,
     ostream& csv) const
 {
 
@@ -6191,7 +6598,11 @@ void CompressedPathGraph::assembleChain(
     }
 
     AssemblyPath assemblyPath(assembler, chain, infos, threadCount1);
-    assemblyPath.getSequence(chain.sequence);
+    if(internalSequenceOnly) {
+        assemblyPath.getInternalSequence(chain.sequence);
+    } else {
+        assemblyPath.getSequence(chain.sequence);
+    }
 
     if(csv) {
         assemblyPath.writeCsv(csv, chainName);
@@ -7018,7 +7429,7 @@ uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uin
                     // Assemble the sequence of its two sides.
                     ofstream noCsv;
                     for(Chain& chain: bubble) {
-                        assembleChain(chain, 1, "", noCsv);
+                        assembleChain(chain, 1, "", false, noCsv);
                     }
 
                     if(debug) {

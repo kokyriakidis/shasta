@@ -51,6 +51,7 @@ public:
         uint64_t threadCount = 0);
 
     void getSequence(vector<Base>&) const;
+    void getInternalSequence(vector<Base>&) const;  // Excluding the begin/end edges.
     void writeFasta(ostream&, const string& name) const;
     void writeCsv(ostream&, const string& name) const;
 private:

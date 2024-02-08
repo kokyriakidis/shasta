@@ -227,6 +227,33 @@ void AssemblyPath::getSequence(vector<Base>& sequence) const
 }
 
 
+
+void AssemblyPath::getInternalSequence(vector<Base>& sequence) const  // Excluding the begin/end edges.
+{
+    sequence.clear();
+    for(uint64_t i=0; /* Check later */ ; i++) {
+
+        // Append the primary edge sequence.
+        if(i>0 and i<primaryEdges.size()-1) {
+            const MarkerGraphEdgeId edgeId = primaryEdges[i];
+            const auto edgeSequence = assembler.markerGraph.edgeSequence[edgeId];
+            copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
+        }
+
+        // If this is the last primary edge, we are done.
+        if(i == primaryEdges.size() - 1) {
+            break;
+        }
+
+        // Append the step sequence.
+        const Step& step = steps[i];
+        copy(step.sequence.begin(), step.sequence.end(), back_inserter(sequence));
+    }
+
+}
+
+
+
 void AssemblyPath::writeFasta(ostream& fasta, const string& name) const
 {
     vector<Base> sequence;

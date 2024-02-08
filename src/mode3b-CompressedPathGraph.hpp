@@ -143,6 +143,17 @@ public:
         return n;
     }
 
+    // This returns true if this superbubble consists of a single haploid bubble.
+    bool isSimpleChain() const
+    {
+        return size() == 1 and firstBubble().isHaploid();
+    }
+    Chain& getOnlyChain()
+    {
+        SHASTA_ASSERT(isSimpleChain());
+        return firstBubble().front();
+    }
+
     // Collapse consecutive haploid bubbles.
     void compress();
 
@@ -497,6 +508,18 @@ private:
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
 
+    // Cleanup/simplify superbubbles that are likely to ba caused by errors,
+    // completely or in part.
+    void cleanupSuperbubbles(
+        bool debug,
+        uint64_t maxOffset1,    // Used to define superbubbles
+        uint64_t maxOffset2);   // Compared against the offset between entry and exit
+    void cleanupSuperbubble(
+        bool debug,
+        const Superbubbles&,
+        uint64_t superbubbleId,
+        uint64_t maxOffset2);   // Compared against the offset between entry and exit
+
     // Split terminal haploid bubbles out of bubble chains, to facilitate detangling.
     void splitTerminalHaploidBubbles();
     void splitTerminalHaploidBubbles(edge_descriptor);
@@ -671,6 +694,7 @@ private:
         Chain&,
         uint64_t threadCount1,
         const string& chainName,
+        bool internalSequenceOnly,
         ostream& csv) const;
 
 
