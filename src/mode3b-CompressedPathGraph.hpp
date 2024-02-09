@@ -524,6 +524,7 @@ private:
     void splitTerminalHaploidBubbles();
     void splitTerminalHaploidBubbles(edge_descriptor);
 
+    void removeSelfComplementarySquares();
 
     // Phasing of bubble chains using the PhasingGraph.
     void phaseBubbleChainsUsingPhasingGraph(
