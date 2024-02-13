@@ -329,6 +329,12 @@ private:
     // Call compress on all BubbleChains to merge adjacent haploid bubbles.
     void compressBubbleChains();
 
+    // This does the opposite of compress. All bubble chains that
+    // consist of more than one simple haploid bubble are expanded into one
+    // edge for each edge of each bubble.
+    // For optimal results it is best to call compressBubbleChains before expand.
+    void expand();
+
     // Compute the tangle matrix given in-edges and out-edges.
     // The last bubble of each in-edge and the first bubble
     // of each out-edge must be haploid.

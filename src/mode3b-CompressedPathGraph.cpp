@@ -887,8 +887,8 @@ void CompressedPathGraph::run5(
     bool assembleSequence)
 {
     // *** EXPOSE WHEN CODE STABILIZES
-    const uint64_t detangleToleranceLow = 1;
-    const uint64_t detangleToleranceHigh = 3;
+    const uint64_t detangleToleranceLow = 0;
+    const uint64_t detangleToleranceHigh = 2;
     const bool useBayesianModel = true;
     const double epsilon = 0.1;
     const double minLogP = 8.;
@@ -900,14 +900,7 @@ void CompressedPathGraph::run5(
 
     write("Initial");
 
-#if 0
-    // Better not to do any detangling before cleanup of bubbles and superbubbles.
-    // Detangle.
-    detangleVertices(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
-    compress();
-    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
-    compress();
-#endif
+    // Don't do any detangling before cleanup of bubbles and superbubbles.
 
     // Cleanup bubbles and superbubbles.
     // Must do compress to make sure all bubbles are in bubble chains.
@@ -921,23 +914,12 @@ void CompressedPathGraph::run5(
         compressBubbleChains();
         compress();
     }
-    write("A");
     cleanupSuperbubbles(false, 1000, 10000);
-    write("B");
-    compress();
-
-
-    // Detangle.
-    detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
-    compress();
-    splitTerminalHaploidBubbles();
-    detangleEdgesGeneral(false, detangleToleranceLow, detangleToleranceHigh);
     compress();
 
     // Remove short superbubbles.
     removeShortSuperbubbles(false, 1000, 10000);
     compress();
-    compressBubbleChains();
 
     // Phase.
     compressBubbleChains();
@@ -947,46 +929,40 @@ void CompressedPathGraph::run5(
         bubbleErrorThreshold,
         longBubbleThreshold);
     compress();
-    write("C");
+    write("A");
+
+    // For detangling, expand all bubble chains.
+    expand();
 
     // Detangle.
-    detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
-    write("C1");
-    compress();
-    splitTerminalHaploidBubbles();
-    detangleEdgesGeneral(false, detangleToleranceLow, detangleToleranceHigh);
-    write("C2");
-    compress();
-    write("C2a");
-    detangleShortSuperbubblesGeneral(false, 1000, detangleToleranceLow, detangleToleranceHigh);
-    write("C3");
-    compress();
+    while(compressSequentialEdges());
+    write("B");
+    detangleVertices(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    write("C");
+    while(compressSequentialEdges());
     write("D");
-
-    // Phase.
-    compressBubbleChains();
-    phaseBubbleChainsUsingPhasingTable(
-        "",
-        phaseErrorThreshold,
-        bubbleErrorThreshold,
-        longBubbleThreshold);
-    compress();
+    detangleEdges(true, detangleToleranceLow, detangleToleranceHigh);
     write("E");
+    while(compressSequentialEdges());
+    // detangleShortSuperbubbles(false, 1000, detangleToleranceLow, detangleToleranceHigh);
+    // compress();
 
-    removeSelfComplementarySquares();
-    write("F");
 
-    // Optimize the chains.
     compress();
+    compressBubbleChains();
+
+#if 0
+    // Optimize the chains.
     optimizeChains(
         false,
         optimizeChainsMinCommon,
         optimizeChainsK);
+#endif
 
     if(assembleSequence) {
 
         // Before final output, renumber the edges contiguously.
-        renumberEdges();
+        // renumberEdges();
 
         // Assemble sequence.
         assembleChains(threadCount0, threadCount1);
@@ -1302,6 +1278,74 @@ void CompressedPathGraph::compressBubbleChains()
         cGraph[e].compress();
     }
 }
+
+
+
+// This does the opposite of compress. All bubble chains that
+// consist of more than one simple haploid bubble are expanded into one
+// edge for each edge of each bubble.
+// For optimal results it is best to call compressBubbleChains before expand.
+void CompressedPathGraph::expand()
+{
+    CompressedPathGraph& cGraph = *this;
+
+    // Gather all edges that exist at this point.
+    vector<edge_descriptor> initialEdges;
+    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+        initialEdges.push_back(ce);
+    }
+
+
+
+    // Loop over the initial edges.
+    for(const edge_descriptor ce: initialEdges) {
+        BubbleChain& bubbleChain = cGraph[ce];
+
+        // If this bubbleChain consists of a single haploid bubble, don't do anything.
+        if(bubbleChain.isSimpleChain()) {
+            continue;
+        }
+
+        // Prepare a vector of the vertices that will be the sources and targets
+        // of the edges we will create.
+        vector<vertex_descriptor> newVertices;
+        newVertices.push_back(source(ce, cGraph));
+        for(uint64_t positionInBubbleChain=1; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            const vertex_descriptor cv = createVertex(bubbleChain[positionInBubbleChain].front().front());
+            newVertices.push_back(cv);
+        }
+        newVertices.push_back(target(ce, cGraph));
+
+        // Create a new edge for each chain of each bubble in this bubble chain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            Bubble& bubble = bubbleChain[positionInBubbleChain];
+            const vertex_descriptor cv0 = newVertices[positionInBubbleChain];
+            const vertex_descriptor cv1 = newVertices[positionInBubbleChain + 1];
+
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                Chain& chain = bubble[indexInBubble];
+
+                // Create a new edge for this chain.
+                edge_descriptor ceNew;
+                tie(ceNew, ignore) = add_edge(cv0, cv1, cGraph);
+                CompressedPathGraphEdge& edge = cGraph[ceNew];
+                edge.id = nextEdgeId++;
+
+                // Store this Chain in the new edge.
+                BubbleChain& newBubbleChain = cGraph[ceNew];
+                newBubbleChain.resize(1);
+                Bubble& newBubble = newBubbleChain.front();
+                newBubble.resize(1);
+                Chain& newChain = newBubble.front();
+                newChain.swap(chain);
+            }
+        }
+
+        // Now we can remove the BubbleChain.
+        boost::remove_edge(ce, cGraph);
+    }
+}
+
 
 
 void CompressedPathGraph::write(const string& name, bool writeSequence) const
@@ -2312,8 +2356,6 @@ void CompressedPathGraph::cleanupSuperbubble(
         }
         cout << endl;
     }
-    SHASTA_ASSERT(entranceOutEdges.size() > 1);
-    SHASTA_ASSERT(exitInEdges.size() > 1);
 
     // If there are common edges between the entranceOutEdges and exitInEdges,
     // skip this superbubble.
@@ -3667,6 +3709,16 @@ bool CompressedPathGraph::detangleEdge(
     const edge_descriptor ce = it->second;
     ++it;
     // edgeMap.erase(cGraph[ce].id);
+
+    // Only try detangling if the edge consists of a single haploid bubble.
+    // Otherwise detangling would lose information.
+    BubbleChain& bubbleChain = cGraph[ce];
+    if(bubbleChain.size() > 1) {
+        return false;
+    }
+    if(bubbleChain.front().size() > 1) {
+        return false;
+    }
 
     // Tangle matrix elements <= detangleToleranceLow are treated as negigible.
     // Tangle matrix elements >= detangleToleranceHigh are treated as significant.
