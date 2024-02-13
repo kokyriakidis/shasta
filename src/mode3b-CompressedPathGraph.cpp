@@ -142,7 +142,7 @@ CompressedPathGraph::CompressedPathGraph(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph-" + to_string(componentId) + ".data");
 
-    run5(threadCount0, threadCount1, false);
+    run5(threadCount0, threadCount1, true);
 }
 
 
@@ -156,7 +156,7 @@ CompressedPathGraph::CompressedPathGraph(
     assembler(assembler)
 {
     load(fileName);
-    run5(threadCount0, threadCount1, false);
+    run5(threadCount0, threadCount1, true);
 }
 
 
@@ -3843,98 +3843,158 @@ bool CompressedPathGraph::detangleEdge(
         }
     }
 
-    // Count the number of significant, ambiguous, and negligible elements
-    // in the tangle matrix.
-    uint64_t significantCount = 0;
-    uint64_t ambiguousCount = 0;
-    uint64_t negligibleCount = 0;
-    for(uint64_t i0=0; i0<inEdges.size(); i0++) {
-        for(uint64_t i1=0; i1<outEdges.size(); i1++) {
-            const uint64_t t = tangleMatrix[i0][i1];
-            if(t <= detangleToleranceLow) {
-                ++negligibleCount;
-            } else if(t >= detangleToleranceHigh) {
-                ++significantCount;
+
+
+    // Detangle based on the contents of the tangle matrix.
+    if(useBayesianModel and inEdges.size() == 2 and outEdges.size() == 2) {
+
+        // Use the 2 by 2 Bayesian model for detangling.
+        array< array<uint64_t, 2>, 2> tangleMatrix22;
+        for(uint64_t i=0; i<2; i++) {
+            for(uint64_t j=0; j<2; j++) {
+                tangleMatrix22[i][j] = tangleMatrix[i][j];
+            }
+        }
+
+        // Compute logarithmic probability ratio of in-phase and out-of-phase
+        // against random.
+        double logPin;
+        double logPout;
+        tie(logPin, logPout) = diploidBayesianPhase(tangleMatrix22, epsilon);
+        if(debug) {
+            cout << "logPin = " << logPin << ", logPout = " << logPout << endl;
+        }
+
+        const bool isInPhase    = (logPin  >= minLogP) and ((logPin - logPout) >= minLogP);
+        const bool isOutOfPhase = (logPout >= minLogP) and ((logPout - logPin) >= minLogP);
+
+        if(isInPhase or isOutOfPhase) {
+
+            // We can detangle.
+
+            // Create truncated versions of the inEdges and outEdges.
+            vector<vertex_descriptor> inVertices;
+            for(const edge_descriptor ce: inEdges) {
+                inVertices.push_back(cloneAndTruncateAtEnd(ce));
+            }
+            vector<vertex_descriptor> outVertices;
+            for(const edge_descriptor ce: outEdges) {
+                outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+            }
+
+            if(isInPhase) {
+                connect(inVertices[0], outVertices[0]);
+                connect(inVertices[1], outVertices[1]);
             } else {
-                ++ambiguousCount;
+                connect(inVertices[0], outVertices[1]);
+                connect(inVertices[1], outVertices[0]);
             }
-        }
-    }
 
-    // If the tangle matrix contains any ambiguous elements, do nothing.
-    if(ambiguousCount > 0) {
-        return false;
-    }
+        } else {
 
-    // There are no ambiguous elements.
-    // If there are no negligible element, that is all elements of the tangle matrix are significant,
-    // there is nothing to do.
-    if(negligibleCount == 0) {
-        return false;
-    }
-
-    // To avoid breaking contiguity, we require each column and each row of the
-    // tangle matrix to have at least one significant element.
-    // This means that each in-edge will be "merged" with at least one out-edge,
-    // and each out-edge will be "merged" with at least one in-edge.
-    // ACTUALY, FOR MORE ROBUSTNESS REQUIRE EXACTLY OEN SIGNIFICANT ELEMENT PER ROW AND COLUMN.
-    for(uint64_t i0=0; i0<inEdges.size(); i0++) {
-        uint64_t significantCount = 0;
-        for(uint64_t i1=0; i1<outEdges.size(); i1++) {
-            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
-                ++significantCount;
-            }
-        }
-        if(significantCount != 1) {
+            // Ambiguous. Don't detangle.
             return false;
         }
-    }
-    for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+
+    } else {
+
+
+
+        // We are not using the Bayesian model.
+
+        // Count the number of significant, ambiguous, and negligible elements
+        // in the tangle matrix.
         uint64_t significantCount = 0;
+        uint64_t ambiguousCount = 0;
+        uint64_t negligibleCount = 0;
         for(uint64_t i0=0; i0<inEdges.size(); i0++) {
-            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
-                ++significantCount;
+            for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+                const uint64_t t = tangleMatrix[i0][i1];
+                if(t <= detangleToleranceLow) {
+                    ++negligibleCount;
+                } else if(t >= detangleToleranceHigh) {
+                    ++significantCount;
+                } else {
+                    ++ambiguousCount;
+                }
             }
         }
-        if(significantCount != 1) {
+
+        // If the tangle matrix contains any ambiguous elements, do nothing.
+        if(ambiguousCount > 0) {
             return false;
         }
-    }
 
-#if 0
-    // In an in-edge is also an out-edge, don't detangle.
-    for(const edge_descriptor ce: inEdges) {
-        if(find(outEdges.begin(), outEdges.end(), ce) != outEdges.end()) {
-            if(debug) {
-                cout << "Not degangled because an in-edge is also an out-edge." << endl;
+        // There are no ambiguous elements.
+        // If there are no negligible element, that is all elements of the tangle matrix are significant,
+        // there is nothing to do.
+        if(negligibleCount == 0) {
+            return false;
+        }
+
+        // To avoid breaking contiguity, we require each column and each row of the
+        // tangle matrix to have at least one significant element.
+        // This means that each in-edge will be "merged" with at least one out-edge,
+        // and each out-edge will be "merged" with at least one in-edge.
+        // ACTUALY, FOR MORE ROBUSTNESS REQUIRE EXACTLY OEN SIGNIFICANT ELEMENT PER ROW AND COLUMN.
+        for(uint64_t i0=0; i0<inEdges.size(); i0++) {
+            uint64_t significantCount = 0;
+            for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+                if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                    ++significantCount;
+                }
             }
-            return false;
+            if(significantCount != 1) {
+                return false;
+            }
         }
-    }
-#endif
-
-    if(debug) {
-        cout << "This edge will be detangled " << inEdges.size() << " by " << outEdges.size() << endl;
-    }
-
-    // Create truncated versions of the inEdges and outEdges.
-    vector<vertex_descriptor> inVertices;
-    for(const edge_descriptor ce: inEdges) {
-        inVertices.push_back(cloneAndTruncateAtEnd(ce));
-    }
-    vector<vertex_descriptor> outVertices;
-    for(const edge_descriptor ce: outEdges) {
-        outVertices.push_back(cloneAndTruncateAtBeginning(ce));
-    }
-
-
-    // Each significant element of the tangle matrix generates a new edge.
-    for(uint64_t i0=0; i0<inEdges.size(); i0++) {
         for(uint64_t i1=0; i1<outEdges.size(); i1++) {
-            if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
-                const edge_descriptor ceNew = connect(inVertices[i0], outVertices[i1]);
+            uint64_t significantCount = 0;
+            for(uint64_t i0=0; i0<inEdges.size(); i0++) {
+                if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                    ++significantCount;
+                }
+            }
+            if(significantCount != 1) {
+                return false;
+            }
+        }
+
+    #if 0
+        // In an in-edge is also an out-edge, don't detangle.
+        for(const edge_descriptor ce: inEdges) {
+            if(find(outEdges.begin(), outEdges.end(), ce) != outEdges.end()) {
                 if(debug) {
-                    cout << "Created " << bubbleChainStringId(ceNew) << endl;
+                    cout << "Not degangled because an in-edge is also an out-edge." << endl;
+                }
+                return false;
+            }
+        }
+    #endif
+
+        if(debug) {
+            cout << "This edge will be detangled " << inEdges.size() << " by " << outEdges.size() << endl;
+        }
+
+        // Create truncated versions of the inEdges and outEdges.
+        vector<vertex_descriptor> inVertices;
+        for(const edge_descriptor ce: inEdges) {
+            inVertices.push_back(cloneAndTruncateAtEnd(ce));
+        }
+        vector<vertex_descriptor> outVertices;
+        for(const edge_descriptor ce: outEdges) {
+            outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+        }
+
+
+        // Each significant element of the tangle matrix generates a new edge.
+        for(uint64_t i0=0; i0<inEdges.size(); i0++) {
+            for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+                if(tangleMatrix[i0][i1] >= detangleToleranceHigh) {
+                    const edge_descriptor ceNew = connect(inVertices[i0], outVertices[i1]);
+                    if(debug) {
+                        cout << "Created " << bubbleChainStringId(ceNew) << endl;
+                    }
                 }
             }
         }
