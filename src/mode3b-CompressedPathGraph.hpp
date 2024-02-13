@@ -396,23 +396,35 @@ private:
     bool detangleEdges(
         bool debug,
         uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
+        uint64_t detangleToleranceHigh,
+        bool useBayesianModel,
+        double epsilon,
+        double minLogP);
     bool detangleEdge(
         bool debug,
         std::map<uint64_t, edge_descriptor>& edgeMap,
         std::map<uint64_t, edge_descriptor>::iterator&,
         uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
+        uint64_t detangleToleranceHigh,
+        bool useBayesianModel,
+        double epsilon,
+        double minLogP);
     bool detangleEdgesGeneral(
         bool debug,
         uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
+        uint64_t detangleToleranceHigh,
+        bool useBayesianModel,
+        double epsilon,
+        double minLogP);
     bool detangleEdgeGeneral(
         bool debug,
         std::map<uint64_t, edge_descriptor>& edgeMap,
         std::map<uint64_t, edge_descriptor>::iterator&,
         uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
+        uint64_t detangleToleranceHigh,
+        bool useBayesianModel,
+        double epsilon,
+        double minLogP);
     bool removeSelfComplementaryEdges();
 
     // Special treatment to detangle back edges that were too long

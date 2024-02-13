@@ -193,9 +193,9 @@ void CompressedPathGraph::run(
         compress();
     }
 
-    detangleEdges(false, 0, detangleToleranceHigh);
-    detangleEdges(false, 0, detangleToleranceHigh);
-    detangleEdges(false, 1, detangleToleranceHigh);
+    detangleEdges(false, 0, detangleToleranceHigh, false, epsilon, minLogP);
+    detangleEdges(false, 0, detangleToleranceHigh, false, epsilon, minLogP);
+    detangleEdges(false, 1, detangleToleranceHigh, false, epsilon, minLogP);
     detangleVertices(false, 0, detangleToleranceHigh, false, epsilon, minLogP);
 
     // detangleBackEdges(1, detangleToleranceHigh);
@@ -311,7 +311,8 @@ void CompressedPathGraph::run1(
             compress();
         }
 
-        const bool detangledSomeEdges =  detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
+        const bool detangledSomeEdges =  detangleEdges(false, detangleToleranceLow, detangleToleranceHigh,
+            false, epsilon, minLogP);
         if(detangledSomeEdges) {
             compress();
         }
@@ -354,7 +355,7 @@ void CompressedPathGraph::run1(
 
     detangleShortSuperbubblesGeneral(false, 30000, detangleToleranceLow, detangleToleranceHigh);
     compress();
-    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
+    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, false, epsilon, minLogP);
     compress();
     detangleShortSuperbubblesGeneral(false, 30000, detangleToleranceLow, detangleToleranceHigh);
     compress();
@@ -500,9 +501,9 @@ void CompressedPathGraph::run3(
         compress();
     }
 
-    detangleEdges(false, 0, detangleToleranceHigh);
-    detangleEdges(false, 0, detangleToleranceHigh);
-    detangleEdges(false, 1, detangleToleranceHigh);
+    detangleEdges(false, 0, detangleToleranceHigh, false, epsilon, minLogP);
+    detangleEdges(false, 0, detangleToleranceHigh, false, epsilon, minLogP);
+    detangleEdges(false, 1, detangleToleranceHigh, false, epsilon, minLogP);
     detangleVertices(false, 0, detangleToleranceHigh, false, epsilon, minLogP);
 
     // detangleBackEdges(1, detangleToleranceHigh);
@@ -792,7 +793,7 @@ void CompressedPathGraph::run4(
 
     // Detangle.
     splitTerminalHaploidBubbles();
-    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
+    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, false, epsilon, minLogP);
     compress();
     compressBubbleChains();
     detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
@@ -804,7 +805,7 @@ void CompressedPathGraph::run4(
 
     // Detangle.
     splitTerminalHaploidBubbles();
-    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
+    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, false, epsilon, minLogP);
     compress();
     compressBubbleChains();
     detangleVerticesGeneral(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
@@ -823,7 +824,7 @@ void CompressedPathGraph::run4(
         longBubbleThreshold);
 
     // Detangle edges.
-    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh);
+    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, false, epsilon, minLogP);
     compress();
     compressBubbleChains();
 
@@ -847,7 +848,7 @@ void CompressedPathGraph::run4(
 
     // Detangle.
     splitTerminalHaploidBubbles();
-    detangleEdgesGeneral(false, detangleToleranceLow, detangleToleranceHigh);
+    detangleEdgesGeneral(false, detangleToleranceLow, detangleToleranceHigh, false, epsilon, minLogP);
     compress();
     compressBubbleChains();
 
@@ -895,8 +896,8 @@ void CompressedPathGraph::run5(
     const uint64_t longBubbleThreshold = 5000;
     const double phaseErrorThreshold = 0.1;
     const double bubbleErrorThreshold = 0.03;
-    const uint64_t optimizeChainsMinCommon = 3;
-    const uint64_t optimizeChainsK = 100;
+    // const uint64_t optimizeChainsMinCommon = 3;
+    // const uint64_t optimizeChainsK = 100;
 
     write("Initial");
 
@@ -941,7 +942,7 @@ void CompressedPathGraph::run5(
     write("C");
     while(compressSequentialEdges());
     write("D");
-    detangleEdges(true, detangleToleranceLow, detangleToleranceHigh);
+    detangleEdges(true, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
     write("E");
     while(compressSequentialEdges());
     // detangleShortSuperbubbles(false, 1000, detangleToleranceLow, detangleToleranceHigh);
@@ -3631,7 +3632,10 @@ void CompressedPathGraph::splitBubbleChainAtEnd(edge_descriptor ce)
 bool CompressedPathGraph::detangleEdges(
     bool debug,
     uint64_t detangleToleranceLow,
-    uint64_t detangleToleranceHigh)
+    uint64_t detangleToleranceHigh,
+    bool useBayesianModel,
+    double epsilon,
+    double minLogP)
 {
     if(debug) {
         cout << "Detangling edges." << endl;
@@ -3649,7 +3653,8 @@ bool CompressedPathGraph::detangleEdges(
 
     uint64_t detangleCount = 0;;
     for(auto it=edgeMap.begin(); it!=edgeMap.end(); /* Incremented safely by detangleEdgeStrict */) {
-        if(detangleEdge(debug, edgeMap, it, detangleToleranceLow, detangleToleranceHigh)) {
+        if(detangleEdge(debug, edgeMap, it, detangleToleranceLow, detangleToleranceHigh,
+            useBayesianModel, epsilon, minLogP)) {
             ++detangleCount;
         }
     }
@@ -3666,7 +3671,10 @@ bool CompressedPathGraph::detangleEdges(
 bool CompressedPathGraph::detangleEdgesGeneral(
     bool debug,
     uint64_t detangleToleranceLow,
-    uint64_t detangleToleranceHigh)
+    uint64_t detangleToleranceHigh,
+    bool useBayesianModel,
+    double epsilon,
+    double minLogP)
 {
     if(debug) {
         cout << "Detangling edges." << endl;
@@ -3684,7 +3692,8 @@ bool CompressedPathGraph::detangleEdgesGeneral(
 
     uint64_t detangleCount = 0;;
     for(auto it=edgeMap.begin(); it!=edgeMap.end(); /* Incremented safely by detangleEdgeStrict */) {
-        if(detangleEdgeGeneral(debug, edgeMap, it, detangleToleranceLow, detangleToleranceHigh)) {
+        if(detangleEdgeGeneral(debug, edgeMap, it, detangleToleranceLow, detangleToleranceHigh,
+            useBayesianModel, epsilon, minLogP)) {
             ++detangleCount;
         }
     }
@@ -3703,7 +3712,10 @@ bool CompressedPathGraph::detangleEdge(
     std::map<uint64_t, edge_descriptor>& edgeMap,
     std::map<uint64_t, edge_descriptor>::iterator& it,
     uint64_t detangleToleranceLow,
-    uint64_t detangleToleranceHigh)
+    uint64_t detangleToleranceHigh,
+    bool useBayesianModel,
+    double epsilon,
+    double minLogP)
 {
     CompressedPathGraph& cGraph = *this;
     const edge_descriptor ce = it->second;
@@ -3968,8 +3980,15 @@ bool CompressedPathGraph::detangleEdgeGeneral(
     std::map<uint64_t, edge_descriptor>& edgeMap,
     std::map<uint64_t, edge_descriptor>::iterator& it,
     uint64_t detangleToleranceLow,
-    uint64_t detangleToleranceHigh)
+    uint64_t detangleToleranceHigh,
+    bool useBayesianModel,
+    double epsilon,
+    double minLogP)
 {
+    // detangleEdgeGeneral does not have code to use the Bayesian model
+    // for the 2 by 2 case. See detangleEdge.
+    SHASTA_ASSERT(not useBayesianModel);
+
     CompressedPathGraph& cGraph = *this;
     const edge_descriptor ce = it->second;
     ++it;
@@ -4177,7 +4196,8 @@ bool CompressedPathGraph::detangleEdgeGeneral(
         cout << "Calling detangleEdge." << endl;
     }
     --it;   // Because detangleEdge increments it again.
-    return detangleEdge(debug, edgeMap, it, detangleToleranceLow, detangleToleranceHigh);
+    return detangleEdge(debug, edgeMap, it, detangleToleranceLow, detangleToleranceHigh,
+        useBayesianModel, epsilon, minLogP);
 }
 
 
