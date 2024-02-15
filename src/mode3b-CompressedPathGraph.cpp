@@ -22,6 +22,7 @@ using namespace mode3b;
 #include <boost/graph/filtered_graph.hpp>
 #include <boost/pending/disjoint_sets.hpp>
 #include <boost/graph/reverse_graph.hpp>
+#include <boost/graph/strong_components.hpp>
 
 // Standard library.
 #include "fstream.hpp"
@@ -2129,7 +2130,7 @@ CompressedPathGraph::Superbubbles::Superbubbles(
             const vertex_descriptor cv0 = p.second;
             const vertex_descriptor cv1 = p.first;
             forwardPairs.push_back({cv0, cv1});
-            if(false) {
+            if(debug) {
                 cout << "F " << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId << endl;
             }
         }
@@ -2169,13 +2170,21 @@ CompressedPathGraph::Superbubbles::Superbubbles(
             const vertex_descriptor cv0 = p.first;
             const vertex_descriptor cv1 = p.second;
             backwardPairs.push_back({cv0, cv1});
-            if(false) {
+            if(debug) {
                 cout << "B " << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId << endl;
             }
         }
     }
 
-    // The pairs that appear both in forwardPairs and backwardPairs define our superbubbles.
+    // Compute strongly connected components.
+    std::map<vertex_descriptor, uint64_t> componentMap;
+    boost::strong_components(
+        cGraph,
+        boost::make_assoc_property_map(componentMap),
+        boost::vertex_index_map(boost::make_assoc_property_map(indexMap)));
+
+
+    // The pairs that appear both in forwardPairs and backwardPairs define our superbubbles
     sort(forwardPairs.begin(), forwardPairs.end());
     sort(backwardPairs.begin(), backwardPairs.end());
     vector< pair<vertex_descriptor, vertex_descriptor> > bidirectionalPairs;
@@ -2185,7 +2194,7 @@ CompressedPathGraph::Superbubbles::Superbubbles(
         back_inserter(bidirectionalPairs)
         );
 
-    if(false) {
+    if(debug) {
         cout << "Bidirectional pairs:" << endl;
         for(const auto& p: bidirectionalPairs) {
             const vertex_descriptor cv0 = p.first;
@@ -2196,11 +2205,13 @@ CompressedPathGraph::Superbubbles::Superbubbles(
 
     // Each bidirectional pair generates a superbubble if
     // the out-degree of the entrance and
-    // the in-degree of the exit are greater than 1.
+    // the in-degree of the exit are greater than 1,
+    // unless the entrance and exit are in the same strong component.
     for(const auto& p: bidirectionalPairs) {
         const vertex_descriptor cv0 = p.first;
         const vertex_descriptor cv1 = p.second;
-        if(out_degree(cv0, cGraph) > 1) {
+        if( out_degree(cv0, cGraph) > 1 and
+            componentMap[cv0] != componentMap[cv1]) {
             SHASTA_ASSERT(in_degree(cv1, cGraph) > 1);
             superbubbles.resize(superbubbles.size() + 1);
             Superbubble& superbubble = superbubbles.back();
