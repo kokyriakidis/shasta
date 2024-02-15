@@ -354,7 +354,7 @@ void PathGraph::localTransitiveReduction(
         }
     }
 
-    if(false) {
+    if(true) {
         cout << "PathGraph edge coverage histogram" << endl;
         cout << "Coverage,All edges,Edges removed by transitive reduction" << endl;
         for(uint64_t coverage=0; coverage<histogram.size(); coverage++) {

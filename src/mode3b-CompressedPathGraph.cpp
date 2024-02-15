@@ -18,9 +18,10 @@ using namespace mode3b;
 // Boost libraries.
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
-#include <boost/graph/filtered_graph.hpp>
 #include <boost/graph/adj_list_serialize.hpp>
+#include <boost/graph/filtered_graph.hpp>
 #include <boost/pending/disjoint_sets.hpp>
+#include <boost/graph/reverse_graph.hpp>
 
 // Standard library.
 #include "fstream.hpp"
@@ -38,7 +39,7 @@ void GlobalPathGraph::assemble(
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
     const uint64_t transitiveReductionDistance = 5000;
-    const uint64_t transitiveReductionMaxCoverage = 100;
+    const uint64_t transitiveReductionMaxCoverage = 8;
     const uint64_t crossEdgesLowCoverageThreshold = 2;
     const uint64_t crossEdgesHighCoverageThreshold = 6;
     const uint64_t crossEdgesMinOffset = 0;
@@ -142,7 +143,7 @@ CompressedPathGraph::CompressedPathGraph(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph-" + to_string(componentId) + ".data");
 
-    run5(threadCount0, threadCount1, true);
+    run5(threadCount0, threadCount1, false);
 }
 
 
@@ -156,7 +157,7 @@ CompressedPathGraph::CompressedPathGraph(
     assembler(assembler)
 {
     load(fileName);
-    run5(threadCount0, threadCount1, true);
+    run5(threadCount0, threadCount1, false);
 }
 
 
@@ -892,7 +893,7 @@ void CompressedPathGraph::run5(
     const uint64_t detangleToleranceHigh = 2;
     const bool useBayesianModel = true;
     const double epsilon = 0.1;
-    const double minLogP = 8.;
+    const double minLogP = 20.;
     const uint64_t longBubbleThreshold = 5000;
     const double phaseErrorThreshold = 0.1;
     const double bubbleErrorThreshold = 0.03;
@@ -915,12 +916,17 @@ void CompressedPathGraph::run5(
         compressBubbleChains();
         compress();
     }
-    cleanupSuperbubbles(false, 1000, 10000);
+    write("R");
+    cleanupSuperbubbles(false, 10000);
+    write("S");
     compress();
+    write("T");
 
     // Remove short superbubbles.
-    removeShortSuperbubbles(false, 1000, 10000);
+    removeShortSuperbubbles(true, 3000, 10000);
+    write("U");
     compress();
+    write("V");
 
     // Phase.
     compressBubbleChains();
@@ -948,9 +954,9 @@ void CompressedPathGraph::run5(
     // detangleShortSuperbubbles(false, 1000, detangleToleranceLow, detangleToleranceHigh);
     // compress();
 
-
     compress();
     compressBubbleChains();
+    write("F");
 
 #if 0
     // Optimize the chains.
@@ -2066,6 +2072,192 @@ CompressedPathGraph::Superbubbles::Superbubbles(
 
 
 
+// This uses dominator trees.
+// It only finds superbubbles with one entrance and one ecit.
+CompressedPathGraph::Superbubbles::Superbubbles(
+    CompressedPathGraph& cGraph) :
+    cGraph(cGraph)
+{
+    const bool debug = false;
+
+    // Map vertices to integers.
+    std::map<vertex_descriptor, uint64_t> indexMap;
+    uint64_t vertexIndex = 0;
+    BGL_FORALL_VERTICES(v, cGraph, CompressedPathGraph) {
+        indexMap.insert({v, vertexIndex++});
+    }
+    auto associativeIndexMap = boost::make_assoc_property_map(indexMap);
+    const uint64_t vertexCount = vertexIndex;
+
+    // Vectors used below to compute the dominator tree.
+    vector<uint64_t> dfNum(vertexCount);
+    vector<vertex_descriptor> parent(vertexCount);
+    vector<vertex_descriptor> verticesByDFNum(vertexCount);
+
+    // Tree pairs found on forward and backward dominator tree.
+    vector< pair<vertex_descriptor, vertex_descriptor> > forwardPairs;
+    vector< pair<vertex_descriptor, vertex_descriptor> > backwardPairs;
+
+
+
+    // Compute dominator trees using as entrance each of the
+    // vertices with zero in-degree.
+    BGL_FORALL_VERTICES(entrance, cGraph, CompressedPathGraph) {
+        if(in_degree(entrance, cGraph) != 0) {
+            continue;
+        }
+
+        // Compute the dominator tree.
+        fill(dfNum.begin(), dfNum.end(), invalid<uint64_t>);
+        fill(parent.begin(), parent.end(), null_vertex());
+        fill(verticesByDFNum.begin(), verticesByDFNum.end(), null_vertex());
+        std::map<vertex_descriptor, vertex_descriptor> predecessorMap;
+
+        boost::lengauer_tarjan_dominator_tree(
+            cGraph,
+            entrance,
+            boost::make_assoc_property_map(indexMap),
+            boost::make_iterator_property_map(dfNum.begin(), associativeIndexMap),
+            boost::make_iterator_property_map(parent.begin(), associativeIndexMap),
+            verticesByDFNum,
+            boost::make_assoc_property_map(predecessorMap));
+
+        if(debug) {
+            cout << "Forward dominator tree with entrance at " << cGraph[entrance].edgeId << endl;
+        }
+        for(const auto& p: predecessorMap) {
+            const vertex_descriptor cv0 = p.second;
+            const vertex_descriptor cv1 = p.first;
+            forwardPairs.push_back({cv0, cv1});
+            if(false) {
+                cout << "F " << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId << endl;
+            }
+        }
+    }
+
+
+
+    // Compute dominator trees on the reverse graph using as entrance each of the
+    // vertices with zero in-degree on the reverse graph
+    // (that is, zero out-degree on the CompressedPathGraph).
+    using ReverseCompressedPathGraph = boost::reverse_graph<CompressedPathGraph>;
+    ReverseCompressedPathGraph reverseGraph(cGraph);
+    BGL_FORALL_VERTICES(entrance, reverseGraph, ReverseCompressedPathGraph) {
+        if(in_degree(entrance, reverseGraph) != 0) {
+            continue;
+        }
+
+        // Compute the dominator tree.
+        fill(dfNum.begin(), dfNum.end(), invalid<uint64_t>);
+        fill(parent.begin(), parent.end(), null_vertex());
+        fill(verticesByDFNum.begin(), verticesByDFNum.end(), null_vertex());
+        std::map<vertex_descriptor, vertex_descriptor> predecessorMap;
+
+        boost::lengauer_tarjan_dominator_tree(
+            reverseGraph,
+            entrance,
+            boost::make_assoc_property_map(indexMap),
+            boost::make_iterator_property_map(dfNum.begin(), associativeIndexMap),
+            boost::make_iterator_property_map(parent.begin(), associativeIndexMap),
+            verticesByDFNum,
+            boost::make_assoc_property_map(predecessorMap));
+
+        if(debug) {
+            cout << "Backward dominator tree with exit at " << cGraph[entrance].edgeId << endl;
+        }
+        for(const auto& p: predecessorMap) {
+            const vertex_descriptor cv0 = p.first;
+            const vertex_descriptor cv1 = p.second;
+            backwardPairs.push_back({cv0, cv1});
+            if(false) {
+                cout << "B " << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId << endl;
+            }
+        }
+    }
+
+    // The pairs that appear both in forwardPairs and backwardPairs define our superbubbles.
+    sort(forwardPairs.begin(), forwardPairs.end());
+    sort(backwardPairs.begin(), backwardPairs.end());
+    vector< pair<vertex_descriptor, vertex_descriptor> > bidirectionalPairs;
+    std::set_intersection(
+        forwardPairs.begin(), forwardPairs.end(),
+        backwardPairs.begin(), backwardPairs.end(),
+        back_inserter(bidirectionalPairs)
+        );
+
+    if(false) {
+        cout << "Bidirectional pairs:" << endl;
+        for(const auto& p: bidirectionalPairs) {
+            const vertex_descriptor cv0 = p.first;
+            const vertex_descriptor cv1 = p.second;
+            cout << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId << endl;
+        }
+    }
+
+    // Each bidirectional pair generates a superbubble if
+    // the out-degree of the entrance and
+    // the in-degree of the exit are greater than 1.
+    for(const auto& p: bidirectionalPairs) {
+        const vertex_descriptor cv0 = p.first;
+        const vertex_descriptor cv1 = p.second;
+        if(out_degree(cv0, cGraph) > 1) {
+            SHASTA_ASSERT(in_degree(cv1, cGraph) > 1);
+            superbubbles.resize(superbubbles.size() + 1);
+            Superbubble& superbubble = superbubbles.back();
+            superbubble.entrances.push_back(cv0);
+            superbubble.exits.push_back(cv1);
+            superbubble.fillInFromEntranceAndExit(cGraph);
+        }
+    }
+
+    if(debug) {
+        cout << "Superbubble entrance/exit pairs:" << endl;
+        for(const Superbubble& superbubble: superbubbles) {
+            const vertex_descriptor cv0 = superbubble.entrances.front();
+            const vertex_descriptor cv1 = superbubble.exits.front();;
+            cout << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId << endl;
+        }
+    }
+}
+
+
+
+// Fill in the superbubble given a single entrance and exit.
+void CompressedPathGraph::Superbubble::fillInFromEntranceAndExit(const CompressedPathGraph& cGraph)
+{
+    SHASTA_ASSERT(empty());
+    SHASTA_ASSERT(entrances.size() == 1);
+    SHASTA_ASSERT(exits.size() == 1);
+
+    const vertex_descriptor entrance = entrances.front();
+    const vertex_descriptor exit = exits.front();
+
+    // Do a BFS starting at the entrance and stopping at the exit.
+    std::set<vertex_descriptor> internalVertices;
+    std::queue<vertex_descriptor> q;
+    q.push(entrance);
+    while(not q.empty()) {
+        const vertex_descriptor cv0 = q.front();
+        q.pop();
+        BGL_FORALL_OUTEDGES(cv0, e, cGraph, CompressedPathGraph) {
+            const vertex_descriptor cv1 = target(e, cGraph);
+            if(cv1 != exit) {
+                if(not internalVertices.contains(cv1)) {
+                    internalVertices.insert(cv1);
+                    q.push(cv1);
+                }
+            }
+        }
+    }
+
+    push_back(entrance);
+    copy(internalVertices.begin(), internalVertices.end(), back_inserter(*this));
+    push_back(exit);
+
+}
+
+
+
 CompressedPathGraph::Superbubbles::~Superbubbles()
 {
     cGraph.clearVertexNumbering();
@@ -2209,7 +2401,7 @@ bool CompressedPathGraph::removeShortSuperbubbles(
 
 
 
-// Cleanup/simplify superbubbles that are likely to ba caused by errors,
+// Cleanup/simplify superbubbles that are likely to be caused by errors,
 // completely or in part.
 void CompressedPathGraph::cleanupSuperbubbles(
     bool debug,
@@ -2232,6 +2424,34 @@ void CompressedPathGraph::cleanupSuperbubbles(
     if(debug) {
         cout << "cleanupSuperbubbles ends." << endl;
     }
+}
+
+
+
+// This version of superbubble cleanup uses dominator trees to define superbubbles,
+// instead of computing connected components using edges of length uo tp maxOffset1.
+void CompressedPathGraph::cleanupSuperbubbles(
+    bool debug,
+    uint64_t maxOffset2     // Compared against the offset between entry and exit
+    )
+{
+    CompressedPathGraph& cGraph = *this;
+
+    if(debug) {
+        cout << "cleanupSuperbubbles begins." << endl;
+    }
+
+    // Find the superbubbles using dominator trees.
+    Superbubbles superbubbles(cGraph);
+
+    // Loop over the superbubbles.
+    for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
+        cleanupSuperbubble(debug, superbubbles, superbubbleId, maxOffset2);
+    }
+    if(debug) {
+        cout << "cleanupSuperbubbles ends." << endl;
+    }
+
 }
 
 
@@ -3883,16 +4103,27 @@ bool CompressedPathGraph::detangleEdge(
             }
 
             if(isInPhase) {
-                connect(inVertices[0], outVertices[0]);
-                connect(inVertices[1], outVertices[1]);
+                const edge_descriptor e0 = connect(inVertices[0], outVertices[0]);
+                const edge_descriptor e1 = connect(inVertices[1], outVertices[1]);
+                if(debug) {
+                    cout << "In phase: created " << bubbleChainStringId(e0) << " and " <<
+                        bubbleChainStringId(e1) << endl;
+                }
             } else {
-                connect(inVertices[0], outVertices[1]);
-                connect(inVertices[1], outVertices[0]);
+                const edge_descriptor e0 = connect(inVertices[0], outVertices[1]);
+                const edge_descriptor e1 = connect(inVertices[1], outVertices[0]);
+                if(debug) {
+                    cout << "Out of phase phase: created " << bubbleChainStringId(e0) << " and " <<
+                        bubbleChainStringId(e1) << endl;
+                }
             }
 
         } else {
 
             // Ambiguous. Don't detangle.
+            if(debug) {
+                cout << "Ambiguous. NOt detangling." << endl;
+            }
             return false;
         }
 

@@ -444,18 +444,29 @@ private:
     uint64_t cleanupBubbles(bool debug, edge_descriptor ce, uint64_t maxOffset);
 
 
+
     // Find short superbubbles in the CompressedPathGraph.
     class Superbubble : public vector<vertex_descriptor> {
     public:
         vector<vertex_descriptor> entrances;
         vector<vertex_descriptor> exits;
+
+        // Fill in the superbubble given a single entrance and exit.
+        void fillInFromEntranceAndExit(const CompressedPathGraph&);
     };
     class Superbubbles {
     public:
+
+        // This computes connected components using only edges with length up to maxOffset1.
         Superbubbles(
             CompressedPathGraph&,
-            uint64_t maxOffset1    // Used to define superbubbles
+            uint64_t maxOffset1
             );
+
+        // This uses dominator trees.
+        // It only finds superbubbles with one entrance and one ecit.
+        Superbubbles(CompressedPathGraph&);
+
         ~Superbubbles();
 
         // Return the number of superbubbbles.
@@ -479,6 +490,7 @@ private:
         {
             return cGraph[cv].superbubbleId == superbubbleId;
         }
+
     private:
 
         CompressedPathGraph& cGraph;
@@ -526,7 +538,7 @@ private:
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
 
-    // Cleanup/simplify superbubbles that are likely to ba caused by errors,
+    // Cleanup/simplify superbubbles that are likely to be caused by errors,
     // completely or in part.
     void cleanupSuperbubbles(
         bool debug,
@@ -536,6 +548,12 @@ private:
         bool debug,
         const Superbubbles&,
         uint64_t superbubbleId,
+        uint64_t maxOffset2);   // Compared against the offset between entry and exit
+
+    // This version of superbubble cleanup uses dominator trees to define superbubbles,
+    // instead of computing connected components using edges of length uo tp maxOffset1.
+    void cleanupSuperbubbles(
+        bool debug,
         uint64_t maxOffset2);   // Compared against the offset between entry and exit
 
     // Split terminal haploid bubbles out of bubble chains, to facilitate detangling.
