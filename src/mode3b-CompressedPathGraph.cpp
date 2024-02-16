@@ -2185,8 +2185,8 @@ CompressedPathGraph::Superbubbles::Superbubbles(
 
 
     // The pairs that appear both in forwardPairs and backwardPairs define our superbubbles
-    sort(forwardPairs.begin(), forwardPairs.end());
-    sort(backwardPairs.begin(), backwardPairs.end());
+    deduplicate(forwardPairs);
+    deduplicate(backwardPairs);
     vector< pair<vertex_descriptor, vertex_descriptor> > bidirectionalPairs;
     std::set_intersection(
         forwardPairs.begin(), forwardPairs.end(),
