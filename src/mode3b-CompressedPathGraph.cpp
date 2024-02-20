@@ -924,7 +924,7 @@ void CompressedPathGraph::run5(
     write("T");
 
     // Remove short superbubbles.
-    removeShortSuperbubbles(true, 3000, 10000);
+    removeShortSuperbubbles(false, 3000, 10000);
     write("U");
     compress();
     write("V");
@@ -949,11 +949,10 @@ void CompressedPathGraph::run5(
     write("C");
     while(compressSequentialEdges());
     write("D");
-    detangleEdges(true, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
     write("E");
     while(compressSequentialEdges());
-    // detangleShortSuperbubbles(false, 1000, detangleToleranceLow, detangleToleranceHigh);
-    // compress();
+    // detangleShortSuperbubbles(false, 30000, detangleToleranceLow, detangleToleranceHigh);
 
     compress();
     compressBubbleChains();
@@ -1872,6 +1871,7 @@ uint64_t CompressedPathGraph::chainOffset(const Chain& chain) const
         const uint64_t offsetThisPair = assembler.estimateBaseOffsetUnsafe(edgeId0, edgeId1);
 
         if(offsetThisPair == invalid<uint64_t>) {
+            cout << "Offset cannot be computed for " << edgeId0 << " " << edgeId1 << endl;
             SHASTA_ASSERT(0);
         } else if(offsetThisPair > 0) {
             offset += offsetThisPair;
@@ -2074,12 +2074,12 @@ CompressedPathGraph::Superbubbles::Superbubbles(
 
 
 // This uses dominator trees.
-// It only finds superbubbles with one entrance and one ecit.
+// It only finds superbubbles with one entrance and one exit.
 CompressedPathGraph::Superbubbles::Superbubbles(
     CompressedPathGraph& cGraph) :
     cGraph(cGraph)
 {
-    const bool debug = false;
+    const bool debug = true;
 
     // Map vertices to integers.
     std::map<vertex_descriptor, uint64_t> indexMap;
@@ -2183,6 +2183,16 @@ CompressedPathGraph::Superbubbles::Superbubbles(
         boost::make_assoc_property_map(componentMap),
         boost::vertex_index_map(boost::make_assoc_property_map(indexMap)));
 
+    // Gather the vertices in each strong component.
+    vector< vector<vertex_descriptor> > strongComponents(vertexCount);
+    for(const auto& p: componentMap) {
+        const vertex_descriptor v = p.first;
+        const uint64_t componentId = p.second;
+        SHASTA_ASSERT(componentId < vertexCount);
+        strongComponents[componentId].push_back(v);
+    }
+
+
 
     // The pairs that appear both in forwardPairs and backwardPairs define our superbubbles
     deduplicate(forwardPairs);
@@ -2206,18 +2216,45 @@ CompressedPathGraph::Superbubbles::Superbubbles(
     // Each bidirectional pair generates a superbubble if
     // the out-degree of the entrance and
     // the in-degree of the exit are greater than 1,
-    // unless the entrance and exit are in the same strong component.
+    // unless the entrance or exit or any of the
+    // superbubble vertices are in a non-trivial strong component..
     for(const auto& p: bidirectionalPairs) {
         const vertex_descriptor cv0 = p.first;
         const vertex_descriptor cv1 = p.second;
-        if( out_degree(cv0, cGraph) > 1 and
-            componentMap[cv0] != componentMap[cv1]) {
-            SHASTA_ASSERT(in_degree(cv1, cGraph) > 1);
-            superbubbles.resize(superbubbles.size() + 1);
-            Superbubble& superbubble = superbubbles.back();
-            superbubble.entrances.push_back(cv0);
-            superbubble.exits.push_back(cv1);
-            superbubble.fillInFromEntranceAndExit(cGraph);
+        if( out_degree(cv0, cGraph) <= 1) {
+            continue;
+        }
+        if(strongComponents[componentMap[cv0]].size() > 1) {
+            // The entrance is in a non-trivial strong component.
+            continue;
+        }
+        if(strongComponents[componentMap[cv1]].size() > 1) {
+            // The exit is in a non-trivial strong component.
+            continue;
+        }
+        SHASTA_ASSERT(in_degree(cv1, cGraph) > 1);
+        superbubbles.resize(superbubbles.size() + 1);
+        Superbubble& superbubble = superbubbles.back();
+        superbubble.entrances.push_back(cv0);
+        superbubble.exits.push_back(cv1);
+        superbubble.fillInFromEntranceAndExit(cGraph);
+
+        if(debug) {
+            cout << "Tentative superbubble with entrance " << cGraph[cv0].edgeId <<
+                " exit " << cGraph[cv1].edgeId << " and " << superbubble.size() <<
+                " vertices total." << endl;
+        }
+
+        // If any vertices in the superbubble are in a non-trivial
+        // strong component, remove it.
+        for(const vertex_descriptor cv: superbubble) {
+            if(strongComponents[componentMap[cv]].size() > 1) {
+                superbubbles.pop_back();
+                if(debug) {
+                    cout << "This superbubble will not be stored because some vertices are in a non-trivial strong component." << endl;
+                }
+                break;
+            }
         }
     }
 
@@ -3271,6 +3308,9 @@ bool CompressedPathGraph::detangleVertex(
         if(isInPhase or isOutOfPhase) {
 
             // We can detangle.
+            if(debug) {
+                cout << "This vertex will be detangled." << endl;
+            }
 
             // Create truncated versions of the inEdges and outEdges.
             vector<vertex_descriptor> inVertices;
@@ -3298,6 +3338,9 @@ bool CompressedPathGraph::detangleVertex(
         } else {
 
             // Ambiguous. Don't detangle.
+            if(debug) {
+                cout << "This vertex will not be detangled." << endl;
+            }
             return false;
         }
 
@@ -7793,7 +7836,8 @@ uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uin
         Bubble& bubble = bubbleChain[positionInBubbleChain];
 
         if(debug) {
-            cout << "cleanupBubbles working on Bubble " << bubbleStringId(ce, positionInBubbleChain) << endl;
+            cout << "cleanupBubbles working on Bubble " << bubbleStringId(ce, positionInBubbleChain) <<
+                " ploidy " << bubble.size() << endl;
             cout << "Entrance " << bubble.front().front() << ", exit " << bubble.front().back() << endl;
         }
 
@@ -7803,6 +7847,10 @@ uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uin
 
             // The bubble is haploid. Keep it.
             keepBubble = true;
+
+            if(debug) {
+                cout << "Keeping this bubble because it is haploid." << endl;
+            }
 
         } else {
 
@@ -7817,6 +7865,10 @@ uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uin
                 // The bubble is not haploid but the offset is large. Keep it.
                 keepBubble = true;
 
+                if(debug) {
+                    cout << "Keeping this bubble because it is not haploid but its offset is large." << endl;
+                }
+
             } else {
 
                 // The bubble is not haploid and has a small offset.
@@ -7825,6 +7877,10 @@ uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uin
 
                     // The bubble has a small offset and ploidy greater than 2. Remove it.
                     keepBubble = false;
+
+                    if(debug) {
+                        cout << "Removing this bubble because it has a small offset and ploidy greater than 2." << endl;
+                    }
 
                 } else {
 
@@ -7866,6 +7922,9 @@ uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uin
 
         if(keepBubble) {
             newBubbleChain.push_back(bubble);
+            if(debug) {
+                cout << "Kept this bubble." << endl;
+            }
         } else {
             // Remove the bubble and replace it with a haploid bubble
             // consisting of only the terminal MarkerGraphEdgeIds.
@@ -7876,6 +7935,9 @@ uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uin
             newBubble.push_back(newChain);
             newBubbleChain.push_back(newBubble);
             ++removedCount;
+            if(debug) {
+                cout << "Removed this bubble." << endl;
+            }
         }
     }
 
