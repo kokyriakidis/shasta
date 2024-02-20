@@ -2079,7 +2079,7 @@ CompressedPathGraph::Superbubbles::Superbubbles(
     CompressedPathGraph& cGraph) :
     cGraph(cGraph)
 {
-    const bool debug = true;
+    const bool debug = false;
 
     // Map vertices to integers.
     std::map<vertex_descriptor, uint64_t> indexMap;
@@ -2465,9 +2465,13 @@ void CompressedPathGraph::cleanupSuperbubbles(
     // Find the superbubbles.
     Superbubbles superbubbles(cGraph, maxOffset1);
 
+    // The bubbles constructed in this way are guaranteed to not overlap,
+    // so we don't have to worry about overlapping bubbles.
+    std::set<vertex_descriptor> previousSuperbubblesVertices;
+
     // Loop over the superbubbles.
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        cleanupSuperbubble(debug, superbubbles, superbubbleId, maxOffset2);
+        cleanupSuperbubble(debug, superbubbles, superbubbleId, maxOffset2, previousSuperbubblesVertices);
     }
     if(debug) {
         cout << "cleanupSuperbubbles ends." << endl;
@@ -2492,9 +2496,27 @@ void CompressedPathGraph::cleanupSuperbubbles(
     // Find the superbubbles using dominator trees.
     Superbubbles superbubbles(cGraph);
 
-    // Loop over the superbubbles.
+    // The superbubbles found in this way can have overlaps.
+    // To deal with this, we process superbubbles in order of increasing size
+    // and keep track of the vertices.
+    // If a bubble contains a previously encountered vertex, don't process it.
+    // Note cleanupSuperbubble does not create any new vertices,
+    // so keeping track of the vertex descriptors that were removed is save.
+    std::set<vertex_descriptor> previousSuperbubblesVertices;
+
+    // Sort the superbubbles in order of increasing size.
+    vector< pair<uint64_t, uint64_t> > superbubbleTable;    // (superbubbleId, size)
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        cleanupSuperbubble(debug, superbubbles, superbubbleId, maxOffset2);
+        const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
+        superbubbleTable.push_back({superbubbleId, superbubble.size()});
+    }
+    sort(superbubbleTable.begin(), superbubbleTable.end(),
+        OrderPairsBySecondOnly<uint64_t, uint64_t>());
+
+    // Loop over the superbubbles in order of increasing size.
+    for(const auto& p: superbubbleTable) {
+        const uint64_t superbubbleId = p.first;
+        cleanupSuperbubble(debug, superbubbles, superbubbleId, maxOffset2, previousSuperbubblesVertices);
     }
     if(debug) {
         cout << "cleanupSuperbubbles ends." << endl;
@@ -2512,7 +2534,8 @@ void CompressedPathGraph::cleanupSuperbubble(
     bool debug,
     const Superbubbles& superbubbles,
     uint64_t superbubbleId,
-    uint64_t maxOffset2)    // Compared against the offset between entry and exit
+    uint64_t maxOffset2,        // Compared against the offset between entry and exit
+    std::set<vertex_descriptor>& previousSuperbubblesVertices)
 {
     CompressedPathGraph& cGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
@@ -2529,6 +2552,25 @@ void CompressedPathGraph::cleanupSuperbubble(
             cout << " " << cGraph[v].edgeId;
         }
         cout << endl;
+    }
+
+    // See if it overlaps any vertices of previous superbubbles.
+    bool overlaps = false;
+    for(const vertex_descriptor v: superbubble) {
+        if(previousSuperbubblesVertices.contains(v)) {
+            if(debug) {
+                cout << "This superbubble ignored because it contains vertex " << cGraph[v].edgeId <<
+                    " which is in a previously processed superbubble." << endl;
+            }
+            overlaps = true;
+            break;
+        }
+    }
+    for(const vertex_descriptor v: superbubble) {
+        previousSuperbubblesVertices.insert(v);
+    }
+    if(overlaps) {
+        return;
     }
 
     // Skip it if it has more than one entrance or exit.
@@ -2555,6 +2597,8 @@ void CompressedPathGraph::cleanupSuperbubble(
         }
         return;
     }
+
+
 
     // Check the base offset between the entrance and the exit.
     MarkerGraphEdgePairInfo info;

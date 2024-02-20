@@ -548,7 +548,8 @@ private:
         bool debug,
         const Superbubbles&,
         uint64_t superbubbleId,
-        uint64_t maxOffset2);   // Compared against the offset between entry and exit
+        uint64_t maxOffset2,    // Compared against the offset between entry and exit
+        std::set<vertex_descriptor>& previousSuperbubblesVertices);
 
     // This version of superbubble cleanup uses dominator trees to define superbubbles,
     // instead of computing connected components using edges of length uo tp maxOffset1.
