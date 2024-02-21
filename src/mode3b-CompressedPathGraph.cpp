@@ -149,7 +149,7 @@ CompressedPathGraph::CompressedPathGraph(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph-" + to_string(componentId) + ".data");
 
-    run5(threadCount0, threadCount1, false);
+    run5(threadCount0, threadCount1, true);
 }
 
 
@@ -163,7 +163,7 @@ CompressedPathGraph::CompressedPathGraph(
     assembler(assembler)
 {
     load(fileName);
-    run5(threadCount0, threadCount1, false);
+    run5(threadCount0, threadCount1, true);
 }
 
 
@@ -955,7 +955,7 @@ void CompressedPathGraph::run5(
     write("C");
     while(compressSequentialEdges());
     write("D");
-    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    detangleEdges(true, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
     write("E");
     while(compressSequentialEdges());
     // detangleShortSuperbubbles(false, 30000, detangleToleranceLow, detangleToleranceHigh);
@@ -963,6 +963,12 @@ void CompressedPathGraph::run5(
     compress();
     compressBubbleChains();
     write("F");
+
+    expand();
+    write("G");
+    removeSelfComplementarySquares();
+    write("H");
+    // compress();
 
 #if 0
     // Optimize the chains.
@@ -3354,8 +3360,11 @@ bool CompressedPathGraph::detangleVertex(
             cout << "logPin = " << logPin << ", logPout = " << logPout << endl;
         }
 
-        const bool isInPhase    = (logPin  >= minLogP) and ((logPin - logPout) >= minLogP);
-        const bool isOutOfPhase = (logPout >= minLogP) and ((logPout - logPin) >= minLogP);
+        // const bool isInPhase    = (logPin  >= minLogP) and ((logPin - logPout) >= minLogP);
+        // const bool isOutOfPhase = (logPout >= minLogP) and ((logPout - logPin) >= minLogP);
+        // Ignore the random hypothesis.
+        const bool isInPhase    = (logPin - logPout) >= minLogP;
+        const bool isOutOfPhase = (logPout - logPin) >= minLogP;
 
         if(isInPhase or isOutOfPhase) {
 
@@ -4191,8 +4200,11 @@ bool CompressedPathGraph::detangleEdge(
             cout << "logPin = " << logPin << ", logPout = " << logPout << endl;
         }
 
-        const bool isInPhase    = (logPin  >= minLogP) and ((logPin - logPout) >= minLogP);
-        const bool isOutOfPhase = (logPout >= minLogP) and ((logPout - logPin) >= minLogP);
+        // const bool isInPhase    = (logPin  >= minLogP) and ((logPin - logPout) >= minLogP);
+        // const bool isOutOfPhase = (logPout >= minLogP) and ((logPout - logPin) >= minLogP);
+        // Ignore the random hypothesis.
+        const bool isInPhase    = (logPin - logPout) >= minLogP;
+        const bool isOutOfPhase = (logPout - logPin) >= minLogP;
 
         if(isInPhase or isOutOfPhase) {
 
