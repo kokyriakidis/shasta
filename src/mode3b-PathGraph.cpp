@@ -40,7 +40,8 @@ void GlobalPathGraph::writeComponentsGraphviz(
         const PathGraph& component = *components[componentRank];
         component.writeGraphviz(
             baseName + "_Component_" + to_string(componentRank),
-            options);
+            options,
+            assembler.markerGraph);
     }
 }
 
@@ -402,7 +403,8 @@ void PathGraph::addEdge(
 // Write a PathGraph in graphviz format.
 void PathGraph::writeGraphviz(
     const string& name,
-    const GlobalPathGraphDisplayOptions& options) const
+    const GlobalPathGraphDisplayOptions& options,
+    const MarkerGraph& markerGraph) const
 {
     ofstream out(name + ".dot");
 
@@ -419,7 +421,7 @@ void PathGraph::writeGraphviz(
 
         if(options.labels) {
             out << "label=\"";
-            out << vertex.edgeId /* << "\\n" << markerGraph.edgeCoverage(vertex.edgeId)*/;
+            out << vertex.edgeId << "\\n" << markerGraph.edgeCoverage(vertex.edgeId);
             out << "\" ";
         }
 
@@ -673,3 +675,29 @@ void PathGraph::removeCrossEdges(
         boost::remove_edge(e, graph);
     }
 }
+
+
+
+// Experiment.
+void PathGraph::removeWeakEdges()
+{
+    PathGraph& graph = *this;
+
+    // Find the edges we are going to remove.
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, graph, PathGraph) {
+        const PathGraphEdge& edge = graph[e];
+        if(edge.coverage < edge.info.common) {
+            edgesToBeRemoved.push_back(e);
+        }
+    }
+
+
+
+    // Remove the edges we found.
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, graph);
+    }
+
+}
+

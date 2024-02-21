@@ -41,8 +41,8 @@ void GlobalPathGraph::assemble(
     const uint64_t minComponentSize = 3;
     const uint64_t transitiveReductionDistance = 5000;
     const uint64_t transitiveReductionMaxCoverage = 8;
-    const uint64_t crossEdgesLowCoverageThreshold = 2;
-    const uint64_t crossEdgesHighCoverageThreshold = 6;
+    const uint64_t crossEdgesLowCoverageThreshold = 1;
+    const uint64_t crossEdgesHighCoverageThreshold = 3;
     const uint64_t crossEdgesMinOffset = 0;
 
 
@@ -86,17 +86,21 @@ void GlobalPathGraph::assembleComponent(
         GlobalPathGraphDisplayOptions options;
         options.showNonTransitiveReductionEdges = true;
         component.writeGraphviz(
-            "PathGraphInitial" + to_string(componentId), options);
+            "PathGraphInitial" + to_string(componentId), options, assembler.markerGraph);
         options.makeCompact();
         component.writeGraphviz(
-            "PathGraphCompactInitial" + to_string(componentId), options);
+            "PathGraphCompactInitial" + to_string(componentId), options, assembler.markerGraph);
     }
 
+    // Experiment: use removeWeakEdges instead of localTransitiveReduction.
+    component.removeWeakEdges();
 
+#if 0
     // Local transitive reduction.
     component.localTransitiveReduction(
         transitiveReductionDistance,
         transitiveReductionMaxCoverage);
+#endif
 
     // Remove cross-edges.
     component.removeCrossEdges(
@@ -104,14 +108,15 @@ void GlobalPathGraph::assembleComponent(
         crossEdgesHighCoverageThreshold,
         crossEdgesMinOffset);
 
+
     // Graphviz output.
     GlobalPathGraphDisplayOptions options;
     options.showNonTransitiveReductionEdges = false;
     component.writeGraphviz(
-        "PathGraph" + to_string(componentId), options);
+        "PathGraph" + to_string(componentId), options, assembler.markerGraph);
     options.makeCompact();
     component.writeGraphviz(
-        "PathGraphCompact" + to_string(componentId), options);
+        "PathGraphCompact" + to_string(componentId), options, assembler.markerGraph);
 
     CompressedPathGraph cGraph(component, componentId, assembler, threadCount0, threadCount1);
 }
@@ -908,6 +913,7 @@ void CompressedPathGraph::run5(
     // Cleanup bubbles and superbubbles.
     // Must do compress to make sure all bubbles are in bubble chains.
     compress();
+    write("Q");
     for(uint64_t iteration=0; ; iteration ++) {
         const uint64_t cleanedUpBubbleCount = cleanupBubbles(false, 1000);
         cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
@@ -918,13 +924,13 @@ void CompressedPathGraph::run5(
         compress();
     }
     write("R");
-    cleanupSuperbubbles(false, 10000);
+    cleanupSuperbubbles(false, 30000);
     write("S");
     compress();
     write("T");
 
     // Remove short superbubbles.
-    removeShortSuperbubbles(false, 3000, 10000);
+    removeShortSuperbubbles(false, 10000, 30000);
     write("U");
     compress();
     write("V");
@@ -2221,7 +2227,10 @@ CompressedPathGraph::Superbubbles::Superbubbles(
     for(const auto& p: bidirectionalPairs) {
         const vertex_descriptor cv0 = p.first;
         const vertex_descriptor cv1 = p.second;
-        if( out_degree(cv0, cGraph) <= 1) {
+        if(out_degree(cv0, cGraph) <= 1) {
+            continue;
+        }
+        if(in_degree(cv1, cGraph) <= 1) {
             continue;
         }
         if(strongComponents[componentMap[cv0]].size() > 1) {
@@ -2232,7 +2241,6 @@ CompressedPathGraph::Superbubbles::Superbubbles(
             // The exit is in a non-trivial strong component.
             continue;
         }
-        SHASTA_ASSERT(in_degree(cv1, cGraph) > 1);
         superbubbles.resize(superbubbles.size() + 1);
         Superbubble& superbubble = superbubbles.back();
         superbubble.entrances.push_back(cv0);

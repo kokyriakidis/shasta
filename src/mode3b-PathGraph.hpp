@@ -35,6 +35,7 @@ A directed edge v0->v1 is generated if:
 
 namespace shasta {
     class Assembler;
+    class MarkerGraph;
     namespace mode3b {
 
         // The global path graph.
@@ -131,7 +132,8 @@ public:
 
     void writeGraphviz(
         const string& name,
-        const GlobalPathGraphDisplayOptions&) const;
+        const GlobalPathGraphDisplayOptions&,
+        const MarkerGraph&) const;
 
     // Create the connected components of this PathGraph,
     // without changing the PathGraph itself.
@@ -151,6 +153,9 @@ public:
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold,
         uint64_t minOffset);
+
+    // Experiment.
+    void removeWeakEdges();
 
 };
 
