@@ -18,10 +18,14 @@ template class MultithreadedObject<AssemblyPath>;
 AssemblyPath::AssemblyPath(
     const Assembler& assembler,
     MarkerGraphEdgeId startEdgeId,
-    uint64_t direction  // 0 = forward, 1 = backward, 2=bidirectional
+    uint64_t direction,  // 0 = forward, 1 = backward, 2=bidirectional
+    bool allowOrientedReadsOnFirst,
+    bool allowOrientedReadsOnLast
     ) :
     MultithreadedObject<AssemblyPath>(*this),
-    assembler(assembler)
+    assembler(assembler),
+    allowOrientedReadsOnFirst(allowOrientedReadsOnFirst),
+    allowOrientedReadsOnLast(allowOrientedReadsOnLast)
 {
     create(startEdgeId, direction);
     assembleSequential();
@@ -114,9 +118,13 @@ AssemblyPath::AssemblyPath(
     const Assembler& assembler,
     const vector<MarkerGraphEdgeId>& primaryEdges,
     const vector<MarkerGraphEdgePairInfo>& infos,
+    bool allowOrientedReadsOnFirst,
+    bool allowOrientedReadsOnLast,
     uint64_t threadCount) :
     MultithreadedObject<AssemblyPath>(*this),
     assembler(assembler),
+    allowOrientedReadsOnFirst(allowOrientedReadsOnFirst),
+    allowOrientedReadsOnLast(allowOrientedReadsOnLast),
     primaryEdges(primaryEdges)
 {
     // Sanity check.
@@ -157,6 +165,18 @@ void AssemblyPath::assembleStep(uint64_t i)
     Step& step = steps[i];
     ostream html(0);
 
+    // Find the required settings for useA and useB for PathFiller3.
+    bool isFirst = (i == 0);
+    bool isLast = ((i + 1) == primaryEdges.size() - 1);
+    bool useA = true;
+    if(isFirst and not allowOrientedReadsOnFirst) {
+        useA = false;
+    }
+    bool useB = true;
+    if(isLast and not allowOrientedReadsOnLast) {
+        useB = false;
+    }
+
 #if 0
     PathFiller1 pathFiller(assembler, edgeIdA, edgeIdB, html, false, false, false, false, false);
     pathFiller.getSecondarySequence(step.sequence);
@@ -167,7 +187,7 @@ void AssemblyPath::assembleStep(uint64_t i)
 #endif
 
     try {
-        PathFiller3 pathFiller(assembler, edgeIdA, edgeIdB, 0, html);
+        PathFiller3 pathFiller(assembler, edgeIdA, edgeIdB, 0, html, useA, useB);
         pathFiller.getSecondarySequence(step.sequence);
     } catch (...) {
         cout << "Error occurred when assembling between marker graph edges " <<

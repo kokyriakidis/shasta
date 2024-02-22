@@ -185,6 +185,7 @@ void CompressedPathGraph::run(
     const uint64_t longBubbleThreshold = 5000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
+    const uint64_t chainTerminalCommonThreshold = 3;
 
     const bool writeSnapshots = true;
     uint64_t snapshotNumber = 0;
@@ -271,7 +272,7 @@ void CompressedPathGraph::run(
             optimizeChainsMinCommon,
             optimizeChainsK);
 
-        assembleChains(threadCount0, threadCount1);
+        assembleChains(chainTerminalCommonThreshold, threadCount0, threadCount1);
 
         // Final output.
         write("Final");
@@ -305,6 +306,7 @@ void CompressedPathGraph::run1(
     const uint64_t longBubbleThreshold = 10000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
+    const uint64_t chainTerminalCommonThreshold = 3;
 
     write("Initial");
     writeGfaExpanded("Initial", false);
@@ -384,7 +386,7 @@ void CompressedPathGraph::run1(
             optimizeChainsMinCommon,
             optimizeChainsK);
 
-        assembleChains(threadCount0, threadCount1);
+        assembleChains(chainTerminalCommonThreshold, threadCount0, threadCount1);
 
         // Final output.
         write("Final");
@@ -417,6 +419,7 @@ void CompressedPathGraph::run2(
     const uint64_t longBubbleThreshold = 20000;
     const uint64_t optimizeChainsMinCommon = 3;
     const uint64_t optimizeChainsK = 6;
+    const uint64_t chainTerminalCommonThreshold = 3;
 
     write("Initial");
     writeGfaExpanded("Initial", false);
@@ -456,7 +459,7 @@ void CompressedPathGraph::run2(
             optimizeChainsMinCommon,
             optimizeChainsK);
 
-        assembleChains(threadCount0, threadCount1);
+        assembleChains(chainTerminalCommonThreshold, threadCount0, threadCount1);
 
         // Final output.
         write("Final");
@@ -493,6 +496,7 @@ void CompressedPathGraph::run3(
     const double phaseErrorThreshold = 0.1;
     const double bubbleErrorThreshold = 0.03;
     const bool usePhasingTable = false;
+    const uint64_t chainTerminalCommonThreshold = 3;
 
     // const bool writeSnapshots = true;
     // uint64_t snapshotNumber = 0;
@@ -592,7 +596,7 @@ void CompressedPathGraph::run3(
             optimizeChainsMinCommon,
             optimizeChainsK);
 
-        assembleChains(threadCount0, threadCount1);
+        assembleChains(chainTerminalCommonThreshold, threadCount0, threadCount1);
 
         // Final output.
         write("Final", true);
@@ -761,6 +765,7 @@ void CompressedPathGraph::run4(
     const uint64_t optimizeChainsK = 100;
     const double phaseErrorThreshold = 0.1;
     const double bubbleErrorThreshold = 0.03;
+    const uint64_t chainTerminalCommonThreshold = 3;
 
     write("Initial");
 
@@ -872,7 +877,7 @@ void CompressedPathGraph::run4(
         renumberEdges();
 
         // Assemble sequence.
-        assembleChains(threadCount0, threadCount1);
+        assembleChains(chainTerminalCommonThreshold, threadCount0, threadCount1);
 
         // Final output.
         write("Final", true);
@@ -903,6 +908,7 @@ void CompressedPathGraph::run5(
     const uint64_t longBubbleThreshold = 5000;
     const double phaseErrorThreshold = 0.1;
     const double bubbleErrorThreshold = 0.03;
+    const uint64_t chainTerminalCommonThreshold = 3;
     // const uint64_t optimizeChainsMinCommon = 3;
     // const uint64_t optimizeChainsK = 100;
 
@@ -915,7 +921,7 @@ void CompressedPathGraph::run5(
     compress();
     write("Q");
     for(uint64_t iteration=0; ; iteration ++) {
-        const uint64_t cleanedUpBubbleCount = cleanupBubbles(false, 1000);
+        const uint64_t cleanedUpBubbleCount = cleanupBubbles(false, 1000, chainTerminalCommonThreshold);
         cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
         if(cleanedUpBubbleCount == 0) {
             break;
@@ -924,7 +930,7 @@ void CompressedPathGraph::run5(
         compress();
     }
     write("R");
-    cleanupSuperbubbles(false, 30000);
+    cleanupSuperbubbles(false, 30000, chainTerminalCommonThreshold);
     write("S");
     compress();
     write("T");
@@ -964,11 +970,13 @@ void CompressedPathGraph::run5(
     compressBubbleChains();
     write("F");
 
+#if 0
     expand();
     write("G");
     removeSelfComplementarySquares();
     write("H");
     // compress();
+#endif
 
 #if 0
     // Optimize the chains.
@@ -984,7 +992,7 @@ void CompressedPathGraph::run5(
         // renumberEdges();
 
         // Assemble sequence.
-        assembleChains(threadCount0, threadCount1);
+        assembleChains(chainTerminalCommonThreshold, threadCount0, threadCount1);
 
         // Final output.
         write("Final", true);
@@ -2468,7 +2476,10 @@ bool CompressedPathGraph::removeShortSuperbubbles(
 void CompressedPathGraph::cleanupSuperbubbles(
     bool debug,
     uint64_t maxOffset1,    // Used to define superbubbles
-    uint64_t maxOffset2)    // Compared against the offset between entry and exit
+    uint64_t maxOffset2,    // Compared against the offset between entry and exit
+    uint64_t chainTerminalCommonThreshold
+
+)
 {
     CompressedPathGraph& cGraph = *this;
 
@@ -2485,7 +2496,8 @@ void CompressedPathGraph::cleanupSuperbubbles(
 
     // Loop over the superbubbles.
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        cleanupSuperbubble(debug, superbubbles, superbubbleId, maxOffset2, previousSuperbubblesVertices);
+        cleanupSuperbubble(debug, superbubbles, superbubbleId,
+            maxOffset2, chainTerminalCommonThreshold, previousSuperbubblesVertices);
     }
     if(debug) {
         cout << "cleanupSuperbubbles ends." << endl;
@@ -2498,7 +2510,8 @@ void CompressedPathGraph::cleanupSuperbubbles(
 // instead of computing connected components using edges of length uo tp maxOffset1.
 void CompressedPathGraph::cleanupSuperbubbles(
     bool debug,
-    uint64_t maxOffset2     // Compared against the offset between entry and exit
+    uint64_t maxOffset2,     // Compared against the offset between entry and exit
+    uint64_t chainTerminalCommonThreshold
     )
 {
     CompressedPathGraph& cGraph = *this;
@@ -2530,7 +2543,8 @@ void CompressedPathGraph::cleanupSuperbubbles(
     // Loop over the superbubbles in order of increasing size.
     for(const auto& p: superbubbleTable) {
         const uint64_t superbubbleId = p.first;
-        cleanupSuperbubble(debug, superbubbles, superbubbleId, maxOffset2, previousSuperbubblesVertices);
+        cleanupSuperbubble(debug, superbubbles, superbubbleId, maxOffset2,
+            chainTerminalCommonThreshold, previousSuperbubblesVertices);
     }
     if(debug) {
         cout << "cleanupSuperbubbles ends." << endl;
@@ -2549,6 +2563,7 @@ void CompressedPathGraph::cleanupSuperbubble(
     const Superbubbles& superbubbles,
     uint64_t superbubbleId,
     uint64_t maxOffset2,        // Compared against the offset between entry and exit
+    uint64_t chainTerminalCommonThreshold,
     std::set<vertex_descriptor>& previousSuperbubblesVertices)
 {
     CompressedPathGraph& cGraph = *this;
@@ -2739,7 +2754,7 @@ void CompressedPathGraph::cleanupSuperbubble(
                 Chain& chain = entranceBubble[i];
                 chain = cGraph[entranceOutEdge].getOnlyChain();
                 chain.push_back(cGraph[exit].edgeId);
-                assembleChain(chain, 1, "", false, noCsv);
+                assembleChain(chain, 1, "", chainTerminalCommonThreshold, false, noCsv);
             }
 
             if(debug) {
@@ -2801,7 +2816,7 @@ void CompressedPathGraph::cleanupSuperbubble(
                 chain.push_back(cGraph[entrance].edgeId);
                 const Chain& exitChain = cGraph[exitInEdge].getOnlyChain();
                 copy(exitChain.begin(), exitChain.end(), back_inserter(chain));
-                assembleChain(chain, 1, "", false, noCsv);
+                assembleChain(chain, 1, "", chainTerminalCommonThreshold, false, noCsv);
             }
 
             if(debug) {
@@ -7059,6 +7074,7 @@ void BubbleChain::compress()
 
 
 void CompressedPathGraph::assembleChains(
+    uint64_t chainTerminalCommonThreshold,
     uint64_t threadCount0,
     uint64_t threadCount1)
 {
@@ -7070,13 +7086,16 @@ void CompressedPathGraph::assembleChains(
     // ****** THIS SHOULD BE MADE MULTITHREADED USING threadCount0 threads.
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
         BubbleChain& bubbleChain = cGraph[ce];
+
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size();
             positionInBubbleChain++)  {
             Bubble& bubble = bubbleChain[positionInBubbleChain];
+
             for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
                 Chain& chain = bubble[indexInBubble];
                 const string chainName = chainStringId(ce, positionInBubbleChain, indexInBubble);
-                assembleChain(chain, threadCount1, chainName, false, csv);
+
+                assembleChain(chain, threadCount1, chainName, chainTerminalCommonThreshold, false, csv);
             }
         }
     }
@@ -7090,6 +7109,7 @@ void CompressedPathGraph::assembleChain(
     Chain& chain,
     uint64_t threadCount1,
     const string& chainName,
+    uint64_t chainTerminalCommonThreshold,
     bool internalSequenceOnly,
     ostream& csv) const
 {
@@ -7102,7 +7122,41 @@ void CompressedPathGraph::assembleChain(
             edgeId0, edgeId1, infos[i]));
     }
 
-    AssemblyPath assemblyPath(assembler, chain, infos, threadCount1);
+
+
+    // Figure out if we want to allow oriented reads on the first and last
+    // primary edge of the path.
+    bool allowOrientedReadsOnFirst;
+    bool allowOrientedReadsOnLast;
+    if(chain.size() == 2) {
+        allowOrientedReadsOnFirst = true;
+        allowOrientedReadsOnLast = true;
+    } else {
+        MarkerGraphEdgePairInfo info;
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
+            chain[0], chain[1], info));
+        const uint64_t commonFirst = info.common;
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
+            chain[chain.size() - 2], chain[chain.size() - 1], info));
+        const uint64_t commonLast = info.common;
+
+        if(commonFirst >= chainTerminalCommonThreshold) {
+            allowOrientedReadsOnFirst = false;
+        } else {
+            allowOrientedReadsOnFirst = true;
+        }
+
+        if(commonLast >= chainTerminalCommonThreshold) {
+            allowOrientedReadsOnLast = false;
+        } else {
+            allowOrientedReadsOnLast = true;
+        }
+    }
+
+
+
+    AssemblyPath assemblyPath(assembler, chain, infos,
+        allowOrientedReadsOnFirst, allowOrientedReadsOnLast, threadCount1);
     if(internalSequenceOnly) {
         assemblyPath.getInternalSequence(chain.sequence);
     } else {
@@ -7874,13 +7928,13 @@ void CompressedPathGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
 
 
 // Bubble cleanup (all bubbles), with the purpose of eliminating most bubbles caused by errors.
-uint64_t CompressedPathGraph::cleanupBubbles(bool debug, uint64_t maxOffset)
+uint64_t CompressedPathGraph::cleanupBubbles(bool debug, uint64_t maxOffset, uint64_t chainTerminalCommonThreshold)
 {
     const CompressedPathGraph& cGraph = *this;
 
     uint64_t removedCount = 0;
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
-        removedCount += cleanupBubbles(debug, ce, maxOffset);
+        removedCount += cleanupBubbles(debug, ce, maxOffset, chainTerminalCommonThreshold);
     }
 
     return removedCount;
@@ -7889,7 +7943,8 @@ uint64_t CompressedPathGraph::cleanupBubbles(bool debug, uint64_t maxOffset)
 
 
 // Bubble cleanup for a bubble chain, with the purpose of eliminating most bubbles caused by errors.
-uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uint64_t maxOffset)
+uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce,
+    uint64_t maxOffset, uint64_t chainTerminalCommonThreshold)
 {
     CompressedPathGraph& cGraph = *this;
     BubbleChain& bubbleChain = cGraph[ce];
@@ -7952,7 +8007,7 @@ uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce, uin
                     // Assemble the sequence of its two sides.
                     ofstream noCsv;
                     for(Chain& chain: bubble) {
-                        assembleChain(chain, 1, "", false, noCsv);
+                        assembleChain(chain, 1, "", chainTerminalCommonThreshold, false, noCsv);
                     }
 
                     if(debug) {

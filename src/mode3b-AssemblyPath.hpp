@@ -39,7 +39,9 @@ public:
     AssemblyPath(
         const Assembler&,
         MarkerGraphEdgeId,
-        uint64_t direction  // 0 = forward, 1 = backward, 2=bidirectional
+        uint64_t direction,  // 0 = forward, 1 = backward, 2=bidirectional
+        bool allowOrientedReadsOnFirst = true,
+        bool allowOrientedReadsOnLast = true
         );
 
     // Create the assembly path given n primary edges and
@@ -48,6 +50,8 @@ public:
         const Assembler&,
         const vector<MarkerGraphEdgeId>&,
         const vector<MarkerGraphEdgePairInfo>&,
+        bool allowOrientedReadsOnFirst = true,  // Allow using for assembly the oriented reads on the first edge of the path.
+        bool allowOrientedReadsOnLast  = true,  // Allow using for assembly the oriented reads on the last edge of the path.
         uint64_t threadCount = 0);
 
     void getSequence(vector<Base>&) const;
@@ -56,6 +60,12 @@ public:
     void writeCsv(ostream&, const string& name) const;
 private:
     const Assembler& assembler;
+
+    // If set, allow using for assembly the oriented reads on the first edge of the path.
+    bool allowOrientedReadsOnFirst;
+
+    // If set, allow using for assembly the oriented reads on the first edge of the path.
+    bool allowOrientedReadsOnLast;
 
     // There are N+1 primary edges numbered from 0 to N
     // and N steps numbered from 0 to N-1.

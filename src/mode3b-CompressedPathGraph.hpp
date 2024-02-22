@@ -440,8 +440,9 @@ private:
 
     // Bubble cleanup, with the purpose of eliminating most bubbles caused by errors.
     // See the code for details of what this does.
-    uint64_t cleanupBubbles(bool debug, uint64_t maxOffset);
-    uint64_t cleanupBubbles(bool debug, edge_descriptor ce, uint64_t maxOffset);
+    uint64_t cleanupBubbles(bool debug, uint64_t maxOffset, uint64_t chainTerminalCommonThreshold);
+    uint64_t cleanupBubbles(bool debug, edge_descriptor ce,
+        uint64_t maxOffset, uint64_t chainTerminalCommonThreshold);
 
 
 
@@ -543,19 +544,22 @@ private:
     void cleanupSuperbubbles(
         bool debug,
         uint64_t maxOffset1,    // Used to define superbubbles
-        uint64_t maxOffset2);   // Compared against the offset between entry and exit
+        uint64_t maxOffset2,    // Compared against the offset between entry and exit
+        uint64_t chainTerminalCommonThreshold);
     void cleanupSuperbubble(
         bool debug,
         const Superbubbles&,
         uint64_t superbubbleId,
         uint64_t maxOffset2,    // Compared against the offset between entry and exit
+        uint64_t chainTerminalCommonThreshold,
         std::set<vertex_descriptor>& previousSuperbubblesVertices);
 
     // This version of superbubble cleanup uses dominator trees to define superbubbles,
     // instead of computing connected components using edges of length uo tp maxOffset1.
     void cleanupSuperbubbles(
         bool debug,
-        uint64_t maxOffset2);   // Compared against the offset between entry and exit
+        uint64_t maxOffset2,    // Compared against the offset between entry and exit
+        uint64_t chainTerminalCommonThreshold);
 
     // Split terminal haploid bubbles out of bubble chains, to facilitate detangling.
     void splitTerminalHaploidBubbles();
@@ -727,11 +731,15 @@ private:
         );
 
     // Sequence assembly.
-    void assembleChains(uint64_t threadCount0, uint64_t threadCount1);
+    void assembleChains(
+        uint64_t chainTerminalCommonThreshold,
+        uint64_t threadCount0,
+        uint64_t threadCount1);
     void assembleChain(
         Chain&,
         uint64_t threadCount1,
         const string& chainName,
+        uint64_t chainTerminalCommonThreshold,
         bool internalSequenceOnly,
         ostream& csv) const;
 
