@@ -436,6 +436,12 @@ void Assembler::fillMode3bAssemblyPathStep3(const vector<string>& request, ostre
     uint64_t edgeIdB = invalid<uint64_t>;
     getParameterValue(request, "edgeIdB", edgeIdB);
 
+    string useAString;
+    const bool useA = getParameterValue(request, "useA", useAString);
+
+    string useBString;
+    const bool useB = getParameterValue(request, "useB", useBString);
+
     uint64_t minVertexCoverage = 0;
     getParameterValue(request, "minVertexCoverage", minVertexCoverage);
 
@@ -477,6 +483,16 @@ void Assembler::fillMode3bAssemblyPathStep3(const vector<string>& request, ostre
         "<tr><th class=left>Edge B<td class=centered>"
         "<input type=text required name=edgeIdB size=8 style='text-align:center' " <<
         ((edgeIdB == invalid<uint64_t>) ? "" : ("value='" + to_string(edgeIdB) + "'")) << ">"
+
+        "<tr>"
+        "<th class=left>Use for assembly oriented reads that appear only on edge A"
+        "<td class=centered><input type=checkbox name=useA" <<
+        (useA ? " checked" : "") << ">"
+
+        "<tr>"
+        "<th class=left>Use for assembly oriented reads that appear only on edge B"
+        "<td class=centered><input type=checkbox name=useB" <<
+        (useB ? " checked" : "") << ">"
 
         "<tr><th class=left>Minimum vertex coverage<br>(0 = automatic)<td class=centered>"
         "<input type=text required name=minVertexCoverage size=8 style='text-align:center' "
@@ -569,5 +585,5 @@ void Assembler::fillMode3bAssemblyPathStep3(const vector<string>& request, ostre
     }
 
     // Fill this assembly step.
-    mode3b::PathFiller3 filler(*this, edgeIdA, edgeIdB, minVertexCoverage, options);
+    mode3b::PathFiller3 filler(*this, edgeIdA, edgeIdB, minVertexCoverage, options, useA, useB);
 }

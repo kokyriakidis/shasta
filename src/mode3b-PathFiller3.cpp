@@ -29,12 +29,26 @@ using namespace mode3b;
 
 
 
+// The oriented reads common between edgeIdA and edgeIdB are always
+// used for assembly. The oriented reads that appear only
+// on edgeIdA or edgeIdB are used for assembly under control
+// of useA and useB.
+// So, if useA and useB are both true (the default), the assembly uses the
+// union of the oriented reads on edgeIdA and edgeIdB.
+// If they are both false, the assembly uses the
+// intersection of the oriented reads on edgeIdA and edgeIdB.
+// If useA is true and useB is false, the assembly uses the
+// oriented reads on edgeIdA, regardless of whether they appear on edgeIdB.
+// If useA is false and useB is true, the assembly uses the
+// oriented reads on edgeIdB, regardless of whether they appear on edgeIdA.
 PathFiller3::PathFiller3(
     const Assembler& assembler,
     MarkerGraphEdgeId edgeIdA,
     MarkerGraphEdgeId edgeIdB,
     uint64_t minVertexCoverage, // 0 = automatic
-    const PathFiller3DisplayOptions& options) :
+    const PathFiller3DisplayOptions& options,
+    bool useA,
+    bool useB) :
     assembler(assembler),
     edgeIdA(edgeIdA),
     edgeIdB(edgeIdB),
@@ -86,7 +100,7 @@ PathFiller3::PathFiller3(
     checkAssumptions();
 
     // Oriented reads.
-    gatherOrientedReads();
+    gatherOrientedReads(useA, useB);
 
     // Use the oriented reads that appear both on vertexIdA and vertexIdB
     // to estimate the base offset between vertexIdA and vertexIdB.
@@ -218,7 +232,7 @@ void PathFiller3::checkAssumptions() const
 
 
 
-void PathFiller3::gatherOrientedReads()
+void PathFiller3::gatherOrientedReads(bool useA, bool useB)
 {
     // Joint loop over marker intervals that appear in edgeIdA and/or edgeIdB.
     const auto markerIntervalsA = assembler.markerGraph.edgeMarkerIntervals[edgeIdA];
@@ -237,13 +251,15 @@ void PathFiller3::gatherOrientedReads()
         // Oriented reads that appear only in edgeIdA.
         if((itB == endB) or (itA != endA and itA->orientedReadId < itB->orientedReadId)) {
 
-            const MarkerInterval& markerIntervalA = *itA;
-            const OrientedReadId orientedReadIdA = markerIntervalA.orientedReadId;
-            const uint32_t ordinalA = markerIntervalA.ordinals[1];    // Because vertexIdA is the target of edgeIdA
+            if(useA) {
+                const MarkerInterval& markerIntervalA = *itA;
+                const OrientedReadId orientedReadIdA = markerIntervalA.orientedReadId;
+                const uint32_t ordinalA = markerIntervalA.ordinals[1];    // Because vertexIdA is the target of edgeIdA
 
-            OrientedReadInfo info(orientedReadIdA);
-            info.ordinalA = ordinalA;
-            orientedReadInfos.push_back(info);
+                OrientedReadInfo info(orientedReadIdA);
+                info.ordinalA = ordinalA;
+                orientedReadInfos.push_back(info);
+            }
 
             ++itA;
         }
@@ -253,13 +269,15 @@ void PathFiller3::gatherOrientedReads()
         // Oriented reads that appear only in edgeIdB.
         else if((itA == endA) or (itB != endB and itB->orientedReadId < itA->orientedReadId)) {
 
-            const MarkerInterval& markerIntervalB = *itB;
-            const OrientedReadId orientedReadIdB = markerIntervalB.orientedReadId;
-            const uint32_t ordinalB = markerIntervalB.ordinals[0];    // Because vertexIdB is the source of edgeIdB
+            if(useB) {
+                const MarkerInterval& markerIntervalB = *itB;
+                const OrientedReadId orientedReadIdB = markerIntervalB.orientedReadId;
+                const uint32_t ordinalB = markerIntervalB.ordinals[0];    // Because vertexIdB is the source of edgeIdB
 
-            OrientedReadInfo info(orientedReadIdB);
-            info.ordinalB = ordinalB;
-            orientedReadInfos.push_back(info);
+                OrientedReadInfo info(orientedReadIdB);
+                info.ordinalB = ordinalB;
+                orientedReadInfos.push_back(info);
+            }
 
             ++itB;
         }
@@ -267,6 +285,7 @@ void PathFiller3::gatherOrientedReads()
 
 
         // Oriented reads that appear in both edgeIdA and edgeIdB.
+        // They are always used for assembly regardless of the settings of useA and useB.
         else {
             SHASTA_ASSERT(itA != endA);
             SHASTA_ASSERT(itB != endB);

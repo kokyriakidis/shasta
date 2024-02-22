@@ -101,12 +101,26 @@ public:
     // Hide class Base defined in boost::adjacency_list.
     using Base = shasta::Base;
 
+    // The oriented reads common between edgeIdA and edgeIdB are always
+    // used for assembly. The oriented reads that appear only
+    // on edgeIdA or edgeIdB are used for assembly under control
+    // of useA and useB.
+    // So, if useA and useB are both true (the default), the assembly uses the
+    // union of the oriented reads on edgeIdA and edgeIdB.
+    // If they are both false, the assembly uses the
+    // intersection of the oriented reads on edgeIdA and edgeIdB.
+    // If useA is true and useB is false, the assembly uses the
+    // oriented reads on edgeIdA, regardless of whether they appear on edgeIdB.
+    // If useA is false and useB is true, the assembly uses the
+    // oriented reads on edgeIdB, regardless of whether they appear on edgeIdA.
     PathFiller3(
         const Assembler&,
         MarkerGraphEdgeId edgeIdA,
         MarkerGraphEdgeId edgeIdB,
         uint64_t minVertexCoverage, // 0 = automatic
-        const PathFiller3DisplayOptions&);
+        const PathFiller3DisplayOptions&,
+        bool useA = true,
+        bool useB = true);
 
     // Get the sequence between edgeIdA and edgeIdB.
     // This does not include the sequences of edgeIdA and edgeIdB themselves.
@@ -224,7 +238,7 @@ private:
     // that appear in edgeIdA and edgeIdB, and that have positive ordinal offset.
     // OrientedReadInfos are stored sorted by OrientedReadId.
     vector<OrientedReadInfo> orientedReadInfos;
-    void gatherOrientedReads();
+    void gatherOrientedReads(bool useA, bool useB);
     void writeOrientedReads() const;
     void writeOrientedReadsSequences() const;
 
