@@ -956,14 +956,20 @@ void CompressedPathGraph::run5(
 
     // Detangle.
     while(compressSequentialEdges());
+    compressBubbleChains();
     write("B");
-    detangleEdges(true, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
     write("C");
     while(compressSequentialEdges());
+    compressBubbleChains();
     write("D");
-    detangleVertices(true, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    detangleVertices(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
     write("E");
     while(compressSequentialEdges());
+    compressBubbleChains();
+    write("E1");
+    detangleEdges(true, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    write("E2");
     // detangleShortSuperbubbles(false, 30000, detangleToleranceLow, detangleToleranceHigh);
 
     compress();
