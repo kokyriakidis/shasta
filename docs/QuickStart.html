@@ -12,7 +12,7 @@
 <h1>Quick start</h1>
 
 Note that the Shasta executable has no dependencies and requires no installation
-or set up. This means that you can use it immediately afterdownloading it and setting its execute permission.
+or set up. This means that you can use it immediately after downloading it and setting its execute permission.
 See below for more information.
 
 
@@ -21,24 +21,14 @@ See below for more information.
 You can use the following commands to download the executable from the latest release and run an assembly:
 <pre>
 # Download the executable for the latest release.
-curl -O -L https://github.com/chanzuckerberg/shasta/releases/download/0.10.0/shasta-Linux-0.10.0
+curl -O -L https://github.com/paoloshasta/shasta/releases/download/0.11.1/shasta-Linux-0.11.1
 
 # Grant execute permissions.
-chmod ugo+x shasta-Linux-0.10.0
+chmod ugo+x shasta-Linux-0.11.1
 
 # Run an assembly.
-./shasta-Linux-0.10.0 --input input.fasta --config Nanopore-May2022
+./shasta-Linux-0.11.1 --input input.fasta --config Nanopore-May2022
 </pre>
-
-<p>
-<b>The above is valid for releases up to 0.10.0. Newer releases will appear in the <code>paoloshasta/shasta</code>
-repository instead, so the download command would be:</b>
-
-<pre>
-curl -O -L https://github.com/paoloshasta/shasta/releases/download/x.y.z/shasta-Linux-x.y.z
-</pre>
-
-(Replace <code>x.y.z</code> with the identifier for the release you want to use).
 
 <p>
 You can specify multiple input FASTA files, if necessary.
