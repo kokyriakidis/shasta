@@ -898,6 +898,8 @@ void MarkerGraph::createPrimaryJourneys(
         " oriented reads." << endl;
     cout << "Average number of marker graph primary journey entries per oriented read is " <<
         double(primaryJourneys.totalSize()) / double(orientedReadCount) << endl;
+
+    writePrimaryJourneys();
 }
 
 
