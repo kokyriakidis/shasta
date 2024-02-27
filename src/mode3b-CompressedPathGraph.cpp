@@ -149,7 +149,7 @@ CompressedPathGraph::CompressedPathGraph(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph-" + to_string(componentId) + ".data");
 
-    run5(threadCount0, threadCount1, true);
+    run5(threadCount0, threadCount1, false);
 }
 
 
@@ -163,7 +163,7 @@ CompressedPathGraph::CompressedPathGraph(
     assembler(assembler)
 {
     load(fileName);
-    run5(threadCount0, threadCount1, true);
+    run5(threadCount0, threadCount1, false);
 }
 
 
@@ -957,11 +957,11 @@ void CompressedPathGraph::run5(
     // Detangle.
     while(compressSequentialEdges());
     write("B");
-    detangleVertices(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    detangleEdges(true, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
     write("C");
     while(compressSequentialEdges());
     write("D");
-    detangleEdges(true, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    detangleVertices(true, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
     write("E");
     while(compressSequentialEdges());
     // detangleShortSuperbubbles(false, 30000, detangleToleranceLow, detangleToleranceHigh);
