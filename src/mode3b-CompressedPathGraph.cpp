@@ -1601,12 +1601,15 @@ void CompressedPathGraph::writeGraphviz(
     dot << "digraph Component_" << componentId << "{\n";
 
     BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph) {
-        dot << cGraph[cv].edgeId << ";\n";
+        const MarkerGraphEdgeId edgeId = cGraph[cv].edgeId;
+        const uint64_t coverage = assembler.markerGraph.edgeCoverage(edgeId);
+        dot << edgeId << "[label=\"" << edgeId << "\\n" << coverage << "\"];\n";
     }
 
 
 
     BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+        const BubbleChain& bubbleChain = cGraph[ce];
         const vertex_descriptor cv0 = source(ce, cGraph);
         const vertex_descriptor cv1 = target(ce, cGraph);
 
@@ -1616,10 +1619,38 @@ void CompressedPathGraph::writeGraphviz(
         bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
 
         dot << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId;
+
         if(labels) {
-            dot << " [label=\"" <<
-                bubbleChainStringId(ce) << "\\n" <<
-                averageOffset << "\"]";
+            dot << " [label=\"";
+            dot << bubbleChainStringId(ce) << "\\noff=" << averageOffset;
+
+            // Additional annotation if this BubbleChain consists of a single
+            // haploid bubble.
+            const uint64_t bubbleCount = bubbleChain.size();
+            if(bubbleCount == 1) {
+                const Bubble& bubble = bubbleChain.front();
+                const uint64_t ploidy = bubble.size();
+                if(ploidy == 1) {
+                    const Chain& chain = bubble.front();
+                    dot << "\\nlen=" << chain.size();
+                    if(chain.size() > 2) {
+                        // Compute average coverage for the internal edges.
+                        uint64_t coverageSum = 0;
+                        for(uint64_t i=1; i<chain.size()-1; i++) {
+                            coverageSum += assembler.markerGraph.edgeCoverage(chain[i]);
+                        }
+                        const double averageCoverage = double(coverageSum) / double(chain.size() - 2);
+                        dot << "\\ncov=" << uint64_t(std::round(averageCoverage));
+
+                        dot << "\\n" << chain.second();
+                        if(chain.size() > 3) {
+                            dot << "\\n" << chain.secondToLast();
+                        }
+                    }
+                }
+            }
+
+            dot << "\"]";
         }
         dot << ";\n";
     }
