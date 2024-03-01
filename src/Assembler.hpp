@@ -461,34 +461,28 @@ private:
     // an additional 4 bytes per marker.
 public:
     pair<OrientedReadId, uint32_t> findMarkerId(MarkerId) const;
-private:
 
+
+    // KmerIds for all markers. Indexed by OrientedReadId::getValue().
+    // Only stored during alignment computation, and then freed.
+    MemoryMapped::VectorOfVectors<KmerId, uint64_t> markerKmerIds;
+    void computeMarkerKmerIds(uint64_t threadCount);
+    void cleanupMarkerKmerIds();
+private:
+    void computeMarkerKmerIdsThreadFunction(size_t threadId);
 
 
     // Pairs (KmerId, ordinal), sorted by KmerId, for each oriented read.
     // Indexed by orientedReadId.getValue().
     // Used by alignment method 4.
-    MemoryMapped::VectorOfVectors< pair<KmerId, uint32_t>, uint64_t> sortedMarkers;
 public:
+    MemoryMapped::VectorOfVectors< pair<KmerId, uint32_t>, uint64_t> sortedMarkers;
     void computeSortedMarkers(uint64_t threadCount);
     bool accessSortedMarkers();
 private:
     void computeSortedMarkersThreadFunction(size_t threadId);
     // void computeSortedMarkersThreadFunction1(size_t threadId);
     // void computeSortedMarkersThreadFunction2(size_t threadId);
-
-
-
-    // KmerIds for all markers. Indexed by OrientedReadId::getValue().
-    // Only stored during alignment computation, and then freed.
-    // They are also permanently stored in each CompressedMarker currently,
-    // but that will go away soon.
-    MemoryMapped::VectorOfVectors<KmerId, uint64_t> markerKmerIds;
-public:
-    void computeMarkerKmerIds(uint64_t threadCount);
-    void cleanupMarkerKmerIds();
-private:
-    void computeMarkerKmerIdsThreadFunction(size_t threadId);
 
 
 
@@ -786,6 +780,17 @@ public:
         Alignment&,
         AlignmentInfo&
         );
+
+    // Alignment method 5.
+    void alignOrientedReads5(
+        OrientedReadId,
+        OrientedReadId,
+        int matchScore,
+        int mismatchScore,
+        int gapScore,
+        Alignment&,
+        AlignmentInfo&,
+        ostream& html);
 
 private:
 

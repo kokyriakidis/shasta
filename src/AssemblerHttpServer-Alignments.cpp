@@ -1229,6 +1229,11 @@ void Assembler::exploreAlignment(
             mismatchScore,
             gapScore,
             alignment, alignmentInfo);
+    } else if(method == 5) {
+        alignOrientedReads5(
+            orientedReadId0, orientedReadId1,
+            matchScore, mismatchScore, gapScore,
+            alignment, alignmentInfo, html);
     } else {
         SHASTA_ASSERT(0);
     }
@@ -1777,7 +1782,9 @@ void Assembler::renderEditableAlignmentConfig(
         "<input type=radio name=method value=3" <<
         (method==3 ? " checked=checked" : "") << "> 3 (SeqAn, banded)<br>"
         "<input type=radio name=method value=4" <<
-        (method==4 ? " checked=checked" : "") << "> 4 (Experimental)"
+        (method==4 ? " checked=checked" : "") << "> 4 (Experimental)<br>"
+        "<input type=radio name=method value=5" <<
+        (method==5 ? " checked=checked" : "") << "> 5 (Experimental)"
         "<td class=smaller>" << descriptions.find("Align.alignMethod", false).description();
 
     html << "<tr><th class=left>maxSkip"
