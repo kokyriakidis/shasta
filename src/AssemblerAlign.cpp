@@ -413,6 +413,12 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                         alignment, alignmentInfo,
                         false);
                     SHASTA_ASSERT(byteAllocator.isEmpty());
+                } else if(alignmentMethod == 5) {
+                    ofstream nullStream;
+                    alignOrientedReads5(orientedReadIds[0], orientedReadIds[1],
+                        matchScore, mismatchScore, gapScore,
+                        alignment, alignmentInfo,
+                        nullStream);
                 } else {
                     SHASTA_ASSERT(0);
                 }
