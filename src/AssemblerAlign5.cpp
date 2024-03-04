@@ -317,6 +317,84 @@ void Assembler::alignOrientedReads5(
     }
 
 
+
+    // We should remove common unique markers that have a different rank
+    // in the two oriented reads. This does not happen frequently and
+    // for now just check for them.
+    for(const CommonKmerInfo& commonKmerInfo: commonKmerInfos) {
+        SHASTA_ASSERT(commonKmerInfo.rank0 == commonKmerInfo.rank1);
+    }
+
+
+
+    // Create the alignment by stitching together alignments computed
+    // between each pair of consecutive unique k-mers that survived
+    // the above process (the "active" markers).
+    alignment.clear();
+    SHASTA_ASSERT(commonKmerInfos.size() > 1);
+    for(uint64_t step=1; step<commonKmerInfos.size(); step++) {
+        const CommonKmerInfo& commonKmerInfoA = commonKmerInfos[step-1];
+        const CommonKmerInfo& commonKmerInfoB = commonKmerInfos[step];
+        SHASTA_ASSERT(commonKmerInfoB.rank0 > commonKmerInfoA.rank0);
+        SHASTA_ASSERT(commonKmerInfoB.rank1 > commonKmerInfoA.rank1);
+
+        const uint32_t ordinalA0 = commonKmerInfoA.ordinal0;
+        const uint32_t ordinalA1 = commonKmerInfoA.ordinal1;
+        const uint32_t ordinalB0 = commonKmerInfoB.ordinal0;
+        const uint32_t ordinalB1 = commonKmerInfoB.ordinal1;
+
+        // Get the KmerIds between A and B for the two reads.
+        // These are the Kmers that we will align in this step.
+        const span<const KmerId> kmerIds0(&allMarkerKmerIds[0][ordinalA0 + 1], &allMarkerKmerIds[0][ordinalB0]);
+        const span<const KmerId> kmerIds1(&allMarkerKmerIds[1][ordinalA1 +1 ], &allMarkerKmerIds[1][ordinalB1]);
+        if(html) {
+            html << "<br>Step " << step << " alignment lengths " << kmerIds0.size() << " " << kmerIds1.size();
+        }
+
+        // Add to the alignment the first marker of this step.
+        alignment.ordinals.push_back({commonKmerInfoA.ordinal0, commonKmerInfoA.ordinal1});
+
+        // If there is nothing to align, we are done for this step,
+        if(kmerIds0.empty() or kmerIds1.empty()) {
+            continue;
+        }
+
+        // Use seqan to compute the alignment for this step.
+        // This alignment is constrained on both sides.
+        vector< pair<bool, bool> > seqanAlignment;
+        const int64_t alignmentScore = seqanAlign(
+            kmerIds0.begin(), kmerIds0.end(),
+            kmerIds1.begin(), kmerIds1.end(),
+            matchScore, mismatchScore, gapScore,
+            false, false,
+            seqanAlignment);
+        if(html) {
+            html << "<br>Alignment score " << alignmentScore;
+        }
+
+        // Add to the alignment the ordinals of matching alignment positions.
+        uint32_t ordinal0 = ordinalA0 + 1;
+        uint32_t ordinal1 = ordinalA1 + 1;
+        for(const auto& p: seqanAlignment) {
+            if(p.first and p.second and allMarkerKmerIds[0][ordinal0] == allMarkerKmerIds[1][ordinal1]) {
+                alignment.ordinals.push_back({ordinal0, ordinal1});
+            }
+            if(p.first) {
+                ++ordinal0;
+            }
+            if(p.second) {
+                ++ordinal1;
+            }
+        }
+        SHASTA_ASSERT(ordinal0 == ordinalB0);
+        SHASTA_ASSERT(ordinal1 == ordinalB1);
+    }
+
+    // Add the last active marker.
+    const CommonKmerInfo& firstCommonKmerInfo = commonKmerInfos.back();
+    alignment.ordinals.push_back({firstCommonKmerInfo.ordinal0, firstCommonKmerInfo.ordinal1});
+
+
 #if 0
     // Recreate the kmerInfos vectors, this time including only the unique markers.
     for(uint64_t i=0; i<2; i++) {
