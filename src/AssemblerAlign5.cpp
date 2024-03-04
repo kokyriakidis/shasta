@@ -332,6 +332,44 @@ void Assembler::alignOrientedReads5(
     // the above process (the "active" markers).
     alignment.clear();
     SHASTA_ASSERT(commonKmerInfos.size() > 1);
+
+    // First, do an alignment between the beginning and the
+    // first active unique marker.
+    // This alignment is constrained on the right only.
+    // We could do a bit better than this for performance.
+    {
+        const CommonKmerInfo& firstCommonKmerInfo = commonKmerInfos.front();
+        const uint32_t ordinalB0 = firstCommonKmerInfo.ordinal0;
+        const uint32_t ordinalB1 = firstCommonKmerInfo.ordinal1;
+        if(ordinalB0 > 0 and ordinalB1 > 0) {
+            const span<const KmerId> kmerIds0(&allMarkerKmerIds[0][0], &allMarkerKmerIds[0][ordinalB0]);
+            const span<const KmerId> kmerIds1(&allMarkerKmerIds[1][0], &allMarkerKmerIds[1][ordinalB1]);
+            vector< pair<bool, bool> > seqanAlignment;
+            seqanAlign(
+                kmerIds0.begin(), kmerIds0.end(),
+                kmerIds1.begin(), kmerIds1.end(),
+                matchScore, mismatchScore, gapScore,
+                true, false,    // Free on left
+                seqanAlignment);
+            uint32_t ordinal0 = 0;
+            uint32_t ordinal1 = 0;
+            for(const auto& p: seqanAlignment) {
+                if(p.first and p.second and allMarkerKmerIds[0][ordinal0] == allMarkerKmerIds[1][ordinal1]) {
+                    alignment.ordinals.push_back({ordinal0, ordinal1});
+                }
+                if(p.first) {
+                    ++ordinal0;
+                }
+                if(p.second) {
+                    ++ordinal1;
+                }
+            }
+            SHASTA_ASSERT(ordinal0 == ordinalB0);
+            SHASTA_ASSERT(ordinal1 == ordinalB1);
+        }
+    }
+
+
     for(uint64_t step=1; step<commonKmerInfos.size(); step++) {
         const CommonKmerInfo& commonKmerInfoA = commonKmerInfos[step-1];
         const CommonKmerInfo& commonKmerInfoB = commonKmerInfos[step];
@@ -391,114 +429,49 @@ void Assembler::alignOrientedReads5(
     }
 
     // Add the last active marker.
-    const CommonKmerInfo& firstCommonKmerInfo = commonKmerInfos.back();
-    alignment.ordinals.push_back({firstCommonKmerInfo.ordinal0, firstCommonKmerInfo.ordinal1});
+    const CommonKmerInfo& lastCommonKmerInfo = commonKmerInfos.back();
+    alignment.ordinals.push_back({lastCommonKmerInfo.ordinal0, lastCommonKmerInfo.ordinal1});
 
 
-#if 0
-    // Recreate the kmerInfos vectors, this time including only the unique markers.
-    for(uint64_t i=0; i<2; i++) {
-        kmerInfos[i].clear();
-    }
-    for(const CommonKmerInfo& commonKmerInfo: commonKmerInfos) {
-        kmerInfos[0].push_back({commonKmerInfo.ordinal0, commonKmerInfo.kmerId});
-        kmerInfos[1].push_back({commonKmerInfo.ordinal1, commonKmerInfo.kmerId});
-    }
 
-    // Sort them by ordinal.
-    class OrderKmerInfosByOrdinal {
-    public:
-        bool operator()(const KmerInfo& x, const KmerInfo& y) const
-        {
-            return x.ordinal < y.ordinal;
-        }
-    };
-    for(uint64_t i=0; i<2; i++) {
-        sort(kmerInfos[i].begin(), kmerInfos[i].end(), OrderKmerInfosByOrdinal());
-    }
-
-    if(html) {
-        html << "<table>";
-        for(uint64_t j0=0; j0<kmerInfos[0].size(); j0++) {
-            const KmerInfo& kmerInfo0 = kmerInfos[0][j0];
-            for(uint64_t j1=0; j1<kmerInfos[1].size(); j1++) {
-                const KmerInfo& kmerInfo1 = kmerInfos[1][j1];
-                if(kmerInfo0.kmerId == kmerInfo1.kmerId) {
-                    html << "<tr>"
-                        "<td class=centered>" << j0 <<
-                        "<td class=centered>" << j1;
+    // Do an alignment between the last active unique marker and the end.
+    // This alignment is constrained on the left only.
+    // We could do a bit better than this for performance.
+    {
+        const CommonKmerInfo& lastCommonKmerInfo = commonKmerInfos.back();
+        const uint32_t ordinalA0 = lastCommonKmerInfo.ordinal0 + 1;
+        const uint32_t ordinalA1 = lastCommonKmerInfo.ordinal1 + 1;
+        const uint32_t ordinalB0 = uint32_t(allMarkerKmerIds[0].size());
+        const uint32_t ordinalB1 = uint32_t(allMarkerKmerIds[1].size());
+        if( ordinalA0 < ordinalB0 and ordinalA1 < ordinalB1) {
+            const span<const KmerId> kmerIds0(&allMarkerKmerIds[0][ordinalA0], &allMarkerKmerIds[0][ordinalB0]);
+            const span<const KmerId> kmerIds1(&allMarkerKmerIds[1][ordinalA1], &allMarkerKmerIds[1][ordinalB1]);
+            vector< pair<bool, bool> > seqanAlignment;
+            seqanAlign(
+                kmerIds0.begin(), kmerIds0.end(),
+                kmerIds1.begin(), kmerIds1.end(),
+                matchScore, mismatchScore, gapScore,
+                false, true,    // Free on right
+                seqanAlignment);
+            uint32_t ordinal0 = ordinalA0;
+            uint32_t ordinal1 = ordinalA1;
+            for(const auto& p: seqanAlignment) {
+                if(p.first and p.second and allMarkerKmerIds[0][ordinal0] == allMarkerKmerIds[1][ordinal1]) {
+                    alignment.ordinals.push_back({ordinal0, ordinal1});
+                }
+                if(p.first) {
+                    ++ordinal0;
+                }
+                if(p.second) {
+                    ++ordinal1;
                 }
             }
-        }
-        html << "</table>";
-    }
-
-
-
-    // We will align the sequences of these unique k-mers.
-    array<vector<KmerId>, 2> compressedSequences;
-    for(uint64_t i=0; i<2; i++) {
-        for(const KmerInfo& kmerInfo: kmerInfos[i]) {
-            compressedSequences[i].push_back(kmerInfo.kmerId);
+            SHASTA_ASSERT(ordinal0 == ordinalB0);
+            SHASTA_ASSERT(ordinal1 == ordinalB1);
         }
     }
-    vector< pair<bool, bool> > booleanAlignment;
-    seqanAlign(
-        compressedSequences[0].begin(), compressedSequences[0].end(),
-        compressedSequences[1].begin(), compressedSequences[1].end(),
-        matchScore, mismatchScore, gapScore,
-        true, true, booleanAlignment);
 
-    if(html) {
-        html << "<br>Alignment of common unique markers follows:<pre>";
-        uint64_t position0 = 0;
-        uint64_t position1 = 0;
-        for(const auto& p: booleanAlignment) {
-            if(p.first and p.second) {
-                if(compressedSequences[0][position0] == compressedSequences[1][position1]) {
-                    html << ".";
-                } else {
-                    html << "X";
-                }
-            } else if (p.first){
-                SHASTA_ASSERT(not p.second);
-                html << ".";
-            } else {
-                SHASTA_ASSERT(p.second);
-                html << "-";
-            }
-            if(p.first) {
-                ++position0;
-            }
-            if(p.second) {
-                ++position1;
-            }
-        }
-        html << "\n";
-        position0 = 0;
-        position1 = 0;
-        for(const auto& p: booleanAlignment) {
-            if(p.first and p.second) {
-                if(compressedSequences[0][position0] == compressedSequences[1][position1]) {
-                    html << ".";
-                } else {
-                    html << "X";
-                }
-            } else if (p.second){
-                SHASTA_ASSERT(not p.first);
-                html << ".";
-            } else {
-                SHASTA_ASSERT(p.first);
-                html << "-";
-            }
-            if(p.first) {
-                ++position0;
-            }
-            if(p.second) {
-                ++position1;
-            }
-        }
-        html << "</pre>";
-    }
-#endif
+    // Store the alignment info.
+    alignmentInfo.create(alignment, uint32_t(allMarkerKmerIds[0].size()), uint32_t(allMarkerKmerIds[1].size()));
+
 }
