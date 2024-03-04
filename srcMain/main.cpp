@@ -268,9 +268,9 @@ void shasta::main::assemble(
 
     if( assemblerOptions.alignOptions.alignMethod <  0 or
         assemblerOptions.alignOptions.alignMethod == 2 or
-        assemblerOptions.alignOptions.alignMethod >  4) {
+        assemblerOptions.alignOptions.alignMethod >  5) {
         throw runtime_error("Align method " + to_string(assemblerOptions.alignOptions.alignMethod) +
-            " is not valid. Valid options are 0, 1, 3, and 4.");
+            " is not valid. Valid options are 0, 1, 3, 4, and 5.");
     }
 
     if(assemblerOptions.readGraphOptions.creationMethod != 0 and
