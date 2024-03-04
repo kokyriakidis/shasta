@@ -1114,6 +1114,8 @@ void Assembler::exploreAlignment(
     getParameterValue(request, "magnifyFactor", magnifyFactor);
     string displayDetailsString;
     bool displayDetails = getParameterValue(request, "displayDetails", displayDetailsString);
+    string displayDebugInfoString;
+    bool displayDebugInfo = getParameterValue(request, "displayDebugInfo", displayDebugInfoString);
 
 
     // Write the form.
@@ -1163,6 +1165,8 @@ void Assembler::exploreAlignment(
         "> times."
         "<br><input type=checkbox name=displayDetails" << (displayDetails ? " checked=checked" : "") <<
         "> Display alignment details"
+        "<br><input type=checkbox name=displayDebugInfo" << (displayDebugInfo ? " checked=checked" : "") <<
+        "> Display debug information"
         "</form>";
 
 
@@ -1230,10 +1234,11 @@ void Assembler::exploreAlignment(
             gapScore,
             alignment, alignmentInfo);
     } else if(method == 5) {
+        ofstream nullStream;
         alignOrientedReads5(
             orientedReadId0, orientedReadId1,
             matchScore, mismatchScore, gapScore,
-            alignment, alignmentInfo, html);
+            alignment, alignmentInfo, displayDebugInfo ? html : nullStream);
     } else {
         SHASTA_ASSERT(0);
     }
