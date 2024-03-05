@@ -14,6 +14,7 @@ void Assembler::alignOrientedReads5(
     ostream& html)
 {
     // EXPOSE WHEN CODE STABILIZES *******
+    const uint64_t maxMarkerFrequency = 1;
     const double driftRateTolerance = 0.02;
 
     // Get the marker KmerIds for the two oriented reads.
@@ -35,60 +36,21 @@ void Assembler::alignOrientedReads5(
     }
 
 
-
-    // Gather the unique markers in the two oriented reads.
-    // For performance, this should done for all oriented reads
-    // before alignment computation begins.
-    class KmerInfo {
-    public:
-        uint32_t ordinal;
-        KmerId kmerId;
-        // Comparison by KmerId only.
-        // This is used below to find unique markers.
-        bool operator<(const KmerInfo& that) const
-        {
-            return kmerId < that.kmerId;
-        }
-        bool operator==(const KmerInfo& that) const
-        {
-            return kmerId == that.kmerId;
-        }
-    };
-    array<vector<KmerInfo>, 2> kmerInfos;
-
-    // Loop over the two oriented reads.
+    // Find the low frequency markers in the two oriented reads, sorted by KmerId.
+    array< vector<uint32_t>, 2> lowFrequencyOrdinals;
     for(uint64_t i=0; i<2; i++) {
-
-        // Gather the markers for this oriented read.
-        const uint64_t markerCount = allMarkerKmerIds[i].size();
-        kmerInfos[i].resize(markerCount);
-        for(uint32_t ordinal=0; ordinal<markerCount; ordinal++) {
-            kmerInfos[i][ordinal] = {ordinal, allMarkerKmerIds[i][ordinal]};
-        }
-
-        // Deduplicate and count occurrences.
-        vector<uint64_t> frequency;
-        deduplicateAndCount(kmerInfos[i], frequency);
-
-        // Only keep the unique ones.
-        vector<KmerInfo> uniqueKmerInfos;
-        for(uint64_t j=0; j<frequency.size(); j++) {
-            if(frequency[j] == 1) {
-                uniqueKmerInfos.push_back(kmerInfos[i][j]);
-            }
-        }
-        kmerInfos[i].swap(uniqueKmerInfos);
-
+        computeLowFrequencyMarkers(allMarkerKmerIds[i], maxMarkerFrequency, lowFrequencyOrdinals[i]);
         if(html) {
-            html << "<br>" << (i==0 ? orientedReadId0 : orientedReadId1) << " has " << markerCount <<
-                " markers of which " << kmerInfos[i].size() << " unique." << endl;
+            html << "<br>" << (i==0 ? orientedReadId0 : orientedReadId1) << " has " << allMarkerKmerIds[i].size() <<
+                " markers of which " << lowFrequencyOrdinals[i].size() << " appear up to " <<
+                maxMarkerFrequency << " times." << endl;
         }
     }
 
 
 
-    // Find markers with a KmerId that is unique in both oriented reads
-    // and occurs in both.
+    // Find pairs of ordinals in the two oriented reads that correspond to
+    // the same low frequency k-mers.
     class CommonKmerInfo {
     public:
         uint32_t ordinal0;
@@ -106,24 +68,66 @@ void Assembler::alignOrientedReads5(
         }
     };
     vector<CommonKmerInfo> commonKmerInfos;
-    const auto begin0 = kmerInfos[0].begin();
-    const auto begin1 = kmerInfos[1].begin();
-    const auto end0 = kmerInfos[0].end();
-    const auto end1 = kmerInfos[1].end();
+
+    // Joint loop over the ordinals corresponding to low frequency markers.
+    // They are both sorted by KmerId.
+    const auto begin0 = lowFrequencyOrdinals[0].begin();
+    const auto begin1 = lowFrequencyOrdinals[1].begin();
+    const auto end0 = lowFrequencyOrdinals[0].end();
+    const auto end1 = lowFrequencyOrdinals[1].end();
     auto it0 = begin0;
     auto it1 = begin1;
     while((it0 != end0) and (it1 != end1)) {
-        const KmerId kmerId0 = it0->kmerId;
-        const KmerId kmerId1 = it1->kmerId;
+        const uint32_t ordinal0 = *it0;
+        const uint32_t ordinal1 = *it1;
+        const KmerId kmerId0 = allMarkerKmerIds[0][ordinal0];
+        const KmerId kmerId1 = allMarkerKmerIds[1][ordinal1];
+
         if(kmerId0 < kmerId1) {
-            ++it0;
+
+            // Go past the streak with this KmerId in lowFrequencyOrdinals[0].
+            while(it0 != end0 and allMarkerKmerIds[0][*it0] == kmerId0) {
+                ++it0;
+            }
+
+
         } else if(kmerId1 < kmerId0) {
-            ++it1;
+
+            // Go past the streak with this KmerId in lowFrequencyOrdinals[1].
+            while(it1 != end1 and allMarkerKmerIds[1][*it1] == kmerId1) {
+                ++it1;
+            }
+
         } else {
+
+            // We found a common low frequency marker k-mer.
             SHASTA_ASSERT(kmerId0 == kmerId1);
-            commonKmerInfos.push_back({it0->ordinal, it1->ordinal, kmerId0});
-            ++it0;
-            ++it1;
+            const KmerId kmerId = kmerId0;
+
+            // Look for the streak with this KmerId in lowFrequencyOrdinals[0].
+            auto streakBegin0 = it0;
+            auto streakEnd0 = it0 + 1;
+            while(streakEnd0 != end0 and allMarkerKmerIds[0][*streakEnd0] == kmerId) {
+                ++streakEnd0;
+            }
+
+            // Look for the streak with this KmerId in lowFrequencyOrdinals[1].
+            auto streakBegin1 = it1;
+            auto streakEnd1 = it1 + 1;
+            while(streakEnd1 != end1 and allMarkerKmerIds[1][*streakEnd1] == kmerId) {
+                ++streakEnd1;
+            }
+
+            // Look over pairs of markers in these streaks.
+            for(auto jt0=streakBegin0; jt0!=streakEnd0; jt0++) {
+                for(auto jt1=streakBegin1; jt1!=streakEnd1; jt1++) {
+                    commonKmerInfos.push_back({*jt0, *jt1, kmerId});
+                }
+            }
+
+            // Point to the next marker in lowFrequencyOrdinals[0] and lowFrequencyOrdinals[1].
+            it0 = streakEnd0;
+            it1 = streakEnd1;
         }
     }
 
@@ -494,4 +498,79 @@ void Assembler::alignOrientedReads5(
     // Store the alignment info.
     alignmentInfo.create(alignment, uint32_t(allMarkerKmerIds[0].size()), uint32_t(allMarkerKmerIds[1].size()));
 
+}
+
+
+
+void Assembler::computeLowFrequencyMarkers(
+    uint64_t maxMarkerFrequency,
+    uint64_t threadCount)
+{
+    SHASTA_ASSERT(0);
+}
+
+
+
+void Assembler::computeLowFrequencyMarkersThreadFunction(uint64_t threadId)
+{
+    SHASTA_ASSERT(0);
+}
+
+
+
+// Compute low frequency markers for a single oriented read.
+// On return, the lowFrequencyOrdinals vector contains the ordinals corresponding
+// to low frequency markers, sorted by KmerId.
+// Low frequency markers are the ones that occur up to maxMarkerFrequency
+// times on the oriented read.
+void Assembler::computeLowFrequencyMarkers(
+    const span<const KmerId>& kmerIds,          // The marker KmerIds for the oriented reads, sorted by ordinal
+    uint64_t maxMarkerFrequency,
+    vector<uint32_t>& lowFrequencyOrdinals)     // The ordinals of the low frequency markers, sorted by KmerId
+{
+
+    // Create a vector of ordinals, sorted by ordinal.
+    const uint64_t markerCount = kmerIds.size();
+    vector<uint32_t> allOrdinals(markerCount);
+    std::iota(allOrdinals.begin(), allOrdinals.end(), uint32_t(0));
+
+    // Now sort them by KmerId.
+    class SortHelper {
+    public:
+        SortHelper(const span<const KmerId>& kmerIds) : kmerIds(kmerIds) {}
+        bool operator()(uint32_t ordinal0, uint32_t ordinal1) const
+        {
+            return kmerIds[ordinal0] < kmerIds[ordinal1];
+        }
+    private:
+        const span<const KmerId>& kmerIds;
+    };
+    sort(allOrdinals.begin(), allOrdinals.end(), SortHelper(kmerIds));
+
+
+
+    // Loop over streaks with the same KmerId.
+    lowFrequencyOrdinals.clear();
+    for(uint64_t streakBegin=0; streakBegin<markerCount; /* Increment later */) {
+        const KmerId kmerId = kmerIds[allOrdinals[streakBegin]];
+
+        // Find the streak with this KmerId.
+        uint64_t streakEnd = streakBegin + 1;
+        while(true) {
+            if(streakEnd == markerCount or kmerIds[allOrdinals[streakEnd]] != kmerId) {
+                break;
+            }
+            ++streakEnd;
+        }
+        const uint64_t streakLength = streakEnd - streakBegin;
+
+        // If short enough, copy to the low frequency ordinals.
+        if(streakLength <= maxMarkerFrequency) {
+            copy(allOrdinals.begin() + streakBegin, allOrdinals.begin() + streakEnd,
+                back_inserter(lowFrequencyOrdinals));
+        }
+
+        // Prepare to process the next streak.
+        streakBegin = streakEnd;
+    }
 }

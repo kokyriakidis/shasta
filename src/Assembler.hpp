@@ -486,6 +486,26 @@ private:
 
 
 
+    // Low frequency markers for each oriented read.
+    // This stores, for each oriented read, the ordinals corresponding
+    // to marker with low frequency (up to maxMarkerFrequency), sorted by KmerId.
+    // Used by alignment method 5. It is only stored durign alignment
+    // computation.
+public:
+    MemoryMapped::VectorOfVectors<uint32_t, uint64_t> lowFrequencyMarkers;
+    void computeLowFrequencyMarkers(uint64_t maxMarkerFrequency, uint64_t threadCount);
+    void computeLowFrequencyMarkers(
+        const span<const KmerId>&,  // The marker k-mers for the oriented reads (sorted by ordinal)
+        uint64_t maxMarkerFrequency,
+        vector<uint32_t>&);         // The ordinals of the low frequency markers, sorted by KmerId.
+private:
+    void computeLowFrequencyMarkersThreadFunction(uint64_t threadId);
+    class CcomputeLowFrequencyMarkersData {
+        uint64_t maxMarkerFrequency;
+    };
+
+
+
     // Low level functions to get marker Kmers/KmerIds of an oriented read.
     // They are obtained from the reads and not from CompressedMarker::kmerId,
     // which will soon go away.
