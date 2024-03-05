@@ -272,6 +272,19 @@ void Assembler::alignOrientedReads5(
     }
 
 
+    // If there are any markers that don't have the same rank, remove them.
+    {
+        vector<CommonKmerInfo> newCommonKmerInfos;
+        for(const CommonKmerInfo& commonKmerInfo: commonKmerInfos) {
+            if(commonKmerInfo.rank0 == commonKmerInfo.rank1) {
+                newCommonKmerInfos.push_back(commonKmerInfo);
+            }
+        }
+        commonKmerInfos.swap(newCommonKmerInfos);
+
+    }
+
+
 
     // Sort them by ordinalSum.
     class OrderByOrdinalSum {
@@ -323,6 +336,13 @@ void Assembler::alignOrientedReads5(
     // for now just check for them.
     for(const CommonKmerInfo& commonKmerInfo: commonKmerInfos) {
         SHASTA_ASSERT(commonKmerInfo.rank0 == commonKmerInfo.rank1);
+    }
+
+
+    if(commonKmerInfos.size() < 2) {
+        alignment.clear();
+        alignmentInfo.create(alignment, uint32_t(allMarkerKmerIds[0].size()), uint32_t(allMarkerKmerIds[1].size()));
+        return;
     }
 
 
