@@ -1,5 +1,6 @@
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
+#include "Reads.hpp"
 #include "seqan.hpp"
 using namespace shasta;
 
@@ -13,6 +14,7 @@ void Assembler::alignOrientedReads5(
     AlignmentInfo& alignmentInfo,
     ostream& html)
 {
+
     // EXPOSE WHEN CODE STABILIZES *******
     const uint64_t maxMarkerFrequency = 1;
     const double driftRateTolerance = 0.02;
@@ -36,11 +38,26 @@ void Assembler::alignOrientedReads5(
     }
 
 
-    // Find the low frequency markers in the two oriented reads, sorted by KmerId.
-    array< vector<uint32_t>, 2> lowFrequencyOrdinals;
-    for(uint64_t i=0; i<2; i++) {
-        computeLowFrequencyMarkers(allMarkerKmerIds[i], maxMarkerFrequency, lowFrequencyOrdinals[i]);
-        if(html) {
+    // Get the low frequency markers in the two oriented reads, sorted by KmerId.
+    array< span<uint32_t>, 2> lowFrequencyOrdinals;
+    array< vector<uint32_t>, 2> lowFrequencyOrdinalsVectors;
+    if(lowFrequencyMarkers.isOpen()) {
+        // Use the stored copy.
+        lowFrequencyOrdinals[0] = lowFrequencyMarkers[orientedReadId0.getValue()];
+        lowFrequencyOrdinals[1] = lowFrequencyMarkers[orientedReadId1.getValue()];
+    }
+    else {
+        // Compute them and store in the local vectors, then have the spans point to them.
+        for(uint64_t i=0; i<2; i++) {
+            computeLowFrequencyMarkers(allMarkerKmerIds[i], maxMarkerFrequency, lowFrequencyOrdinalsVectors[i]);
+            lowFrequencyOrdinals[i] = span<uint32_t>(lowFrequencyOrdinalsVectors[i]);
+        }
+    }
+
+
+
+    if(html) {
+        for(uint64_t i=0; i<2; i++) {
             html << "<br>" << (i==0 ? orientedReadId0 : orientedReadId1) << " has " << allMarkerKmerIds[i].size() <<
                 " markers of which " << lowFrequencyOrdinals[i].size() << " appear up to " <<
                 maxMarkerFrequency << " times." << endl;
@@ -506,14 +523,79 @@ void Assembler::computeLowFrequencyMarkers(
     uint64_t maxMarkerFrequency,
     uint64_t threadCount)
 {
-    SHASTA_ASSERT(0);
+    // Check that we have what we need.
+    SHASTA_ASSERT(markerKmerIds.isOpen());
+
+    // Get the number of reads.
+    const uint64_t readCount = getReads().readCount();
+
+    // Adjust the number of threads, if necessary.
+    if(threadCount == 0) {
+        threadCount = std::thread::hardware_concurrency();
+    }
+
+    // Store the maxMarkerFrequency so all threads can see it.
+    computeLowFrequencyMarkersData.maxMarkerFrequency = maxMarkerFrequency;
+
+    // Initialize the low frequency markers.
+    lowFrequencyMarkers.createNew(largeDataName("LowFrequencyMarkers"), largeDataPageSize);
+
+    // Pass 1 just counts the number of low frequency markers for each oriented read.
+    const uint64_t batchSize = 1;
+    lowFrequencyMarkers.beginPass1(2 * readCount);
+    setupLoadBalancing(readCount, batchSize);
+    runThreads(&Assembler::computeLowFrequencyMarkersThreadFunctionPass1, threadCount);
+
+    // Pass 2 stores the low frequency markers for each oriented read.
+    setupLoadBalancing(getReads().readCount(), batchSize);
+    lowFrequencyMarkers.beginPass2();
+    runThreads(&Assembler::computeLowFrequencyMarkersThreadFunctionPass2, threadCount);
+    lowFrequencyMarkers.endPass2(false, true);
 }
 
 
 
-void Assembler::computeLowFrequencyMarkersThreadFunction(uint64_t threadId)
+void Assembler::computeLowFrequencyMarkersThreadFunctionPass1(uint64_t threadId)
 {
-    SHASTA_ASSERT(0);
+    computeLowFrequencyMarkersThreadFunctionPass12(1);
+}
+void Assembler::computeLowFrequencyMarkersThreadFunctionPass2(uint64_t threadId)
+{
+    computeLowFrequencyMarkersThreadFunctionPass12(2);
+}
+void Assembler::computeLowFrequencyMarkersThreadFunctionPass12(uint64_t pass)
+{
+    const uint64_t maxMarkerFrequency = computeLowFrequencyMarkersData.maxMarkerFrequency;
+    vector<uint32_t> lowFrequencyOrdinals;
+
+    // Loop over all batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over oriented reads in this batch.
+        for(uint32_t readId=ReadId(begin); readId!=ReadId(end); ++readId) {
+            for(uint32_t strand=0; strand<2; strand++) {
+                const OrientedReadId orientedReadId(readId, strand);
+
+                // Compute the low frequency markers.
+                computeLowFrequencyMarkers(
+                    markerKmerIds[orientedReadId.getValue()],
+                    maxMarkerFrequency,
+                    lowFrequencyOrdinals);
+
+                if(pass == 1) {
+                    // Just make space for them.
+                    lowFrequencyMarkers.incrementCountMultithreaded(
+                        orientedReadId.getValue(),
+                        lowFrequencyOrdinals.size());
+                } else {
+                    // Store them.
+                    copy(lowFrequencyOrdinals.begin(), lowFrequencyOrdinals.end(),
+                        lowFrequencyMarkers.begin(orientedReadId.getValue()));
+                }
+            }
+        }
+    }
 }
 
 

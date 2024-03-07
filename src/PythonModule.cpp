@@ -313,6 +313,10 @@ PYBIND11_MODULE(shasta, shastaModule)
             arg("strand0"),
             arg("readId1"),
             arg("strand1"))
+        .def("computeMarkerKmerIds",
+            &Assembler::computeMarkerKmerIds)
+        .def("cleanupMarkerKmerIds",
+            &Assembler::cleanupMarkerKmerIds)
 
 
 

@@ -37,7 +37,10 @@ alignOptions.align4MinEntryCountPerCell = int(config['Align']['align4.minEntryCo
 alignOptions.align4MaxDistanceFromBoundary = int(config['Align']['align4.maxDistanceFromBoundary'])
 
 # Do the computation.
+shasta.openPerformanceLog('ComputeAlignments.log')
+a.computeMarkerKmerIds(0);
 a.computeAlignments(alignOptions, 0)
+a.cleanupMarkerKmerIds();
 
     
     

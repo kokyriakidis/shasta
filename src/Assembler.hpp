@@ -499,10 +499,14 @@ public:
         uint64_t maxMarkerFrequency,
         vector<uint32_t>&);         // The ordinals of the low frequency markers, sorted by KmerId.
 private:
-    void computeLowFrequencyMarkersThreadFunction(uint64_t threadId);
-    class CcomputeLowFrequencyMarkersData {
+    void computeLowFrequencyMarkersThreadFunctionPass1(uint64_t threadId);
+    void computeLowFrequencyMarkersThreadFunctionPass2(uint64_t threadId);
+    void computeLowFrequencyMarkersThreadFunctionPass12(uint64_t pass);
+    class ComputeLowFrequencyMarkersData {
+    public:
         uint64_t maxMarkerFrequency;
     };
+    ComputeLowFrequencyMarkersData computeLowFrequencyMarkersData;
 
 
 

@@ -214,6 +214,8 @@ void Assembler::computeAlignments(
     size_t threadCount
 )
 {
+    const uint64_t maxMarkerFrequency = 1; // EXPOSE? ******
+
     const auto tBegin = steady_clock::now();
     performanceLog << timestamp << "Begin computing alignments for ";
     performanceLog << alignmentCandidates.candidates.size() << " alignment candidates." << endl;
@@ -237,6 +239,12 @@ void Assembler::computeAlignments(
     if(alignOptions.alignMethod == 4) {
         cout << timestamp << "Computing sorted markers." << endl;
         computeSortedMarkers(threadCount);
+    }
+
+    // For alignment method 5, compute low frequency markers.
+    if(alignOptions.alignMethod == 5) {
+        cout << timestamp << "Computing low frequency markers." << endl;
+        computeLowFrequencyMarkers(maxMarkerFrequency, threadCount);
     }
 
     // Pick the batch size for computing alignments.
@@ -289,6 +297,9 @@ void Assembler::computeAlignments(
     // Cleanup.
     if(alignOptions.alignMethod == 4) {
         sortedMarkers.remove();
+    }
+    if(alignOptions.alignMethod == 5) {
+        lowFrequencyMarkers.remove();
     }
 
     cout << "Found and stored " << alignmentData.size() << " good alignments." << endl;
@@ -365,13 +376,10 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
         largeDataName("tmp-ThreadGlobalCompressedAlignments-" + to_string(threadId)),
         largeDataPageSize);
 
+    const uint64_t messageFrequency = min(1000000UL, alignmentCandidates.candidates.size()/20);
+
     uint64_t begin, end;
     while(getNextBatch(begin, end)) {
-        if((begin % 1000000) == 0){
-            std::lock_guard<std::mutex> lock(mutex);
-            performanceLog << timestamp << "Working on alignment " << begin;
-            performanceLog << " of " << alignmentCandidates.candidates.size() << endl;
-        }
 
         for(size_t i=begin; i!=end; i++) {
             const OrientedReadPair& candidate = alignmentCandidates.candidates[i];
@@ -381,6 +389,13 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
             orientedReadIds[0] = OrientedReadId(candidate.readIds[0], 0);
             orientedReadIds[1] = OrientedReadId(candidate.readIds[1], candidate.isSameStrand ? 0 : 1);
 
+            if((i % messageFrequency) == 0){
+                std::lock_guard<std::mutex> lock(mutex);
+                performanceLog << timestamp << "Working on alignment " << i;
+                performanceLog << " of " << alignmentCandidates.candidates.size();
+                // performanceLog << ": " << orientedReadIds[0] << " " << orientedReadIds[1];
+                performanceLog << endl;
+            }
 
 
             // Compute the alignment.
