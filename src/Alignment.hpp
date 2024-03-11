@@ -193,6 +193,10 @@ public:
     // Flag that is set if this alignment is used in the read graph.
     uint8_t isInReadGraph : 1;
 
+    // Uniqueness metric (alignment method 5 only).
+    // See Assembler::alignOrientedReads5.
+    float uniquenessMetric = std::numeric_limits<float>::signaling_NaN();
+
     void clearFlags()
     {
         isInReadGraph = 0;

@@ -44,6 +44,8 @@ namespace shasta {
         {};
 
     enum class AlignmentType;
+
+    class Assembler;
 }
 
 
@@ -158,6 +160,7 @@ public:
         double vertexScalingFactor,
         double edgeThicknessScalingFactor,
         uint64_t maxDistance,
+        const Assembler&,
         ostream& svg) const;
 
     // Write in Graphviz format.

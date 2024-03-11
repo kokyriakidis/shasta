@@ -508,6 +508,7 @@ void Assembler::exploreUndirectedReadGraph(
                        vertexScalingFactor,
                        edgeThicknessScalingFactor,
                        maxDistance,
+                       *this,
                        html);
     }
 

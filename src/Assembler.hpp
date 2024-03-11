@@ -870,7 +870,9 @@ private:
     // The good alignments we found.
     // They are stored with readId0<readId1 and with strand0==0.
     // The order in compressedAlignments matches that in alignmentData.
+public:
     MemoryMapped::Vector<AlignmentData> alignmentData;
+private:
     MemoryMapped::VectorOfVectors<char, uint64_t> compressedAlignments;
 
     void checkAlignmentDataAreOpen() const;
@@ -942,8 +944,8 @@ private:
 
     // Read graph and related functions and data.
     // For more information, see comments in ReadGraph.hpp.
-    ReadGraph readGraph;
 public:
+    ReadGraph readGraph;
     void createReadGraph(
         uint32_t maxAlignmentCount,
         uint32_t maxTrim);

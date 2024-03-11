@@ -1,6 +1,7 @@
 // Shasta.
 #include "LocalReadGraph.hpp"
 #include "Alignment.hpp"
+#include "Assembler.hpp"
 #include "writeGraph.hpp"
 using namespace shasta;
 
@@ -224,6 +225,7 @@ void LocalReadGraph::writeSvg(
     double vertexScalingFactor,
     double edgeThicknessScalingFactor,
     uint64_t maxDistance,
+    const Assembler& assembler,
     ostream& svg) const
 {
     using Graph = LocalReadGraph;
@@ -275,15 +277,42 @@ void LocalReadGraph::writeSvg(
         EdgeAttributes attributes;
 
         attributes.thickness = edgeThicknessScalingFactor * 1.e-6 * double(edge.markerCount);
-        if(edge.color.empty()) {
-            attributes.color = "midnightblue";
+
+        // Extract the uniqueness metric. It is only valid for alignment method 5.
+        // In all other cases it is a signaling Nan.
+        // If the uniqueness metric is available, use it to color the edge.
+        const uint64_t globalEdgeId = edge.globalEdgeId;
+        const ReadGraphEdge& globalEdge = assembler.readGraph.edges[globalEdgeId];
+        const uint64_t alignmentId = globalEdge.alignmentId;
+        const AlignmentData& alignmentData = assembler.alignmentData[alignmentId];
+        const AlignmentInfo& alignmentInfo = alignmentData.info;
+
+        // Set the edge color.
+        if(false /* not std::isnan(alignmentInfo.uniquenessMetric) */) {
+            const float red = 1.;
+            const float green = 5.;
+            if(alignmentInfo.uniquenessMetric <= red) {
+                attributes.color = "red";
+            } else if(alignmentInfo.uniquenessMetric >= green) {
+                attributes.color = "green";
+            } else {
+                const uint64_t h = uint64_t(std::round(alignmentInfo.uniquenessMetric - red) * 120. / (green - red));
+                attributes.color = "hsl(" + to_string(h) + ",100%,50%)";
+            }
         } else {
-            attributes.color = edge.color;
+            if(edge.color.empty()) {
+                attributes.color = "midnightblue";
+            } else {
+                attributes.color = edge.color;
+            }
         }
 
         attributes.tooltip = vertex0.orientedReadId.getString() + " " +
             vertex1.orientedReadId.getString() +
             ", " + to_string(edge.markerCount) + " aligned markers";
+        if(not std::isnan(alignmentInfo.uniquenessMetric)) {
+            attributes.tooltip += ", uniqueness metric " + to_string(alignmentInfo.uniquenessMetric);
+        }
 
         edgeAttributes.insert(make_pair(e, attributes));
     }
