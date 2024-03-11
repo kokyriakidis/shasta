@@ -84,6 +84,9 @@ void Assembler::createMarkerGraphPrimaryJourneys(uint64_t threadCount)
     checkMarkerGraphVerticesAreAvailable();
     checkMarkerGraphEdgesIsOpen();
 
+    if(markerGraph.primaryJourneys.isOpen()) {
+        markerGraph.primaryJourneys.remove();
+    }
 
     markerGraph.primaryJourneys.createNew(
         largeDataName("MarkerGraphPrimaryJourneys"), largeDataPageSize);
