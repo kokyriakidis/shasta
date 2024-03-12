@@ -909,8 +909,8 @@ void CompressedPathGraph::run5(
     const double phaseErrorThreshold = 0.1;
     const double bubbleErrorThreshold = 0.03;
     const uint64_t chainTerminalCommonThreshold = 3;
-    // const uint64_t optimizeChainsMinCommon = 3;
-    // const uint64_t optimizeChainsK = 100;
+    const uint64_t optimizeChainsMinCommon = 3;
+    const uint64_t optimizeChainsK = 100;
 
     write("Initial");
 
@@ -949,6 +949,10 @@ void CompressedPathGraph::run5(
         bubbleErrorThreshold,
         longBubbleThreshold);
     compress();
+    optimizeChains(
+        true,
+        optimizeChainsMinCommon,
+        optimizeChainsK);
     write("A");
 
     // For detangling, expand all bubble chains.
@@ -7617,10 +7621,6 @@ void CompressedPathGraph::optimizeChain(
 
                     }
                 }
-            }
-
-            if(j0 == 0) {
-                break;
             }
         }
         totalAddedEdgesCount += addedEdgesCount;
