@@ -252,12 +252,6 @@ void Assembler::fillServerFunctionTable()
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3AssemblyPath);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3LinkAssembly);
 
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3aAssemblyGraph);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3aTangleMatrix);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3aAssemblyGraphSegment);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3aAssemblyGraphLink);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3aAssemblyPath);
-
     SHASTA_ADD_TO_FUNCTION_TABLE(fillMode3bAssemblyPathStep);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3bPathGraph);
 }
@@ -492,30 +486,6 @@ void Assembler::writeNavigation(ostream& html) const
             {"Compressed assembly graph", "exploreCompressedAssemblyGraph"},
             });
     }
-    /*
-    if(assemblerInfo->assemblyMode == 3) {
-        if(assemblyGraph3Pointer) {
-            // Implementation in the mode3 namespace.
-            writeNavigation(html, "Assembly graph", {
-                {"Local assembly graph", "exploreMode3AssemblyGraph"},
-                {"Assembly graph segments", "exploreMode3AssemblyGraphSegment"},
-                {"Assembly graph segment pairs", "exploreMode3AssemblyGraphSegmentPair"},
-                {"Assembly graph links", "exploreMode3AssemblyGraphLink"},
-                {"Meta-alignments", "exploreMode3MetaAlignment"},
-                {"Assembly paths", "exploreMode3AssemblyPath"},
-                });
-        } else {
-            // Implementation in the mode3a namespace.
-            writeNavigation(html, "Assembly graph", {
-                {"Local assembly graph", "exploreMode3aAssemblyGraph"},
-                {"Assembly graph segments", "exploreMode3aAssemblyGraphSegment"},
-                {"Assembly graph links", "exploreMode3aAssemblyGraphLink"},
-                {"Assembly graph paths", "exploreMode3aAssemblyPath"},
-                {"Tangle matrix", "exploreMode3aTangleMatrix"}
-                });
-        }
-    }
-    */
 
     if (!httpServerData.docsDirectory.empty()) {
         writeNavigation(html, "Help", {
@@ -784,12 +754,8 @@ void Assembler::accessAllSoft()
         try {
             accessMode3AssemblyGraph();
         } catch(const exception& e) {
-            try {
-                accessMode3aAssemblyData();
-            } catch(const exception& e) {
-                cout << "The mode 3 assembly graph is not accessible." << endl;
-                allDataAreAvailable = false;
-            }
+            cout << "The mode 3 assembly graph is not accessible." << endl;
+            allDataAreAvailable = false;
         }
     }
 

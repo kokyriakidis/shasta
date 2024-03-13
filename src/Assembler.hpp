@@ -2377,23 +2377,6 @@ public:
 
 
 
-    // Mode 3 assembly (code in namespace mode3a).
-    void mode3aAssembly(size_t threadCount);
-    class Mode3aAssemblyData {
-    public:
-        shared_ptr<mode3a::PackedMarkerGraph> packedMarkerGraph;
-        vector< shared_ptr<mode3a::AssemblyGraphSnapshot> > assemblyGraphSnapshots;
-    };
-    Mode3aAssemblyData mode3aAssemblyData;
-    void accessMode3aAssemblyData();
-    void exploreMode3aAssemblyGraph(const vector<string>& request, ostream& html);
-    void exploreMode3aAssemblyGraphSegment(const vector<string>&, ostream&);
-    void exploreMode3aAssemblyGraphLink(const vector<string>&, ostream&);
-    void exploreMode3aAssemblyPath(const vector<string>&, ostream&);
-    void exploreMode3aTangleMatrix(const vector<string>& request, ostream& html);
-
-
-
     // Mode 3 assembly.
     // Version in namespace mode3b that uses the complete marker graph.
     void findCompleteMarkerGraphPath(
