@@ -909,8 +909,8 @@ void CompressedPathGraph::run5(
     const double phaseErrorThreshold = 0.1;
     const double bubbleErrorThreshold = 0.03;
     const uint64_t chainTerminalCommonThreshold = 3;
-    const uint64_t optimizeChainsMinCommon = 3;
-    const uint64_t optimizeChainsK = 100;
+    // const uint64_t optimizeChainsMinCommon = 3;
+    // const uint64_t optimizeChainsK = 100;
 
     write("Initial");
 
@@ -949,10 +949,6 @@ void CompressedPathGraph::run5(
         bubbleErrorThreshold,
         longBubbleThreshold);
     compress();
-    optimizeChains(
-        true,
-        optimizeChainsMinCommon,
-        optimizeChainsK);
     write("A");
 
     // For detangling, expand all bubble chains.
@@ -5951,7 +5947,7 @@ void CompressedPathGraph::phaseBubbleChainUsingPhasingTable(
     phasingTable.constructPhasedComponents(debug);
 
 
-#if 0
+#if 1
     // Split each PhasedComponent at locations where this is necessary.
     // Check pairs of adjacent consecutive bubbles in the same phased component.
     vector< shared_ptr<PhasedComponent> > splitComponents;
