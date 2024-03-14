@@ -156,8 +156,8 @@ public:
         uint64_t highCoverageThreshold,
         uint64_t minOffset);
 
-    // Experiment.
-    void removeWeakEdges();
+    // Remove edges for which loss = (commonCount - coverage) / commonCount > maxLoss
+    void removeWeakEdges(double maxLoss);
 
 };
 
@@ -254,6 +254,7 @@ private:
 
     void assembleComponent(
         uint64_t componentId,
+        double maxLoss,
         uint64_t transitiveReductionDistance,
         uint64_t transitiveReductionMaxCoverage,
         uint64_t crossEdgesLowCoverageThreshold,

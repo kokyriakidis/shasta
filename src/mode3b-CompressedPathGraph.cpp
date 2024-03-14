@@ -39,6 +39,7 @@ void GlobalPathGraph::assemble(
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
+    const double maxLoss = 0.1;
     const uint64_t transitiveReductionDistance = 5000;
     const uint64_t transitiveReductionMaxCoverage = 8;
     const uint64_t crossEdgesLowCoverageThreshold = 1;
@@ -56,6 +57,7 @@ void GlobalPathGraph::assemble(
     for(uint64_t componentId=0; componentId<graph.components.size(); componentId++) {
         graph.assembleComponent(
             componentId,
+            maxLoss,
             transitiveReductionDistance,
             transitiveReductionMaxCoverage,
             crossEdgesLowCoverageThreshold,
@@ -70,6 +72,7 @@ void GlobalPathGraph::assemble(
 
 void GlobalPathGraph::assembleComponent(
     uint64_t componentId,
+    double maxLoss,
     uint64_t transitiveReductionDistance,
     uint64_t transitiveReductionMaxCoverage,
     uint64_t crossEdgesLowCoverageThreshold,
@@ -94,7 +97,7 @@ void GlobalPathGraph::assembleComponent(
     }
 
     // Experiment: use removeWeakEdges instead of localTransitiveReduction.
-    component.removeWeakEdges();
+    component.removeWeakEdges(maxLoss);
 
 #if 0
     // Local transitive reduction.

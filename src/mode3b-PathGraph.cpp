@@ -724,8 +724,8 @@ void PathGraph::removeCrossEdges(
 
 
 
-// Experiment.
-void PathGraph::removeWeakEdges()
+// Remove edges for which loss = (commonCount - coverage) / commonCount > maxLoss
+void PathGraph::removeWeakEdges(double maxLoss)
 {
     PathGraph& graph = *this;
 
@@ -733,7 +733,8 @@ void PathGraph::removeWeakEdges()
     vector<edge_descriptor> edgesToBeRemoved;
     BGL_FORALL_EDGES(e, graph, PathGraph) {
         const PathGraphEdge& edge = graph[e];
-        if(edge.coverage < edge.info.common) {
+        const double loss = double(edge.info.common - edge.coverage) / double(edge.info.common);
+        if(loss > maxLoss) {
             edgesToBeRemoved.push_back(e);
         }
     }
