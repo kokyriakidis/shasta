@@ -510,6 +510,52 @@ void PathGraph::writeGraphviz(
 
 
 
+void PathGraph::writeEdgeCoverageHistogram(const string& fileName) const
+{
+    const PathGraph& pathGraph = *this;
+
+    // Create a histogram indexed by histogram[coverage][commonCount].
+    vector< vector<uint64_t> > histogram;
+
+    // Loop over all edges.
+    BGL_FORALL_EDGES(e, pathGraph, PathGraph) {
+        const PathGraphEdge& edge = pathGraph[e];
+        const uint64_t coverage = edge.coverage;
+        const uint64_t commonCount = edge.info.common;
+        SHASTA_ASSERT(coverage <= commonCount);
+
+        // Increment the histogram, making space as necessary.
+        if(coverage >= histogram.size()) {
+            histogram.resize(coverage + 1);
+        }
+        vector<uint64_t>& h = histogram[coverage];
+        if(commonCount >= h.size()) {
+            h.resize(commonCount + 1, 0);
+        }
+        ++h[commonCount];
+    }
+
+    // Write out the histogram.
+    ofstream csv(fileName);
+    csv << "Coverage,Common count,Loss,Frequency\n";
+    for(uint64_t coverage=0; coverage<histogram.size(); coverage++) {
+        const vector<uint64_t>& h = histogram[coverage];
+        for(uint64_t commonCount=0; commonCount<h.size(); commonCount++) {
+            const uint64_t frequency = h[commonCount];
+
+            if(frequency > 0) {
+                const uint64_t loss = commonCount - coverage;
+                csv << coverage << ",";
+                csv << commonCount << ",";
+                csv << loss << ",";
+                csv << frequency << "\n";
+            }
+        }
+    }
+}
+
+
+
 // Create the connected components of this PathGraph,
 // without changing the PathGraph itself.
 vector< shared_ptr<PathGraph> > PathGraph::createConnectedComponents(

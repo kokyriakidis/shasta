@@ -135,6 +135,8 @@ public:
         const GlobalPathGraphDisplayOptions&,
         const MarkerGraph&) const;
 
+    void writeEdgeCoverageHistogram(const string& fileName) const;
+
     // Create the connected components of this PathGraph,
     // without changing the PathGraph itself.
     vector< shared_ptr<PathGraph> > createConnectedComponents(uint64_t minComponentSize) const;

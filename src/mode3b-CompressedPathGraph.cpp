@@ -90,6 +90,7 @@ void GlobalPathGraph::assembleComponent(
         options.makeCompact();
         component.writeGraphviz(
             "PathGraphCompactInitial" + to_string(componentId), options, assembler.markerGraph);
+        component.writeEdgeCoverageHistogram("PathGraphInitial" + to_string(componentId) + "-EdgeCoverageHistogram.csv");
     }
 
     // Experiment: use removeWeakEdges instead of localTransitiveReduction.
