@@ -263,6 +263,7 @@ private:
         uint64_t threadCount0,
         uint64_t threadCount1);
 
+public:
     static void searchForDetangling(
         const array<MarkerGraphEdgeId, 2>& in,
         const array<MarkerGraphEdgeId, 2>& out,

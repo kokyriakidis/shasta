@@ -425,6 +425,17 @@ private:
         bool useBayesianModel,
         double epsilon,
         double minLogP);
+    bool detangleEdgesWithSearch(
+        bool debug,
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
+    bool detangleEdgeWithSearch(
+        bool debug,
+        std::map<uint64_t, edge_descriptor>& edgeMap,
+        std::map<uint64_t, edge_descriptor>::iterator&,
+        uint64_t detangleToleranceLow,
+        uint64_t detangleToleranceHigh);
+
     bool removeSelfComplementaryEdges();
 
     // Special treatment to detangle back edges that were too long
