@@ -31,142 +31,24 @@ using namespace mode3b;
 
 
 
-namespace shasta {
-    void searchForDetangling(
-        const Assembler& assembler,
-        const array<MarkerGraphEdgeId, 2>& in,
-        const array<MarkerGraphEdgeId, 2>& out);
-}
-
-void shasta::searchForDetangling(
+void GlobalPathGraph::assemble(
     const Assembler& assembler,
-    const array<MarkerGraphEdgeId, 2>& in,
-    const array<MarkerGraphEdgeId, 2>& out)
+    uint64_t threadCount0,
+    uint64_t threadCount1)
 {
+#if 1
+    // Experiments.
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t highCommonCountThreshold = 6;
     const uint64_t lowCommonCountThreshold = 1;
-
-    // Loop over the primary journeys of oriented reads in the "in" primary edges.
-    // Only use the journey portion following the "in" primary edges.
-    array<vector<MarkerGraphEdgeId>, 2> inFollowers;
-    array<vector<uint64_t>, 2> inFollowersCommonCount;
-    for(uint64_t i=0; i<2; i++) {
-        assembler.markerGraph.followPrimaryJourneysForward(in[i], inFollowers[i], inFollowersCommonCount[i]);
-    }
-
-
-
-    // Find inFollowers that have high common count with in[0]
-    // and low common count with in[1], or vice versa.
-    array<vector<MarkerGraphEdgeId>, 2> inCandidates;
-    {
-        uint64_t i0 = 0;
-        uint64_t i1 = 0;
-        uint64_t end0 = inFollowers[0].size();
-        uint64_t end1 = inFollowers[1].size();
-        while(i0<end0 and i1<end1) {
-            const MarkerGraphEdgeId edgeId0 = inFollowers[0][i0];
-            const MarkerGraphEdgeId edgeId1 = inFollowers[1][i1];
-
-            if(edgeId0 < edgeId1) {
-                // edgeId0 is in inFollowers[0] but not in inFollowers[1].
-                if(inFollowersCommonCount[0][i0] >= highCommonCountThreshold) {
-                    inCandidates[0].push_back(edgeId0);
-                }
-                ++i0;
-            }
-
-            else if(edgeId1 < edgeId0) {
-                // edgeId1 is in inFollowers[1] but not in inFollowers[0].
-                if(inFollowersCommonCount[1][i1] >= highCommonCountThreshold) {
-                    inCandidates[1].push_back(edgeId1);
-                }
-                ++i1;
-            }
-
-            else {
-                // edgeId0 is in inFollowers[0] and in inFollowers[1].
-                const uint64_t common0 = inFollowersCommonCount[0][i0];
-                const uint64_t common1 = inFollowersCommonCount[1][i1];
-                if(common0 >= highCommonCountThreshold and common1 <= lowCommonCountThreshold) {
-                    inCandidates[0].push_back(edgeId0);
-                }
-                else if(common1 >= highCommonCountThreshold and common0 <= lowCommonCountThreshold) {
-                    inCandidates[1].push_back(edgeId1);
-                }
-                ++i0;
-                ++i1;
-            }
-        }
-    }
-
-
-
-    // Loop over the primary journeys of oriented reads in the "out" primary edges.
-    // Only use the journey portion preceding the "out" primary edges.
-    array<vector<MarkerGraphEdgeId>, 2> outPreceders;
-    array<vector<uint64_t>, 2> outPrecedersCommonCount;
-    for(uint64_t i=0; i<2; i++) {
-        assembler.markerGraph.followPrimaryJourneysBackward(out[i], outPreceders[i], outPrecedersCommonCount[i]);
-    }
-
-
-
-    // Find outPreceders that have high common count with out[0]
-    // and low common count with out[1], or vice versa.
-    array<vector<MarkerGraphEdgeId>, 2> outCandidates;
-    {
-        uint64_t i0 = 0;
-        uint64_t i1 = 0;
-        uint64_t end0 = outPreceders[0].size();
-        uint64_t end1 = outPreceders[1].size();
-        while(i0<end0 and i1<end1) {
-            const MarkerGraphEdgeId edgeId0 = outPreceders[0][i0];
-            const MarkerGraphEdgeId edgeId1 = outPreceders[1][i1];
-
-            if(edgeId0 < edgeId1) {
-                // edgeId0 is in outPreceders[0] but not in outPreceders[1].
-                if(outPrecedersCommonCount[0][i0] >= highCommonCountThreshold) {
-                    outCandidates[0].push_back(edgeId0);
-                }
-                ++i0;
-            }
-
-            else if(edgeId1 < edgeId0) {
-                // edgeId1 is in outPreceders[1] but not in outPreceders[0].
-                if(outPrecedersCommonCount[1][i1] >= highCommonCountThreshold) {
-                    outCandidates[1].push_back(edgeId1);
-                }
-                ++i1;
-            }
-
-            else {
-                // edgeId0 is in outPreceders[0] and in outPreceders[1].
-                const uint64_t common0 = outPrecedersCommonCount[0][i0];
-                const uint64_t common1 = outPrecedersCommonCount[1][i1];
-                if(common0 >= highCommonCountThreshold and common1 <= lowCommonCountThreshold) {
-                    outCandidates[0].push_back(edgeId0);
-                }
-                else if(common1 >= highCommonCountThreshold and common0 <= lowCommonCountThreshold) {
-                    outCandidates[1].push_back(edgeId1);
-                }
-                ++i0;
-                ++i1;
-            }
-        }
-    }
-
-
-    // Find MarkerGraphEdgeIds that are bot inCandidates and outCandidates.
-    vector<MarkerGraphEdgeId> hits;
+    array<array<vector<MarkerGraphEdgeId>, 2>, 2> detanglingCandidates;
+    GlobalPathGraph::searchForDetangling(
+        {28114676, 42650741}, {35953648, 35953649},
+        highCommonCountThreshold, lowCommonCountThreshold,
+        assembler, detanglingCandidates);
     for(uint64_t i0=0; i0<2; i0++) {
         for(uint64_t i1=0; i1<2; i1++) {
-            hits.clear();
-            std::set_intersection(
-                inCandidates[i0].begin(), inCandidates[i0].end(),
-                outCandidates[i1].begin(), outCandidates[i1].end(),
-                back_inserter(hits));
+            const auto& hits = detanglingCandidates[i0][i1];
             cout << "Found " << hits.size() << " hits for " << i0 << " " << i1 << ":" << endl;
             if(not hits.empty()) {
                 copy(hits.begin(), hits.end(), ostream_iterator<MarkerGraphEdgeId>(cout, " "));
@@ -174,20 +56,6 @@ void shasta::searchForDetangling(
             }
         }
     }
-}
-
-
-
-void GlobalPathGraph::assemble(
-    const Assembler& assembler,
-    uint64_t threadCount0,
-    uint64_t threadCount1)
-{
-#if 0
-    // Experiments.
-    searchForDetangling(
-        assembler,
-        {28114676, 42650741}, {35953648, 35953649});
     return;
 #endif
 

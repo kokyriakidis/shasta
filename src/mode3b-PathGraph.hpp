@@ -262,6 +262,15 @@ private:
         uint64_t crossEdgesMinOffset,
         uint64_t threadCount0,
         uint64_t threadCount1);
+
+    static void searchForDetangling(
+        const array<MarkerGraphEdgeId, 2>& in,
+        const array<MarkerGraphEdgeId, 2>& out,
+        uint64_t highCommonCountThreshold,
+        uint64_t lowCommonCountThreshold,
+        const Assembler&,
+        array<array<vector<MarkerGraphEdgeId>, 2>, 2>&);
+
 };
 
 
