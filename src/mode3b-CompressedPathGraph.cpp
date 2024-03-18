@@ -1002,7 +1002,7 @@ void CompressedPathGraph::run5(
     write("E2");
     // detangleShortSuperbubbles(false, 30000, detangleToleranceLow, detangleToleranceHigh);
 
-    detangleEdgesWithSearch(true, detangleWithSearchToleranceLow, detangleWithSearchToleranceHigh);
+    // detangleEdgesWithSearch(true, detangleWithSearchToleranceLow, detangleWithSearchToleranceHigh);
 
     compress();
     compressBubbleChains();
