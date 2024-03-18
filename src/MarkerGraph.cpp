@@ -1,6 +1,7 @@
 // Shasta.
 #include "MarkerGraph.hpp"
 #include "Coverage.hpp"
+#include "deduplicate.hpp"
 #include "findMarkerId.hpp"
 #include "invalid.hpp"
 #include "markerAccessFunctions.hpp"
@@ -988,5 +989,74 @@ void MarkerGraph::createPrimaryJourneysThreadFunction3(uint64_t threadId)
             sort(journey.begin(), journey.end());
         }
     }
+}
+
+
+
+// Starting from a primary marker graph edge, follow the primary journeys
+// of all oriented reads on the edge, moving forward.
+// Find the set of MarkerGraphEdgeIds that were encountered in this way,
+// and for each the number of times it was encountered.
+void MarkerGraph::followPrimaryJourneysForward(
+    MarkerGraphEdgeId edgeId0,
+    vector<MarkerGraphEdgeId>& edgeIds,
+    vector<uint64_t>& count) const
+{
+    edgeIds.clear();
+    count.clear();
+
+    // Loop over the oriented reads in edgeId0.
+    for(const MarkerInterval& markerInterval: edgeMarkerIntervals[edgeId0]) {
+        const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+        const auto primaryJourney = primaryJourneys[orientedReadId.getValue()];
+
+        // Loop over the primary journey backward, stopping when we encounter edgeId0.
+        for(uint64_t j=primaryJourney.size(); /* Check later */; --j) {
+            const auto& primaryJourneyEntry = primaryJourney[j];
+            const MarkerGraphEdgeId edgeId1 = primaryJourneyEntry.edgeId;
+            if(edgeId1 == edgeId0) {
+                break;
+            }
+            edgeIds.push_back(edgeId1);
+            if(j == 0) {
+                break;
+            }
+        }
+    }
+
+    deduplicateAndCount(edgeIds, count);
+    SHASTA_ASSERT(edgeIds.size() == count.size());
+
+}
+
+
+
+// Same, but moving backward.
+void MarkerGraph::followPrimaryJourneysBackward(
+    MarkerGraphEdgeId edgeId0,
+    vector<MarkerGraphEdgeId>& edgeIds,
+    vector<uint64_t>& count) const
+{
+    edgeIds.clear();
+    count.clear();
+
+    // Loop over the oriented reads in edgeId0.
+    for(const MarkerInterval& markerInterval: edgeMarkerIntervals[edgeId0]) {
+        const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+        const auto primaryJourney = primaryJourneys[orientedReadId.getValue()];
+
+        // Loop over the primary journey, stopping when we encounter edgeId0.
+        for(const auto& primaryJourneyEntry: primaryJourney) {
+            const MarkerGraphEdgeId edgeId1 = primaryJourneyEntry.edgeId;
+            if(edgeId1 == edgeId0) {
+                break;
+            }
+            edgeIds.push_back(edgeId1);
+        }
+    }
+
+    deduplicateAndCount(edgeIds, count);
+    SHASTA_ASSERT(edgeIds.size() == count.size());
+
 }
 

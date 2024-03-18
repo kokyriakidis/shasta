@@ -427,6 +427,24 @@ private:
     void createPrimaryJourneysThreadFunction12(uint64_t pass);
     void createPrimaryJourneysThreadFunction3(uint64_t threadId);
 
+public:
+
+    // Starting from a primary marker graph edge, follow the primary journeys
+    // of all oriented reads on the edge, moving forward.
+    // Find the set of MarkerGraphEdgeIds that were encountered in this way,
+    // and for each the number of times it was encountered.
+    void followPrimaryJourneysForward(
+        MarkerGraphEdgeId,
+        vector<MarkerGraphEdgeId>&,
+        vector<uint64_t>& count
+        ) const;
+    // Same, but moving backward.
+    void followPrimaryJourneysBackward(
+        MarkerGraphEdgeId,
+        vector<MarkerGraphEdgeId>&,
+        vector<uint64_t>& count
+        ) const;
+
 };
 
 #endif

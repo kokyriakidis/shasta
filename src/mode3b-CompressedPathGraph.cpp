@@ -52,29 +52,7 @@ void shasta::searchForDetangling(
     array<vector<MarkerGraphEdgeId>, 2> inFollowers;
     array<vector<uint64_t>, 2> inFollowersCommonCount;
     for(uint64_t i=0; i<2; i++) {
-        const MarkerGraphEdgeId edgeId0 = in[i];
-
-        // Loop over the oriented reads in edgeId0.
-        vector<MarkerGraphEdgeId> edgeIds;
-        for(const MarkerInterval& markerInterval: assembler.markerGraph.edgeMarkerIntervals[edgeId0]) {
-            const OrientedReadId orientedReadId = markerInterval.orientedReadId;
-            const auto primaryJourney = assembler.markerGraph.primaryJourneys[orientedReadId.getValue()];
-
-            // Loop over the primary journey backward, stopping when we encounter edgeId0.
-            for(uint64_t j=primaryJourney.size(); /* Check later */; --j) {
-                const auto& primaryJourneyEntry = primaryJourney[j];
-                const MarkerGraphEdgeId edgeId1 = primaryJourneyEntry.edgeId;
-                if(edgeId1 == edgeId0) {
-                    break;
-                }
-                inFollowers[i].push_back(edgeId1);
-                if(j == 0) {
-                    break;
-                }
-            }
-        }
-
-        deduplicateAndCount(inFollowers[i], inFollowersCommonCount[i]);
+        assembler.markerGraph.followPrimaryJourneysForward(in[i], inFollowers[i], inFollowersCommonCount[i]);
     }
 
 
@@ -130,26 +108,7 @@ void shasta::searchForDetangling(
     array<vector<MarkerGraphEdgeId>, 2> outPreceders;
     array<vector<uint64_t>, 2> outPrecedersCommonCount;
     for(uint64_t i=0; i<2; i++) {
-        const MarkerGraphEdgeId edgeId0 = out[i];
-
-        // Loop over the oriented reads in edgeId0.
-        vector<MarkerGraphEdgeId> edgeIds;
-        for(const MarkerInterval& markerInterval: assembler.markerGraph.edgeMarkerIntervals[edgeId0]) {
-            const OrientedReadId orientedReadId = markerInterval.orientedReadId;
-            const auto primaryJourney = assembler.markerGraph.primaryJourneys[orientedReadId.getValue()];
-
-            // Loop over the primary journey forward, stopping when we encounter edgeId0.
-            for(const auto& primaryJourneyEntry : primaryJourney) {
-                const MarkerGraphEdgeId edgeId1 = primaryJourneyEntry.edgeId;
-                if(edgeId1 == edgeId0) {
-                    break;
-                }
-                outPreceders[i].push_back(edgeId1);
-            }
-        }
-
-        vector<uint64_t> count;
-        deduplicateAndCount(outPreceders[i], outPrecedersCommonCount[i]);
+        assembler.markerGraph.followPrimaryJourneysBackward(out[i], outPreceders[i], outPrecedersCommonCount[i]);
     }
 
 
