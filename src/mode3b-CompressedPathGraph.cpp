@@ -31,11 +31,208 @@ using namespace mode3b;
 
 
 
+namespace shasta {
+    void searchForDetangling(
+        const Assembler& assembler,
+        const array<MarkerGraphEdgeId, 2>& in,
+        const array<MarkerGraphEdgeId, 2>& out);
+}
+
+void shasta::searchForDetangling(
+    const Assembler& assembler,
+    const array<MarkerGraphEdgeId, 2>& in,
+    const array<MarkerGraphEdgeId, 2>& out)
+{
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t highCommonCountThreshold = 6;
+    const uint64_t lowCommonCountThreshold = 1;
+
+    // Loop over the primary journeys of oriented reads in the "in" primary edges.
+    // Only use the journey portion following the "in" primary edges.
+    array<vector<MarkerGraphEdgeId>, 2> inFollowers;
+    array<vector<uint64_t>, 2> inFollowersCommonCount;
+    for(uint64_t i=0; i<2; i++) {
+        const MarkerGraphEdgeId edgeId0 = in[i];
+
+        // Loop over the oriented reads in edgeId0.
+        vector<MarkerGraphEdgeId> edgeIds;
+        for(const MarkerInterval& markerInterval: assembler.markerGraph.edgeMarkerIntervals[edgeId0]) {
+            const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+            const auto primaryJourney = assembler.markerGraph.primaryJourneys[orientedReadId.getValue()];
+
+            // Loop over the primary journey backward, stopping when we encounter edgeId0.
+            for(uint64_t j=primaryJourney.size(); /* Check later */; --j) {
+                const auto& primaryJourneyEntry = primaryJourney[j];
+                const MarkerGraphEdgeId edgeId1 = primaryJourneyEntry.edgeId;
+                if(edgeId1 == edgeId0) {
+                    break;
+                }
+                inFollowers[i].push_back(edgeId1);
+                if(j == 0) {
+                    break;
+                }
+            }
+        }
+
+        deduplicateAndCount(inFollowers[i], inFollowersCommonCount[i]);
+    }
+
+
+
+    // Find inFollowers that have high common count with in[0]
+    // and low common count with in[1], or vice versa.
+    array<vector<MarkerGraphEdgeId>, 2> inCandidates;
+    {
+        uint64_t i0 = 0;
+        uint64_t i1 = 0;
+        uint64_t end0 = inFollowers[0].size();
+        uint64_t end1 = inFollowers[1].size();
+        while(i0<end0 and i1<end1) {
+            const MarkerGraphEdgeId edgeId0 = inFollowers[0][i0];
+            const MarkerGraphEdgeId edgeId1 = inFollowers[1][i1];
+
+            if(edgeId0 < edgeId1) {
+                // edgeId0 is in inFollowers[0] but not in inFollowers[1].
+                if(inFollowersCommonCount[0][i0] >= highCommonCountThreshold) {
+                    inCandidates[0].push_back(edgeId0);
+                }
+                ++i0;
+            }
+
+            else if(edgeId1 < edgeId0) {
+                // edgeId1 is in inFollowers[1] but not in inFollowers[0].
+                if(inFollowersCommonCount[1][i1] >= highCommonCountThreshold) {
+                    inCandidates[1].push_back(edgeId1);
+                }
+                ++i1;
+            }
+
+            else {
+                // edgeId0 is in inFollowers[0] and in inFollowers[1].
+                const uint64_t common0 = inFollowersCommonCount[0][i0];
+                const uint64_t common1 = inFollowersCommonCount[1][i1];
+                if(common0 >= highCommonCountThreshold and common1 <= lowCommonCountThreshold) {
+                    inCandidates[0].push_back(edgeId0);
+                }
+                else if(common1 >= highCommonCountThreshold and common0 <= lowCommonCountThreshold) {
+                    inCandidates[1].push_back(edgeId1);
+                }
+                ++i0;
+                ++i1;
+            }
+        }
+    }
+
+
+
+    // Loop over the primary journeys of oriented reads in the "out" primary edges.
+    // Only use the journey portion preceding the "out" primary edges.
+    array<vector<MarkerGraphEdgeId>, 2> outPreceders;
+    array<vector<uint64_t>, 2> outPrecedersCommonCount;
+    for(uint64_t i=0; i<2; i++) {
+        const MarkerGraphEdgeId edgeId0 = out[i];
+
+        // Loop over the oriented reads in edgeId0.
+        vector<MarkerGraphEdgeId> edgeIds;
+        for(const MarkerInterval& markerInterval: assembler.markerGraph.edgeMarkerIntervals[edgeId0]) {
+            const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+            const auto primaryJourney = assembler.markerGraph.primaryJourneys[orientedReadId.getValue()];
+
+            // Loop over the primary journey forward, stopping when we encounter edgeId0.
+            for(const auto& primaryJourneyEntry : primaryJourney) {
+                const MarkerGraphEdgeId edgeId1 = primaryJourneyEntry.edgeId;
+                if(edgeId1 == edgeId0) {
+                    break;
+                }
+                outPreceders[i].push_back(edgeId1);
+            }
+        }
+
+        vector<uint64_t> count;
+        deduplicateAndCount(outPreceders[i], outPrecedersCommonCount[i]);
+    }
+
+
+
+    // Find outPreceders that have high common count with out[0]
+    // and low common count with out[1], or vice versa.
+    array<vector<MarkerGraphEdgeId>, 2> outCandidates;
+    {
+        uint64_t i0 = 0;
+        uint64_t i1 = 0;
+        uint64_t end0 = outPreceders[0].size();
+        uint64_t end1 = outPreceders[1].size();
+        while(i0<end0 and i1<end1) {
+            const MarkerGraphEdgeId edgeId0 = outPreceders[0][i0];
+            const MarkerGraphEdgeId edgeId1 = outPreceders[1][i1];
+
+            if(edgeId0 < edgeId1) {
+                // edgeId0 is in outPreceders[0] but not in outPreceders[1].
+                if(outPrecedersCommonCount[0][i0] >= highCommonCountThreshold) {
+                    outCandidates[0].push_back(edgeId0);
+                }
+                ++i0;
+            }
+
+            else if(edgeId1 < edgeId0) {
+                // edgeId1 is in outPreceders[1] but not in outPreceders[0].
+                if(outPrecedersCommonCount[1][i1] >= highCommonCountThreshold) {
+                    outCandidates[1].push_back(edgeId1);
+                }
+                ++i1;
+            }
+
+            else {
+                // edgeId0 is in outPreceders[0] and in outPreceders[1].
+                const uint64_t common0 = outPrecedersCommonCount[0][i0];
+                const uint64_t common1 = outPrecedersCommonCount[1][i1];
+                if(common0 >= highCommonCountThreshold and common1 <= lowCommonCountThreshold) {
+                    outCandidates[0].push_back(edgeId0);
+                }
+                else if(common1 >= highCommonCountThreshold and common0 <= lowCommonCountThreshold) {
+                    outCandidates[1].push_back(edgeId1);
+                }
+                ++i0;
+                ++i1;
+            }
+        }
+    }
+
+
+    // Find MarkerGraphEdgeIds that are bot inCandidates and outCandidates.
+    vector<MarkerGraphEdgeId> hits;
+    for(uint64_t i0=0; i0<2; i0++) {
+        for(uint64_t i1=0; i1<2; i1++) {
+            hits.clear();
+            std::set_intersection(
+                inCandidates[i0].begin(), inCandidates[i0].end(),
+                outCandidates[i1].begin(), outCandidates[i1].end(),
+                back_inserter(hits));
+            cout << "Found " << hits.size() << " hits for " << i0 << " " << i1 << ":" << endl;
+            if(not hits.empty()) {
+                copy(hits.begin(), hits.end(), ostream_iterator<MarkerGraphEdgeId>(cout, " "));
+                cout << endl;
+            }
+        }
+    }
+}
+
+
+
 void GlobalPathGraph::assemble(
     const Assembler& assembler,
     uint64_t threadCount0,
     uint64_t threadCount1)
 {
+#if 0
+    // Experiments.
+    searchForDetangling(
+        assembler,
+        {28114676, 42650741}, {35953648, 35953649});
+    return;
+#endif
+
+
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
     const double minCorrectedJaccard = 0.;
     const uint64_t minComponentSize = 3;
