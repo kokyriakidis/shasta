@@ -1,5 +1,4 @@
-#ifndef SHASTA_MODE3B_ASSEMBLY_PATH_HPP
-#define SHASTA_MODE3B_ASSEMBLY_PATH_HPP
+#pragma once
 
 #include "MarkerGraphEdgePairInfo.hpp"
 #include "MultithreadedObject.hpp"
@@ -96,4 +95,3 @@ private:
     void assembleThreadFunction(uint64_t threadId);
 };
 
-#endif

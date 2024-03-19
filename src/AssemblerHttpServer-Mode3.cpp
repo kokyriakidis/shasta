@@ -23,7 +23,7 @@ using namespace mode3;
 
 
 
-void Assembler::exploreMode3bPathGraph(const vector<string>& request, ostream& html)
+void Assembler::exploreMode3PathGraph(const vector<string>& request, ostream& html)
 {
 #if 0
     // Get these from a form.

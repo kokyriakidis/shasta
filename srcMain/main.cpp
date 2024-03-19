@@ -1119,7 +1119,7 @@ void shasta::main::mode3Assembly(
     assembler.createMarkerGraphPrimaryJourneys(threadCount);
 
     // Use the complete marker graph to run Mode 3 assembly.
-    assembler.findMode3bPaths(threadCount, threadCount);
+    assembler.findMode3Paths(threadCount, threadCount);
 }
 
 

@@ -2,14 +2,9 @@
 
 import shasta
 import argparse
-import GetConfig
 
-# Read the config file.
-config = GetConfig.getConfig()
-
-# Parse the command line arguments.
 parser = argparse.ArgumentParser(description=
-    'Rerun Mode 3 assembly.')
+    'Find and assemble paths in the complete marker graph.')
 parser.add_argument('threadCount0', type=int, 
     help='Number of threads for high level parallelization')
 parser.add_argument('threadCount1', type=int, 
@@ -19,22 +14,13 @@ arguments = parser.parse_args()
 if arguments.threadCount0 <= 0 or arguments.threadCount1 <=0:
     raise Exception("Numbers of threads must be positive.")    
 
-
-# Create the Assembler object and access what we need.
 a = shasta.Assembler()
 a.accessMarkers()
 a.accessMarkerGraphVertices()
-a.accessMarkerGraphEdges(True)
+a.accessMarkerGraphEdges()
 a.accessMarkerGraphReverseComplementEdge()
 a.accessMarkerGraphConsensus()
 a.accessMarkerGraphPrimaryJourneys()
-
-# Redo Mode 3 assembly.
-shasta.openPerformanceLog('Mode3Reassembly.log')
-a.flagPrimaryMarkerGraphEdges(
-    int(config['MarkerGraph']['minPrimaryEdgeCoverage']), 
-    int(config['MarkerGraph']['maxPrimaryEdgeCoverage']), 
-    0)
-a.createMarkerGraphPrimaryJourneys(0)
-a.findMode3bPaths(arguments.threadCount0, arguments.threadCount1)
+shasta.openPerformanceLog('FindMode3Paths.log')
+a.findMode3Paths(arguments.threadCount0, arguments.threadCount1)
  

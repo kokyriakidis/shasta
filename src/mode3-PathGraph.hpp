@@ -1,5 +1,4 @@
-#ifndef SHASTA_MODE3B_PATH_GRAPH_HPP
-#define SHASTA_MODE3B_PATH_GRAPH_HPP
+#pragma once
 
 /*******************************************************************************
 
@@ -274,7 +273,4 @@ public:
 
 };
 
-
-
-#endif
 

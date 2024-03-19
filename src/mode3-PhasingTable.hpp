@@ -1,5 +1,4 @@
-#ifndef SHASTA_MODE3B_PHASING_TABLE_HPP
-#define SHASTA_MODE3B_PHASING_TABLE_HPP
+#pragma once
 
 // Shasta.
 #include "invalid.hpp"
@@ -248,5 +247,4 @@ private:
     void writeDetailsCsv(const string& fileNamePrefix) const;
 };
 
-#endif
 

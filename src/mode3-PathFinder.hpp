@@ -1,5 +1,4 @@
-#ifndef SHASTA_MODE3B_PATH_FINDER_HPP
-#define SHASTA_MODE3B_PATH_FINDER_HPP
+#pragma once
 
 #include "MappedMemoryOwner.hpp"
 #include "MarkerGraphEdgePairInfo.hpp"
@@ -206,4 +205,3 @@ public:
     CreateMarkerGraphEdgeTableData createMarkerGraphEdgeTableData;
 };
 
-#endif

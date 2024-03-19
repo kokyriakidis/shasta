@@ -244,8 +244,8 @@ void Assembler::fillServerFunctionTable()
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreAssemblyGraphEdgesSupport);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreCompressedAssemblyGraph);
 
-    SHASTA_ADD_TO_FUNCTION_TABLE(fillMode3bAssemblyPathStep);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3bPathGraph);
+    SHASTA_ADD_TO_FUNCTION_TABLE(fillMode3AssemblyPathStep);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3PathGraph);
 }
 #undef SHASTA_ADD_TO_FUNCTION_TABLE
 
@@ -453,8 +453,8 @@ void Assembler::writeNavigation(ostream& html) const
             {"Induced alignments", "exploreMarkerGraphInducedAlignment"},
             {"Follow a read in the marker graph", "followReadInMarkerGraph"},
             {"Marker connectivity", "exploreMarkerConnectivity"},
-            {"Assembly path step", "fillMode3bAssemblyPathStep"},
-            {"Path graph", "exploreMode3bPathGraph"},
+            {"Assembly path step", "fillMode3AssemblyPathStep"},
+            {"Path graph", "exploreMode3PathGraph"},
             });
     } else {
         writeNavigation(html, "Marker graph", {

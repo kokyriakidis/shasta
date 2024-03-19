@@ -1,5 +1,4 @@
-#ifndef SHASTA_MODE3B_PHASED_COMPONENT_HPP
-#define SHASTA_MODE3B_PHASED_COMPONENT_HPP
+#pragma once
 
 #include "cstdint.hpp"
 #include "utility.hpp"
@@ -27,6 +26,4 @@ public:
     void sort();
     void computePositionRange();
 };
-
-#endif
 

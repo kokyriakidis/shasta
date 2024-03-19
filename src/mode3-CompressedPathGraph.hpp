@@ -1,5 +1,4 @@
-#ifndef SHASTA_MODE3B_COMPRESSED_PATH_GRAPH_HPP
-#define SHASTA_MODE3B_COMPRESSED_PATH_GRAPH_HPP
+#pragma once
 
 // Shasta
 #include "Base.hpp"
@@ -796,4 +795,3 @@ private:
         ) const;
 };
 
-#endif

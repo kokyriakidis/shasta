@@ -1,5 +1,4 @@
-#ifndef SHASTA_MODE3B_PATH_FILLER3_HPP
-#define SHASTA_MODE3B_PATH_FILLER3_HPP
+#pragma once
 
 // PathFiller3 assembles the sequence between two primary marker graph edges.
 // It uses a local marker graph.
@@ -337,4 +336,3 @@ private:
     void clear();
 };
 
-#endif

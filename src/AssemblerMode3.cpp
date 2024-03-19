@@ -111,7 +111,7 @@ void Assembler::writeMarkerGraphPrimaryJourneys()
 
 
 
-void Assembler::findMode3bPaths(
+void Assembler::findMode3Paths(
     uint64_t threadCount0,  // High level parallelization
     uint64_t threadCount1   // Low level parallelization
     ) const
@@ -135,9 +135,9 @@ void Assembler::loadAndAssembleCompressedPathGraph(
 // Given two consecutive primary edges in the marker graph,
 // find the secondary edges in between.
 // This works with mode3 assembly and the complete marker graph.
-void Assembler::fillMode3bAssemblyPathStep(const vector<string>& request, ostream& html)
+void Assembler::fillMode3AssemblyPathStep(const vector<string>& request, ostream& html)
 {
-    fillMode3bAssemblyPathStep3(request, html);
+    fillMode3AssemblyPathStep3(request, html);
 }
 
 
@@ -147,7 +147,7 @@ void Assembler::fillMode3bAssemblyPathStep(const vector<string>& request, ostrea
 // find the secondary edges in between.
 // This works with mode3 assembly and the complete marker graph.
 // Version that uses class mode3::PathFiller1.
-void Assembler::fillMode3bAssemblyPathStep1(const vector<string>& request, ostream& html)
+void Assembler::fillMode3AssemblyPathStep1(const vector<string>& request, ostream& html)
 {
     // Check that our assumptions are satisfied.
     if(assemblerInfo->assemblyMode != 3) {
@@ -281,7 +281,7 @@ void Assembler::fillMode3bAssemblyPathStep1(const vector<string>& request, ostre
 // find the secondary edges in between.
 // This works with mode3 assembly and the complete marker graph.
 // Version that uses class mode3::PathFiller2.
-void Assembler::fillMode3bAssemblyPathStep2(const vector<string>& request, ostream& html)
+void Assembler::fillMode3AssemblyPathStep2(const vector<string>& request, ostream& html)
 {
     // Check that our assumptions are satisfied.
     if(assemblerInfo->assemblyMode != 3) {
@@ -421,7 +421,7 @@ void Assembler::fillMode3bAssemblyPathStep2(const vector<string>& request, ostre
 // find the secondary edges in between.
 // This works with mode3 assembly and the complete marker graph.
 // Version that uses class mode3::PathFiller3.
-void Assembler::fillMode3bAssemblyPathStep3(const vector<string>& request, ostream& html)
+void Assembler::fillMode3AssemblyPathStep3(const vector<string>& request, ostream& html)
 {
     // Check that our assumptions are satisfied.
     if(assemblerInfo->assemblyMode != 3) {

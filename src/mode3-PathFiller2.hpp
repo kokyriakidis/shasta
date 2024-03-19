@@ -1,5 +1,4 @@
-#ifndef SHASTA_MODE3B_PATH_FILLER2_HPP
-#define SHASTA_MODE3B_PATH_FILLER2_HPP
+#pragma once
 
 // Shasta.
 #include "Base.hpp"
@@ -300,4 +299,3 @@ private:
 
 };
 
-#endif

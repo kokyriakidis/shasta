@@ -1,5 +1,4 @@
-#ifndef SHASTA_MODE3B_PATH_FILLER1_HPP
-#define SHASTA_MODE3B_PATH_FILLER1_HPP
+#pragma once
 
 // Shasta.
 #include "invalid.hpp"
@@ -257,4 +256,3 @@ private:
     void writeAssemblyDetails(ostream& csv) const;
 };
 
-#endif
