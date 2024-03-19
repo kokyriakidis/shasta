@@ -262,9 +262,11 @@ void Assembler::computeAlignments(
     data.threadCompressedAlignments.resize(threadCount);
     
     performanceLog << timestamp << "Alignment computation begins." << endl;
+    cout << timestamp << "Alignment computation begins." << endl;
     setupLoadBalancing(alignmentCandidates.candidates.size(), batchSize);
     runThreads(&Assembler::computeAlignmentsThreadFunction, threadCount);
     performanceLog << timestamp << "Alignment computation completed." << endl;
+    cout << timestamp << "Alignment computation completed." << endl;
 
     // Store the alignments found by each thread.
     performanceLog << timestamp << "Storing the alignment found by each thread." << endl;
