@@ -20,7 +20,7 @@
 
 
 namespace shasta {
-    namespace mode3b {
+    namespace mode3 {
         class PathFiller3Vertex;
         class PathFiller3Edge;
         class PathFiller3;
@@ -39,7 +39,7 @@ namespace shasta {
 
 
 
-class shasta::mode3b::PathFiller3DisplayOptions {
+class shasta::mode3::PathFiller3DisplayOptions {
 public:
 
     // If this is not open, no output takes place.
@@ -60,7 +60,7 @@ public:
 
 
 // A way to identify a marker in PathFiller3, besides its id.
-class shasta::mode3b::PathFiller3MarkerIndexes {
+class shasta::mode3::PathFiller3MarkerIndexes {
 public:
     uint64_t i; // Index in orientedReadInfos
     uint64_t j; // Index in OrientedReadInfo::markerInfos;
@@ -68,7 +68,7 @@ public:
 
 
 
-class shasta::mode3b::PathFiller3Vertex {
+class shasta::mode3::PathFiller3Vertex {
 public:
     uint64_t disjointSetId;
     bool isAccessibleA = false;
@@ -77,7 +77,7 @@ public:
 
 
 
-class shasta::mode3b::PathFiller3Edge {
+class shasta::mode3::PathFiller3Edge {
 public:
 
     // Each marker interval is identified by the two markers.
@@ -95,7 +95,7 @@ public:
 
 
 
-class shasta::mode3b::PathFiller3 : public PathFiller3BaseClass {
+class shasta::mode3::PathFiller3 : public PathFiller3BaseClass {
 public:
 
     // Hide class Base defined in boost::adjacency_list.

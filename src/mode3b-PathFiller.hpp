@@ -18,7 +18,7 @@
 
 
 namespace shasta {
-    namespace mode3b {
+    namespace mode3 {
         class PathFillerVertex;
         class PathFillerEdge;
         class PathFiller;
@@ -39,7 +39,7 @@ namespace shasta {
 
 
 
-class shasta::mode3b::PathFillerVertex {
+class shasta::mode3::PathFillerVertex {
 public:
     // The corresponding vertex in the global marker graph.
     // There can be more than one PathFillerVertex corresponding to
@@ -85,7 +85,7 @@ public:
 // - edgeId is invalid<MarkerGraphEdgeId>.
 // - The sequence is stored in PathFillerEdge::sequence.
 //   It is computed by assembleVirtualEdge using MSA.
-class shasta::mode3b::PathFillerEdge {
+class shasta::mode3::PathFillerEdge {
 public:
     // The corresponding edge in the global marker graph.
     // There can be more than one PathFillerEdge corresponding to
@@ -128,7 +128,7 @@ public:
 
 
 
-class shasta::mode3b::PathFiller: public PathFillerBaseClass {
+class shasta::mode3::PathFiller: public PathFillerBaseClass {
 public:
 
     // Hide class Base defined in boost::adjacency_list.

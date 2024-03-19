@@ -25,7 +25,7 @@
 
 
 namespace shasta {
-    namespace mode3b {
+    namespace mode3 {
 
         // Each edge of the CompressedPathGraph describes a BubbleChain.
 
@@ -60,7 +60,7 @@ namespace shasta {
 
 // A Chain is a sequence of MarkerGraphEdgeIds.
 // It can be used to generate an AssemblyPath.
-class shasta::mode3b::Chain : public vector<MarkerGraphEdgeId> {
+class shasta::mode3::Chain : public vector<MarkerGraphEdgeId> {
 public:
     vector<Base> sequence;
 
@@ -83,7 +83,7 @@ public:
 
 
 
-class shasta::mode3b::Bubble : public vector<Chain> {
+class shasta::mode3::Bubble : public vector<Chain> {
 public:
     bool isHaploid() const
     {
@@ -109,7 +109,7 @@ public:
 
 
 
-class shasta::mode3b::BubbleChain : public vector<Bubble> {
+class shasta::mode3::BubbleChain : public vector<Bubble> {
 public:
     const Bubble& firstBubble() const
     {
@@ -188,7 +188,7 @@ public:
 
 
 
-class shasta::mode3b::CompressedPathGraphVertex {
+class shasta::mode3::CompressedPathGraphVertex {
 public:
     MarkerGraphEdgeId edgeId;
 
@@ -209,7 +209,7 @@ public:
 
 
 
-class shasta::mode3b::CompressedPathGraphEdge : public BubbleChain {
+class shasta::mode3::CompressedPathGraphEdge : public BubbleChain {
 public:
     uint64_t id = invalid<uint64_t>;
 
@@ -222,7 +222,7 @@ public:
 
 
 
-class shasta::mode3b::CompressedPathGraph: public CompressedPathGraphBaseClass {
+class shasta::mode3::CompressedPathGraph: public CompressedPathGraphBaseClass {
 public:
 
     // Create from a PathGraph1, then call run.

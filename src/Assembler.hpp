@@ -2349,7 +2349,7 @@ public:
 
 
     // Mode 3 assembly.
-    // Version in namespace mode3b.
+    // Version in namespace mode3.
     void findCompleteMarkerGraphPath(
         MarkerGraphEdgeId startEdgeId,  // The path starts here.
         uint64_t direction              // 0=forward, 1=backward, 2=bidirectional
@@ -2367,9 +2367,9 @@ public:
     // Given two consecutive primary edges, find the secondary edges
     // in between.
     void fillMode3bAssemblyPathStep(const vector<string>&, ostream&);
-    void fillMode3bAssemblyPathStep1(const vector<string>&, ostream&); // Uses class mode3b::PathFiller1
-    void fillMode3bAssemblyPathStep2(const vector<string>&, ostream&); // Uses class mode3b::PathFiller2
-    void fillMode3bAssemblyPathStep3(const vector<string>&, ostream&); // Uses class mode3b::PathFiller3
+    void fillMode3bAssemblyPathStep1(const vector<string>&, ostream&); // Uses class mode3::PathFiller1
+    void fillMode3bAssemblyPathStep2(const vector<string>&, ostream&); // Uses class mode3::PathFiller2
+    void fillMode3bAssemblyPathStep3(const vector<string>&, ostream&); // Uses class mode3::PathFiller3
 
     void exploreMode3bPathGraph(const vector<string>& request, ostream& html);
     void findMode3bPaths(

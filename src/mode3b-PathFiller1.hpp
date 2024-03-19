@@ -18,7 +18,7 @@
 
 
 namespace shasta {
-    namespace mode3b {
+    namespace mode3 {
         class PathFiller1Vertex;
         class PathFiller1Edge;
         class PathFiller1;
@@ -39,7 +39,7 @@ namespace shasta {
 
 
 
-class shasta::mode3b::PathFiller1Vertex {
+class shasta::mode3::PathFiller1Vertex {
 public:
     // The corresponding vertex in the global marker graph.
     // There can be more than one PathFillerVertex corresponding to
@@ -67,7 +67,7 @@ public:
 
 
 
-class shasta::mode3b::PathFiller1Edge {
+class shasta::mode3::PathFiller1Edge {
 public:
 
     // The MarkerIntervals in this edge for each of the oriented reads.
@@ -98,7 +98,7 @@ public:
 
 
 
-class shasta::mode3b::PathFiller1: public PathFiller1BaseClass {
+class shasta::mode3::PathFiller1: public PathFiller1BaseClass {
 public:
 
     // Hide class Base defined in boost::adjacency_list.

@@ -35,7 +35,7 @@ void Assembler::findCompleteMarkerGraphPath(
     checkMarkerGraphEdgesIsOpen();
 
     // Do it.
-    mode3b::AssemblyPath assemblyPath(
+    mode3::AssemblyPath assemblyPath(
         *this,
         startEdgeId,
         direction);
@@ -54,7 +54,7 @@ void Assembler::findCompleteMarkerGraphPaths(uint64_t threadCount) const
         threadCount = std::thread::hardware_concurrency();
     }
 
-    mode3b::PathFinder pathFinder(*this, threadCount);
+    mode3::PathFinder pathFinder(*this, threadCount);
 }
 
 
@@ -116,7 +116,7 @@ void Assembler::findMode3bPaths(
     uint64_t threadCount1   // Low level parallelization
     ) const
 {
-    mode3b::GlobalPathGraph::assemble(*this, threadCount0, threadCount1);
+    mode3::GlobalPathGraph::assemble(*this, threadCount0, threadCount1);
 }
 
 
@@ -127,14 +127,14 @@ void Assembler::loadAndAssembleCompressedPathGraph(
     uint64_t threadCount1   // Low level parallelization
     ) const
 {
-    mode3b::GlobalPathGraph::loadAndAssemble(*this, fileName, threadCount0, threadCount1);
+    mode3::GlobalPathGraph::loadAndAssemble(*this, fileName, threadCount0, threadCount1);
 }
 
 
 
 // Given two consecutive primary edges in the marker graph,
 // find the secondary edges in between.
-// This works with mode3b assembly and the complete marker graph.
+// This works with mode3 assembly and the complete marker graph.
 void Assembler::fillMode3bAssemblyPathStep(const vector<string>& request, ostream& html)
 {
     fillMode3bAssemblyPathStep3(request, html);
@@ -145,8 +145,8 @@ void Assembler::fillMode3bAssemblyPathStep(const vector<string>& request, ostrea
 
 // Given two consecutive primary edges in the marker graph,
 // find the secondary edges in between.
-// This works with mode3b assembly and the complete marker graph.
-// Version that uses class mode3b::PathFiller1.
+// This works with mode3 assembly and the complete marker graph.
+// Version that uses class mode3::PathFiller1.
 void Assembler::fillMode3bAssemblyPathStep1(const vector<string>& request, ostream& html)
 {
     // Check that our assumptions are satisfied.
@@ -267,7 +267,7 @@ void Assembler::fillMode3bAssemblyPathStep1(const vector<string>& request, ostre
     }
 
     // Fill this assembly step.
-    mode3b::PathFiller1 filler(*this, edgeIdA, edgeIdB, html,
+    mode3::PathFiller1 filler(*this, edgeIdA, edgeIdB, html,
         showGraph,
         showVertices,
         showVertexLabels,
@@ -279,8 +279,8 @@ void Assembler::fillMode3bAssemblyPathStep1(const vector<string>& request, ostre
 
 // Given two consecutive primary edges in the marker graph,
 // find the secondary edges in between.
-// This works with mode3b assembly and the complete marker graph.
-// Version that uses class mode3b::PathFiller2.
+// This works with mode3 assembly and the complete marker graph.
+// Version that uses class mode3::PathFiller2.
 void Assembler::fillMode3bAssemblyPathStep2(const vector<string>& request, ostream& html)
 {
     // Check that our assumptions are satisfied.
@@ -290,7 +290,7 @@ void Assembler::fillMode3bAssemblyPathStep2(const vector<string>& request, ostre
     SHASTA_ASSERT(getReads().representation == 0);      // No RLE.
     SHASTA_ASSERT((assemblerInfo->k % 2) == 0);         // Marker length is even.
 
-    mode3b::PathFiller2DisplayOptions options(html);
+    mode3::PathFiller2DisplayOptions options(html);
 
     // Get the parameters for the request.
     uint64_t edgeIdA = invalid<uint64_t>;
@@ -409,7 +409,7 @@ void Assembler::fillMode3bAssemblyPathStep2(const vector<string>& request, ostre
     }
 
     // Fill this assembly step.
-    mode3b::PathFiller2 filler(*this, edgeIdA, edgeIdB, options);
+    mode3::PathFiller2 filler(*this, edgeIdA, edgeIdB, options);
 }
 
 
@@ -419,8 +419,8 @@ void Assembler::fillMode3bAssemblyPathStep2(const vector<string>& request, ostre
 
 // Given two consecutive primary edges in the marker graph,
 // find the secondary edges in between.
-// This works with mode3b assembly and the complete marker graph.
-// Version that uses class mode3b::PathFiller3.
+// This works with mode3 assembly and the complete marker graph.
+// Version that uses class mode3::PathFiller3.
 void Assembler::fillMode3bAssemblyPathStep3(const vector<string>& request, ostream& html)
 {
     // Check that our assumptions are satisfied.
@@ -430,7 +430,7 @@ void Assembler::fillMode3bAssemblyPathStep3(const vector<string>& request, ostre
     SHASTA_ASSERT(getReads().representation == 0);      // No RLE.
     SHASTA_ASSERT((assemblerInfo->k % 2) == 0);         // Marker length is even.
 
-    mode3b::PathFiller3DisplayOptions options(html);
+    mode3::PathFiller3DisplayOptions options(html);
 
     // Get the parameters for the request.
     uint64_t edgeIdA = invalid<uint64_t>;
@@ -588,5 +588,5 @@ void Assembler::fillMode3bAssemblyPathStep3(const vector<string>& request, ostre
     }
 
     // Fill this assembly step.
-    mode3b::PathFiller3 filler(*this, edgeIdA, edgeIdB, minVertexCoverage, options, useA, useB);
+    mode3::PathFiller3 filler(*this, edgeIdA, edgeIdB, minVertexCoverage, options, useA, useB);
 }

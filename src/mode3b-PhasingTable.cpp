@@ -1,38 +1,37 @@
 // Shasta.
 
-#include <Assembler.hpp>
-#include <bits/stdint-uintn.h>
+#include "Assembler.hpp"
+#include "bits/stdint-uintn.h"
+#include "mode3b-CompressedPathGraph.hpp"
+#include "mode3b-PhasingTable.hpp"
+#include "MarkerGraph.hpp"
+#include "MarkerInterval.hpp"
+#include "orderPairs.hpp"
+#include "PngImage.hpp"
+#include "shastaTypes.hpp"
+#include "SHASTA_ASSERT.hpp"
+using namespace shasta;
+using namespace mode3;
+
+// Boost libraries
+#include <boost/graph/iteration_macros.hpp>
 #include <boost/graph/graph_traits.hpp>
 #include <boost/multi_index/detail/bidir_node_iterator.hpp>
 #include <boost/multi_index/detail/ord_index_impl.hpp>
 #include <boost/operators.hpp>
-#include <mode3b-CompressedPathGraph.hpp>
-#include <mode3b-PhasingTable.hpp>
-#include <MarkerGraph.hpp>
-#include <MarkerInterval.hpp>
-#include <orderPairs.hpp>
-#include <PngImage.hpp>
-#include <shastaTypes.hpp>
-#include <SHASTA_ASSERT.hpp>
-#include <algorithm>
-#include <iostream>
-#include <limits>
-#include <set>
-#include <stdexcept>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <vector>
-
-using namespace shasta;
-using namespace mode3b;
-
-// Boost libraries
-#include <boost/graph/iteration_macros.hpp>
 
 // Standard library.
-#include <filesystem>
+#include "algorithm.hpp"
+#include "filesystem.hpp"
+#include "iostream.hpp"
+#include <limits>
+#include <set>
+#include "stdexcept.hpp"
+#include "string.hpp"
 #include "tuple.hpp"
+#include "utility.hpp"
+#include "vector.hpp"
+
 
 
 void CompressedPathGraph::writeBubbleChainsPhasingTables(
@@ -115,7 +114,7 @@ void PhasingTable::fill(
 
     // Loop over the bubbles in this bubble chain.
     for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
-        const mode3b::Bubble& bubble = bubbleChain[positionInBubbleChain];
+        const mode3::Bubble& bubble = bubbleChain[positionInBubbleChain];
 
         // If this bubble is not diploid, skip it.
         if(not bubble.isDiploid()) {

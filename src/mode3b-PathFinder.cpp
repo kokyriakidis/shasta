@@ -11,7 +11,7 @@
 #include "timestamp.hpp"
 #include "transitiveReduction.hpp"
 using namespace shasta;
-using namespace mode3b;
+using namespace mode3;
 
 // Boost libraries.
 #include "boost/graph/iteration_macros.hpp"

@@ -6,7 +6,7 @@
 #include "vector.hpp"
 
 namespace shasta {
-    namespace mode3b {
+    namespace mode3 {
         class PhasedComponent;
     }
 }
@@ -20,7 +20,7 @@ namespace shasta {
 // The phase can be -1 or +1.
 // PhasedComponents are created in such a way that their position ranges
 // in the bubble chain are not overlapping.
-class shasta::mode3b::PhasedComponent : public vector< pair<uint64_t, int64_t> > {
+class shasta::mode3::PhasedComponent : public vector< pair<uint64_t, int64_t> > {
 public:
     uint64_t minPositionInBubbleChain;
     uint64_t maxPositionInBubbleChain;

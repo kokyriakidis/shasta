@@ -19,7 +19,7 @@
 #include "vector.hpp"
 
 namespace shasta {
-    namespace mode3b {
+    namespace mode3 {
         class PhasingComponent;
         class PhasingTable;
         class PhasingTableEntry;
@@ -35,7 +35,7 @@ namespace shasta {
 // on one or both sides of a diploid Bubble of a BubbleChain.
 // The frequency array contains the number of times the oriented read
 // appears on non-terminal marker graph edges of the two Chains of the diploid Bubble.
-class shasta::mode3b::PhasingTableEntry {
+class shasta::mode3::PhasingTableEntry {
 public:
 
     PhasingTableEntry(
@@ -97,7 +97,7 @@ public:
 
 // A PhasingTable is a set of PhasingTableEntry objects,
 // randomly accessible by orientedReadId and by positionInBubbleChain.
-class shasta::mode3b::PhasingTable: public boost::multi_index_container<PhasingTableEntry,
+class shasta::mode3::PhasingTable: public boost::multi_index_container<PhasingTableEntry,
     boost::multi_index::indexed_by <
 
         // Index by (orientedReadId, positionInBubbleChain) (unique).

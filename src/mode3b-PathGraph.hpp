@@ -3,7 +3,7 @@
 
 /*******************************************************************************
 
-In the mode3b::GlobalPathGraph, each vertex corresponds to a primary edge of
+In the mode3::GlobalPathGraph, each vertex corresponds to a primary edge of
 of the marker graph, which is believed to correspond to a single copy
 of sequence. It is characterized as follows:
 - minPrimaryCoverage <= coverage <= maxPrimaryCoverage
@@ -36,7 +36,7 @@ A directed edge v0->v1 is generated if:
 namespace shasta {
     class Assembler;
     class MarkerGraph;
-    namespace mode3b {
+    namespace mode3 {
 
         // The global path graph.
         // Each vertex corresponds to a primary marker graph edge.
@@ -64,7 +64,7 @@ namespace shasta {
 
 
 // Class to control Graphviz output of GlobalPathGraph and PathGraph.
-class shasta::mode3b::GlobalPathGraphDisplayOptions {
+class shasta::mode3::GlobalPathGraphDisplayOptions {
 public:
     bool labels = true;
     bool tooltips = true;
@@ -93,7 +93,7 @@ public:
 
 
 
-class shasta::mode3b::PathGraphVertex {
+class shasta::mode3::PathGraphVertex {
 public:
 
     // The corresponding GlobalPathGraph vertexId.
@@ -105,7 +105,7 @@ public:
 
 
 
-class shasta::mode3b::PathGraphEdge {
+class shasta::mode3::PathGraphEdge {
 public:
     MarkerGraphEdgePairInfo info;
     uint64_t coverage;
@@ -116,7 +116,7 @@ public:
 
 // A subset of the GlobalPathGraph, for example
 // a single connected component, represented as a Boost graph.
-class shasta::mode3b::PathGraph : public PathGraphGraphBaseClass {
+class shasta::mode3::PathGraph : public PathGraphGraphBaseClass {
 public:
 
     std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
@@ -163,7 +163,7 @@ public:
 
 
 
-class shasta::mode3b::GlobalPathGraphVertex {
+class shasta::mode3::GlobalPathGraphVertex {
 public:
     MarkerGraphEdgeId edgeId;
 
@@ -179,7 +179,7 @@ public:
 
 
 
-class shasta::mode3b::GlobalPathGraphEdge {
+class shasta::mode3::GlobalPathGraphEdge {
 public:
     uint64_t vertexId0;
     uint64_t vertexId1;
@@ -193,7 +193,7 @@ public:
 
 
 
-class shasta::mode3b::GlobalPathGraph {
+class shasta::mode3::GlobalPathGraph {
 public:
     static void assemble(
         const Assembler&,

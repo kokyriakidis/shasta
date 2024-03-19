@@ -10,7 +10,7 @@
 #include "vector.hpp"
 
 namespace shasta {
-    namespace mode3b {
+    namespace mode3 {
         class AssemblyPath;
     }
 
@@ -22,17 +22,17 @@ namespace shasta {
 
 // An AssemblyPath is path in the marker graph that is used to assemble sequence.
 // It is created starting with of N+1 primary vertices, numbered from 0 to N,
-// found by mode3b::PathFinder. The primary vertices are not necessarily
+// found by mode3::PathFinder. The primary vertices are not necessarily
 // adjacent in the marker graph.
 // Two consecutive primary vertices have similar read compositions
 // and therefore a number of common oriented reads.
 // Each pair of consecutive primary vertices generates an AssemblyStep.
 // There are N AssemblySteps, numbered from 0 to N-1.
 // Each AssemblyStep consists of a number of secondary vertices
-// created by mode3b::PathFiller.
+// created by mode3::PathFiller.
 // The primary and secondary vertices are a path in the marker graph and
 // can be used to assemble sequence.
-class shasta::mode3b::AssemblyPath : public MultithreadedObject<AssemblyPath> {
+class shasta::mode3::AssemblyPath : public MultithreadedObject<AssemblyPath> {
 public:
 
     // Create the assembly path starting from a given primary edge.

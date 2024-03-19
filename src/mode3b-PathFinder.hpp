@@ -15,7 +15,7 @@
 #include "vector.hpp"
 
 namespace shasta {
-    namespace mode3b {
+    namespace mode3 {
         class PathFinder;
     }
 
@@ -24,7 +24,7 @@ namespace shasta {
 
 
 // Find and assemble a path in the complete marker graph.
-class shasta::mode3b::PathFinder :
+class shasta::mode3::PathFinder :
     public MappedMemoryOwner,
     public MultithreadedObject<PathFinder> {
 public:

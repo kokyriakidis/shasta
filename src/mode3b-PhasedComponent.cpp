@@ -2,7 +2,7 @@
 #include "orderPairs.hpp"
 #include "SHASTA_ASSERT.hpp"
 using namespace shasta;
-using namespace mode3b;
+using namespace mode3;
 
 #include "algorithm.hpp"
 #include "limits"

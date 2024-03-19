@@ -7,7 +7,7 @@
 #include "MarkerInterval.hpp"
 #include "SHASTA_ASSERT.hpp"
 using namespace shasta;
-using namespace mode3b;
+using namespace mode3;
 
 #include <iostream.hpp>
 
