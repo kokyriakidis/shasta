@@ -2,8 +2,8 @@
 
 #include "Assembler.hpp"
 #include "bits/stdint-uintn.h"
-#include "mode3b-CompressedPathGraph.hpp"
-#include "mode3b-PhasingTable.hpp"
+#include "mode3-CompressedPathGraph.hpp"
+#include "mode3-PhasingTable.hpp"
 #include "MarkerGraph.hpp"
 #include "MarkerInterval.hpp"
 #include "orderPairs.hpp"

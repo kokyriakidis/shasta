@@ -1,5 +1,5 @@
 // Shasta.
-#include "mode3b-PathFiller2.hpp"
+#include "mode3-PathFiller2.hpp"
 #include "approximateTopologicalSort.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"

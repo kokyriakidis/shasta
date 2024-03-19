@@ -2,7 +2,7 @@
 #include "Assembler.hpp"
 #include "computeLayout.hpp"
 #include "html.hpp"
-#include "mode3b-PathFinder.hpp"
+#include "mode3-PathFinder.hpp"
 #include "orderPairs.hpp"
 #include "platformDependent.hpp"
 #include "runCommandWithTimeout.hpp"

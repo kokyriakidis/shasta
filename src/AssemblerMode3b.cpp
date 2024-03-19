@@ -1,12 +1,12 @@
 // Shasta
 #include "Assembler.hpp"
 #include "LocalMarkerGraph1.hpp"
-#include "mode3b-PathFiller1.hpp"
-#include "mode3b-PathFiller2.hpp"
-#include "mode3b-PathFiller3.hpp"
-#include "mode3b-PathFinder.hpp"
-#include "mode3b-PathGraph.hpp"
-#include "mode3b-AssemblyPath.hpp"
+#include "mode3-PathFiller1.hpp"
+#include "mode3-PathFiller2.hpp"
+#include "mode3-PathFiller3.hpp"
+#include "mode3-PathFinder.hpp"
+#include "mode3-PathGraph.hpp"
+#include "mode3-AssemblyPath.hpp"
 #include "Reads.hpp"
 using namespace shasta;
 

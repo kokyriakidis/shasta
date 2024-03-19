@@ -1,8 +1,8 @@
 // Shasta.
-#include "mode3b-CompressedPathGraph.hpp"
-#include "mode3b-AssemblyPath.hpp"
-#include "mode3b-PathGraph.hpp"
-#include "mode3b-PhasingTable.hpp"
+#include "mode3-CompressedPathGraph.hpp"
+#include "mode3-AssemblyPath.hpp"
+#include "mode3-PathGraph.hpp"
+#include "mode3-PhasingTable.hpp"
 #include "Assembler.hpp"
 #include "copyNumber.hpp"
 #include "deduplicate.hpp"

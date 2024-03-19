@@ -1,5 +1,5 @@
 // Shasta.
-#include "mode3b-PathFiller3.hpp"
+#include "mode3-PathFiller3.hpp"
 #include "Assembler.hpp"
 #include "globalMsa.hpp"
 #include "markerAccessFunctions.hpp"

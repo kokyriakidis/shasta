@@ -1,4 +1,4 @@
-#include "mode3b-PhasedComponent.hpp"
+#include "mode3-PhasedComponent.hpp"
 #include "orderPairs.hpp"
 #include "SHASTA_ASSERT.hpp"
 using namespace shasta;

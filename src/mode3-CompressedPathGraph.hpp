@@ -4,7 +4,7 @@
 // Shasta
 #include "Base.hpp"
 #include "invalid.hpp"
-#include "mode3b-PhasedComponent.hpp"
+#include "mode3-PhasedComponent.hpp"
 #include "shastaTypes.hpp"
 #include "SHASTA_ASSERT.hpp"
 
