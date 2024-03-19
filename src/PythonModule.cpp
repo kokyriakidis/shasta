@@ -609,17 +609,6 @@ PYBIND11_MODULE(shasta, shastaModule)
             arg("debug") = false)
 
         // Assembly mode 3.
-        .def("mode3Assembly",
-            &Assembler::mode3Assembly,
-            arg("threadCount") = 0)
-        .def("accessMode3AssemblyGraph",
-            &Assembler::accessMode3AssemblyGraph)
-        .def("analyzeMode3Subgraph",
-            &Assembler::analyzeMode3Subgraph)
-        .def("createMode3PathGraph",
-            &Assembler::createMode3PathGraph)
-        .def("createMode3Detangler",
-            &Assembler::createMode3Detangler)
         .def("findCompleteMarkerGraphPath",
             &Assembler::findCompleteMarkerGraphPath)
         .def("findCompleteMarkerGraphPaths",

@@ -75,15 +75,6 @@ namespace shasta {
         class Options;
     }
 
-    namespace mode3 {
-        class AssemblyGraph;
-    }
-
-    namespace mode3a {
-        class PackedMarkerGraph;
-        class AssemblyGraphSnapshot;
-    }
-
     extern template class MultithreadedObject<Assembler>;
 }
 
@@ -2325,16 +2316,6 @@ private:
     void exploreAssemblyGraphEdgesSupport(const vector<string>&, ostream&);
 
 
-    // Http server functionality specific to mode 3 assembly.
-    void exploreMode3AssemblyGraph(const vector<string>&, ostream&);
-    void exploreMode3AssemblyGraphSegment(const vector<string>&, ostream&);
-    void exploreMode3AssemblyGraphSegmentPair(const vector<string>&, ostream&);
-    void exploreMode3AssemblyGraphLink(const vector<string>&, ostream&);
-    void exploreMode3MetaAlignment(const vector<string>&, ostream&);
-    void exploreMode3AssemblyPath(const vector<string>&, ostream&);
-    void exploreMode3LinkAssembly(const vector<string>&, ostream&);
-
-
 
     // Set up the ConsensusCaller used to compute the "best"
     // base and repeat count at each assembly position.
@@ -2366,19 +2347,9 @@ public:
         bool debug);
 
 
-    // Mode 3 assembly (old development code).
-    void mode3Assembly(
-        size_t threadCount);
-    shared_ptr<mode3::AssemblyGraph> assemblyGraph3Pointer;
-    void accessMode3AssemblyGraph();
-    void analyzeMode3Subgraph(const vector<uint64_t>& segmentIds);
-    void createMode3PathGraph();
-    void createMode3Detangler();
-
-
 
     // Mode 3 assembly.
-    // Version in namespace mode3b that uses the complete marker graph.
+    // Version in namespace mode3b.
     void findCompleteMarkerGraphPath(
         MarkerGraphEdgeId startEdgeId,  // The path starts here.
         uint64_t direction              // 0=forward, 1=backward, 2=bidirectional

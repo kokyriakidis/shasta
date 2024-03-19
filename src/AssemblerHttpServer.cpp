@@ -244,14 +244,6 @@ void Assembler::fillServerFunctionTable()
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreAssemblyGraphEdgesSupport);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreCompressedAssemblyGraph);
 
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3AssemblyGraph);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3AssemblyGraphSegment);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3AssemblyGraphSegmentPair);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3AssemblyGraphLink);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3MetaAlignment);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3AssemblyPath);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3LinkAssembly);
-
     SHASTA_ADD_TO_FUNCTION_TABLE(fillMode3bAssemblyPathStep);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3bPathGraph);
 }
@@ -745,18 +737,6 @@ void Assembler::accessAllSoft()
             allDataAreAvailable = false;
         }
 
-    }
-
-
-
-    // Data specific to assembly mode 3.
-    if(assemblerInfo->assemblyMode == 3) {
-        try {
-            accessMode3AssemblyGraph();
-        } catch(const exception& e) {
-            cout << "The mode 3 assembly graph is not accessible." << endl;
-            allDataAreAvailable = false;
-        }
     }
 
 
