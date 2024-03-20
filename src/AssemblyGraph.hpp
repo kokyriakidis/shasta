@@ -25,12 +25,14 @@ vertex in the assembly graph.
 #include <limits>
 
 namespace shasta {
-    class AssemblyGraph;
+    namespace mode0 {
+        class AssemblyGraph;
+    }
 }
 
 
 
-class shasta::AssemblyGraph {
+class shasta::mode0::AssemblyGraph {
 public:
 
     // Use the same vertex and edge ids of the marker graph.

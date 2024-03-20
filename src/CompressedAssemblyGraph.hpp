@@ -36,9 +36,9 @@ namespace shasta {
 
 class shasta::CompressedAssemblyGraphVertex {
 public:
-    AssemblyGraph::VertexId vertexId;
+    mode0::AssemblyGraph::VertexId vertexId;
 
-    CompressedAssemblyGraphVertex(AssemblyGraph::VertexId vertexId) :
+    CompressedAssemblyGraphVertex(mode0::AssemblyGraph::VertexId vertexId) :
         vertexId(vertexId) {}
 };
 
@@ -51,10 +51,10 @@ public:
     // with this edge.
     // This includes the assembly graph vertices
     // associated with the source and target of this edge.
-    vector<AssemblyGraph::VertexId> vertices;
+    vector<mode0::AssemblyGraph::VertexId> vertices;
 
     // The chain of sets of parallel assembly graph edges.
-    vector< vector<AssemblyGraph::EdgeId> > edges;
+    vector< vector<mode0::AssemblyGraph::EdgeId> > edges;
 
     // An id assigned to this edge of the compressed assembly graph
     // and used in gfa and other output.
@@ -68,7 +68,7 @@ public:
     {
         return double(minMarkerCount + maxMarkerCount) / 2.;
     }
-    void fillMarkerCounts(const AssemblyGraph&);
+    void fillMarkerCounts(const mode0::AssemblyGraph&);
 
     // Find the oriented reads that appear in marker graph vertices
     // internal to this edge of the compressed assembly graph.
@@ -99,8 +99,8 @@ private:
 class shasta::CompressedAssemblyGraph :
     public CompressedAssemblyGraphBaseClass {
 public:
-    using VertexId = AssemblyGraph::VertexId;
-    using EdgeId = AssemblyGraph::EdgeId;
+    using VertexId = mode0::AssemblyGraph::VertexId;
+    using EdgeId = mode0::AssemblyGraph::EdgeId;
 
 
     // Create the CompressedAssemblyGraph from the AssemblyGraph.
@@ -180,7 +180,7 @@ private:
 
     // Create an edge for each set of parallel edges of the assembly graph.
     void createEdges(
-        const AssemblyGraph&,
+        const mode0::AssemblyGraph&,
         const vector<vertex_descriptor>& vertexTable
     );
 
@@ -195,10 +195,10 @@ private:
 
     // Fill in the assembly graph edges that go into each
     // edge of the compressed assembly graph.
-    void fillContributingEdges(const AssemblyGraph&);
+    void fillContributingEdges(const mode0::AssemblyGraph&);
 
     // Fill in minimum and maximum marker counts for each edge.
-    void fillMarkerCounts(const AssemblyGraph&);
+    void fillMarkerCounts(const mode0::AssemblyGraph&);
 
     // Find the oriented reads that appear in marker graph vertices
     // internal to each edge of the compressed assembly graph.

@@ -40,7 +40,7 @@ public:
 
     // The vertex id of the vertex of the global assembly
     // graph that corresponds to this vertex.
-    AssemblyGraph::VertexId assemblyGraphVertexId;
+    mode0::AssemblyGraph::VertexId assemblyGraphVertexId;
 
     // The vertex id of the vertex of the global marker
     // graph that corresponds to this vertex.
@@ -54,7 +54,7 @@ public:
     size_t rank = 0;
 
     LocalAssemblyGraphVertex(
-        AssemblyGraph::VertexId assemblyGraphVertexId,
+        mode0::AssemblyGraph::VertexId assemblyGraphVertexId,
         MarkerGraph::VertexId markerGraphVertexId,
         int distance) :
         assemblyGraphVertexId(assemblyGraphVertexId),
@@ -70,7 +70,7 @@ class shasta::LocalAssemblyGraphEdge {
 public:
     // The global edge id of the edge of the global assembly
     // graph that corresponds to this edge.
-    AssemblyGraph::EdgeId edgeId;
+    mode0::AssemblyGraph::EdgeId edgeId;
 
     // Field used by approximateTopologicalSort.
     bool isDagEdge = true;
@@ -87,11 +87,11 @@ class shasta::LocalAssemblyGraph :
 public:
 
     LocalAssemblyGraph(
-        AssemblyGraph&
+        mode0::AssemblyGraph&
         );
 
-    using VertexId = AssemblyGraph::VertexId;
-    using EdgeId = AssemblyGraph::EdgeId;
+    using VertexId = mode0::AssemblyGraph::VertexId;
+    using EdgeId = mode0::AssemblyGraph::EdgeId;
 
     // Add a vertex with the given vertex ids
     // and return its vertex descriptor.
@@ -136,7 +136,7 @@ private:
     std::map<VertexId, vertex_descriptor> vertexMap;
 
     // Reference to the global assembly graph.
-    AssemblyGraph& globalAssemblyGraph;
+    mode0::AssemblyGraph& globalAssemblyGraph;
 
     // Writer class used for Graphviz output.
     class Writer {

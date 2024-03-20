@@ -132,15 +132,17 @@ namespace shasta {
         ostream&,
         const AssemblyPathGraph2Edge&);
 
-    class AssemblyGraph;
+    namespace mode0 {
+        class AssemblyGraph;
+    }
 }
 
 
 
 class shasta::AssemblyPathGraph2Vertex {
 public:
-    AssemblyGraph::VertexId vertexId;
-    AssemblyPathGraph2Vertex(AssemblyGraph::VertexId vertexId) :
+    mode0::AssemblyGraph::VertexId vertexId;
+    AssemblyPathGraph2Vertex(mode0::AssemblyGraph::VertexId vertexId) :
         vertexId(vertexId) {}
 
     AssemblyPathGraph2BaseClass::vertex_descriptor reverseComplementVertex =
@@ -153,7 +155,7 @@ class shasta::AssemblyPathGraph2Edge {
 public:
 
     // The AsssemblyGraph path corresponding to this edge.
-    vector <AssemblyGraph::EdgeId> path;
+    vector <mode0::AssemblyGraph::EdgeId> path;
 
     // The length of the path, as measured on the marker graph.
     uint64_t pathLength = 0;
@@ -176,7 +178,7 @@ public:
 
 
     // Initialize the path to a single AssemblyGraph edge.
-    AssemblyPathGraph2Edge(AssemblyGraph::EdgeId edgeId) :
+    AssemblyPathGraph2Edge(mode0::AssemblyGraph::EdgeId edgeId) :
         path(1, edgeId) {}
     AssemblyPathGraph2Edge() {}
 
@@ -282,7 +284,7 @@ public:
     // The constructor does not fill in the oriented read ids for each edge.
     // This must be done separately (see Assembler::detangle2).
     AssemblyPathGraph2(
-        const AssemblyGraph&,
+        const mode0::AssemblyGraph&,
         uint64_t diagonalReadCountMin,
         uint64_t offDiagonalReadCountMax,
         double detangleOffDiagonalRatio);
@@ -302,7 +304,7 @@ public:
 
     void fillReverseComplementNewEdges(
         const vector<edge_descriptor>& newEdges,
-        const AssemblyGraph&);
+        const mode0::AssemblyGraph&);
 
     // Initial creation of all tangles.
     void createTangles();
@@ -331,7 +333,7 @@ public:
     // for GFA output.
     void detangle(
         double basesPerMarker,
-        const AssemblyGraph&);
+        const mode0::AssemblyGraph&);
 
     // Detangle a single tangle.
     // This does not fill in the reverseComplementEdge of newly created edges,

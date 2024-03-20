@@ -13,6 +13,7 @@
 #include "Reads.hpp"
 #include "ReferenceOverlapMap.hpp"
 using namespace shasta;
+using namespace mode0;
 
 // Boost libraries.
 #include <boost/icl/interval_map.hpp>

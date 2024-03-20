@@ -28,7 +28,6 @@ namespace shasta {
 
     class Assembler;
     class AssemblerInfo;
-    class AssemblyGraph;
     class Alignment;
     class AlignmentData;
     class AlignmentGraph;
@@ -58,6 +57,9 @@ namespace shasta {
     class Reads;
     class ReferenceOverlapMap;
 
+    namespace mode0 {
+        class AssemblyGraph;
+    }
 
     namespace MemoryMapped {
         class ByteAllocator;
@@ -1785,7 +1787,7 @@ public:
     // A directed vertex A->B is created if the last marker graph vertex
     // of the edge chain corresponding to A coincides with the
     // first marker graph vertex of the edge chain corresponding to B.
-    shared_ptr<AssemblyGraph> assemblyGraphPointer;
+    shared_ptr<mode0::AssemblyGraph> assemblyGraphPointer;
     void removeAssemblyGraph()
     {
         assemblyGraphPointer.reset();

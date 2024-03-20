@@ -10,6 +10,7 @@
 #include "runCommandWithTimeout.hpp"
 #include "subgraph.hpp"
 using namespace shasta;
+using namespace mode0;
 
 // Boost libraries.
 #include <boost/algorithm/string.hpp>

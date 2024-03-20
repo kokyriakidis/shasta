@@ -1,6 +1,7 @@
 #include "AssemblyGraph.hpp"
 #include "deduplicate.hpp"
 using namespace shasta;
+using namespace mode0;
 
 #include "fstream.hpp"
 #include "iterator.hpp"

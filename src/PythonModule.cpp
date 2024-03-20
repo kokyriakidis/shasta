@@ -576,7 +576,7 @@ PYBIND11_MODULE(shasta, shastaModule)
         .def("assembleAssemblyGraphEdge",
             (
                 AssembledSegment (Assembler::*)
-                (AssemblyGraph::EdgeId, bool)
+                (mode0::AssemblyGraph::EdgeId, bool)
             )
             &Assembler::assembleAssemblyGraphEdge,
             arg("edgeId"),

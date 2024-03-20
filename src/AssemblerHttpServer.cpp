@@ -8,6 +8,7 @@
 #include "platformDependent.hpp"
 #include "Reads.hpp"
 using namespace shasta;
+using namespace mode0;
 
 // Boost libraries.
 #include <boost/tokenizer.hpp>
@@ -917,7 +918,7 @@ void Assembler::writeAssemblySummary(ostream& html)
 void Assembler::writeAssemblySummaryBody(ostream& html)
 {
     using std::setprecision;
-    AssemblyGraph& assemblyGraph = *assemblyGraphPointer;
+    mode0::AssemblyGraph& assemblyGraph = *assemblyGraphPointer;
 
     const uint64_t totalDiscardedReadCount =
         assemblerInfo->discardedInvalidBaseReadCount +

@@ -6,6 +6,7 @@
 // Shasta.
 #include "seqan.hpp"
 using namespace shasta;
+using namespace mode0;
 
 // Standard library.
 #include "array.hpp"

@@ -2,6 +2,7 @@
 #include "LocalAssemblyGraph.hpp"
 #include "approximateTopologicalSort.hpp"
 using namespace shasta;
+using namespace mode0;
 
 // Boost libraries.
 #include <boost/graph/graphviz.hpp>

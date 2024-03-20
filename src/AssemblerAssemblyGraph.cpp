@@ -9,6 +9,7 @@
 #include "Reads.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
+using namespace mode0;
 
 // Boost libraries.
 #include <boost/graph/iteration_macros.hpp>

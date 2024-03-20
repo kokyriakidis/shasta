@@ -5,6 +5,7 @@
 #include "MemoryMappedVectorOfVectors.hpp"
 #include "orderPairs.hpp"
 using namespace shasta;
+using namespace mode0;
 
 // Boost libraries.
 #include <boost/graph/graphviz.hpp>

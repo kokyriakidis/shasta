@@ -13,6 +13,7 @@
 #include "Reads.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
+using namespace mode0;
 
 // Spoa.
 #include "spoa/spoa.hpp"

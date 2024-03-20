@@ -4,6 +4,7 @@
 #include "LocalAssemblyGraph.hpp"
 #include "platformDependent.hpp"
 using namespace shasta;
+using namespace mode0;
 
 // Boost libraries.
 #include <boost/algorithm/string.hpp>

@@ -128,15 +128,14 @@ namespace shasta {
         ostream&,
         const AssemblyPathGraphEdge&);
 
-    class AssemblyGraph;
 }
 
 
 
 class shasta::AssemblyPathGraphVertex {
 public:
-    AssemblyGraph::VertexId vertexId;
-    AssemblyPathGraphVertex(AssemblyGraph::VertexId vertexId) :
+    mode0::AssemblyGraph::VertexId vertexId;
+    AssemblyPathGraphVertex(mode0::AssemblyGraph::VertexId vertexId) :
         vertexId(vertexId) {}
 
     AssemblyPathGraphBaseClass::vertex_descriptor reverseComplementVertex =
@@ -149,7 +148,7 @@ class shasta::AssemblyPathGraphEdge {
 public:
 
     // The AsssemblyGraph path corresponding to this edge.
-    vector <AssemblyGraph::EdgeId> path;
+    vector <mode0::AssemblyGraph::EdgeId> path;
 
     // The length of the path, as measured on the marker graph.
     uint64_t pathLength = 0;
@@ -172,7 +171,7 @@ public:
 
 
     // Initialize the path to a single AssemblyGraph edge.
-    AssemblyPathGraphEdge(AssemblyGraph::EdgeId edgeId) :
+    AssemblyPathGraphEdge(mode0::AssemblyGraph::EdgeId edgeId) :
         path(1, edgeId) {}
     AssemblyPathGraphEdge() {}
 
@@ -261,7 +260,7 @@ public:
 
     // The constructor does not fill in the oriented read ids for each edge.
     // This must be done separately (see Assembler::detangle).
-    AssemblyPathGraph(const AssemblyGraph&);
+    AssemblyPathGraph(const mode0::AssemblyGraph&);
 
     // The tangles currently present in the graph, keyed by their ids.
     TangleId nextTangleId = 0;
@@ -273,7 +272,7 @@ public:
 
     void fillReverseComplementNewEdges(
         const vector<edge_descriptor>& newEdges,
-        const AssemblyGraph&);
+        const mode0::AssemblyGraph&);
 
     // Initial creation of all tangles.
     void createTangles();
@@ -302,7 +301,7 @@ public:
     // for GFA output.
     void detangle(
         double basesPerMarker,
-        const AssemblyGraph&);
+        const mode0::AssemblyGraph&);
 
     // Detangle a single tangle.
     // This does not fill in the reverseComplementEdge of newly created edges,

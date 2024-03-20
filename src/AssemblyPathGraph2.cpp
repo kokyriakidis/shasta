@@ -3,6 +3,7 @@
 #include "deduplicate.hpp"
 #include "html.hpp"
 using namespace shasta;
+using namespace mode0;
 
 // Boost libraries.
 #include <boost/graph/graphviz.hpp>

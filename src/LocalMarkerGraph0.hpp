@@ -181,7 +181,7 @@ public:
     // in the assembly graph. However, after detangling a marker
     // graph edge can correspond to multiple locations in the
     // assembly graph.
-    vector< pair<AssemblyGraph::EdgeId, uint32_t> > assemblyGraphLocations;
+    vector< pair<mode0::AssemblyGraph::EdgeId, uint32_t> > assemblyGraphLocations;
 
     // Flag that is set if the edge was removed during
     // approximate transitive reduction by flagWeakMarkerGraphEdges.
