@@ -254,30 +254,6 @@ private:
     void save(const string& fileName) const;
     void load(const string& fileName);
 
-    void run(
-        uint64_t threadCount0,
-        uint64_t threadCount1,
-        bool assembleSequence);
-    void run1(
-        uint64_t threadCount0,
-        uint64_t threadCount1,
-        bool assembleSequence);
-    void run2(
-        uint64_t threadCount0,
-        uint64_t threadCount1,
-        bool assembleSequence);
-
-    // Run3 uses the PhasingGraph.
-    void run3(
-        uint64_t threadCount0,
-        uint64_t threadCount1,
-        bool assembleSequence);
-
-    // Run4 and run5 use the PhasingTable.
-    void run4(
-        uint64_t threadCount0,
-        uint64_t threadCount1,
-        bool assembleSequence);
     void run5(
         uint64_t threadCount0,
         uint64_t threadCount1,
