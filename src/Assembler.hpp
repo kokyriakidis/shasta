@@ -2366,7 +2366,6 @@ public:
     // Given two consecutive primary edges, find the secondary edges
     // in between.
     void fillMode3AssemblyPathStep(const vector<string>&, ostream&);
-    void fillMode3AssemblyPathStep1(const vector<string>&, ostream&); // Uses class mode3::PathFiller1
     void fillMode3AssemblyPathStep2(const vector<string>&, ostream&); // Uses class mode3::PathFiller2
     void fillMode3AssemblyPathStep3(const vector<string>&, ostream&); // Uses class mode3::PathFiller3
 
