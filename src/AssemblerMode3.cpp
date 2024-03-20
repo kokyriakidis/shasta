@@ -130,21 +130,8 @@ void Assembler::loadAndAssembleCompressedPathGraph(
 
 
 
-// Given two consecutive primary edges in the marker graph,
-// find the secondary edges in between.
-// This works with mode3 assembly and the complete marker graph.
+// Assemble sequence between two primary edges.
 void Assembler::fillMode3AssemblyPathStep(const vector<string>& request, ostream& html)
-{
-    fillMode3AssemblyPathStep3(request, html);
-}
-
-
-
-// Given two consecutive primary edges in the marker graph,
-// find the secondary edges in between.
-// This works with mode3 assembly and the complete marker graph.
-// Version that uses class mode3::PathFiller3.
-void Assembler::fillMode3AssemblyPathStep3(const vector<string>& request, ostream& html)
 {
     // Check that our assumptions are satisfied.
     if(assemblerInfo->assemblyMode != 3) {

@@ -2363,10 +2363,8 @@ public:
     void accessMarkerGraphPrimaryJourneys();
     void writeMarkerGraphPrimaryJourneys();
 
-    // Given two consecutive primary edges, find the secondary edges
-    // in between.
+    // Assemble sequence between two primary edges.
     void fillMode3AssemblyPathStep(const vector<string>&, ostream&);
-    void fillMode3AssemblyPathStep3(const vector<string>&, ostream&); // Uses class mode3::PathFiller3
 
     void exploreMode3PathGraph(const vector<string>& request, ostream& html);
     void findMode3Paths(
