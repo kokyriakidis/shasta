@@ -1,7 +1,7 @@
 // Shasta
 #include "Assembler.hpp"
 #include "LocalMarkerGraph1.hpp"
-#include "mode3-PathFiller3.hpp"
+#include "mode3-LocalAssembly.hpp"
 #include "mode3-PathFinder.hpp"
 #include "mode3-PathGraph.hpp"
 #include "mode3-AssemblyPath.hpp"
@@ -140,7 +140,7 @@ void Assembler::fillMode3AssemblyPathStep(const vector<string>& request, ostream
     SHASTA_ASSERT(getReads().representation == 0);      // No RLE.
     SHASTA_ASSERT((assemblerInfo->k % 2) == 0);         // Marker length is even.
 
-    mode3::PathFiller3DisplayOptions options(html);
+    mode3::LocalAssemblyDisplayOptions options(html);
 
     // Get the parameters for the request.
     uint64_t edgeIdA = invalid<uint64_t>;
@@ -297,6 +297,6 @@ void Assembler::fillMode3AssemblyPathStep(const vector<string>& request, ostream
         return;
     }
 
-    // Fill this assembly step.
-    mode3::PathFiller3 filler(*this, edgeIdA, edgeIdB, minVertexCoverage, options, useA, useB);
+    // Local assembly for this assembly step.
+    mode3::LocalAssembly localAssembly(*this, edgeIdA, edgeIdB, minVertexCoverage, options, useA, useB);
 }

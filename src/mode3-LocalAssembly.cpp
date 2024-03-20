@@ -1,5 +1,5 @@
 // Shasta.
-#include "mode3-PathFiller3.hpp"
+#include "mode3-LocalAssembly.hpp"
 #include "Assembler.hpp"
 #include "globalMsa.hpp"
 #include "markerAccessFunctions.hpp"
@@ -41,12 +41,12 @@ using namespace mode3;
 // oriented reads on edgeIdA, regardless of whether they appear on edgeIdB.
 // If useA is false and useB is true, the assembly uses the
 // oriented reads on edgeIdB, regardless of whether they appear on edgeIdA.
-PathFiller3::PathFiller3(
+LocalAssembly::LocalAssembly(
     const Assembler& assembler,
     MarkerGraphEdgeId edgeIdA,
     MarkerGraphEdgeId edgeIdB,
     uint64_t minVertexCoverage, // 0 = automatic
-    const PathFiller3DisplayOptions& options,
+    const LocalAssemblyDisplayOptions& options,
     bool useA,
     bool useB) :
     assembler(assembler),
@@ -181,8 +181,8 @@ PathFiller3::PathFiller3(
             copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(html));
             html << "</pre>";
 
-            ofstream fasta("PathFiller3.fasta");
-            fasta << ">PathFiller3 " << sequence.size() << endl;
+            ofstream fasta("LocalAssembly.fasta");
+            fasta << ">LocalAssembly " << sequence.size() << endl;
             copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(fasta));
 
             getCompleteSequence(sequence);
@@ -202,7 +202,7 @@ PathFiller3::PathFiller3(
 
 
 
-void PathFiller3::checkAssumptions() const
+void LocalAssembly::checkAssumptions() const
 {
     SHASTA_ASSERT(edgeIdA != edgeIdB);
     SHASTA_ASSERT(assembler.assemblerInfo->assemblyMode == 3);
@@ -232,7 +232,7 @@ void PathFiller3::checkAssumptions() const
 
 
 
-void PathFiller3::gatherOrientedReads(bool useA, bool useB)
+void LocalAssembly::gatherOrientedReads(bool useA, bool useB)
 {
     // Joint loop over marker intervals that appear in edgeIdA and/or edgeIdB.
     const auto markerIntervalsA = assembler.markerGraph.edgeMarkerIntervals[edgeIdA];
@@ -320,7 +320,7 @@ void PathFiller3::gatherOrientedReads(bool useA, bool useB)
 
 
 
-void PathFiller3::writeOrientedReads() const
+void LocalAssembly::writeOrientedReads() const
 {
     if(not html) {
         return;
@@ -438,7 +438,7 @@ void PathFiller3::writeOrientedReads() const
 
 // Get the base position of a marker in an oriented read
 // given the ordinal.
-int64_t PathFiller3::basePosition(OrientedReadId orientedReadId, int64_t ordinal) const
+int64_t LocalAssembly::basePosition(OrientedReadId orientedReadId, int64_t ordinal) const
 {
     const MarkerId markerId = assembler.getMarkerId(orientedReadId, uint32_t(ordinal));
     const int64_t position = int64_t(assembler.markers.begin()[markerId].position);
@@ -448,7 +448,7 @@ int64_t PathFiller3::basePosition(OrientedReadId orientedReadId, int64_t ordinal
 
 
 
-void PathFiller3::estimateOffset()
+void LocalAssembly::estimateOffset()
 {
     int64_t n = 0;
     int64_t sum = 0;
@@ -474,7 +474,7 @@ void PathFiller3::estimateOffset()
 
 
 // Fill in the markerInfos vector of each read.
-void PathFiller3::gatherMarkers(double estimatedOffsetRatio)
+void LocalAssembly::gatherMarkers(double estimatedOffsetRatio)
 {
     const int64_t offsetThreshold = int64_t(estimatedOffsetRatio * double(estimatedABOffset));
 
@@ -534,7 +534,7 @@ void PathFiller3::gatherMarkers(double estimatedOffsetRatio)
 
 
 // Add the marker at given ordinal to the i-th oriented read.
-void PathFiller3::addMarkerInfo(uint64_t i, int64_t ordinal)
+void LocalAssembly::addMarkerInfo(uint64_t i, int64_t ordinal)
 {
     OrientedReadInfo& info = orientedReadInfos[i];
 
@@ -553,7 +553,7 @@ void PathFiller3::addMarkerInfo(uint64_t i, int64_t ordinal)
 
 
 
-void PathFiller3::writeMarkers()
+void LocalAssembly::writeMarkers()
 {
     if(not (html and options.showMarkers)) {
         return;
@@ -619,7 +619,7 @@ void PathFiller3::writeMarkers()
 // from which the marker graph will be created.
 // maxDrift is the maximum tolerated length drift of each read.
 // Used to compute the band for banded alignments.
-void PathFiller3::alignAndDisjointSets(
+void LocalAssembly::alignAndDisjointSets(
     uint64_t matchScore,
     uint64_t mismatchScore,
     uint64_t gapScore,
@@ -640,9 +640,9 @@ void PathFiller3::alignAndDisjointSets(
     ofstream dot;
     ofstream csv;
     if(detailedDebugOutput) {
-        dot.open("PathFiller3-AlignmentDetails.dot");
+        dot.open("LocalAssembly-AlignmentDetails.dot");
         dot << "graph PathFiler3lignments {\n";
-        csv.open("PathFiller3-AlignmentDetails.csv");
+        csv.open("LocalAssembly-AlignmentDetails.csv");
         csv << "OrientedReadId0,Ordinal0,OrientedReadId1,Ordinal1\n";
     }
 
@@ -998,14 +998,14 @@ void PathFiller3::alignAndDisjointSets(
 
 // Create vertices. Each disjoint set with at least minVertexCoverage markers
 // generates a vertex.
-uint64_t PathFiller3::createVertices(
+uint64_t LocalAssembly::createVertices(
     uint64_t minVertexCoverage,
     double vertexSamplingRate)  // Only used if minVertexCoverage is 0
 {
-    PathFiller3& graph = *this;
+    LocalAssembly& graph = *this;
 
     // Remove all vertices and edges, just in case.
-    PathFiller3BaseClass::clear();
+    LocalAssemblyBaseClass::clear();
     vertexMap.clear();
 
     // Find the disjoint sets corresponding to vertexIdA and vertexIdB.
@@ -1101,9 +1101,9 @@ uint64_t PathFiller3::createVertices(
 
 
 // Create edges by following the reads.
-void PathFiller3::createEdges()
+void LocalAssembly::createEdges()
 {
-    PathFiller3& graph = *this;
+    LocalAssembly& graph = *this;
 
     removeAllEdges();
 
@@ -1113,7 +1113,7 @@ void PathFiller3::createEdges()
 
         // Follow this read, finding the vertices it reaches.
         vertex_descriptor v0 = null_vertex();
-        PathFiller3MarkerIndexes indexes0;
+        LocalAssemblyMarkerIndexes indexes0;
         for(uint64_t j=0; j<info.markerInfos.size(); j++) {
             const MarkerInfo& markerInfo = info.markerInfos[j];
             const uint64_t disjointSetId = markerInfo.disjointSetId;
@@ -1121,7 +1121,7 @@ void PathFiller3::createEdges()
 
             if(it != vertexMap.end()) {
                 const vertex_descriptor v1 = it->second;
-                const PathFiller3MarkerIndexes indexes1 = {i, j};
+                const LocalAssemblyMarkerIndexes indexes1 = {i, j};
                 if(v0 != null_vertex()) {
 
                     // Get the edge v0->v1, creating it if necessary.
@@ -1133,7 +1133,7 @@ void PathFiller3::createEdges()
                         tie(e, edgeWasAdded) = add_edge(v0, v1, graph);
                         SHASTA_ASSERT(edgeWasAdded);
                     }
-                    PathFiller3Edge& edge = graph[e];
+                    LocalAssemblyEdge& edge = graph[e];
 
                     edge.markerIntervals.push_back({indexes0, indexes1});
                 }
@@ -1152,17 +1152,17 @@ void PathFiller3::createEdges()
 
 
 
-void PathFiller3::removeAllEdges()
+void LocalAssembly::removeAllEdges()
 {
-    PathFiller3& graph = *this;
-    BGL_FORALL_VERTICES(v, graph, PathFiller3) {
+    LocalAssembly& graph = *this;
+    BGL_FORALL_VERTICES(v, graph, LocalAssembly) {
         clear_vertex(v, graph);
     }
 }
 
 
 
-void PathFiller3::writeGraphviz(const string& fileName) const
+void LocalAssembly::writeGraphviz(const string& fileName) const
 {
     ofstream file(fileName);
     writeGraphviz(file);
@@ -1170,9 +1170,9 @@ void PathFiller3::writeGraphviz(const string& fileName) const
 
 
 
-void PathFiller3::writeGraphviz(ostream& s) const
+void LocalAssembly::writeGraphviz(ostream& s) const
 {
-    const PathFiller3& graph = *this;
+    const LocalAssembly& graph = *this;
 
     // S and V for edges HSV.
     const double S = 0.7;
@@ -1183,7 +1183,7 @@ void PathFiller3::writeGraphviz(ostream& s) const
     sort(sortedAssemblyPathEdges.begin(), sortedAssemblyPathEdges.end());
 
     s <<
-        "digraph PathFiller3 {\n"
+        "digraph LocalAssembly {\n"
         "mclimit=0.01;\n"       // For layout speed
         "edge [penwidth=6];\n"
         "node [fontname=\"Courier New\"];\n"
@@ -1200,7 +1200,7 @@ void PathFiller3::writeGraphviz(ostream& s) const
     }
 
     // Vertices.
-    BGL_FORALL_VERTICES(v, graph, PathFiller3) {
+    BGL_FORALL_VERTICES(v, graph, LocalAssembly) {
         const uint64_t disjointSetId = graph[v].disjointSetId;
         auto it = disjointSetsMap.find(disjointSetId);
         SHASTA_ASSERT(it != disjointSetsMap.end());
@@ -1231,8 +1231,8 @@ void PathFiller3::writeGraphviz(ostream& s) const
     }
 
     // Edges.
-    BGL_FORALL_EDGES(e, graph, PathFiller3) {
-        const PathFiller3Edge& edge = graph[e];
+    BGL_FORALL_EDGES(e, graph, LocalAssembly) {
+        const LocalAssemblyEdge& edge = graph[e];
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
         const uint64_t coverage = edge.coverage();
@@ -1276,9 +1276,9 @@ void PathFiller3::writeGraphviz(ostream& s) const
 
 
 
-void PathFiller3::writeGraph(const string& title)
+void LocalAssembly::writeGraph(const string& title)
 {
-    PathFiller3& graph = *this;
+    LocalAssembly& graph = *this;
 
     if(html and options.showGraph) {
         html << "<h2>" << title << "</h2>";
@@ -1290,7 +1290,7 @@ void PathFiller3::writeGraph(const string& title)
 
 
 
-void PathFiller3::writeGraph() const
+void LocalAssembly::writeGraph() const
 {
     // Write out the graph in graphviz format.
     const string uuid = to_string(boost::uuids::random_generator()());
@@ -1330,15 +1330,15 @@ void PathFiller3::writeGraph() const
 
 
 
-uint64_t PathFiller3::removeStrongComponents()
+uint64_t LocalAssembly::removeStrongComponents()
 {
-    PathFiller3& graph = *this;
+    LocalAssembly& graph = *this;
     uint64_t removedCount = 0;
 
     // Map the vertices to integers.
     uint64_t vertexIndex = 0;
     std::map<vertex_descriptor, uint64_t> vertexMap;
-    BGL_FORALL_VERTICES(v, graph, PathFiller3) {
+    BGL_FORALL_VERTICES(v, graph, LocalAssembly) {
         vertexMap.insert({v, vertexIndex++});
     }
 
@@ -1386,7 +1386,7 @@ uint64_t PathFiller3::removeStrongComponents()
         // But don't remove vertexIdA or vertexIdB.
         if(isNonTrivial) {
             for(const vertex_descriptor v: p.second) {
-                const PathFiller3Vertex& vertex = graph[v];
+                const LocalAssemblyVertex& vertex = graph[v];
                 if(vertex.disjointSetId == disjointSetIdA or vertex.disjointSetId == disjointSetIdB) {
                     continue;
                 }
@@ -1410,9 +1410,9 @@ uint64_t PathFiller3::removeStrongComponents()
 
 
 
-void PathFiller3::removeVertex(vertex_descriptor v)
+void LocalAssembly::removeVertex(vertex_descriptor v)
 {
-    PathFiller3& graph = *this;
+    LocalAssembly& graph = *this;
 
     vertexMap.erase(graph[v].disjointSetId);
 
@@ -1423,17 +1423,17 @@ void PathFiller3::removeVertex(vertex_descriptor v)
 
 
 
-void PathFiller3::findAssemblyPath()
+void LocalAssembly::findAssemblyPath()
 {
-    const PathFiller3& graph = *this;
+    const LocalAssembly& graph = *this;
     assemblyPath.clear();
 
 
     // Find the first and last vertex of the path we are looking for.
     vertex_descriptor vA = null_vertex();
     vertex_descriptor vB = null_vertex();
-    BGL_FORALL_VERTICES(v, graph, PathFiller3) {
-        const PathFiller3Vertex& vertex = graph[v];
+    BGL_FORALL_VERTICES(v, graph, LocalAssembly) {
+        const LocalAssemblyVertex& vertex = graph[v];
         if(vertex.disjointSetId == disjointSetIdA) {
             SHASTA_ASSERT(vA == null_vertex());
             vA = v;
@@ -1454,7 +1454,7 @@ void PathFiller3::findAssemblyPath()
         // Find the edge with the most coverage.
         edge_descriptor eNext;
         uint64_t bestCoverage = 0;
-        BGL_FORALL_OUTEDGES(v, e, graph, PathFiller3) {
+        BGL_FORALL_OUTEDGES(v, e, graph, LocalAssembly) {
             // Ignore a self-edge A->A.
             // This can exist because we did not allow vertex A (and B)
             // to be removed when removing strong components.
@@ -1468,7 +1468,7 @@ void PathFiller3::findAssemblyPath()
             }
         }
         if(bestCoverage == 0) {
-            cout << "PathFiller3: at " << graph[v].disjointSetId <<
+            cout << "LocalAssembly: at " << graph[v].disjointSetId <<
                 ": no out-edge found when filling path from " <<
                 edgeIdA << " to " << edgeIdB << endl;
         }
@@ -1487,11 +1487,11 @@ void PathFiller3::findAssemblyPath()
 
 
 
-void PathFiller3::assembleAssemblyPathEdges(
+void LocalAssembly::assembleAssemblyPathEdges(
     uint64_t maxMsaLength,
     LongMsaPolicy longMsaPolicy)
 {
-    const PathFiller3& graph = *this;
+    const LocalAssembly& graph = *this;
 
     for(const edge_descriptor e: assemblyPath) {
         assembleEdge(maxMsaLength, longMsaPolicy, e);
@@ -1515,7 +1515,7 @@ void PathFiller3::assembleAssemblyPathEdges(
 
         uint64_t position = 0;
         for(const edge_descriptor e: assemblyPath) {
-            const PathFiller3Edge& edge = graph[e];
+            const LocalAssemblyEdge& edge = graph[e];
             const vector<Base>& sequence = edge.consensusSequence;
             const vector<uint64_t>& coverage = edge.consensusCoverage;
             SHASTA_ASSERT(sequence.size() == coverage.size());
@@ -1543,13 +1543,13 @@ void PathFiller3::assembleAssemblyPathEdges(
 
 
 
-void PathFiller3::assembleEdge(
+void LocalAssembly::assembleEdge(
     uint64_t maxMsaLength,
     LongMsaPolicy longMsaPolicy,
     edge_descriptor e)
 {
-    PathFiller3& graph = *this;
-    PathFiller3Edge& edge = graph[e];
+    LocalAssembly& graph = *this;
+    LocalAssemblyEdge& edge = graph[e];
 
     if(html and options.showAssemblyDetails) {
         html << "<h2>Assembly details for edge " <<
@@ -1573,8 +1573,8 @@ void PathFiller3::assembleEdge(
     for(const auto& p: edge.markerIntervals) {
 
         // Locate the two markers of this marker interval.
-        const PathFiller3MarkerIndexes indexes0 = p.first;
-        const PathFiller3MarkerIndexes indexes1 = p.second;
+        const LocalAssemblyMarkerIndexes indexes0 = p.first;
+        const LocalAssemblyMarkerIndexes indexes1 = p.second;
         const uint64_t i0 = indexes0.i;
         const uint64_t i1 = indexes1.i;
         const uint64_t j0 = indexes0.j;
@@ -1818,7 +1818,7 @@ void PathFiller3::assembleEdge(
 
 
 
-void PathFiller3::writeCoverageCharacterToHtml(uint64_t coverage) const
+void LocalAssembly::writeCoverageCharacterToHtml(uint64_t coverage) const
 {
     if(coverage == 0) {
         html << "&nbsp;";
@@ -1835,10 +1835,10 @@ void PathFiller3::writeCoverageCharacterToHtml(uint64_t coverage) const
 
 // Get the sequence between edgeIdA and edgeIdB.
 // This does not include the sequences of edgeIdA and edgeIdB themselves.
-void PathFiller3::getSecondarySequence(
+void LocalAssembly::getSecondarySequence(
     vector<Base>& sequence) const
 {
-    const PathFiller3& graph = *this;
+    const LocalAssembly& graph = *this;
 
     sequence.clear();
     for(const edge_descriptor e: assemblyPath) {
@@ -1851,10 +1851,10 @@ void PathFiller3::getSecondarySequence(
 
 
 // Get the complete sequence, including the sequences of edgeIdA and edgeIdB.
-void PathFiller3::getCompleteSequence(
+void LocalAssembly::getCompleteSequence(
     vector<Base>& sequence) const
 {
-    const PathFiller3& graph = *this;
+    const LocalAssembly& graph = *this;
 
     sequence.clear();
 
@@ -1877,15 +1877,15 @@ void PathFiller3::getCompleteSequence(
 // Remove vertices that are not accessible from vertexIdA
 // or from which vertexIdB is not accessible.
 // Returns the number of vertices that were removed.
-uint64_t PathFiller3::removeInaccessibleVertices()
+uint64_t LocalAssembly::removeInaccessibleVertices()
 {
-    PathFiller3& graph = *this;
+    LocalAssembly& graph = *this;
 
     // Find the vertices corresponding to vertexIdA and vertexIdB.
     vertex_descriptor vA = null_vertex();
     vertex_descriptor vB = null_vertex();
-    BGL_FORALL_VERTICES(v, graph, PathFiller3) {
-        const PathFiller3Vertex& vertex = graph[v];
+    BGL_FORALL_VERTICES(v, graph, LocalAssembly) {
+        const LocalAssemblyVertex& vertex = graph[v];
         if(vertex.disjointSetId == disjointSetIdA) {
             SHASTA_ASSERT(vA == null_vertex());
             vA = v;
@@ -1910,7 +1910,7 @@ uint64_t PathFiller3::removeInaccessibleVertices()
             const vertex_descriptor v0 = q.front();
             q.pop();
 
-            BGL_FORALL_OUTEDGES(v0, e, graph, PathFiller3) {
+            BGL_FORALL_OUTEDGES(v0, e, graph, LocalAssembly) {
                 const vertex_descriptor v1 = target(e, graph);
                 auto& vertex1 = graph[v1];
                 if(not vertex1.isAccessibleA) {
@@ -1934,7 +1934,7 @@ uint64_t PathFiller3::removeInaccessibleVertices()
             const vertex_descriptor v0 = q.front();
             q.pop();
 
-            BGL_FORALL_INEDGES(v0, e, graph, PathFiller3) {
+            BGL_FORALL_INEDGES(v0, e, graph, LocalAssembly) {
                 const vertex_descriptor v1 = source(e, graph);
                 auto& vertex1 = graph[v1];
                 if(not vertex1.isAccessibleB) {
@@ -1949,7 +1949,7 @@ uint64_t PathFiller3::removeInaccessibleVertices()
 
     // Gather the vertices to be removed.
     vector<vertex_descriptor> verticesToBeRemoved;
-    BGL_FORALL_VERTICES(v, graph, PathFiller3) {
+    BGL_FORALL_VERTICES(v, graph, LocalAssembly) {
         const auto& vertex = graph[v];
         if(not (vertex.isAccessibleA and vertex.isAccessibleB)) {
             verticesToBeRemoved.push_back(v);
@@ -1968,16 +1968,16 @@ uint64_t PathFiller3::removeInaccessibleVertices()
 
 // Remove all vertices and edges and clear the vertexMap and assemblyPath.
 // All other data are left alone.
-void PathFiller3::clear()
+void LocalAssembly::clear()
 {
-    PathFiller3BaseClass::clear();
+    LocalAssemblyBaseClass::clear();
     vertexMap.clear();
     assemblyPath.clear();
 }
 
 
 
-void PathFiller3::writeOrientedReadsSequences() const
+void LocalAssembly::writeOrientedReadsSequences() const
 {
     if(not html) {
         return;
@@ -1990,7 +1990,7 @@ void PathFiller3::writeOrientedReadsSequences() const
     SHASTA_ASSERT((k % 2) == 0);
     const uint64_t kHalf = k / 2;
 
-    ofstream fasta("PathFiller3-OrientedReadSequences.fasta");
+    ofstream fasta("LocalAssembly-OrientedReadSequences.fasta");
 
     for(const OrientedReadInfo& info: orientedReadInfos) {
 

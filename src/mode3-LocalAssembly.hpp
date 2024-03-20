@@ -1,6 +1,6 @@
 #pragma once
 
-// PathFiller3 assembles the sequence between two primary marker graph edges.
+// LocalAssembly assembles the sequence between two primary marker graph edges.
 // It uses a local marker graph.
 
 // Shasta.
@@ -20,25 +20,25 @@
 
 namespace shasta {
     namespace mode3 {
-        class PathFiller3Vertex;
-        class PathFiller3Edge;
-        class PathFiller3;
-        using PathFiller3BaseClass = boost::adjacency_list<
+        class LocalAssemblyVertex;
+        class LocalAssemblyEdge;
+        class LocalAssembly;
+        using LocalAssemblyBaseClass = boost::adjacency_list<
             boost::listS,
             boost::listS,
             boost::bidirectionalS,
-            PathFiller3Vertex,
-            PathFiller3Edge
+            LocalAssemblyVertex,
+            LocalAssemblyEdge
             >;
-        class PathFiller3DisplayOptions;
-        class PathFiller3MarkerIndexes;
+        class LocalAssemblyDisplayOptions;
+        class LocalAssemblyMarkerIndexes;
     }
     class Assembler;
 };
 
 
 
-class shasta::mode3::PathFiller3DisplayOptions {
+class shasta::mode3::LocalAssemblyDisplayOptions {
 public:
 
     // If this is not open, no output takes place.
@@ -53,13 +53,13 @@ public:
     bool showAssemblyDetails = false;
     bool showDebugInformation = false;
 
-    PathFiller3DisplayOptions(ostream& html) : html(html) {}
+    LocalAssemblyDisplayOptions(ostream& html) : html(html) {}
 };
 
 
 
-// A way to identify a marker in PathFiller3, besides its id.
-class shasta::mode3::PathFiller3MarkerIndexes {
+// A way to identify a marker in LocalAssembly, besides its id.
+class shasta::mode3::LocalAssemblyMarkerIndexes {
 public:
     uint64_t i; // Index in orientedReadInfos
     uint64_t j; // Index in OrientedReadInfo::markerInfos;
@@ -67,7 +67,7 @@ public:
 
 
 
-class shasta::mode3::PathFiller3Vertex {
+class shasta::mode3::LocalAssemblyVertex {
 public:
     uint64_t disjointSetId;
     bool isAccessibleA = false;
@@ -76,11 +76,11 @@ public:
 
 
 
-class shasta::mode3::PathFiller3Edge {
+class shasta::mode3::LocalAssemblyEdge {
 public:
 
     // Each marker interval is identified by the two markers.
-    vector< pair<PathFiller3MarkerIndexes, PathFiller3MarkerIndexes> > markerIntervals;
+    vector< pair<LocalAssemblyMarkerIndexes, LocalAssemblyMarkerIndexes> > markerIntervals;
 
     uint64_t coverage() const
     {
@@ -94,7 +94,7 @@ public:
 
 
 
-class shasta::mode3::PathFiller3 : public PathFiller3BaseClass {
+class shasta::mode3::LocalAssembly : public LocalAssemblyBaseClass {
 public:
 
     // Hide class Base defined in boost::adjacency_list.
@@ -112,12 +112,12 @@ public:
     // oriented reads on edgeIdA, regardless of whether they appear on edgeIdB.
     // If useA is false and useB is true, the assembly uses the
     // oriented reads on edgeIdB, regardless of whether they appear on edgeIdA.
-    PathFiller3(
+    LocalAssembly(
         const Assembler&,
         MarkerGraphEdgeId edgeIdA,
         MarkerGraphEdgeId edgeIdB,
         uint64_t minVertexCoverage, // 0 = automatic
-        const PathFiller3DisplayOptions&,
+        const LocalAssemblyDisplayOptions&,
         bool useA = true,
         bool useB = true);
 
@@ -136,7 +136,7 @@ private:
     const Assembler& assembler;
     MarkerGraphEdgeId edgeIdA;
     MarkerGraphEdgeId edgeIdB;
-    const PathFiller3DisplayOptions& options;
+    const LocalAssemblyDisplayOptions& options;
     ostream& html;
 
     MarkerGraphVertexId vertexIdA;  // The target vertex of marker graph edge edgeIdA.
@@ -156,7 +156,7 @@ private:
         int64_t position;
         KmerId kmerId;
 
-        // An id for this marker, global to the PathFiller3.
+        // An id for this marker, global to the LocalAssembly.
         // This is the index of this marker in the disjoint sets data structure.
         uint64_t id;
 
@@ -273,7 +273,7 @@ private:
     // where i is the index of the OrientedReadInfo in orientedReadInfos
     // and j is the index of the MarkerInfo in orientedReadInfo.markerInfos.
     // Keyed by the disjoint set id (the same also stored in each marker).
-    std::map<uint64_t, vector<PathFiller3MarkerIndexes> > disjointSetsMap;
+    std::map<uint64_t, vector<LocalAssemblyMarkerIndexes> > disjointSetsMap;
 
     vector<uint64_t> disjointSetsSizeHistogram;
 

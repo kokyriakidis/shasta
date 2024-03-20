@@ -1,7 +1,5 @@
 #include "mode3-AssemblyPath.hpp"
-// #include "mode3-PathFiller1.hpp"
-// #include "mode3-PathFiller2.hpp"
-#include "mode3-PathFiller3.hpp"
+#include "mode3-LocalAssembly.hpp"
 #include "mode3-PathFinder.hpp"
 #include "Assembler.hpp"
 #include "MarkerInterval.hpp"
@@ -165,7 +163,7 @@ void AssemblyPath::assembleStep(uint64_t i)
     Step& step = steps[i];
     ostream html(0);
 
-    // Find the required settings for useA and useB for PathFiller3.
+    // Find the required settings for useA and useB for LocalAssembly.
     bool isFirst = (i == 0);
     bool isLast = ((i + 1) == primaryEdges.size() - 1);
     bool useA = true;
@@ -177,20 +175,12 @@ void AssemblyPath::assembleStep(uint64_t i)
         useB = false;
     }
 
-#if 0
-    PathFiller1 pathFiller(assembler, edgeIdA, edgeIdB, html, false, false, false, false, false);
-    pathFiller.getSecondarySequence(step.sequence);
-#endif
-#if 0
-    PathFiller2 pathFiller(assembler, edgeIdA, edgeIdB, html);
-    pathFiller.getSecondarySequence(step.sequence);
-#endif
 
     try {
-        PathFiller3 pathFiller(assembler, edgeIdA, edgeIdB, 0, html, useA, useB);
-        pathFiller.getSecondarySequence(step.sequence);
+        LocalAssembly localAssembly(assembler, edgeIdA, edgeIdB, 0, html, useA, useB);
+        localAssembly.getSecondarySequence(step.sequence);
     } catch (...) {
-        cout << "Error occurred when assembling between marker graph edges " <<
+        cout << "Error occurred in local assembly between marker graph edges " <<
             edgeIdA << " and " << edgeIdB << endl;
         throw;
     }
