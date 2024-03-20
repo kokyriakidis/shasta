@@ -254,7 +254,7 @@ private:
     void save(const string& fileName) const;
     void load(const string& fileName);
 
-    void run5(
+    void run(
         uint64_t threadCount0,
         uint64_t threadCount1,
         bool assembleSequence);

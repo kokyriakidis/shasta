@@ -177,7 +177,7 @@ CompressedPathGraph::CompressedPathGraph(
     // Serialize it so we can restore it to facilitate debugging.
     save("CompressedPathGraph-" + to_string(componentId) + ".data");
 
-    run5(threadCount0, threadCount1, true);
+    run(threadCount0, threadCount1, true);
 }
 
 
@@ -191,12 +191,12 @@ CompressedPathGraph::CompressedPathGraph(
     assembler(assembler)
 {
     load(fileName);
-    run5(threadCount0, threadCount1, true);
+    run(threadCount0, threadCount1, true);
 }
 
 
 
-void CompressedPathGraph::run5(
+void CompressedPathGraph::run(
     uint64_t threadCount0,
     uint64_t threadCount1,
     bool assembleSequence)
@@ -204,8 +204,8 @@ void CompressedPathGraph::run5(
     // *** EXPOSE WHEN CODE STABILIZES
     const uint64_t detangleToleranceLow = 0;
     const uint64_t detangleToleranceHigh = 2;
-    const uint64_t detangleWithSearchToleranceLow = 1;
-    const uint64_t detangleWithSearchToleranceHigh = 6;
+    // const uint64_t detangleWithSearchToleranceLow = 1;
+    // const uint64_t detangleWithSearchToleranceHigh = 6;
     const bool useBayesianModel = true;
     const double epsilon = 0.1;
     const double minLogP = 20.;
