@@ -216,14 +216,11 @@ void AssemblyGraph::run(
     // const uint64_t optimizeChainsMinCommon = 3;
     // const uint64_t optimizeChainsK = 100;
 
-    write("Initial");
-
     // Don't do any detangling before cleanup of bubbles and superbubbles.
 
     // Cleanup bubbles and superbubbles.
     // Must do compress to make sure all bubbles are in bubble chains.
     compress();
-    write("Q");
     for(uint64_t iteration=0; ; iteration ++) {
         const uint64_t cleanedUpBubbleCount = cleanupBubbles(false, 1000, chainTerminalCommonThreshold);
         cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
@@ -233,17 +230,12 @@ void AssemblyGraph::run(
         compressBubbleChains();
         compress();
     }
-    write("R");
     cleanupSuperbubbles(false, 30000, chainTerminalCommonThreshold);
-    write("S");
     compress();
-    write("T");
 
     // Remove short superbubbles.
     removeShortSuperbubbles(false, 10000, 30000);
-    write("U");
     compress();
-    write("V");
 
     // Phase.
     compressBubbleChains();
@@ -253,7 +245,6 @@ void AssemblyGraph::run(
         bubbleErrorThreshold,
         longBubbleThreshold);
     compress();
-    write("A");
 
     // For detangling, expand all bubble chains.
     expand();
@@ -261,34 +252,17 @@ void AssemblyGraph::run(
     // Detangle.
     while(compressSequentialEdges());
     compressBubbleChains();
-    write("B");
     detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
-    write("C");
     while(compressSequentialEdges());
     compressBubbleChains();
-    write("D");
     detangleVertices(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
-    write("E");
     while(compressSequentialEdges());
     compressBubbleChains();
-    write("E1");
     detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
-    write("E2");
     // detangleShortSuperbubbles(false, 30000, detangleToleranceLow, detangleToleranceHigh);
-
-    // detangleEdgesWithSearch(true, detangleWithSearchToleranceLow, detangleWithSearchToleranceHigh);
 
     compress();
     compressBubbleChains();
-    write("F");
-
-#if 0
-    expand();
-    write("G");
-    removeSelfComplementarySquares();
-    write("H");
-    // compress();
-#endif
 
 #if 0
     // Optimize the chains.
@@ -298,10 +272,10 @@ void AssemblyGraph::run(
         optimizeChainsK);
 #endif
 
-    if(assembleSequence) {
+    // Before final output, renumber the edges contiguously.
+    renumberEdges();
 
-        // Before final output, renumber the edges contiguously.
-        // renumberEdges();
+    if(assembleSequence) {
 
         // Assemble sequence.
         assembleChains(chainTerminalCommonThreshold, threadCount0, threadCount1);
