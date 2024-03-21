@@ -68,7 +68,7 @@ void Assembler::writeMarkerGraphPrimaryJourneys()
 
 
 
-void Assembler::findMode3Paths(
+void Assembler::mode3Assembly(
     uint64_t threadCount0,  // High level parallelization
     uint64_t threadCount1   // Low level parallelization
     ) const

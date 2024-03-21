@@ -609,8 +609,8 @@ PYBIND11_MODULE(shasta, shastaModule)
             arg("debug") = false)
 
         // Assembly mode 3.
-        .def("findMode3Paths",
-            &Assembler::findMode3Paths,
+        .def("mode3Assembly",
+            &Assembler::mode3Assembly,
             arg("threadCount0"),
             arg("threadCount1"))
         .def("loadAndAssembleCompressedPathGraph",
