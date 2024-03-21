@@ -24,15 +24,6 @@ namespace shasta {
 class shasta::mode3::AssemblyPath : public MultithreadedObject<AssemblyPath> {
 public:
 
-    // Create the assembly path starting from a given primary edge.
-    AssemblyPath(
-        const Assembler&,
-        MarkerGraphEdgeId,
-        uint64_t direction,  // 0 = forward, 1 = backward, 2=bidirectional
-        bool allowOrientedReadsOnFirst = true,
-        bool allowOrientedReadsOnLast = true
-        );
-
     // Create the assembly path given n primary edges and
     // the n-1 MarkerGraphEdgePairInfo between consecutive primary edges.
     AssemblyPath(

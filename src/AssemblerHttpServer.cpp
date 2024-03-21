@@ -246,7 +246,6 @@ void Assembler::fillServerFunctionTable()
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreCompressedAssemblyGraph);
 
     SHASTA_ADD_TO_FUNCTION_TABLE(fillMode3AssemblyPathStep);
-    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3PathGraph);
 }
 #undef SHASTA_ADD_TO_FUNCTION_TABLE
 

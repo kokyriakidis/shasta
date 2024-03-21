@@ -2351,11 +2351,6 @@ public:
 
 
     // Mode 3 assembly.
-    void findCompleteMarkerGraphPath(
-        MarkerGraphEdgeId startEdgeId,  // The path starts here.
-        uint64_t direction              // 0=forward, 1=backward, 2=bidirectional
-        ) const;
-    void findCompleteMarkerGraphPaths(uint64_t threadCount) const;
     void flagPrimaryMarkerGraphEdges(
         uint64_t minEdgeCoverage,
         uint64_t maxEdgeCoverage,
@@ -2368,7 +2363,6 @@ public:
     // Assemble sequence between two primary edges.
     void fillMode3AssemblyPathStep(const vector<string>&, ostream&);
 
-    void exploreMode3PathGraph(const vector<string>& request, ostream& html);
     void findMode3Paths(
         uint64_t threadCount0,  // High level parallelization
         uint64_t threadCount1   // Low level parallelization

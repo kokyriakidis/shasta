@@ -2,7 +2,6 @@
 #include "Assembler.hpp"
 #include "LocalMarkerGraph1.hpp"
 #include "mode3-LocalAssembly.hpp"
-#include "mode3-PathFinder.hpp"
 #include "mode3-PathGraph.hpp"
 #include "mode3-AssemblyPath.hpp"
 #include "Reads.hpp"
@@ -14,46 +13,6 @@ using namespace shasta;
 // Standard library.
 #include "fstream.hpp"
 #include <map>
-
-
-
-void Assembler::findCompleteMarkerGraphPath(
-    MarkerGraphEdgeId startEdgeId,  // The path starts here.
-    uint64_t direction              // 0=forward, 1=backward, 2=bidirectional
-    ) const
-{
-    // Check our assumptions.
-    SHASTA_ASSERT(assemblerInfo->assemblyMode == 3);    // Complete assembly graph.
-    SHASTA_ASSERT(getReads().representation == 0);      // No RLE
-
-
-    // Check that we have what we need.
-    checkMarkersAreOpen();
-    checkMarkerGraphVerticesAreAvailable();
-    checkMarkerGraphEdgesIsOpen();
-
-    // Do it.
-    mode3::AssemblyPath assemblyPath(
-        *this,
-        startEdgeId,
-        direction);
-    ofstream fasta("AssemblyPath.fasta");
-    assemblyPath.writeFasta(fasta, "Path");
-    ofstream csv("AssemblyPath.csv");
-    assemblyPath.writeCsv(csv, "Path");
-}
-
-
-
-void Assembler::findCompleteMarkerGraphPaths(uint64_t threadCount) const
-{
-    // Adjust the numbers of threads, if necessary.
-    if(threadCount == 0) {
-        threadCount = std::thread::hardware_concurrency();
-    }
-
-    mode3::PathFinder pathFinder(*this, threadCount);
-}
 
 
 

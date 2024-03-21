@@ -1,6 +1,5 @@
 #include "mode3-AssemblyPath.hpp"
 #include "mode3-LocalAssembly.hpp"
-#include "mode3-PathFinder.hpp"
 #include "Assembler.hpp"
 #include "MarkerInterval.hpp"
 #include "SHASTA_ASSERT.hpp"
@@ -11,102 +10,6 @@ using namespace mode3;
 
 #include "MultithreadedObject.tpp"
 template class MultithreadedObject<AssemblyPath>;
-
-// Create the assembly path starting from a given primary edge.
-AssemblyPath::AssemblyPath(
-    const Assembler& assembler,
-    MarkerGraphEdgeId startEdgeId,
-    uint64_t direction,  // 0 = forward, 1 = backward, 2=bidirectional
-    bool allowOrientedReadsOnFirst,
-    bool allowOrientedReadsOnLast
-    ) :
-    MultithreadedObject<AssemblyPath>(*this),
-    assembler(assembler),
-    allowOrientedReadsOnFirst(allowOrientedReadsOnFirst),
-    allowOrientedReadsOnLast(allowOrientedReadsOnLast)
-{
-    create(startEdgeId, direction);
-    assembleSequential();
-}
-
-
-
-// Create the primaryEdges and the steps.
-void AssemblyPath::create(
-    MarkerGraphEdgeId startEdgeId,
-    uint64_t direction  // 0 = forward, 1 = backward, 2=bidirectional
-    )
-{
-
-    // Forward.
-    if(direction == 0) {
-
-        vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > otherPrimaryEdges;
-        PathFinder pathFinder(assembler, startEdgeId, direction, otherPrimaryEdges);
-
-        // Create the primaryEdges and the steps.
-        primaryEdges.push_back(startEdgeId);
-        for(const auto& p: otherPrimaryEdges) {
-            primaryEdges.push_back(p.first);
-            steps.push_back(Step(p.second));
-        }
-    }
-
-
-
-    // Backward.
-    else if(direction == 1) {
-
-        vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > otherPrimaryEdges;
-        PathFinder pathFinder(assembler, startEdgeId, direction, otherPrimaryEdges);
-
-        // Reverse the other primary edges.
-        reverse(otherPrimaryEdges.begin(), otherPrimaryEdges.end());
-        for(auto& p: otherPrimaryEdges) {
-            p.second.reverse();
-        }
-
-        // Create the primaryEdges and the steps.
-        for(const auto& p: otherPrimaryEdges) {
-            primaryEdges.push_back(p.first);
-            steps.push_back(Step(p.second));
-        }
-        primaryEdges.push_back(startEdgeId);
-    }
-
-
-
-    // Bidirectional
-    else if(direction == 2) {
-
-        // Move forward.
-        vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > otherPrimaryEdgesForward;
-        PathFinder forwardPathFinder(assembler, startEdgeId, 0, otherPrimaryEdgesForward);
-
-        // Move backward.
-        vector< pair<MarkerGraphEdgeId, MarkerGraphEdgePairInfo> > otherPrimaryEdgesBackward;
-        PathFinder backWardPathFinder(assembler, startEdgeId, 1, otherPrimaryEdgesBackward);
-        reverse(otherPrimaryEdgesBackward.begin(), otherPrimaryEdgesBackward.end());
-        for(auto& p: otherPrimaryEdgesBackward) {
-            p.second.reverse();
-        }
-
-        // Combine them.
-        for(const auto& p: otherPrimaryEdgesBackward) {
-            primaryEdges.push_back(p.first);
-            steps.push_back(Step(p.second));
-        }
-        primaryEdges.push_back(startEdgeId);
-        for(const auto& p: otherPrimaryEdgesForward) {
-            primaryEdges.push_back(p.first);
-            steps.push_back(Step(p.second));
-        }
-    }
-
-
-
-    SHASTA_ASSERT(primaryEdges.size() == steps.size() + 1);
-}
 
 
 
