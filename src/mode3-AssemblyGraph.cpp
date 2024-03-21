@@ -1,5 +1,5 @@
 // Shasta.
-#include "mode3-CompressedPathGraph.hpp"
+#include "mode3-AssemblyGraph.hpp"
 #include "mode3-AssemblyPath.hpp"
 #include "mode3-PathGraph.hpp"
 #include "mode3-PhasingTable.hpp"
@@ -146,7 +146,7 @@ void GlobalPathGraph::assembleComponent(
     component.writeGraphviz(
         "PathGraphCompact" + to_string(componentId), options, assembler.markerGraph);
 
-    CompressedPathGraph cGraph(component, componentId, assembler, threadCount0, threadCount1);
+    AssemblyGraph cGraph(component, componentId, assembler, threadCount0, threadCount1);
 }
 
 
@@ -157,13 +157,13 @@ void GlobalPathGraph::loadAndAssemble(
     uint64_t threadCount0,
     uint64_t threadCount1)
 {
-    CompressedPathGraph cGraph(fileName, assembler,threadCount0, threadCount1);
+    AssemblyGraph cGraph(fileName, assembler,threadCount0, threadCount1);
 }
 
 
 
 // Create from a PathGraph, then call run.
-CompressedPathGraph::CompressedPathGraph(
+AssemblyGraph::AssemblyGraph(
     const PathGraph& graph,
     uint64_t componentId,
     const Assembler& assembler,
@@ -175,7 +175,7 @@ CompressedPathGraph::CompressedPathGraph(
     create(graph);
 
     // Serialize it so we can restore it to facilitate debugging.
-    save("CompressedPathGraph-" + to_string(componentId) + ".data");
+    save("AssemblyGraph-" + to_string(componentId) + ".data");
 
     run(threadCount0, threadCount1, true);
 }
@@ -183,7 +183,7 @@ CompressedPathGraph::CompressedPathGraph(
 
 
 // Load it from a binary archive, then call run.
-CompressedPathGraph::CompressedPathGraph(
+AssemblyGraph::AssemblyGraph(
     const string& fileName,
     const Assembler& assembler,
     uint64_t threadCount0,
@@ -196,7 +196,7 @@ CompressedPathGraph::CompressedPathGraph(
 
 
 
-void CompressedPathGraph::run(
+void AssemblyGraph::run(
     uint64_t threadCount0,
     uint64_t threadCount1,
     bool assembleSequence)
@@ -322,10 +322,10 @@ void CompressedPathGraph::run(
 
 // Initial creation from the PathGraph.
 // Each linear chain of edges in the PathGraph after transitive reduction generates
-// a CompressedPathGraphEdge (BubbleChain) consisting of a single haploid bubble.
-void CompressedPathGraph::create(const PathGraph& graph)
+// a AssemblyGraphEdge (BubbleChain) consisting of a single haploid bubble.
+void AssemblyGraph::create(const PathGraph& graph)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     // Create a filtered version of the PathGraph, containing only the
     // transitive reduction edges.
@@ -361,7 +361,7 @@ void CompressedPathGraph::create(const PathGraph& graph)
         // Create an edge for this input chain.
         edge_descriptor ce;
         tie(ce, ignore) = add_edge(cv0, cv1, cGraph);
-        CompressedPathGraphEdge& edge = cGraph[ce];
+        AssemblyGraphEdge& edge = cGraph[ce];
         edge.id = nextEdgeId++;
 
         // The edge is a degenerate BubbleChain consisting of a single haploid bubble.
@@ -385,11 +385,11 @@ void CompressedPathGraph::create(const PathGraph& graph)
 
 // Return the vertex corresponding to a given MarkerGraphEdgeId,
 // creating it if it is not in the given vertexMap
-CompressedPathGraph::vertex_descriptor CompressedPathGraph::getVertex(
+AssemblyGraph::vertex_descriptor AssemblyGraph::getVertex(
     MarkerGraphEdgeId markerGraphEdgeId,
     std::map<MarkerGraphEdgeId, vertex_descriptor>& vertexMap)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     auto it = vertexMap.find(markerGraphEdgeId);
     if(it == vertexMap.end()) {
@@ -404,7 +404,7 @@ CompressedPathGraph::vertex_descriptor CompressedPathGraph::getVertex(
 
 
 // Create a new vertex with a given MarkerGraphEdgeId.
-CompressedPathGraph::vertex_descriptor CompressedPathGraph::createVertex(
+AssemblyGraph::vertex_descriptor AssemblyGraph::createVertex(
     MarkerGraphEdgeId markerGraphEdgeId)
 {
     return add_vertex({markerGraphEdgeId}, *this);
@@ -412,9 +412,9 @@ CompressedPathGraph::vertex_descriptor CompressedPathGraph::createVertex(
 
 
 
-void CompressedPathGraph::removeVertex(vertex_descriptor cv)
+void AssemblyGraph::removeVertex(vertex_descriptor cv)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     SHASTA_ASSERT(in_degree(cv, cGraph) == 0);
     SHASTA_ASSERT(out_degree(cv, cGraph) == 0);
@@ -427,33 +427,33 @@ void CompressedPathGraph::removeVertex(vertex_descriptor cv)
 // Compute vertexIndex for every vertex.
 // This numbers vertices consecutively starting at zero.
 // This numbering becomes invalid as soon as a vertex is added or removed.
-void CompressedPathGraph::numberVertices()
+void AssemblyGraph::numberVertices()
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     uint64_t index = 0;
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph) {
+    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
         cGraph[cv].index = index++;
     }
 }
 
 
 
-void CompressedPathGraph::clearVertexNumbering()
+void AssemblyGraph::clearVertexNumbering()
 {
-    CompressedPathGraph& cGraph = *this;
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph) {
+    AssemblyGraph& cGraph = *this;
+    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
         cGraph[cv].index = invalid<uint64_t>;
     }
 
 }
 
 
-void CompressedPathGraph::renumberEdges()
+void AssemblyGraph::renumberEdges()
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     nextEdgeId = 0;
 
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         cGraph[ce].id = nextEdgeId++;
     }
 }
@@ -461,23 +461,23 @@ void CompressedPathGraph::renumberEdges()
 
 
 // Compress parallel edges into bubbles, where possible.
-bool CompressedPathGraph::compressParallelEdges()
+bool AssemblyGraph::compressParallelEdges()
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     bool changesWereMade = false;
 
     // Look for sets of parallel edges v0->v1.
     vector<vertex_descriptor> childrenVertices;
     vector<edge_descriptor> edgesToBeRemoved;
     Bubble newBubble;
-    BGL_FORALL_VERTICES(v0, cGraph, CompressedPathGraph) {
+    BGL_FORALL_VERTICES(v0, cGraph, AssemblyGraph) {
         if(out_degree(v0, cGraph) < 2) {
             continue;
         }
 
         // Find distinct children vertices of v0.
         childrenVertices.clear();
-        BGL_FORALL_OUTEDGES(v0, e, cGraph, CompressedPathGraph) {
+        BGL_FORALL_OUTEDGES(v0, e, cGraph, AssemblyGraph) {
             childrenVertices.push_back(target(e, cGraph));
         }
         deduplicate(childrenVertices);
@@ -488,11 +488,11 @@ bool CompressedPathGraph::compressParallelEdges()
             // Create the new bubble using parallel edges v0->v1.
             newBubble.clear();
             edgesToBeRemoved.clear();
-            BGL_FORALL_OUTEDGES(v0, e, cGraph, CompressedPathGraph) {
+            BGL_FORALL_OUTEDGES(v0, e, cGraph, AssemblyGraph) {
                 if(target(e, cGraph) != v1) {
                     continue;
                 }
-                CompressedPathGraphEdge& edge = cGraph[e];
+                AssemblyGraphEdge& edge = cGraph[e];
 
                 // The BubbleChain must have length 1.
                 if(edge.size() > 1) {
@@ -511,7 +511,7 @@ bool CompressedPathGraph::compressParallelEdges()
             changesWereMade = true;
             edge_descriptor eNew;
             tie(eNew, ignore) = add_edge(v0, v1, cGraph);
-            CompressedPathGraphEdge& newEdge = cGraph[eNew];
+            AssemblyGraphEdge& newEdge = cGraph[eNew];
             newEdge.id = nextEdgeId++;
             newEdge.resize(1);  // Make it a single bubble.
             Bubble& newEdgeBubble = newEdge.front();
@@ -539,9 +539,9 @@ void Bubble::deduplicate()
 
 
 // Compress linear sequences of edges (BubbleChains) into longer BubbleChains.
-bool CompressedPathGraph::compressSequentialEdges()
+bool AssemblyGraph::compressSequentialEdges()
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     bool changesWereMade = false;
 
     // Find linear chains of edges.
@@ -562,10 +562,10 @@ bool CompressedPathGraph::compressSequentialEdges()
         const vertex_descriptor v1 = target(linearChain.back(), cGraph);
         edge_descriptor ceNew;
         tie(ceNew, ignore) = add_edge(v0, v1, cGraph);
-        CompressedPathGraphEdge& newEdge = cGraph[ceNew];
+        AssemblyGraphEdge& newEdge = cGraph[ceNew];
         newEdge.id = nextEdgeId++;
         for(const edge_descriptor ce: linearChain) {
-            const CompressedPathGraphEdge& oldEdge = cGraph[ce];
+            const AssemblyGraphEdge& oldEdge = cGraph[ce];
             copy(oldEdge.begin(), oldEdge.end(), back_inserter(newEdge));
         }
 
@@ -586,7 +586,7 @@ bool CompressedPathGraph::compressSequentialEdges()
 
 
 // Call compressParallelEdges and compressSequentialEdges iteratively until nothing changes.
-bool CompressedPathGraph::compress()
+bool AssemblyGraph::compress()
 {
     bool changesWereMade = false;
 
@@ -610,10 +610,10 @@ bool CompressedPathGraph::compress()
 
 
 // Call compress on all BubbleChains to merge adjacent haploid bubbles.
-void CompressedPathGraph::compressBubbleChains()
+void AssemblyGraph::compressBubbleChains()
 {
-    CompressedPathGraph& cGraph = *this;
-    BGL_FORALL_EDGES(e, cGraph, CompressedPathGraph) {
+    AssemblyGraph& cGraph = *this;
+    BGL_FORALL_EDGES(e, cGraph, AssemblyGraph) {
         cGraph[e].compress();
     }
 }
@@ -624,13 +624,13 @@ void CompressedPathGraph::compressBubbleChains()
 // consist of more than one simple haploid bubble are expanded into one
 // edge for each edge of each bubble.
 // For optimal results it is best to call compressBubbleChains before expand.
-void CompressedPathGraph::expand()
+void AssemblyGraph::expand()
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     // Gather all edges that exist at this point.
     vector<edge_descriptor> initialEdges;
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         initialEdges.push_back(ce);
     }
 
@@ -667,7 +667,7 @@ void CompressedPathGraph::expand()
                 // Create a new edge for this chain.
                 edge_descriptor ceNew;
                 tie(ceNew, ignore) = add_edge(cv0, cv1, cGraph);
-                CompressedPathGraphEdge& edge = cGraph[ceNew];
+                AssemblyGraphEdge& edge = cGraph[ceNew];
                 edge.id = nextEdgeId++;
 
                 // Store this Chain in the new edge.
@@ -687,7 +687,7 @@ void CompressedPathGraph::expand()
 
 
 
-void CompressedPathGraph::write(const string& name, bool writeSequence) const
+void AssemblyGraph::write(const string& name, bool writeSequence) const
 {
     const string fileNamePrefix = name + "-" + to_string(componentId);
 
@@ -706,7 +706,7 @@ void CompressedPathGraph::write(const string& name, bool writeSequence) const
 
 
 
-void CompressedPathGraph::writeCsv(const string& fileNamePrefix) const
+void AssemblyGraph::writeCsv(const string& fileNamePrefix) const
 {
     writeChainsDetailsCsv(fileNamePrefix);
     writeChainsCsv(fileNamePrefix);
@@ -716,14 +716,14 @@ void CompressedPathGraph::writeCsv(const string& fileNamePrefix) const
 
 
 
-void CompressedPathGraph::writeBubbleChainsCsv(const string& fileNamePrefix) const
+void AssemblyGraph::writeBubbleChainsCsv(const string& fileNamePrefix) const
 {
-    const CompressedPathGraph& cGraph = *this;
+    const AssemblyGraph& cGraph = *this;
 
     ofstream csv(fileNamePrefix + "-BubbleChains.csv");
     csv << "Id,ComponentId,BubbleChainId,v0,v1,BubbleCount,AverageOffset,MinOffset,MaxOffset,\n";
 
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         const vertex_descriptor cv0 = source(ce, cGraph);
         const vertex_descriptor cv1 = target(ce, cGraph);
         const BubbleChain& bubbleChain = cGraph[ce];
@@ -749,14 +749,14 @@ void CompressedPathGraph::writeBubbleChainsCsv(const string& fileNamePrefix) con
 
 
 
-void CompressedPathGraph::writeBubblesCsv(const string& fileNamePrefix) const
+void AssemblyGraph::writeBubblesCsv(const string& fileNamePrefix) const
 {
-    const CompressedPathGraph& cGraph = *this;
+    const AssemblyGraph& cGraph = *this;
 
     ofstream csv(fileNamePrefix + "-Bubbles.csv");
     csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,v0,v1,Ploidy,AverageOffset,MinOffset,MaxOffset,\n";
 
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
 
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
@@ -791,14 +791,14 @@ void CompressedPathGraph::writeBubblesCsv(const string& fileNamePrefix) const
 }
 
 
-void CompressedPathGraph::writeChainsCsv(const string& fileNamePrefix) const
+void AssemblyGraph::writeChainsCsv(const string& fileNamePrefix) const
 {
-    const CompressedPathGraph& cGraph = *this;
+    const AssemblyGraph& cGraph = *this;
 
     ofstream csv(fileNamePrefix + "-Chains.csv");
     csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,Index in bubble,Length,Offset\n";
 
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
 
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
@@ -825,27 +825,27 @@ void CompressedPathGraph::writeChainsCsv(const string& fileNamePrefix) const
 
 
 
-void CompressedPathGraph::writeChainsDetailsCsv(const string& fileNamePrefix) const
+void AssemblyGraph::writeChainsDetailsCsv(const string& fileNamePrefix) const
 {
-    const CompressedPathGraph& cGraph = *this;
+    const AssemblyGraph& cGraph = *this;
 
     ofstream csv(fileNamePrefix + "-ChainsDetails.csv");
     csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,"
         "Index in bubble,Position in chain,MarkerGraphEdgeId,Coverage,Common,Offset\n";
 
-    BGL_FORALL_EDGES(e, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(e, cGraph, AssemblyGraph) {
         writeChainDetailsCsv(csv, e, false);
     }
 }
 
 
 
-void CompressedPathGraph::writeChainDetailsCsv(
+void AssemblyGraph::writeChainDetailsCsv(
     ostream& csv,
     edge_descriptor e,
     bool writeHeader) const
 {
-    const CompressedPathGraph& cGraph = *this;
+    const AssemblyGraph& cGraph = *this;
     const BubbleChain& bubbleChain = cGraph[e];
 
     if(writeHeader) {
@@ -891,11 +891,11 @@ void CompressedPathGraph::writeChainDetailsCsv(
 
 
 
-void CompressedPathGraph::writeGraphviz(
+void AssemblyGraph::writeGraphviz(
     const string& fileNamePrefix,
     bool labels) const
 {
-    const CompressedPathGraph& cGraph = *this;
+    const AssemblyGraph& cGraph = *this;
 
     ofstream dot;
     if(labels) {
@@ -906,7 +906,7 @@ void CompressedPathGraph::writeGraphviz(
 
     dot << "digraph Component_" << componentId << "{\n";
 
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph) {
+    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
         const MarkerGraphEdgeId edgeId = cGraph[cv].edgeId;
         const uint64_t coverage = assembler.markerGraph.edgeCoverage(edgeId);
         dot << edgeId << "[label=\"" << edgeId << "\\n" << coverage << "\"];\n";
@@ -914,7 +914,7 @@ void CompressedPathGraph::writeGraphviz(
 
 
 
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         const vertex_descriptor cv0 = source(ce, cGraph);
         const vertex_descriptor cv1 = target(ce, cGraph);
@@ -966,9 +966,9 @@ void CompressedPathGraph::writeGraphviz(
 
 
 
-void CompressedPathGraph::writeGfa(const string& fileNamePrefix) const
+void AssemblyGraph::writeGfa(const string& fileNamePrefix) const
 {
-    const CompressedPathGraph& cGraph = *this;
+    const AssemblyGraph& cGraph = *this;
 
     ofstream gfa(fileNamePrefix + ".gfa");
 
@@ -976,7 +976,7 @@ void CompressedPathGraph::writeGfa(const string& fileNamePrefix) const
     gfa << "H\tVN:Z:1.0\n";
 
     // Write a segment for each edge.
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
 
         uint64_t averageOffset;
         uint64_t minOffset;
@@ -997,9 +997,9 @@ void CompressedPathGraph::writeGfa(const string& fileNamePrefix) const
     }
 
     // For each vertex, write links between each pair of incoming/outgoing edges.
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph) {
-        BGL_FORALL_INEDGES(cv, ceIn, cGraph, CompressedPathGraph) {
-            BGL_FORALL_OUTEDGES(cv, ceOut, cGraph, CompressedPathGraph) {
+    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
+        BGL_FORALL_INEDGES(cv, ceIn, cGraph, AssemblyGraph) {
+            BGL_FORALL_OUTEDGES(cv, ceOut, cGraph, AssemblyGraph) {
                 gfa <<
                     "L\t" <<
                     bubbleChainStringId(ceIn) << "\t+\t" <<
@@ -1013,11 +1013,11 @@ void CompressedPathGraph::writeGfa(const string& fileNamePrefix) const
 
 // This version writes each chain as a segment, so it shows the
 // details of the BubbleChains.
-void CompressedPathGraph::writeGfaExpanded(
+void AssemblyGraph::writeGfaExpanded(
     const string& fileNamePrefix,
     bool includeSequence) const
 {
-    const CompressedPathGraph& cGraph = *this;
+    const AssemblyGraph& cGraph = *this;
 
     ofstream gfa(fileNamePrefix + "-" + to_string(componentId) + "-Expanded.gfa");
 
@@ -1025,7 +1025,7 @@ void CompressedPathGraph::writeGfaExpanded(
     gfa << "H\tVN:Z:1.0\n";
 
     // Loop over BubbleChains. Each Chain of each Bubble generates a GFA segment.
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
 
         // Loop over Bubbles of this chain.
@@ -1070,7 +1070,7 @@ void CompressedPathGraph::writeGfaExpanded(
 
 
     // Write links between adjacent Chains of each BubbleChain.
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
 
         // Loop over Bubbles of this chain.
@@ -1097,11 +1097,11 @@ void CompressedPathGraph::writeGfaExpanded(
 
 
     // Write links between Chains in different bubble chains.
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph) {
-        BGL_FORALL_INEDGES(cv, ce0, cGraph, CompressedPathGraph) {
+    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
+        BGL_FORALL_INEDGES(cv, ce0, cGraph, AssemblyGraph) {
             const BubbleChain& bubbleChain0 = cGraph[ce0];
             const Bubble& bubble0 = bubbleChain0.back();
-            BGL_FORALL_OUTEDGES(cv, ce1, cGraph, CompressedPathGraph) {
+            BGL_FORALL_OUTEDGES(cv, ce1, cGraph, AssemblyGraph) {
                 const BubbleChain& bubbleChain1 = cGraph[ce1];
                 const Bubble& bubble1 = bubbleChain1.front();
 
@@ -1125,15 +1125,15 @@ void CompressedPathGraph::writeGfaExpanded(
 
 
 
-void CompressedPathGraph::writeFastaExpanded(
+void AssemblyGraph::writeFastaExpanded(
     const string& fileNamePrefix) const
 {
-    const CompressedPathGraph& cGraph = *this;
+    const AssemblyGraph& cGraph = *this;
 
     ofstream fasta(fileNamePrefix + "-" + to_string(componentId) + "-Expanded.fasta");
 
     // Loop over BubbleChains. Each Chain of each Bubble generates a GFA segment.
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
 
         // Loop over Bubbles of this chain.
@@ -1162,7 +1162,7 @@ void CompressedPathGraph::writeFastaExpanded(
 
 
 
-void CompressedPathGraph::writeSnapshot(uint64_t& snapshotNumber) const
+void AssemblyGraph::writeSnapshot(uint64_t& snapshotNumber) const
 {
     const string name = to_string(snapshotNumber++);
     write(name);
@@ -1171,21 +1171,21 @@ void CompressedPathGraph::writeSnapshot(uint64_t& snapshotNumber) const
 
 
 
-string CompressedPathGraph::bubbleChainStringId(edge_descriptor ce) const
+string AssemblyGraph::bubbleChainStringId(edge_descriptor ce) const
 {
-    const CompressedPathGraph& cGraph = *this;
-    const CompressedPathGraphEdge& edge = cGraph[ce];
+    const AssemblyGraph& cGraph = *this;
+    const AssemblyGraphEdge& edge = cGraph[ce];
     return to_string(componentId) + "-" + to_string(edge.id);
 }
 
 
 
-string CompressedPathGraph::bubbleStringId(
+string AssemblyGraph::bubbleStringId(
     edge_descriptor ce,
     uint64_t positionInBubbleChain) const
 {
-    const CompressedPathGraph& cGraph = *this;
-    const CompressedPathGraphEdge& edge = cGraph[ce];
+    const AssemblyGraph& cGraph = *this;
+    const AssemblyGraphEdge& edge = cGraph[ce];
 
     return
         to_string(componentId) + "-" +
@@ -1195,13 +1195,13 @@ string CompressedPathGraph::bubbleStringId(
 
 
 
-string CompressedPathGraph::chainStringId(
+string AssemblyGraph::chainStringId(
     edge_descriptor ce,
     uint64_t positionInBubbleChain,
     uint64_t indexInBubble) const
 {
-    const CompressedPathGraph& cGraph = *this;
-    const CompressedPathGraphEdge& edge = cGraph[ce];
+    const AssemblyGraph& cGraph = *this;
+    const AssemblyGraphEdge& edge = cGraph[ce];
 
     return
         to_string(componentId) + "-" +
@@ -1212,7 +1212,7 @@ string CompressedPathGraph::chainStringId(
 
 
 
-uint64_t CompressedPathGraph::chainOffset(const Chain& chain) const
+uint64_t AssemblyGraph::chainOffset(const Chain& chain) const
 {
     const uint64_t length = chain.size();
     SHASTA_ASSERT(length >= 2);
@@ -1245,7 +1245,7 @@ uint64_t CompressedPathGraph::chainOffset(const Chain& chain) const
 
 
 
-uint64_t CompressedPathGraph::chainOffsetNoException(const Chain& chain) const
+uint64_t AssemblyGraph::chainOffsetNoException(const Chain& chain) const
 {
     const uint64_t length = chain.size();
     SHASTA_ASSERT(length >= 2);
@@ -1270,7 +1270,7 @@ uint64_t CompressedPathGraph::chainOffsetNoException(const Chain& chain) const
 
 
 
-void CompressedPathGraph::bubbleOffset(
+void AssemblyGraph::bubbleOffset(
     const Bubble& bubble,
     uint64_t& averageOffset,
     uint64_t& minOffset,
@@ -1293,7 +1293,7 @@ void CompressedPathGraph::bubbleOffset(
 
 
 
-bool CompressedPathGraph::bubbleOffsetNoException(
+bool AssemblyGraph::bubbleOffsetNoException(
     const Bubble& bubble,
     uint64_t& averageOffset,
     uint64_t& minOffset,
@@ -1320,7 +1320,7 @@ bool CompressedPathGraph::bubbleOffsetNoException(
 
 
 
-void CompressedPathGraph::bubbleChainOffset(
+void AssemblyGraph::bubbleChainOffset(
     const BubbleChain& bubbleChain,
     uint64_t& averageOffset,
     uint64_t& minOffset,
@@ -1345,8 +1345,8 @@ void CompressedPathGraph::bubbleChainOffset(
 
 
 
-CompressedPathGraph::Superbubbles::Superbubbles(
-    CompressedPathGraph& cGraph,
+AssemblyGraph::Superbubbles::Superbubbles(
+    AssemblyGraph& cGraph,
     uint64_t maxOffset1     // Used to define superbubbles
     ) :
     cGraph(cGraph)
@@ -1362,7 +1362,7 @@ CompressedPathGraph::Superbubbles::Superbubbles(
     for(uint64_t i=0; i<vertexCount; i++) {
         disjointSets.make_set(i);
     }
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         uint64_t averageOffset;
         uint64_t minOffset;
         uint64_t maxOffset;
@@ -1376,7 +1376,7 @@ CompressedPathGraph::Superbubbles::Superbubbles(
 
     // Gather the vertices in each connected component.
     vector< vector<vertex_descriptor> > components(vertexCount);
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph) {
+    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
         const uint64_t componentId = disjointSets.find_set(cGraph[cv].index);
         components[componentId].push_back(cv);
     }
@@ -1390,7 +1390,7 @@ CompressedPathGraph::Superbubbles::Superbubbles(
     }
 
     // Store superbubble ids in the vertices.
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph) {
+    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
         cGraph[cv].superbubbleId = invalid<uint64_t>;
     }
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
@@ -1409,7 +1409,7 @@ CompressedPathGraph::Superbubbles::Superbubbles(
         // Find entrances. These are superbubble vertices with in-edges
         // from outside the superbubble.
         for(const vertex_descriptor cv0: superbubble) {
-            BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph) {
+            BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
                 const vertex_descriptor cv1 = source(ce, cGraph);
                 if(not isInSuperbubble(superbubbleId, cv1)) {
                     superbubble.entrances.push_back(cv0);
@@ -1422,7 +1422,7 @@ CompressedPathGraph::Superbubbles::Superbubbles(
         // to outside the superbubble.
         vector<vertex_descriptor> exits;
         for(const vertex_descriptor cv0: superbubble) {
-            BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph) {
+            BGL_FORALL_OUTEDGES(cv0, ce, cGraph, AssemblyGraph) {
                 const vertex_descriptor cv1 = target(ce, cGraph);
                 if(not isInSuperbubble(superbubbleId, cv1)) {
                     superbubble.exits.push_back(cv0);
@@ -1438,8 +1438,8 @@ CompressedPathGraph::Superbubbles::Superbubbles(
 
 // This uses dominator trees.
 // It only finds superbubbles with one entrance and one exit.
-CompressedPathGraph::Superbubbles::Superbubbles(
-    CompressedPathGraph& cGraph) :
+AssemblyGraph::Superbubbles::Superbubbles(
+    AssemblyGraph& cGraph) :
     cGraph(cGraph)
 {
     const bool debug = false;
@@ -1447,7 +1447,7 @@ CompressedPathGraph::Superbubbles::Superbubbles(
     // Map vertices to integers.
     std::map<vertex_descriptor, uint64_t> indexMap;
     uint64_t vertexIndex = 0;
-    BGL_FORALL_VERTICES(v, cGraph, CompressedPathGraph) {
+    BGL_FORALL_VERTICES(v, cGraph, AssemblyGraph) {
         indexMap.insert({v, vertexIndex++});
     }
     auto associativeIndexMap = boost::make_assoc_property_map(indexMap);
@@ -1466,7 +1466,7 @@ CompressedPathGraph::Superbubbles::Superbubbles(
 
     // Compute dominator trees using as entrance each of the
     // vertices with zero in-degree.
-    BGL_FORALL_VERTICES(entrance, cGraph, CompressedPathGraph) {
+    BGL_FORALL_VERTICES(entrance, cGraph, AssemblyGraph) {
         if(in_degree(entrance, cGraph) != 0) {
             continue;
         }
@@ -1503,10 +1503,10 @@ CompressedPathGraph::Superbubbles::Superbubbles(
 
     // Compute dominator trees on the reverse graph using as entrance each of the
     // vertices with zero in-degree on the reverse graph
-    // (that is, zero out-degree on the CompressedPathGraph).
-    using ReverseCompressedPathGraph = boost::reverse_graph<CompressedPathGraph>;
-    ReverseCompressedPathGraph reverseGraph(cGraph);
-    BGL_FORALL_VERTICES(entrance, reverseGraph, ReverseCompressedPathGraph) {
+    // (that is, zero out-degree on the AssemblyGraph).
+    using ReverseAssemblyGraph = boost::reverse_graph<AssemblyGraph>;
+    ReverseAssemblyGraph reverseGraph(cGraph);
+    BGL_FORALL_VERTICES(entrance, reverseGraph, ReverseAssemblyGraph) {
         if(in_degree(entrance, reverseGraph) != 0) {
             continue;
         }
@@ -1636,7 +1636,7 @@ CompressedPathGraph::Superbubbles::Superbubbles(
 
 
 // Fill in the superbubble given a single entrance and exit.
-void CompressedPathGraph::Superbubble::fillInFromEntranceAndExit(const CompressedPathGraph& cGraph)
+void AssemblyGraph::Superbubble::fillInFromEntranceAndExit(const AssemblyGraph& cGraph)
 {
     SHASTA_ASSERT(empty());
     SHASTA_ASSERT(entrances.size() == 1);
@@ -1652,7 +1652,7 @@ void CompressedPathGraph::Superbubble::fillInFromEntranceAndExit(const Compresse
     while(not q.empty()) {
         const vertex_descriptor cv0 = q.front();
         q.pop();
-        BGL_FORALL_OUTEDGES(cv0, e, cGraph, CompressedPathGraph) {
+        BGL_FORALL_OUTEDGES(cv0, e, cGraph, AssemblyGraph) {
             const vertex_descriptor cv1 = target(e, cGraph);
             if(cv1 != exit) {
                 if(not internalVertices.contains(cv1)) {
@@ -1671,7 +1671,7 @@ void CompressedPathGraph::Superbubble::fillInFromEntranceAndExit(const Compresse
 
 
 
-CompressedPathGraph::Superbubbles::~Superbubbles()
+AssemblyGraph::Superbubbles::~Superbubbles()
 {
     cGraph.clearVertexNumbering();
 }
@@ -1679,12 +1679,12 @@ CompressedPathGraph::Superbubbles::~Superbubbles()
 
 
 // Remove short superbubbles with one entry and one exit.
-bool CompressedPathGraph::removeShortSuperbubbles(
+bool AssemblyGraph::removeShortSuperbubbles(
     bool debug,
     uint64_t maxOffset1,    // Used to define superbubbles
     uint64_t maxOffset2)    // Compared against the offset between entry and exit
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     bool changesWereMade = false;
 
     // Find the superbubbles.
@@ -1748,7 +1748,7 @@ bool CompressedPathGraph::removeShortSuperbubbles(
         // - There is only one edge between the two.
         if(superbubble.size() == 2) {
             uint64_t edgeCount = 0;
-            BGL_FORALL_OUTEDGES(entrance, e, cGraph, CompressedPathGraph) {
+            BGL_FORALL_OUTEDGES(entrance, e, cGraph, AssemblyGraph) {
                 if(target(e, cGraph) == exit) {
                     ++edgeCount;
                 }
@@ -1774,7 +1774,7 @@ bool CompressedPathGraph::removeShortSuperbubbles(
         }
         // We must also remove edges between the entrance and the exit.
         vector<edge_descriptor> entranceToExitEdges;
-        BGL_FORALL_OUTEDGES(entrance, ce, cGraph, CompressedPathGraph) {
+        BGL_FORALL_OUTEDGES(entrance, ce, cGraph, AssemblyGraph) {
             if(target(ce, cGraph) == exit) {
                 entranceToExitEdges.push_back(ce);
             }
@@ -1783,7 +1783,7 @@ bool CompressedPathGraph::removeShortSuperbubbles(
             boost::remove_edge(ce, cGraph);
         }
         vector<edge_descriptor> exitToEntranceEdges;
-        BGL_FORALL_OUTEDGES(exit, ce, cGraph, CompressedPathGraph) {
+        BGL_FORALL_OUTEDGES(exit, ce, cGraph, AssemblyGraph) {
             if(target(ce, cGraph) == entrance) {
                 exitToEntranceEdges.push_back(ce);
             }
@@ -1796,7 +1796,7 @@ bool CompressedPathGraph::removeShortSuperbubbles(
         // This will be a BubbleChain consisting of a single haploid Bubble.
         edge_descriptor eNew;
         tie(eNew, ignore) = add_edge(entrance, exit, cGraph);
-        CompressedPathGraphEdge& newEdge = cGraph[eNew];
+        AssemblyGraphEdge& newEdge = cGraph[eNew];
         newEdge.id = nextEdgeId++;
         BubbleChain& bubbleChain = newEdge;
         bubbleChain.resize(1);
@@ -1816,7 +1816,7 @@ bool CompressedPathGraph::removeShortSuperbubbles(
 
 // Cleanup/simplify superbubbles that are likely to be caused by errors,
 // completely or in part.
-void CompressedPathGraph::cleanupSuperbubbles(
+void AssemblyGraph::cleanupSuperbubbles(
     bool debug,
     uint64_t maxOffset1,    // Used to define superbubbles
     uint64_t maxOffset2,    // Compared against the offset between entry and exit
@@ -1824,7 +1824,7 @@ void CompressedPathGraph::cleanupSuperbubbles(
 
 )
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     if(debug) {
         cout << "cleanupSuperbubbles begins." << endl;
@@ -1851,13 +1851,13 @@ void CompressedPathGraph::cleanupSuperbubbles(
 
 // This version of superbubble cleanup uses dominator trees to define superbubbles,
 // instead of computing connected components using edges of length uo tp maxOffset1.
-void CompressedPathGraph::cleanupSuperbubbles(
+void AssemblyGraph::cleanupSuperbubbles(
     bool debug,
     uint64_t maxOffset2,     // Compared against the offset between entry and exit
     uint64_t chainTerminalCommonThreshold
     )
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     if(debug) {
         cout << "cleanupSuperbubbles begins." << endl;
@@ -1901,7 +1901,7 @@ void CompressedPathGraph::cleanupSuperbubbles(
 // completely or in part.
 // This handles superbubbles caused by two marker graph bubbles with
 // no primary edges in between.
-void CompressedPathGraph::cleanupSuperbubble(
+void AssemblyGraph::cleanupSuperbubble(
     bool debug,
     const Superbubbles& superbubbles,
     uint64_t superbubbleId,
@@ -1909,7 +1909,7 @@ void CompressedPathGraph::cleanupSuperbubble(
     uint64_t chainTerminalCommonThreshold,
     std::set<vertex_descriptor>& previousSuperbubblesVertices)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
 
 #if 0
@@ -1996,7 +1996,7 @@ void CompressedPathGraph::cleanupSuperbubble(
     // - There is only one edge between the two.
     if(superbubble.size() == 2) {
         uint64_t edgeCount = 0;
-        BGL_FORALL_OUTEDGES(entrance, e, cGraph, CompressedPathGraph) {
+        BGL_FORALL_OUTEDGES(entrance, e, cGraph, AssemblyGraph) {
             if(target(e, cGraph) == exit) {
                 ++edgeCount;
             }
@@ -2011,7 +2011,7 @@ void CompressedPathGraph::cleanupSuperbubble(
 
     // Find the out-edges of the entrance that go inside the superbubble.
     vector<edge_descriptor> entranceOutEdges;
-    BGL_FORALL_OUTEDGES(entrance, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_OUTEDGES(entrance, ce, cGraph, AssemblyGraph) {
         const vertex_descriptor cv = target(ce, cGraph);
         if(superbubbles.isInSuperbubble(superbubbleId, cv)) {
             entranceOutEdges.push_back(ce);
@@ -2021,7 +2021,7 @@ void CompressedPathGraph::cleanupSuperbubble(
 
     // Find the in-edges of the exit that come from inside the superbubble.
     vector<edge_descriptor> exitInEdges;
-    BGL_FORALL_INEDGES(exit, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_INEDGES(exit, ce, cGraph, AssemblyGraph) {
         const vertex_descriptor cv = source(ce, cGraph);
         if(superbubbles.isInSuperbubble(superbubbleId, cv)) {
             exitInEdges.push_back(ce);
@@ -2273,7 +2273,7 @@ void CompressedPathGraph::cleanupSuperbubble(
     // the superbubble.
     edge_descriptor ce;
     tie(ce, ignore) = add_edge(entrance, exit, cGraph);
-    CompressedPathGraphEdge& edge = cGraph[ce];
+    AssemblyGraphEdge& edge = cGraph[ce];
     edge.id = nextEdgeId++;
     BubbleChain& bubbleChain = edge;
     SHASTA_ASSERT(not (entranceBubbleIsGood and exitBubbleIsGood));
@@ -2295,15 +2295,15 @@ void CompressedPathGraph::cleanupSuperbubble(
 
 
 #if 0
-bool CompressedPathGraph::detangleVerticesStrict(bool debug)
+bool AssemblyGraph::detangleVerticesStrict(bool debug)
 {
     if(debug) {
         cout << "Detangling vertices." << endl;
     }
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     vector<vertex_descriptor> allVertices;
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph) {
+    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
         allVertices.push_back(cv);
     }
 
@@ -2325,7 +2325,7 @@ bool CompressedPathGraph::detangleVerticesStrict(bool debug)
 
 
 
-bool CompressedPathGraph::detangleVertices(
+bool AssemblyGraph::detangleVertices(
     bool debug,
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh,
@@ -2336,10 +2336,10 @@ bool CompressedPathGraph::detangleVertices(
     if(debug) {
         cout << "Detangling vertices." << endl;
     }
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     vector<vertex_descriptor> allVertices;
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph) {
+    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
         allVertices.push_back(cv);
     }
 
@@ -2360,7 +2360,7 @@ bool CompressedPathGraph::detangleVertices(
 
 
 
-bool CompressedPathGraph::detangleVerticesGeneral(
+bool AssemblyGraph::detangleVerticesGeneral(
     bool debug,
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh,
@@ -2371,10 +2371,10 @@ bool CompressedPathGraph::detangleVerticesGeneral(
     if(debug) {
         cout << "Detangling vertices (general detangling)." << endl;
     }
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     vector<vertex_descriptor> allVertices;
-    BGL_FORALL_VERTICES(cv, cGraph, CompressedPathGraph) {
+    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
         allVertices.push_back(cv);
     }
 
@@ -2398,14 +2398,14 @@ bool CompressedPathGraph::detangleVerticesGeneral(
 // Compute the tangle matrix given in-edges and out-edges.
 // The last bubble of each in-edge and the first bubble
 // of each out-edge must be haploid.
-void CompressedPathGraph::computeTangleMatrix(
+void AssemblyGraph::computeTangleMatrix(
     const vector<edge_descriptor>& inEdges,
     const vector<edge_descriptor>& outEdges,
     vector< vector<uint64_t> >& tangleMatrix,
     bool setToZeroForComplementaryPairs
     ) const
 {
-    const CompressedPathGraph& cGraph = *this;
+    const AssemblyGraph& cGraph = *this;
 
     tangleMatrix.clear();
     tangleMatrix.resize(inEdges.size(), vector<uint64_t>(outEdges.size()));
@@ -2446,14 +2446,14 @@ void CompressedPathGraph::computeTangleMatrix(
 // This works if the following is true:
 // - For all incoming edges (bubble chains) of cv, the last bubble is haploid.
 // - For all outgoing edges (bubble chains) of cv, the first bubble is haploid.
-bool CompressedPathGraph::detangleVertexStrict(
+bool AssemblyGraph::detangleVertexStrict(
     vertex_descriptor cv, bool debug)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     // Gather the in-edges and check that the last bubble is haploid.
     vector<edge_descriptor> inEdges;
-    BGL_FORALL_INEDGES(cv, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_INEDGES(cv, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.lastBubble().isHaploid()) {
             return false;
@@ -2463,7 +2463,7 @@ bool CompressedPathGraph::detangleVertexStrict(
 
     // Gather the out-edges and check that the first bubble is haploid.
     vector<edge_descriptor> outEdges;
-    BGL_FORALL_OUTEDGES(cv, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_OUTEDGES(cv, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.firstBubble().isHaploid()) {
             return false;
@@ -2564,7 +2564,7 @@ bool CompressedPathGraph::detangleVertexStrict(
 
             edge_descriptor eNew;
             tie(eNew, ignore) = add_edge(source(ce0, cGraph), target(ce1, graph), cGraph);
-            CompressedPathGraphEdge& newEdge = cGraph[eNew];
+            AssemblyGraphEdge& newEdge = cGraph[eNew];
             newEdge.id = nextEdgeId++;
             BubbleChain& newBubbleChain = newEdge;
 
@@ -2611,7 +2611,7 @@ bool CompressedPathGraph::detangleVertexStrict(
 
 
 
-bool CompressedPathGraph::detangleVertex(
+bool AssemblyGraph::detangleVertex(
     vertex_descriptor cv,
     bool debug,
     uint64_t detangleToleranceLow,
@@ -2620,7 +2620,7 @@ bool CompressedPathGraph::detangleVertex(
     double epsilon,
     double minLogP)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     if(debug) {
         cout << "Attempting to detangle vertex " << cGraph[cv].edgeId << endl;
@@ -2629,7 +2629,7 @@ bool CompressedPathGraph::detangleVertex(
 
     // Gather the in-edges and check that the last bubble is haploid.
     vector<edge_descriptor> inEdges;
-    BGL_FORALL_INEDGES(cv, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_INEDGES(cv, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.lastBubble().isHaploid()) {
             if(debug) {
@@ -2643,7 +2643,7 @@ bool CompressedPathGraph::detangleVertex(
 
     // Gather the out-edges and check that the first bubble is haploid.
     vector<edge_descriptor> outEdges;
-    BGL_FORALL_OUTEDGES(cv, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_OUTEDGES(cv, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.firstBubble().isHaploid()) {
             if(debug) {
@@ -2880,7 +2880,7 @@ bool CompressedPathGraph::detangleVertex(
 
             edge_descriptor eNew;
             tie(eNew, ignore) = add_edge(source(ce0, cGraph), target(ce1, graph), cGraph);
-            CompressedPathGraphEdge& newEdge = cGraph[eNew];
+            AssemblyGraphEdge& newEdge = cGraph[eNew];
             newEdge.id = nextEdgeId++;
             BubbleChain& newBubbleChain = newEdge;
 
@@ -2936,7 +2936,7 @@ bool CompressedPathGraph::detangleVertex(
 //   the last bubble of each in-edge is haploid and the first bubble
 //   of each out-edge is haploid.
 // - Call detangleVertex to do the detangling.
-bool CompressedPathGraph::detangleVertexGeneral(
+bool AssemblyGraph::detangleVertexGeneral(
     vertex_descriptor cv,
     bool debug,
     uint64_t detangleToleranceLow,
@@ -2945,18 +2945,18 @@ bool CompressedPathGraph::detangleVertexGeneral(
     double epsilon,
     double minLogP)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
 #if 0
     // Use detangleVertex, if possible.
     bool involvesNonHaploidBubbles = false;
-    BGL_FORALL_INEDGES(cv, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_INEDGES(cv, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.lastBubble().isHaploid()) {
             involvesNonHaploidBubbles = true;
         }
     }
-    BGL_FORALL_OUTEDGES(cv, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_OUTEDGES(cv, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.firstBubble().isHaploid()) {
             involvesNonHaploidBubbles = true;
@@ -2985,7 +2985,7 @@ bool CompressedPathGraph::detangleVertexGeneral(
         MarkerGraphEdgeId edgeId;
     };
     vector<ChainInfo> inChains;
-    BGL_FORALL_INEDGES(cv, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_INEDGES(cv, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         const Bubble& bubble = bubbleChain.lastBubble();
         for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
@@ -2994,7 +2994,7 @@ bool CompressedPathGraph::detangleVertexGeneral(
         }
     }
     vector<ChainInfo> outChains;
-    BGL_FORALL_OUTEDGES(cv, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_OUTEDGES(cv, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         const Bubble& bubble = bubbleChain.firstBubble();
         for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
@@ -3201,9 +3201,9 @@ bool CompressedPathGraph::detangleVertexGeneral(
 // Split the first bubble of a bubble chain.
 // Used by detangleVertexGeneral to eliminate
 // non-haploid bubbles adjacent to a vertex to be detangled.
-void CompressedPathGraph::splitBubbleChainAtBeginning(edge_descriptor ce)
+void AssemblyGraph::splitBubbleChainAtBeginning(edge_descriptor ce)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     const BubbleChain& bubbleChain = cGraph[ce];
     const Bubble& firstBubble = bubbleChain.firstBubble();
@@ -3221,7 +3221,7 @@ void CompressedPathGraph::splitBubbleChainAtBeginning(edge_descriptor ce)
 
         // Generate one new edge containing the bubble chain except for
         // the first bubble.
-        CompressedPathGraphEdge newEdge;
+        AssemblyGraphEdge newEdge;
         newEdge.id = nextEdgeId++;
         copy(bubbleChain.begin() + 1, bubbleChain.end(), back_inserter(newEdge));
         const vertex_descriptor cv2 = createVertex(newEdge.front().front().front());
@@ -3229,7 +3229,7 @@ void CompressedPathGraph::splitBubbleChainAtBeginning(edge_descriptor ce)
 
         // Generate a  new edge for each chain in the firstBubble.
         for(const Chain& chain: firstBubble) {
-            CompressedPathGraphEdge newEdge;
+            AssemblyGraphEdge newEdge;
             newEdge.resize(1);  // The new edge has only one bubble.
             Bubble& newBubble = newEdge.front();
             newEdge.id = nextEdgeId++;
@@ -3245,7 +3245,7 @@ void CompressedPathGraph::splitBubbleChainAtBeginning(edge_descriptor ce)
 
         // Generate a new edge for each chain in the firstBubble.
         for(const Chain& chain: firstBubble) {
-            CompressedPathGraphEdge newEdge;
+            AssemblyGraphEdge newEdge;
             newEdge.resize(1);  // The new edge has only one bubble.
             Bubble& newBubble = newEdge.front();
             newEdge.id = nextEdgeId++;
@@ -3263,9 +3263,9 @@ void CompressedPathGraph::splitBubbleChainAtBeginning(edge_descriptor ce)
 // Split the last bubble of a bubble chain.
 // Used by detangleVertexGeneral to eliminate
 // non-haploid bubbles adjacent to a vertex to be detangled.
-void CompressedPathGraph::splitBubbleChainAtEnd(edge_descriptor ce)
+void AssemblyGraph::splitBubbleChainAtEnd(edge_descriptor ce)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     const BubbleChain& bubbleChain = cGraph[ce];
     const Bubble& lastBubble = bubbleChain.lastBubble();
@@ -3283,7 +3283,7 @@ void CompressedPathGraph::splitBubbleChainAtEnd(edge_descriptor ce)
 
         // Generate one new edge containing the bubble chain except for
         // the last bubble.
-        CompressedPathGraphEdge newEdge;
+        AssemblyGraphEdge newEdge;
         newEdge.id = nextEdgeId++;
         copy(bubbleChain.begin(), bubbleChain.end()-1, back_inserter(newEdge));
         const vertex_descriptor cv2 = createVertex(newEdge.back().front().back());
@@ -3291,7 +3291,7 @@ void CompressedPathGraph::splitBubbleChainAtEnd(edge_descriptor ce)
 
         // Generate a  new edge for each chain in the lastBubble.
         for(const Chain& chain: lastBubble) {
-            CompressedPathGraphEdge newEdge;
+            AssemblyGraphEdge newEdge;
             newEdge.resize(1);  // The new edge has only one bubble.
             Bubble& newBubble = newEdge.front();
             newEdge.id = nextEdgeId++;
@@ -3307,7 +3307,7 @@ void CompressedPathGraph::splitBubbleChainAtEnd(edge_descriptor ce)
 
         // Generate a new edge for each chain in the lastBubble.
         for(const Chain& chain: lastBubble) {
-            CompressedPathGraphEdge newEdge;
+            AssemblyGraphEdge newEdge;
             newEdge.resize(1);  // The new edge has only one bubble.
             Bubble& newBubble = newEdge.front();
             newEdge.id = nextEdgeId++;
@@ -3322,7 +3322,7 @@ void CompressedPathGraph::splitBubbleChainAtEnd(edge_descriptor ce)
 
 
 
-bool CompressedPathGraph::detangleEdges(
+bool AssemblyGraph::detangleEdges(
     bool debug,
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh,
@@ -3334,13 +3334,13 @@ bool CompressedPathGraph::detangleEdges(
         cout << "Detangling edges." << endl;
     }
 
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     // To safely iterate over edges while removing edges we must use edge ids
     // as unique identifiers, because edge descriptors can be reused as edges are
     // deleted ndw new edges are created.
     std::map<uint64_t, edge_descriptor> edgeMap;
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         edgeMap.insert({cGraph[ce].id, ce});
     }
 
@@ -3361,7 +3361,7 @@ bool CompressedPathGraph::detangleEdges(
 
 
 
-bool CompressedPathGraph::detangleEdgesGeneral(
+bool AssemblyGraph::detangleEdgesGeneral(
     bool debug,
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh,
@@ -3373,13 +3373,13 @@ bool CompressedPathGraph::detangleEdgesGeneral(
         cout << "Detangling edges." << endl;
     }
 
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     // To safely iterate over edges while removing edges we must use edge ids
     // as unique identifiers, because edge descriptors can be reused as edges are
     // deleted ndw new edges are created.
     std::map<uint64_t, edge_descriptor> edgeMap;
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         edgeMap.insert({cGraph[ce].id, ce});
     }
 
@@ -3400,7 +3400,7 @@ bool CompressedPathGraph::detangleEdgesGeneral(
 
 
 
-bool CompressedPathGraph::detangleEdge(
+bool AssemblyGraph::detangleEdge(
     bool debug,
     std::map<uint64_t, edge_descriptor>& edgeMap,
     std::map<uint64_t, edge_descriptor>::iterator& it,
@@ -3410,7 +3410,7 @@ bool CompressedPathGraph::detangleEdge(
     double epsilon,
     double minLogP)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     const edge_descriptor ce = it->second;
     ++it;
     // edgeMap.erase(cGraph[ce].id);
@@ -3448,7 +3448,7 @@ bool CompressedPathGraph::detangleEdge(
     // Ignore in-edges coming from cv1 (back-edges).
     vector<edge_descriptor> inEdges;
     vector<edge_descriptor> backEdges;
-    BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.lastBubble().isHaploid()) {
             if(debug) {
@@ -3467,7 +3467,7 @@ bool CompressedPathGraph::detangleEdge(
     // Gather the out-edges and check that the first bubble is haploid.
     // Ignore out-edges going to cv0 (back-edges).
     vector<edge_descriptor> outEdges;
-    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.firstBubble().isHaploid()) {
             if(debug) {
@@ -3742,7 +3742,7 @@ bool CompressedPathGraph::detangleEdge(
 
 
 
-bool CompressedPathGraph::detangleEdgeGeneral(
+bool AssemblyGraph::detangleEdgeGeneral(
     bool debug,
     std::map<uint64_t, edge_descriptor>& edgeMap,
     std::map<uint64_t, edge_descriptor>::iterator& it,
@@ -3756,7 +3756,7 @@ bool CompressedPathGraph::detangleEdgeGeneral(
     // for the 2 by 2 case. See detangleEdge.
     SHASTA_ASSERT(not useBayesianModel);
 
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     const edge_descriptor ce = it->second;
     ++it;
 
@@ -3786,7 +3786,7 @@ bool CompressedPathGraph::detangleEdgeGeneral(
         MarkerGraphEdgeId edgeId;
     };
     vector<ChainInfo> inChains;
-    BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         const Bubble& bubble = bubbleChain.lastBubble();
         for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
@@ -3795,7 +3795,7 @@ bool CompressedPathGraph::detangleEdgeGeneral(
         }
     }
     vector<ChainInfo> outChains;
-    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         const Bubble& bubble = bubbleChain.firstBubble();
         for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
@@ -3969,7 +3969,7 @@ bool CompressedPathGraph::detangleEdgeGeneral(
 
 
 
-bool CompressedPathGraph::detangleEdgesWithSearch(
+bool AssemblyGraph::detangleEdgesWithSearch(
     bool debug,
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
@@ -3978,13 +3978,13 @@ bool CompressedPathGraph::detangleEdgesWithSearch(
         cout << "Detangling edges with search." << endl;
     }
 
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     // To safely iterate over edges while removing edges we must use edge ids
     // as unique identifiers, because edge descriptors can be reused as edges are
     // deleted ndw new edges are created.
     std::map<uint64_t, edge_descriptor> edgeMap;
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         edgeMap.insert({cGraph[ce].id, ce});
     }
 
@@ -4004,14 +4004,14 @@ bool CompressedPathGraph::detangleEdgesWithSearch(
 
 
 
-bool CompressedPathGraph::detangleEdgeWithSearch(
+bool AssemblyGraph::detangleEdgeWithSearch(
     bool debug,
     std::map<uint64_t, edge_descriptor>& edgeMap,
     std::map<uint64_t, edge_descriptor>::iterator& it,
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     const edge_descriptor ce = it->second;
     ++it;
 
@@ -4043,7 +4043,7 @@ bool CompressedPathGraph::detangleEdgeWithSearch(
     // Gather the in-edges and check that the last bubble is haploid.
     vector<edge_descriptor> inEdges;
     vector<edge_descriptor> backEdges;
-    BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.lastBubble().isHaploid()) {
             if(debug) {
@@ -4062,7 +4062,7 @@ bool CompressedPathGraph::detangleEdgeWithSearch(
     // Gather the out-edges and check that the first bubble is haploid.
     // Ignore out-edges going to cv0 (back-edges).
     vector<edge_descriptor> outEdges;
-    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
         if(not bubbleChain.firstBubble().isHaploid()) {
             if(debug) {
@@ -4379,13 +4379,13 @@ bool CompressedPathGraph::detangleEdgeWithSearch(
 
 
 // Detangle short superbubbles with any number of entrances and exits.
-bool CompressedPathGraph::detangleShortSuperbubbles(
+bool AssemblyGraph::detangleShortSuperbubbles(
     bool debug,
     uint64_t maxOffset1,    // Used to define superbubbles
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     // Find the superbubbles.
     Superbubbles superbubbles(cGraph, maxOffset1);
@@ -4404,14 +4404,14 @@ bool CompressedPathGraph::detangleShortSuperbubbles(
 
 
 
-bool CompressedPathGraph::detangleShortSuperbubble(
+bool AssemblyGraph::detangleShortSuperbubble(
     bool debug,
     const Superbubbles& superbubbles,
     uint64_t superbubbleId,
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
 
     if(debug) {
@@ -4429,13 +4429,13 @@ bool CompressedPathGraph::detangleShortSuperbubble(
     vector<edge_descriptor> inEdges;
     vector<edge_descriptor> outEdges;
     for(const vertex_descriptor cv0: superbubble) {
-        BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph) {
+        BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
             const vertex_descriptor cv1 = source(ce, cGraph);
             if(not superbubbles.isInSuperbubble(superbubbleId, cv1)) {
                 inEdges.push_back(ce);
             }
         }
-        BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph) {
+        BGL_FORALL_OUTEDGES(cv0, ce, cGraph, AssemblyGraph) {
             const vertex_descriptor cv1 = target(ce, cGraph);
             if(not superbubbles.isInSuperbubble(superbubbleId, cv1)) {
                 outEdges.push_back(ce);
@@ -4653,7 +4653,7 @@ bool CompressedPathGraph::detangleShortSuperbubble(
 
             edge_descriptor eNew;
             tie(eNew, ignore) = add_edge(source(ce0, cGraph), target(ce1, cGraph), cGraph);
-            CompressedPathGraphEdge& newEdge = cGraph[eNew];
+            AssemblyGraphEdge& newEdge = cGraph[eNew];
             newEdge.id = nextEdgeId++;
             BubbleChain& newBubbleChain = newEdge;
 
@@ -4703,13 +4703,13 @@ bool CompressedPathGraph::detangleShortSuperbubble(
 // The above versions require the last bubble of superbubble in-edges
 // and the first bubble of superbubble out-edges to be haploid.
 // This version does not.
-bool CompressedPathGraph::detangleShortSuperbubblesGeneral(
+bool AssemblyGraph::detangleShortSuperbubblesGeneral(
     bool debug,
     uint64_t maxOffset1,    // Used to define superbubbles
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     // Find the superbubbles.
     Superbubbles superbubbles(cGraph, maxOffset1);
@@ -4729,14 +4729,14 @@ bool CompressedPathGraph::detangleShortSuperbubblesGeneral(
 
 
 
-bool CompressedPathGraph::detangleShortSuperbubbleGeneral(
+bool AssemblyGraph::detangleShortSuperbubbleGeneral(
     bool debug,
     const Superbubbles& superbubbles,
     uint64_t superbubbleId,
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
 
     if(debug) {
@@ -4755,13 +4755,13 @@ bool CompressedPathGraph::detangleShortSuperbubbleGeneral(
     vector<edge_descriptor> inEdges;
     vector<edge_descriptor> outEdges;
     for(const vertex_descriptor cv0: superbubble) {
-        BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph) {
+        BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
             const vertex_descriptor cv1 = source(ce, cGraph);
             if(not superbubbles.isInSuperbubble(superbubbleId, cv1)) {
                 inEdges.push_back(ce);
             }
         }
-        BGL_FORALL_OUTEDGES(cv0, ce, cGraph, CompressedPathGraph) {
+        BGL_FORALL_OUTEDGES(cv0, ce, cGraph, AssemblyGraph) {
             const vertex_descriptor cv1 = target(ce, cGraph);
             if(not superbubbles.isInSuperbubble(superbubbleId, cv1)) {
                 outEdges.push_back(ce);
@@ -4999,18 +4999,18 @@ bool CompressedPathGraph::detangleShortSuperbubbleGeneral(
 
 // Special treatment to detangle back edges that were too long
 // to be handled by detangleEdges.
-bool CompressedPathGraph::detangleBackEdges(
+bool AssemblyGraph::detangleBackEdges(
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
 {
     cout << "Detangling back edges." << endl;
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     // To safely iterate over edges while removing edges we must use edge ids
     // as unique identifiers, because edge descriptors can be reused as edges are
     // deleted a new edges are created.
     std::map<uint64_t, edge_descriptor> edgeMap;
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         edgeMap.insert({cGraph[ce].id, ce});
     }
 
@@ -5030,13 +5030,13 @@ bool CompressedPathGraph::detangleBackEdges(
 
 // Special treatment to detangle back edges that were too long
 // to be handled by detangleEdge.
-bool CompressedPathGraph::detangleBackEdge(
+bool AssemblyGraph::detangleBackEdge(
     std::map<uint64_t, edge_descriptor>& edgeMap,
     std::map<uint64_t, edge_descriptor>::iterator& it,
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     const edge_descriptor ce = it->second;
     ++it;
     // edgeMap.erase(cGraph[ce].id);
@@ -5061,7 +5061,7 @@ bool CompressedPathGraph::detangleBackEdge(
 
     // Look for a back edge.
     vector<edge_descriptor> backEdges;
-    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, AssemblyGraph) {
         if(target(ce, cGraph) == cv0) {
             backEdges.push_back(ce);
         }
@@ -5086,7 +5086,7 @@ bool CompressedPathGraph::detangleBackEdge(
 
     // Gather the in-edges.
     vector<edge_descriptor> inEdges(1, ceBack);
-    BGL_FORALL_INEDGES(cv0, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
         if(ce == ceBack) {
             continue;
         }
@@ -5103,7 +5103,7 @@ bool CompressedPathGraph::detangleBackEdge(
 
     // Gather the out-edges.
     vector<edge_descriptor> outEdges(1, ceBack);
-    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, AssemblyGraph) {
         if(ce == ceBack) {
             continue;
         }
@@ -5161,7 +5161,7 @@ bool CompressedPathGraph::detangleBackEdge(
 
 
 
-void CompressedPathGraph::phaseBubbleChainsUsingPhasingGraph(
+void AssemblyGraph::phaseBubbleChainsUsingPhasingGraph(
     bool debug,
     uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
     uint64_t lowThreshold,
@@ -5171,14 +5171,14 @@ void CompressedPathGraph::phaseBubbleChainsUsingPhasingGraph(
     double minLogP,
     uint64_t longBubbleThreshold)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     if(debug) {
         cout << "phaseBubbleChainsUsingPhasingGraph begins." << endl;
     }
 
     vector<edge_descriptor> allEdges;
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         allEdges.push_back(ce);
     }
 
@@ -5193,13 +5193,13 @@ void CompressedPathGraph::phaseBubbleChainsUsingPhasingGraph(
 
 
 
-void CompressedPathGraph::phaseBubbleChainsUsingPhasingTable(
+void AssemblyGraph::phaseBubbleChainsUsingPhasingTable(
     const string& debugOutputFileNamePrefix,
     double phaseErrorThreshold,
     double bubbleErrorThreshold,
     uint64_t longBubbleThreshold)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     const bool debug = not debugOutputFileNamePrefix.empty();
     if(debug) {
@@ -5215,7 +5215,7 @@ void CompressedPathGraph::phaseBubbleChainsUsingPhasingTable(
     }
 
     vector<edge_descriptor> allEdges;
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         allEdges.push_back(ce);
     }
 
@@ -5233,7 +5233,7 @@ void CompressedPathGraph::phaseBubbleChainsUsingPhasingTable(
 
 
 
-void CompressedPathGraph::phaseBubbleChainUsingPhasingGraph(
+void AssemblyGraph::phaseBubbleChainUsingPhasingGraph(
     edge_descriptor ce,
     uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
     uint64_t lowThreshold,
@@ -5244,7 +5244,7 @@ void CompressedPathGraph::phaseBubbleChainUsingPhasingGraph(
     uint64_t longBubbleThreshold,
     bool debug)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     BubbleChain& bubbleChain = cGraph[ce];
 
     // debug = debug and (cGraph[ce].id == 500048);
@@ -5449,13 +5449,13 @@ void CompressedPathGraph::phaseBubbleChainUsingPhasingGraph(
 
 
 // Use PhasedComponents to create a new BubbleChain that will replace the existing one.
-void CompressedPathGraph::phaseBubbleChainUsingPhasedComponents(
+void AssemblyGraph::phaseBubbleChainUsingPhasedComponents(
     bool debug,
     edge_descriptor e,
     const vector<shared_ptr<PhasedComponent> >& phasedComponents,
     uint64_t longBubbleThreshold)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     BubbleChain& bubbleChain = cGraph[e];
 
     BubbleChain newBubbleChain;
@@ -5569,14 +5569,14 @@ void CompressedPathGraph::phaseBubbleChainUsingPhasedComponents(
 
 
 
-void CompressedPathGraph::phaseBubbleChainUsingPhasingTable(
+void AssemblyGraph::phaseBubbleChainUsingPhasingTable(
     const string& debugOutputFileNamePrefix,
     edge_descriptor e,
     double phaseErrorThreshold,
     double bubbleErrorThreshold,
     uint64_t longBubbleThreshold)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     BubbleChain& bubbleChain = cGraph[e];
 
     const bool debug = not debugOutputFileNamePrefix.empty();
@@ -5787,7 +5787,7 @@ void CompressedPathGraph::phaseBubbleChainUsingPhasingTable(
 
 
 
-void CompressedPathGraph::cleanupBubbleChainUsingPhasingTable(
+void AssemblyGraph::cleanupBubbleChainUsingPhasingTable(
     const string& debugOutputFileNamePrefix,
     edge_descriptor e,
     double phaseErrorThreshold,
@@ -5795,7 +5795,7 @@ void CompressedPathGraph::cleanupBubbleChainUsingPhasingTable(
     uint64_t longBubbleThreshold)
 {
 
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     BubbleChain& bubbleChain = cGraph[e];
 
     const bool debug = not debugOutputFileNamePrefix.empty();
@@ -5967,7 +5967,7 @@ void CompressedPathGraph::cleanupBubbleChainUsingPhasingTable(
 // Compute the tangle matrix between two incoming chains
 // and two outgoing chains, taking into account up to
 // n MarkergraphEdgeIds for each Chain.
-void CompressedPathGraph::computeTangleMatrix(
+void AssemblyGraph::computeTangleMatrix(
     const array<const Chain*, 2> inChains,
     const array<const Chain*, 2> outChains,
     uint64_t n,
@@ -6022,7 +6022,7 @@ void CompressedPathGraph::computeTangleMatrix(
 
 // Gather OrientedReadIds from up to n MarkergraphEdgeIds
 // near the end of a chain.
-void CompressedPathGraph::gatherOrientedReadIdsAtEnd(
+void AssemblyGraph::gatherOrientedReadIdsAtEnd(
     const Chain& chain,
     uint64_t n,
     vector<OrientedReadId>& orientedReadIds) const
@@ -6050,7 +6050,7 @@ void CompressedPathGraph::gatherOrientedReadIdsAtEnd(
 
 // Gather OrientedReadIds from up to n MarkergraphEdgeIds
 // near the beginning of a chain.
-void CompressedPathGraph::gatherOrientedReadIdsAtBeginning(
+void AssemblyGraph::gatherOrientedReadIdsAtBeginning(
     const Chain& chain,
     uint64_t n,
     vector<OrientedReadId>& orientedReadIds) const
@@ -6078,7 +6078,7 @@ void CompressedPathGraph::gatherOrientedReadIdsAtBeginning(
 
 // To phase the PhasingGraph, we create an optimal spanning tree
 // using edges in order of decreasing "significance".
-void CompressedPathGraph::PhasingGraph::phase(bool debug)
+void AssemblyGraph::PhasingGraph::phase(bool debug)
 {
     PhasingGraph& phasingGraph = *this;
 
@@ -6312,7 +6312,7 @@ void CompressedPathGraph::PhasingGraph::phase(bool debug)
 // Sort edges in order of decreasing significance:
 // - If using the Bayesian model, logP.
 // - Otherwise, minConcordant/maxDiscordant.
-void CompressedPathGraph::PhasingGraph::sortEdges(
+void AssemblyGraph::PhasingGraph::sortEdges(
     vector<edge_descriptor>& sortedEdges,
     bool useBayesianModel) const
 {
@@ -6377,7 +6377,7 @@ void CompressedPathGraph::PhasingGraph::sortEdges(
 // using edges in order of decreasing "significance".
 // We do this iteratively. At each iteration we process the largest
 // connected component of the surviving PhasingGraph.
-void CompressedPathGraph::PhasingGraph::phase1(bool debug, bool useBayesianModel)
+void AssemblyGraph::PhasingGraph::phase1(bool debug, bool useBayesianModel)
 {
     PhasingGraph& phasingGraph = *this;
     phasedComponents.clear();
@@ -6680,7 +6680,7 @@ void CompressedPathGraph::PhasingGraph::phase1(bool debug, bool useBayesianModel
 
 
 
-bool CompressedPathGraph::PhasingGraph::isConsistent(edge_descriptor e) const
+bool AssemblyGraph::PhasingGraph::isConsistent(edge_descriptor e) const
 {
     const PhasingGraph& phasingGraph = *this;
     const vertex_descriptor v0 = source(e, phasingGraph);
@@ -6702,7 +6702,7 @@ bool CompressedPathGraph::PhasingGraph::isConsistent(edge_descriptor e) const
 
 
 
-void CompressedPathGraph::PhasingGraph::writeGraphviz(const string& fileName) const
+void AssemblyGraph::PhasingGraph::writeGraphviz(const string& fileName) const
 {
     const PhasingGraph& phasingGraph = *this;
 
@@ -6728,7 +6728,7 @@ void CompressedPathGraph::PhasingGraph::writeGraphviz(const string& fileName) co
 
 
 
-void CompressedPathGraph::TangleMatrix::analyze(
+void AssemblyGraph::TangleMatrix::analyze(
     uint64_t lowThreshold,
     uint64_t highThreshold,
     int64_t& phase,
@@ -6825,18 +6825,18 @@ void BubbleChain::compress()
 
 
 
-void CompressedPathGraph::assembleChains(
+void AssemblyGraph::assembleChains(
     uint64_t chainTerminalCommonThreshold,
     uint64_t threadCount0,
     uint64_t threadCount1)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     ofstream csv("ChainsAssemblyDetails.csv");
     cout << timestamp << "Assembling sequence." << endl;
 
     // ****** THIS SHOULD BE MADE MULTITHREADED USING threadCount0 threads.
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         BubbleChain& bubbleChain = cGraph[ce];
 
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size();
@@ -6857,7 +6857,7 @@ void CompressedPathGraph::assembleChains(
 
 
 // Assemble sequence for a Chain.
-void CompressedPathGraph::assembleChain(
+void AssemblyGraph::assembleChain(
     Chain& chain,
     uint64_t threadCount1,
     const string& chainName,
@@ -6927,11 +6927,11 @@ void CompressedPathGraph::assembleChain(
 // The last bubble of the bubble chain of the given edge must be haploid.
 // If the bubble chain consists of just a single haploid bubble with a chain of length 2,
 // no new edge is created, and this simply returns the source vertex of the given edge.
-CompressedPathGraph::vertex_descriptor
-    CompressedPathGraph::cloneAndTruncateAtEnd(edge_descriptor ce)
+AssemblyGraph::vertex_descriptor
+    AssemblyGraph::cloneAndTruncateAtEnd(edge_descriptor ce)
 {
-    CompressedPathGraph& cGraph = *this;
-    const CompressedPathGraphEdge& edge = cGraph[ce];
+    AssemblyGraph& cGraph = *this;
+    const AssemblyGraphEdge& edge = cGraph[ce];
     const vertex_descriptor cv0 = source(ce, cGraph);
     const BubbleChain& bubbleChain = cGraph[ce];
 
@@ -6957,7 +6957,7 @@ CompressedPathGraph::vertex_descriptor
         }
 
         // Create the new edge, without adding it to the graph for now.
-        CompressedPathGraphEdge newEdge = edge;
+        AssemblyGraphEdge newEdge = edge;
         newEdge.id = nextEdgeId++;
         BubbleChain& newBubbleChain = newEdge;
         SHASTA_ASSERT(newBubbleChain.size() == 1);
@@ -6985,7 +6985,7 @@ CompressedPathGraph::vertex_descriptor
         SHASTA_ASSERT(lastChain.size() > 1);
 
         // Create the new edge, without adding it to the graph for now.
-        CompressedPathGraphEdge newEdge = edge;
+        AssemblyGraphEdge newEdge = edge;
         newEdge.id = nextEdgeId++;
         BubbleChain& newBubbleChain = newEdge;
         SHASTA_ASSERT(newBubbleChain.size() > 1);
@@ -7020,11 +7020,11 @@ CompressedPathGraph::vertex_descriptor
 // The first bubble of the bubble chain of the given edge must be haploid.
 // If the bubble chain consists of just a single haploid bubble with a chain of length 2,
 // no new edge is created, and this simply returns the target vertex of the given edge.
-CompressedPathGraph::vertex_descriptor
-    CompressedPathGraph::cloneAndTruncateAtBeginning(edge_descriptor ce)
+AssemblyGraph::vertex_descriptor
+    AssemblyGraph::cloneAndTruncateAtBeginning(edge_descriptor ce)
 {
-    CompressedPathGraph& cGraph = *this;
-    const CompressedPathGraphEdge& edge = cGraph[ce];
+    AssemblyGraph& cGraph = *this;
+    const AssemblyGraphEdge& edge = cGraph[ce];
     const vertex_descriptor cv1 = target(ce, cGraph);
     const BubbleChain& bubbleChain = cGraph[ce];
 
@@ -7050,7 +7050,7 @@ CompressedPathGraph::vertex_descriptor
         }
 
         // Create the new edge, without adding it to the graph for now.
-        CompressedPathGraphEdge newEdge = edge;
+        AssemblyGraphEdge newEdge = edge;
         newEdge.id = nextEdgeId++;
         BubbleChain& newBubbleChain = newEdge;
         SHASTA_ASSERT(newBubbleChain.size() == 1);
@@ -7078,7 +7078,7 @@ CompressedPathGraph::vertex_descriptor
         SHASTA_ASSERT(firstChain.size() > 1);
 
         // Create the new edge, without adding it to the graph for now.
-        CompressedPathGraphEdge newEdge = edge;
+        AssemblyGraphEdge newEdge = edge;
         newEdge.id = nextEdgeId++;
         BubbleChain& newBubbleChain = newEdge;
         SHASTA_ASSERT(newBubbleChain.size() > 1);
@@ -7108,13 +7108,13 @@ CompressedPathGraph::vertex_descriptor
 // Create a new edge connecting the cv0 and cv1.
 // The new edge will consist of a simple BubbleChain with a single
 // haploid Bubble with a Chain of length 2.
-CompressedPathGraph::edge_descriptor CompressedPathGraph::connect(vertex_descriptor cv0, vertex_descriptor cv1)
+AssemblyGraph::edge_descriptor AssemblyGraph::connect(vertex_descriptor cv0, vertex_descriptor cv1)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     edge_descriptor ceNew;
     tie(ceNew, ignore) = add_edge(cv0, cv1, cGraph);
-    CompressedPathGraphEdge& newEdge = cGraph[ceNew];
+    AssemblyGraphEdge& newEdge = cGraph[ceNew];
     newEdge.id = nextEdgeId++;
     BubbleChain& newBubbleChain = newEdge;
 
@@ -7137,7 +7137,7 @@ CompressedPathGraph::edge_descriptor CompressedPathGraph::connect(vertex_descrip
 
 
 
-void CompressedPathGraph::save(const string& fileName) const
+void AssemblyGraph::save(const string& fileName) const
 {
     ofstream file(fileName);
     boost::archive::binary_oarchive archive(file);
@@ -7146,7 +7146,7 @@ void CompressedPathGraph::save(const string& fileName) const
 
 
 
-void CompressedPathGraph::load(const string& fileName)
+void AssemblyGraph::load(const string& fileName)
 {
     ifstream file(fileName);
     boost::archive::binary_iarchive archive(file);
@@ -7157,14 +7157,14 @@ void CompressedPathGraph::load(const string& fileName)
 
 // Optimize chains before assembly, to remove assembly steps with
 // less that minCommon reads.
-void CompressedPathGraph::optimizeChains(
+void AssemblyGraph::optimizeChains(
     bool debug,
     uint64_t minCommon,
     uint64_t k)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         BubbleChain& bubbleChain = cGraph[ce];
 
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
@@ -7189,7 +7189,7 @@ void CompressedPathGraph::optimizeChains(
 
 // Optimize a chain before assembly, to remove assembly steps with
 // less that minCommon reads.
-void CompressedPathGraph::optimizeChain(
+void AssemblyGraph::optimizeChain(
     bool debug,
     Chain& chain,
     uint64_t minCommon,
@@ -7514,12 +7514,12 @@ void CompressedPathGraph::optimizeChain(
 
 
 
-bool CompressedPathGraph::removeSelfComplementaryEdges()
+bool AssemblyGraph::removeSelfComplementaryEdges()
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     vector<edge_descriptor> edgesToBeRemoved;
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         const vertex_descriptor v0 = source(ce, cGraph);
         const vertex_descriptor v1 = target(ce, cGraph);
         const MarkerGraphEdgeId edgeId0 = cGraph[v0].edgeId;
@@ -7541,12 +7541,12 @@ bool CompressedPathGraph::removeSelfComplementaryEdges()
 
 
 // Split terminal haploid bubbles out of bubble chains, to facilitate detangling.
-void CompressedPathGraph::splitTerminalHaploidBubbles()
+void AssemblyGraph::splitTerminalHaploidBubbles()
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
 
     vector<edge_descriptor> allEdges;
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         allEdges.push_back(ce);
     }
 
@@ -7557,9 +7557,9 @@ void CompressedPathGraph::splitTerminalHaploidBubbles()
 
 
 
-void CompressedPathGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
+void AssemblyGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     BubbleChain& bubbleChain = cGraph[ce];
 
     // Skip trivial bubble chains consisting of a single bubble.
@@ -7616,7 +7616,7 @@ void CompressedPathGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
         // Add the new edge.
         edge_descriptor eNew;
         tie(eNew, ignore) = add_edge(cv0, cv2, cGraph);
-        CompressedPathGraphEdge& newEdge = cGraph[eNew];
+        AssemblyGraphEdge& newEdge = cGraph[eNew];
         newEdge.id = nextEdgeId++;
 
         // Copy the first bubble to the new edge.
@@ -7637,7 +7637,7 @@ void CompressedPathGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
         // Add the new edge.
         edge_descriptor eNew;
         tie(eNew, ignore) = add_edge(cv3, cv1, cGraph);
-        CompressedPathGraphEdge& newEdge = cGraph[eNew];
+        AssemblyGraphEdge& newEdge = cGraph[eNew];
         newEdge.id = nextEdgeId++;
 
         // Copy the last bubble to the new edge.
@@ -7653,7 +7653,7 @@ void CompressedPathGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
         splitFirstBubble ? cv2 : cv0,
         splitLastBubble ? cv3 : cv1,
         cGraph);
-        CompressedPathGraphEdge& newEdge = cGraph[eNew];
+        AssemblyGraphEdge& newEdge = cGraph[eNew];
         newEdge.id = nextEdgeId++;
 
     // Copy the rest of the bubble chain to the new edge.
@@ -7676,12 +7676,12 @@ void CompressedPathGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
 
 
 // Bubble cleanup (all bubbles), with the purpose of eliminating most bubbles caused by errors.
-uint64_t CompressedPathGraph::cleanupBubbles(bool debug, uint64_t maxOffset, uint64_t chainTerminalCommonThreshold)
+uint64_t AssemblyGraph::cleanupBubbles(bool debug, uint64_t maxOffset, uint64_t chainTerminalCommonThreshold)
 {
-    const CompressedPathGraph& cGraph = *this;
+    const AssemblyGraph& cGraph = *this;
 
     uint64_t removedCount = 0;
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         removedCount += cleanupBubbles(debug, ce, maxOffset, chainTerminalCommonThreshold);
     }
 
@@ -7691,10 +7691,10 @@ uint64_t CompressedPathGraph::cleanupBubbles(bool debug, uint64_t maxOffset, uin
 
 
 // Bubble cleanup for a bubble chain, with the purpose of eliminating most bubbles caused by errors.
-uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce,
+uint64_t AssemblyGraph::cleanupBubbles(bool debug, edge_descriptor ce,
     uint64_t maxOffset, uint64_t chainTerminalCommonThreshold)
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     BubbleChain& bubbleChain = cGraph[ce];
     BubbleChain newBubbleChain;
 
@@ -7831,9 +7831,9 @@ uint64_t CompressedPathGraph::cleanupBubbles(bool debug, edge_descriptor ce,
 // A1 = A'
 // B0 = B
 // B1 = B'
-void CompressedPathGraph::removeSelfComplementarySquares()
+void AssemblyGraph::removeSelfComplementarySquares()
 {
-    CompressedPathGraph& cGraph = *this;
+    AssemblyGraph& cGraph = *this;
     const bool debug = true;
 
     vector< pair<edge_descriptor, vertex_descriptor> > outEdgesA0;
@@ -7845,11 +7845,11 @@ void CompressedPathGraph::removeSelfComplementarySquares()
 
         // Loop over all possible choices for A0.
         bool done = false;
-        BGL_FORALL_VERTICES(A0, cGraph, CompressedPathGraph) {
+        BGL_FORALL_VERTICES(A0, cGraph, AssemblyGraph) {
 
             // Gather the children of A.
             outEdgesA0.clear();
-            BGL_FORALL_OUTEDGES(A0, ce, cGraph, CompressedPathGraph) {
+            BGL_FORALL_OUTEDGES(A0, ce, cGraph, AssemblyGraph) {
                 outEdgesA0.push_back({ce, target(ce, cGraph)});
             }
 
@@ -7871,7 +7871,7 @@ void CompressedPathGraph::removeSelfComplementarySquares()
 
                         edge_descriptor B0A1;
                         vertex_descriptor A10 = null_vertex();
-                        BGL_FORALL_OUTEDGES(B0, ce, cGraph, CompressedPathGraph) {
+                        BGL_FORALL_OUTEDGES(B0, ce, cGraph, AssemblyGraph) {
                             const vertex_descriptor v = target(ce, cGraph);
                             if(cGraph[v].edgeId == edgeIdA1) {
                                 B0A1 = ce;
@@ -7885,7 +7885,7 @@ void CompressedPathGraph::removeSelfComplementarySquares()
 
                         edge_descriptor B1A1;
                         vertex_descriptor A11 = null_vertex();
-                        BGL_FORALL_OUTEDGES(B1, ce, cGraph, CompressedPathGraph) {
+                        BGL_FORALL_OUTEDGES(B1, ce, cGraph, AssemblyGraph) {
                             const vertex_descriptor v = target(ce, cGraph);
                             if(cGraph[v].edgeId == edgeIdA1) {
                                 B1A1 = ce;

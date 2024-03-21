@@ -2,7 +2,7 @@
 
 #include "Assembler.hpp"
 #include "bits/stdint-uintn.h"
-#include "mode3-CompressedPathGraph.hpp"
+#include "mode3-AssemblyGraph.hpp"
 #include "mode3-PhasingTable.hpp"
 #include "MarkerGraph.hpp"
 #include "MarkerInterval.hpp"
@@ -34,11 +34,11 @@ using namespace mode3;
 
 
 
-void CompressedPathGraph::writeBubbleChainsPhasingTables(
+void AssemblyGraph::writeBubbleChainsPhasingTables(
     const string& fileNamePrefix,
     double phaseErrorThreshold) const
 {
-    const CompressedPathGraph& cGraph = *this;
+    const AssemblyGraph& cGraph = *this;
 
     const string directoryName = fileNamePrefix + "-PhasingTables";
     if(not std::filesystem::create_directory(directoryName)) {
@@ -47,8 +47,8 @@ void CompressedPathGraph::writeBubbleChainsPhasingTables(
 
 
     // Loop over all BubbleChains.
-    BGL_FORALL_EDGES(ce, cGraph, CompressedPathGraph) {
-        const CompressedPathGraphEdge& edge = cGraph[ce];
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
+        const AssemblyGraphEdge& edge = cGraph[ce];
         const BubbleChain& bubbleChain = edge;
 
         // Create the phasing table for this bubble chain.

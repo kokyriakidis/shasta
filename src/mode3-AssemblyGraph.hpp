@@ -39,15 +39,15 @@ namespace shasta {
         // A BubbleChain is a sequence of Bubbles.
         class BubbleChain;
 
-        class CompressedPathGraph;
-        class CompressedPathGraphVertex;
-        class CompressedPathGraphEdge;
-        using CompressedPathGraphBaseClass = boost::adjacency_list<
+        class AssemblyGraph;
+        class AssemblyGraphVertex;
+        class AssemblyGraphEdge;
+        using AssemblyGraphBaseClass = boost::adjacency_list<
             boost::listS,
             boost::listS,
             boost::bidirectionalS,
-            CompressedPathGraphVertex,
-            CompressedPathGraphEdge>;
+            AssemblyGraphVertex,
+            AssemblyGraphEdge>;
 
         class PathGraph;
     }
@@ -187,7 +187,7 @@ public:
 
 
 
-class shasta::mode3::CompressedPathGraphVertex {
+class shasta::mode3::AssemblyGraphVertex {
 public:
     MarkerGraphEdgeId edgeId;
 
@@ -208,7 +208,7 @@ public:
 
 
 
-class shasta::mode3::CompressedPathGraphEdge : public BubbleChain {
+class shasta::mode3::AssemblyGraphEdge : public BubbleChain {
 public:
     uint64_t id = invalid<uint64_t>;
 
@@ -221,11 +221,11 @@ public:
 
 
 
-class shasta::mode3::CompressedPathGraph: public CompressedPathGraphBaseClass {
+class shasta::mode3::AssemblyGraph: public AssemblyGraphBaseClass {
 public:
 
     // Create from a PathGraph1, then call run.
-    CompressedPathGraph(
+    AssemblyGraph(
         const PathGraph&,
         uint64_t componentId,
         const Assembler&,
@@ -233,7 +233,7 @@ public:
         uint64_t threadCount1);
 
     // Load it from a binary archive, then call run.
-    CompressedPathGraph(
+    AssemblyGraph(
         const string& fileName,
         const Assembler&,
         uint64_t threadCount0,
@@ -247,7 +247,7 @@ private:
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive & ar, const unsigned int version)
     {
-        ar & boost::serialization::base_object<CompressedPathGraphBaseClass>(*this);
+        ar & boost::serialization::base_object<AssemblyGraphBaseClass>(*this);
         ar & componentId;
         ar & nextEdgeId;
     }
@@ -263,7 +263,7 @@ private:
 
     // Initial creation from the PathGraph.
     // Each linear chain of edges in the PathGraph after transitive reduction generates
-    // a CompressedPathGraphEdge (BubbleChain) consisting of a single haploid bubble.
+    // an AssemblyGraphEdge (BubbleChain) consisting of a single haploid bubble.
     void create(const PathGraph&);
     uint64_t nextEdgeId = 0;
     void renumberEdges();
@@ -432,27 +432,27 @@ private:
 
 
 
-    // Find short superbubbles in the CompressedPathGraph.
+    // Find short superbubbles in the AssemblyGraph.
     class Superbubble : public vector<vertex_descriptor> {
     public:
         vector<vertex_descriptor> entrances;
         vector<vertex_descriptor> exits;
 
         // Fill in the superbubble given a single entrance and exit.
-        void fillInFromEntranceAndExit(const CompressedPathGraph&);
+        void fillInFromEntranceAndExit(const AssemblyGraph&);
     };
     class Superbubbles {
     public:
 
         // This computes connected components using only edges with length up to maxOffset1.
         Superbubbles(
-            CompressedPathGraph&,
+            AssemblyGraph&,
             uint64_t maxOffset1
             );
 
         // This uses dominator trees.
         // It only finds superbubbles with one entrance and one ecit.
-        Superbubbles(CompressedPathGraph&);
+        Superbubbles(AssemblyGraph&);
 
         ~Superbubbles();
 
@@ -480,7 +480,7 @@ private:
 
     private:
 
-        CompressedPathGraph& cGraph;
+        AssemblyGraph& cGraph;
 
         // The superbubbles are the connected components with size at least 2,
         // computed using only the edges with offset up to maxOffset1.
