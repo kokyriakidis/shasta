@@ -7,6 +7,7 @@
 #include "shastaTypes.hpp"
 
 // Standard library.
+#include "utility.hpp"
 #include "vector.hpp"
 
 namespace shasta {
@@ -47,4 +48,16 @@ private:
     };
     vector<ConnectedComponent> connectedComponents;
     void computeConnectedComponents();
+
+    // For each oriented read, store which ConnectedComponent it belongs to,
+    // and at what position.
+    // Indexed by OrientedReadId::getValue().
+    // For each OrientedReadId we store a pair (componentId, position),
+    // where componentId is the index in the connectedComponents vector
+    // and position is the index in the orientedReadIds vector
+    // for that connected component.
+    vector< pair<uint64_t, uint64_t> > orientedReadIdTable;
+
+    void assembleConnectedComponents();
+    void assembleConnectedComponent(uint64_t componentId);
 };

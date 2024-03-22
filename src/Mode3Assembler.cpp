@@ -28,6 +28,7 @@ Mode3Assembler::Mode3Assembler(
 
     gatherPrimaryMarkerGraphEdgeIds();
     computeConnectedComponents();
+    assembleConnectedComponents();
 
     performanceLog << timestamp << "Mode 3 assembly ends." << endl;
 }
@@ -148,6 +149,17 @@ void Mode3Assembler::computeConnectedComponents()
         connectedComponents[i].primaryIds.swap(componentsPrimaryIds[componentId]);
     }
 
+    // Fill in the orientedReadIdTable.
+    orientedReadIdTable.clear();
+    orientedReadIdTable.resize(orientedReadCount, {invalid<uint64_t>, invalid<uint64_t>});
+    for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
+        const vector<OrientedReadId>& orientedReadIds = connectedComponents[componentId].orientedReadIds;
+        for(uint64_t position=0; position<orientedReadIds.size(); position++) {
+            const OrientedReadId orientedReadId = orientedReadIds[position];
+            orientedReadIdTable[orientedReadId.getValue()] = {componentId, position};
+        }
+    }
+
     // Summarize in a csv file the connected components we kept.
     {
         ofstream csv("Mode3Assembler-OrientedReadIdComponents.csv");
@@ -162,4 +174,57 @@ void Mode3Assembler::computeConnectedComponents()
 
 
     performanceLog << timestamp << "Mode3Assembler::computeConnectedComponents ends." << endl;
+}
+
+
+
+void Mode3Assembler::assembleConnectedComponents()
+{
+    performanceLog << timestamp << "Mode3Assembler::assembleConnectedComponents begins." << endl;
+    for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
+        assembleConnectedComponent(componentId);
+    }
+    performanceLog << timestamp << "Mode3Assembler::assembleConnectedComponents ends." << endl;
+}
+
+
+
+void Mode3Assembler::assembleConnectedComponent(uint64_t componentId)
+{
+    performanceLog << timestamp << "Assembling connected component " <<
+        componentId << " of " << connectedComponents.size() << endl;
+    cout << timestamp << "Assembling connected component " <<
+        componentId << " of " << connectedComponents.size() << endl;
+
+    ConnectedComponent connectedComponent = connectedComponents[componentId];
+    const vector<OrientedReadId>& orientedReadIds = connectedComponent.orientedReadIds;
+    const vector<uint64_t>& primaryIds = connectedComponent.primaryIds;
+
+    cout << "This connected component has " << orientedReadIds.size() <<
+        " reads and " << primaryIds.size() << " primary marker graph edges." << endl;
+
+
+
+    // We need to compute the primary journey of each oriented read,
+    // that is, the sequence of primary edges encountered by each read.
+    // We store each journey as a vector of pairs of
+    // (ordinal0, localPrimaryId), where localPrimaryId is an index into primaryIds
+    // for this connected component.
+    vector< vector< pair<uint32_t, uint64_t> > > journeys(orientedReadIds.size());
+
+    for(uint64_t localPrimaryId=0; localPrimaryId<primaryIds.size(); localPrimaryId++) {
+        const uint64_t primaryId = primaryIds[localPrimaryId];
+        const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
+        const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
+        for(const MarkerInterval& markerInterval: markerIntervals) {
+            const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+            const uint32_t ordinal0 = markerInterval.ordinals[0];
+            const auto& p = orientedReadIdTable[orientedReadId.getValue()];
+            SHASTA_ASSERT(p.first == componentId);
+            journeys[p.second].push_back({ordinal0, localPrimaryId});
+        }
+    }
+    for(vector< pair<uint32_t, uint64_t> >& journey: journeys) {
+        sort(journey.begin(), journey.end(), OrderPairsByFirstOnly<uint32_t, uint64_t>());
+    }
 }
