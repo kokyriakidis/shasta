@@ -112,7 +112,9 @@ void GlobalPathGraph::createEdges()
 
     // Deduplicate the edge pairs and count the number of times each of them was found.
     vector<uint64_t> coverage;
+    performanceLog << timestamp << "Deduplicating " << edgePairs.size() << " edge pairs." << endl;
     deduplicateAndCount(edgePairs, coverage);
+    performanceLog << timestamp << edgePairs.size() << " edge pairs after deduplication." << endl;
     SHASTA_ASSERT(edgePairs.size() == coverage.size());
     edgePairs.shrink_to_fit();
     coverage.shrink_to_fit();
@@ -120,6 +122,7 @@ void GlobalPathGraph::createEdges()
     // To generate edges, we need a table to map MarkerGraphEdgeIds
     // to vertex ids in the GlobalPathGraph.
     vector<uint64_t> primaryEdgeTable(assembler.markerGraph.edges.size(), invalid<uint64_t>);
+    performanceLog << timestamp << "Creating primaryEdgeTable." << endl;
     for(uint64_t vertexId=0; vertexId<verticesVector.size(); vertexId++) {
         const GlobalPathGraphVertex& vertex = verticesVector[vertexId];
         primaryEdgeTable[vertex.edgeId] = vertexId;
@@ -129,6 +132,7 @@ void GlobalPathGraph::createEdges()
 
     // Now we can generate the edges.
     edges.clear();
+    performanceLog << timestamp << "Generating the edges." << endl;
     for(uint64_t i=0; i<edgePairs.size(); i++) {
         const uint64_t c = coverage[i];
         const auto& p = edgePairs[i];
