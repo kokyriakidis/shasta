@@ -1,5 +1,5 @@
 // Shasta.
-#include "mode3-PathGraph.hpp"
+#include "mode3-PrimaryGraph.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
 #include "longestPath.hpp"
@@ -38,7 +38,7 @@ void GlobalPathGraph::writeComponentsGraphviz(
     const GlobalPathGraphDisplayOptions& options) const
 {
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
-        const PathGraph& component = *components[componentRank];
+        const PrimaryGraph& component = *components[componentRank];
         component.writeGraphviz(
             baseName + "_Component_" + to_string(componentRank),
             options,
@@ -204,9 +204,9 @@ void GlobalPathGraph::createComponents(
     }
 
     // Generate vertices of each connected component.
-    vector< shared_ptr<PathGraph> > allComponents;
+    vector< shared_ptr<PrimaryGraph> > allComponents;
     for(uint64_t componentId=0; componentId<n; componentId++) {
-        allComponents.push_back(make_shared<PathGraph>());
+        allComponents.push_back(make_shared<PrimaryGraph>());
     }
     for(uint64_t vertexId=0; vertexId<n; vertexId++) {
         const GlobalPathGraphVertex& vertex = verticesVector[vertexId];
@@ -232,8 +232,8 @@ void GlobalPathGraph::createComponents(
     // minComponentSize vertices.
     components.clear();
     for(uint64_t componentId=0; componentId<n; componentId++) {
-        const shared_ptr<PathGraph> componentPointer = allComponents[componentId];
-        const PathGraph& component = *componentPointer;
+        const shared_ptr<PrimaryGraph> componentPointer = allComponents[componentId];
+        const PrimaryGraph& component = *componentPointer;
         if(num_vertices(component) >= minComponentSize) {
             components.push_back(componentPointer);
         }
@@ -245,8 +245,8 @@ void GlobalPathGraph::createComponents(
     class ComponentSorter {
     public:
         bool operator()(
-            const shared_ptr<PathGraph>& x,
-            const shared_ptr<PathGraph>& y)
+            const shared_ptr<PrimaryGraph>& x,
+            const shared_ptr<PrimaryGraph>& y)
         {
             return num_vertices(*x) > num_vertices(*y);
         }
@@ -264,18 +264,18 @@ void GlobalPathGraph::localTransitiveReduction(
     uint64_t maxCoverage)
 {
     for(uint64_t componentRank=0; componentRank<components.size(); componentRank++) {
-        PathGraph& component = *components[componentRank];
+        PrimaryGraph& component = *components[componentRank];
         component.localTransitiveReduction(distance, maxCoverage);
     }
 }
 
 
 
-void PathGraph::localTransitiveReduction(
+void PrimaryGraph::localTransitiveReduction(
     uint64_t distance,
     uint64_t maxCoverage)
 {
-    PathGraph& graph = *this;
+    PrimaryGraph& graph = *this;
 
     // Histograms by coverage.
     // (all edges, only edges removed by transitive reduction.
@@ -283,7 +283,7 @@ void PathGraph::localTransitiveReduction(
 
     // We want to process edges in order of increasing coverage.
     vector<pair<edge_descriptor, uint64_t> > edgeTable;
-    BGL_FORALL_EDGES(e, graph, PathGraph) {
+    BGL_FORALL_EDGES(e, graph, PrimaryGraph) {
         edgeTable.push_back({e, graph[e].coverage});
     }
     sort(edgeTable.begin(), edgeTable.end(), OrderPairsBySecondOnly<edge_descriptor, uint64_t>());
@@ -330,7 +330,7 @@ void PathGraph::localTransitiveReduction(
 
             // Loop over the out-edges of vA.
             bool endBfs = false;
-            BGL_FORALL_OUTEDGES_T(vA, eAB, graph, PathGraph) {
+            BGL_FORALL_OUTEDGES_T(vA, eAB, graph, PrimaryGraph) {
 
                 // Dont's use e01 in the BFS.
                 if(eAB == e01) {
@@ -373,7 +373,7 @@ void PathGraph::localTransitiveReduction(
     }
 
     if(true) {
-        cout << "PathGraph edge coverage histogram" << endl;
+        cout << "PrimaryGraph edge coverage histogram" << endl;
         cout << "Coverage,All edges,Edges removed by transitive reduction" << endl;
         for(uint64_t coverage=0; coverage<histogram.size(); coverage++) {
             const auto& p = histogram[coverage];
@@ -388,7 +388,7 @@ void PathGraph::localTransitiveReduction(
 
 
 
-void PathGraph::addVertex(
+void PrimaryGraph::addVertex(
     uint64_t vertexId,
     MarkerGraphEdgeId edgeId)
 {
@@ -399,7 +399,7 @@ void PathGraph::addVertex(
 
 
 
-void PathGraph::addEdge(
+void PrimaryGraph::addEdge(
     MarkerGraphEdgeId edgeId0,
     MarkerGraphEdgeId edgeId1,
     const MarkerGraphEdgePairInfo& info,
@@ -417,19 +417,19 @@ void PathGraph::addEdge(
 
 
 
-// Write a PathGraph in graphviz format.
-void PathGraph::writeGraphviz(
+// Write a PrimaryGraph in graphviz format.
+void PrimaryGraph::writeGraphviz(
     const string& name,
     const GlobalPathGraphDisplayOptions& options,
     const MarkerGraph& markerGraph) const
 {
     ofstream out(name + ".dot");
 
-    const PathGraph& graph = *this;
+    const PrimaryGraph& graph = *this;
     out << "digraph " << name << " {\n";
 
-    BGL_FORALL_VERTICES(v, graph, PathGraph) {
-        const PathGraphVertex& vertex = graph[v];
+    BGL_FORALL_VERTICES(v, graph, PrimaryGraph) {
+        const PrimaryGraphVertex& vertex = graph[v];
         out << vertex.edgeId;
 
         if(options.labels or options.tooltips or options.colorVertices) {
@@ -456,8 +456,8 @@ void PathGraph::writeGraphviz(
 
 
 
-    BGL_FORALL_EDGES(e, graph, PathGraph) {
-        const PathGraphEdge& edge = graph[e];
+    BGL_FORALL_EDGES(e, graph, PrimaryGraph) {
+        const PrimaryGraphEdge& edge = graph[e];
         if(not options.showNonTransitiveReductionEdges and edge.isNonTransitiveReductionEdge) {
             continue;
         }
@@ -527,16 +527,16 @@ void PathGraph::writeGraphviz(
 
 
 
-void PathGraph::writeEdgeCoverageHistogram(const string& fileName) const
+void PrimaryGraph::writeEdgeCoverageHistogram(const string& fileName) const
 {
-    const PathGraph& pathGraph = *this;
+    const PrimaryGraph& primaryGraph = *this;
 
     // Create a histogram indexed by histogram[coverage][commonCount].
     vector< vector<uint64_t> > histogram;
 
     // Loop over all edges.
-    BGL_FORALL_EDGES(e, pathGraph, PathGraph) {
-        const PathGraphEdge& edge = pathGraph[e];
+    BGL_FORALL_EDGES(e, primaryGraph, PrimaryGraph) {
+        const PrimaryGraphEdge& edge = primaryGraph[e];
         const uint64_t coverage = edge.coverage;
         const uint64_t commonCount = edge.info.common;
         SHASTA_ASSERT(coverage <= commonCount);
@@ -573,12 +573,12 @@ void PathGraph::writeEdgeCoverageHistogram(const string& fileName) const
 
 
 
-// Create the connected components of this PathGraph,
-// without changing the PathGraph itself.
-vector< shared_ptr<PathGraph> > PathGraph::createConnectedComponents(
+// Create the connected components of this PrimaryGraph,
+// without changing the PrimaryGraph itself.
+vector< shared_ptr<PrimaryGraph> > PrimaryGraph::createConnectedComponents(
     uint64_t minComponentSize) const
 {
-    const PathGraph& graph = *this;
+    const PrimaryGraph& graph = *this;
 
     // Compute connected components.
     // We can't use boost::connected_components because it only works
@@ -590,23 +590,23 @@ vector< shared_ptr<PathGraph> > PathGraph::createConnectedComponents(
     for(uint64_t vertexId=0; vertexId<n; vertexId++) {
         disjointSets.make_set(vertexId);
     }
-    BGL_FORALL_EDGES(e, graph, PathGraph) {
-        const PathGraph::vertex_descriptor v0 = source(e, graph);
-        const PathGraph::vertex_descriptor v1 = target(e, graph);
+    BGL_FORALL_EDGES(e, graph, PrimaryGraph) {
+        const PrimaryGraph::vertex_descriptor v0 = source(e, graph);
+        const PrimaryGraph::vertex_descriptor v1 = target(e, graph);
         disjointSets.union_set(v0, v1);
     }
 
 
     // Gather the vertices in each connected component.
-    vector< shared_ptr<PathGraph> > allComponentPointers(num_vertices(graph));
-    BGL_FORALL_VERTICES(v, graph, PathGraph) {
-        const PathGraphVertex& vertex = graph[v];
+    vector< shared_ptr<PrimaryGraph> > allComponentPointers(num_vertices(graph));
+    BGL_FORALL_VERTICES(v, graph, PrimaryGraph) {
+        const PrimaryGraphVertex& vertex = graph[v];
         const uint64_t componentId = disjointSets.find_set(v);
-        shared_ptr<PathGraph>& componentPointer = allComponentPointers[componentId];
+        shared_ptr<PrimaryGraph>& componentPointer = allComponentPointers[componentId];
         if(not componentPointer) {
-            componentPointer = make_shared<PathGraph>();
+            componentPointer = make_shared<PrimaryGraph>();
         }
-        PathGraph& component = *componentPointer;
+        PrimaryGraph& component = *componentPointer;
         component.addVertex(
             vertex.vertexId,
             vertex.edgeId);
@@ -614,16 +614,16 @@ vector< shared_ptr<PathGraph> > PathGraph::createConnectedComponents(
 
 
     // Gather the edges in each connected component.
-    BGL_FORALL_EDGES(e, graph, PathGraph) {
-        const PathGraph::vertex_descriptor v0 = source(e, graph);
-        const PathGraph::vertex_descriptor v1 = target(e, graph);
+    BGL_FORALL_EDGES(e, graph, PrimaryGraph) {
+        const PrimaryGraph::vertex_descriptor v0 = source(e, graph);
+        const PrimaryGraph::vertex_descriptor v1 = target(e, graph);
         const uint64_t edgeId0 = graph[v0].edgeId;
         const uint64_t edgeId1 = graph[v1].edgeId;
         const uint64_t componentId = disjointSets.find_set(v0);
         SHASTA_ASSERT(componentId == disjointSets.find_set(v1));
-        shared_ptr<PathGraph>& componentPointer = allComponentPointers[componentId];
+        shared_ptr<PrimaryGraph>& componentPointer = allComponentPointers[componentId];
         SHASTA_ASSERT(componentPointer);
-        PathGraph& component = *componentPointer;
+        PrimaryGraph& component = *componentPointer;
         component.addEdge(
             edgeId0,
             edgeId1,
@@ -635,8 +635,8 @@ vector< shared_ptr<PathGraph> > PathGraph::createConnectedComponents(
 
     // Keep only the components with at least minComponentSize vertices
     // and sort them by size.
-    vector< pair<shared_ptr<PathGraph>, uint64_t> > componentPointersWithSizes;
-    for(const shared_ptr<PathGraph>& p: allComponentPointers) {
+    vector< pair<shared_ptr<PrimaryGraph>, uint64_t> > componentPointersWithSizes;
+    for(const shared_ptr<PrimaryGraph>& p: allComponentPointers) {
         if(p) {
             const uint64_t componentSize = num_vertices(*p);
             if(componentSize >= minComponentSize) {
@@ -645,12 +645,12 @@ vector< shared_ptr<PathGraph> > PathGraph::createConnectedComponents(
         }
     }
     sort(componentPointersWithSizes.begin(), componentPointersWithSizes.end(),
-        OrderPairsBySecondOnlyGreater<shared_ptr<PathGraph>, uint64_t>());
+        OrderPairsBySecondOnlyGreater<shared_ptr<PrimaryGraph>, uint64_t>());
 
 
     // For now return all components, including the empty ones.
     // But we want to remove the small ones and sort them by size.
-    vector< shared_ptr<PathGraph> > componentPointers;
+    vector< shared_ptr<PrimaryGraph> > componentPointers;
     for(const auto& p: componentPointersWithSizes) {
         componentPointers.push_back(p.first);
     }
@@ -668,17 +668,17 @@ vector< shared_ptr<PathGraph> > PathGraph::createConnectedComponents(
 //   (ignoring edges marked as removed by transitive reduction).
 // - v1 has at least one in-edge with coverage at least highCoverageThreshold.
 //   (ignoring edges marked as removed by transitive reduction).
-void PathGraph::removeCrossEdges(
+void PrimaryGraph::removeCrossEdges(
     uint64_t lowCoverageThreshold,
     uint64_t highCoverageThreshold,
     uint64_t minOffset)
 {
-    PathGraph& graph = *this;
+    PrimaryGraph& graph = *this;
 
     // Find the edges we are going to remove.
     vector<edge_descriptor> edgesToBeRemoved;
-    BGL_FORALL_EDGES(e, graph, PathGraph) {
-        const PathGraphEdge& edge = graph[e];
+    BGL_FORALL_EDGES(e, graph, PrimaryGraph) {
+        const PrimaryGraphEdge& edge = graph[e];
 
         // If it is marked as removed by transitive reduction, skip it.
         if(edge.isNonTransitiveReductionEdge) {
@@ -698,7 +698,7 @@ void PathGraph::removeCrossEdges(
         // Check out-edges of v0.
         const vertex_descriptor v0 = source(e, graph);
         bool v0HasStrongOutEdge = false;
-        BGL_FORALL_OUTEDGES(v0, e0, graph, PathGraph) {
+        BGL_FORALL_OUTEDGES(v0, e0, graph, PrimaryGraph) {
             // If it is marked as removed by transitive reduction, ignore it.
             if(graph[e0].isNonTransitiveReductionEdge) {
                 continue;
@@ -715,7 +715,7 @@ void PathGraph::removeCrossEdges(
         // Check in-edges of v1.
         const vertex_descriptor v1 = target(e, graph);
         bool v1HasStrongOutEdge = false;
-        BGL_FORALL_INEDGES(v1, e1, graph, PathGraph) {
+        BGL_FORALL_INEDGES(v1, e1, graph, PrimaryGraph) {
             // If it is marked as removed by transitive reduction, ignore it.
             if(graph[e1].isNonTransitiveReductionEdge) {
                 continue;
@@ -742,14 +742,14 @@ void PathGraph::removeCrossEdges(
 
 
 // Remove edges for which loss = (commonCount - coverage) / commonCount > maxLoss
-void PathGraph::removeWeakEdges(double maxLoss)
+void PrimaryGraph::removeWeakEdges(double maxLoss)
 {
-    PathGraph& graph = *this;
+    PrimaryGraph& graph = *this;
 
     // Find the edges we are going to remove.
     vector<edge_descriptor> edgesToBeRemoved;
-    BGL_FORALL_EDGES(e, graph, PathGraph) {
-        const PathGraphEdge& edge = graph[e];
+    BGL_FORALL_EDGES(e, graph, PrimaryGraph) {
+        const PrimaryGraphEdge& edge = graph[e];
         const double loss = double(edge.info.common - edge.coverage) / double(edge.info.common);
         if(loss > maxLoss) {
             edgesToBeRemoved.push_back(e);

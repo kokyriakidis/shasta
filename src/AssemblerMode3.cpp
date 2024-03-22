@@ -2,7 +2,7 @@
 #include "Assembler.hpp"
 #include "LocalMarkerGraph1.hpp"
 #include "mode3-LocalAssembly.hpp"
-#include "mode3-PathGraph.hpp"
+#include "mode3-PrimaryGraph.hpp"
 #include "mode3-AssemblyPath.hpp"
 #include "Mode3Assembler.hpp"
 #include "Reads.hpp"

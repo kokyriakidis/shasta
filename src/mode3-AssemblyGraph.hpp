@@ -49,7 +49,7 @@ namespace shasta {
             AssemblyGraphVertex,
             AssemblyGraphEdge>;
 
-        class PathGraph;
+        class PrimaryGraph;
     }
     class Assembler;
     class OrientedReadId;
@@ -226,7 +226,7 @@ public:
 
     // Create from a PathGraph1, then call run.
     AssemblyGraph(
-        const PathGraph&,
+        const PrimaryGraph&,
         uint64_t componentId,
         const Assembler&,
         uint64_t threadCount0,
@@ -261,10 +261,10 @@ private:
 
 
 
-    // Initial creation from the PathGraph.
-    // Each linear chain of edges in the PathGraph after transitive reduction generates
+    // Initial creation from the PrimaryGraph.
+    // Each linear chain of edges in the PrimaryGraph after transitive reduction generates
     // an AssemblyGraphEdge (BubbleChain) consisting of a single haploid bubble.
-    void create(const PathGraph&);
+    void create(const PrimaryGraph&);
     uint64_t nextEdgeId = 0;
     void renumberEdges();
 
