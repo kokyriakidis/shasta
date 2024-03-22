@@ -11,6 +11,7 @@
 #include "enumeratePaths.hpp"
 #include "findLinearChains.hpp"
 #include "orderPairs.hpp"
+#include "performanceLog.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3;
@@ -106,6 +107,8 @@ void GlobalPathGraph::assembleComponent(
     uint64_t threadCount1)
 {
     cout << "Assembly begins for connected component " << componentId << endl;
+    performanceLog << timestamp << "Assembly begins for connected component " << componentId << endl;
+
     PathGraph& component = *components[componentId];
 
     // Graphviz output.

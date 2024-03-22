@@ -7,6 +7,7 @@
 #include "MarkerGraph.hpp"
 #include "MurmurHash2.hpp"
 #include "orderPairs.hpp"
+#include "performanceLog.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3;
@@ -49,6 +50,8 @@ void GlobalPathGraph::writeComponentsGraphviz(
 
 void GlobalPathGraph::createVertices()
 {
+    performanceLog << timestamp << "GlobalPathGraph::createVertices begins." << endl;
+
     const MarkerGraph& markerGraph = assembler.markerGraph;
 
     verticesVector.clear();
@@ -58,6 +61,8 @@ void GlobalPathGraph::createVertices()
             verticesVector.push_back(GlobalPathGraphVertex(edgeId));
         }
     }
+
+    performanceLog << timestamp << "GlobalPathGraph::ends begins." << endl;
 }
 
 
@@ -88,6 +93,8 @@ uint64_t GlobalPathGraph::getVertexId(MarkerGraphEdgeId edgeId) const
 // This can be converted to multithreaded code and use mapped memory.
 void GlobalPathGraph::createEdges()
 {
+    performanceLog << timestamp << "GlobalPathGraph::createEdges begins." << endl;
+
     // Gather pairs of consecutive edges in oriented read primary journeys.
     vector< pair<MarkerGraphEdgeId, MarkerGraphEdgeId> > edgePairs;
 
@@ -143,6 +150,8 @@ void GlobalPathGraph::createEdges()
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, edge.info));
         edges.push_back(edge);
     }
+
+    performanceLog << timestamp << "GlobalPathGraph::createEdges ends." << endl;
 }
 
 
@@ -173,6 +182,8 @@ void GlobalPathGraph::createComponents(
     double minCorrectedJaccard,
     uint64_t minComponentSize)
 {
+    performanceLog << timestamp << "GlobalPathGraph::createComponents begins." << endl;
+
     // Compute connected components.
     const uint64_t n = verticesVector.size();
     vector<uint64_t> rank(n);
@@ -237,6 +248,8 @@ void GlobalPathGraph::createComponents(
         }
     };
     sort(components.begin(), components.end(), ComponentSorter());
+
+    performanceLog << timestamp << "GlobalPathGraph::createComponents ends." << endl;
 }
 
 
