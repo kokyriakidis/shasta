@@ -14,6 +14,7 @@ parser.add_argument('threadCount0', type=int,
     help='Number of threads for high level parallelization')
 parser.add_argument('threadCount1', type=int, 
     help='Number of threads for low level parallelization')
+    
 parser.add_argument(
     "--recomputePrimaryJourneys",
     dest="recomputePrimaryJourneys",
@@ -22,6 +23,12 @@ parser.add_argument(
          "are recomputed. This is only necessary if "
          "--MarkerGraph.minPrimaryEdgeCoverage or "
          "--MarkerGraph.maxPrimaryEdgeCoverage have changed."
+)    
+        
+parser.add_argument(
+    "--debug",
+    dest="debug",
+    action="store_true",
 )    
         
 arguments = parser.parse_args() 
@@ -49,6 +56,7 @@ if arguments.recomputePrimaryJourneys:
         0)
     a.createMarkerGraphPrimaryJourneys(0)
 
-# Redo Mode 3 assembly.
-a.mode3Assembly(arguments.threadCount0, arguments.threadCount1)
+# Run Mode 3 assembly.
+# a.mode3Assembly0(arguments.threadCount0, arguments.threadCount1)
+a.mode3Assembly1(arguments.threadCount0, arguments.debug)
  

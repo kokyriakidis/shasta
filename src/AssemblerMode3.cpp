@@ -4,6 +4,7 @@
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-PathGraph.hpp"
 #include "mode3-AssemblyPath.hpp"
+#include "Mode3Assembler.hpp"
 #include "Reads.hpp"
 using namespace shasta;
 
@@ -68,13 +69,25 @@ void Assembler::writeMarkerGraphPrimaryJourneys()
 
 
 
-void Assembler::mode3Assembly(
+void Assembler::mode3Assembly0(
     uint64_t threadCount0,  // High level parallelization
     uint64_t threadCount1   // Low level parallelization
     ) const
 {
     mode3::GlobalPathGraph::assemble(*this, threadCount0, threadCount1);
 }
+
+
+
+
+void Assembler::mode3Assembly1(
+    uint64_t threadCount,
+    bool debug
+    )
+{
+    mode3Assembler = make_shared<Mode3Assembler>(*this, debug);
+}
+
 
 
 

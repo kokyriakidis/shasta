@@ -53,6 +53,7 @@ namespace shasta {
     class MarkerConnectivityGraph;
     class MarkerConnectivityGraphVertexMap;
     class Mode2AssemblyOptions;
+    class Mode3Assembler;
     class OrientedReadPair;
     class Reads;
     class ReferenceOverlapMap;
@@ -2351,6 +2352,7 @@ public:
 
 
     // Mode 3 assembly.
+    shared_ptr<Mode3Assembler> mode3Assembler;
     void flagPrimaryMarkerGraphEdges(
         uint64_t minEdgeCoverage,
         uint64_t maxEdgeCoverage,
@@ -2363,10 +2365,17 @@ public:
     // Assemble sequence between two primary edges.
     void fillMode3AssemblyPathStep(const vector<string>&, ostream&);
 
-    void mode3Assembly(
+    // This works but is slow for large assemblies.
+    void mode3Assembly0(
         uint64_t threadCount0,  // High level parallelization
         uint64_t threadCount1   // Low level parallelization
     ) const;
+    // This is incomplete and under development.
+    void mode3Assembly1(
+        uint64_t threadCount,
+        bool debug
+    );
+
     void loadAndAssembleCompressedPathGraph(
         const string& fileName,
         uint64_t threadCount0,  // High level parallelization

@@ -609,10 +609,12 @@ PYBIND11_MODULE(shasta, shastaModule)
             arg("debug") = false)
 
         // Assembly mode 3.
-        .def("mode3Assembly",
-            &Assembler::mode3Assembly,
+        .def("mode3Assembly0",
+            &Assembler::mode3Assembly0,
             arg("threadCount0"),
             arg("threadCount1"))
+        .def("mode3Assembly1",
+            &Assembler::mode3Assembly1)
         .def("loadAndAssembleCompressedPathGraph",
             &Assembler::loadAndAssembleCompressedPathGraph)
         .def("flagPrimaryMarkerGraphEdges",
