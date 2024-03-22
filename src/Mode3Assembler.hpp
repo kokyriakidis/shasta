@@ -3,6 +3,7 @@
 // Shasta.
 #include "MappedMemoryOwner.hpp"
 #include "MultithreadedObject.hpp"
+#include "ReadId.hpp"
 #include "shastaTypes.hpp"
 
 // Standard library.
@@ -32,5 +33,18 @@ private:
     // The oriented reads present in each primary marker graph edge
     // define a bipartite graph. We want to compute connected components
     // of this bipartite graph and process them one at a time.
+    // These are also connected components of the global primary graph
+    // (with one vertex for each primary marker graph edge,
+    // and edges created by following the reads).
+    class ConnectedComponent {
+    public:
+        // The oriented reads in this connected component.
+        vector<OrientedReadId> orientedReadIds;
+
+        // The PrimaryIds of the marker graph edges in this connected component.
+        // These are indices into primaryMarkerGraphEdgeIds.
+        vector<uint64_t> primaryIds;
+    };
+    vector<ConnectedComponent> connectedComponents;
     void computeConnectedComponents();
 };
