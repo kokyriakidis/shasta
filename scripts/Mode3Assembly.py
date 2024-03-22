@@ -46,7 +46,7 @@ a.accessMarkerGraphConsensus()
 a.accessMarkerGraphPrimaryJourneys()
 
 # Open a performance log.
-shasta.openPerformanceLog('Mode3Reassembly.log')
+shasta.openPerformanceLog('Mode3Assembly.log')
 
 # If requested, recompute the primary journeys.
 if arguments.recomputePrimaryJourneys:
