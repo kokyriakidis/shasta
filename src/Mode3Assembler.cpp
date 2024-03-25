@@ -1,11 +1,14 @@
 // Shasta.
 #include "Mode3Assembler.hpp"
 #include "Assembler.hpp"
+#include "deduplicate.hpp"
 #include "dset64-gccAtomic.hpp"
+#include "mode3-PrimaryGraph.hpp"
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
+using namespace mode3;
 
 // Standard library.
 #include "iostream.hpp"
@@ -212,6 +215,7 @@ void Mode3Assembler::assembleConnectedComponent(uint64_t componentId)
     // for this connected component.
     vector< vector< pair<uint32_t, uint64_t> > > journeys(orientedReadIds.size());
 
+    performanceLog << timestamp << "Journey computation begins." << endl;
     for(uint64_t localPrimaryId=0; localPrimaryId<primaryIds.size(); localPrimaryId++) {
         const uint64_t primaryId = primaryIds[localPrimaryId];
         const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
@@ -227,6 +231,7 @@ void Mode3Assembler::assembleConnectedComponent(uint64_t componentId)
     for(vector< pair<uint32_t, uint64_t> >& journey: journeys) {
         sort(journey.begin(), journey.end(), OrderPairsByFirstOnly<uint32_t, uint64_t>());
     }
+    performanceLog << timestamp << "Journey computation ends." << endl;
 
     // Check that the journeys computed in this way are identical to the ones stored in the MarkerGraph.
     // The ones stored in the MarkerGraph will eventually go away.
@@ -239,10 +244,62 @@ void Mode3Assembler::assembleConnectedComponent(uint64_t componentId)
         for(uint64_t j=0; j<journey.size(); j++) {
             const auto& p = journey[j];
             const uint64_t localPrimaryId = p.second;
-            const uint64_t primaryId = connectedComponent.primaryIds[localPrimaryId];
+            const uint64_t primaryId = primaryIds[localPrimaryId];
             const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
             // cout << orientedReadId << " " << storedJourney[j].edgeId << " " << edgeId << endl;
             SHASTA_ASSERT(edgeId == storedJourney[j].edgeId);
         }
     }
+
+
+
+    // Now we can create the PrimaryGraph for this connected component.
+    PrimaryGraph primaryGraph;
+
+    // Create the vertices first.
+    vector<PrimaryGraph::vertex_descriptor> vertexDescriptors;
+    for(uint64_t localPrimaryId=0; localPrimaryId<primaryIds.size(); localPrimaryId++) {
+        const uint64_t primaryId = primaryIds[localPrimaryId];
+        const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
+        vertexDescriptors.push_back(primaryGraph.addVertex(edgeId));
+    }
+
+
+
+    // To generate edges of the PrimaryGraph, we need to gather pairs of consecutive
+    // journey entries. Each pair (localPrimaryId0, localPrimaryId1) is stored
+    // as a localPrimaryId1 in journeyPairs[localPrimaryId0].
+    // For now use a simple vector of vector and sequential code, but later
+    // switch to MemoryMapped::VectorOfVectors<uint64_t, uint64_t> and multithreaded code.
+    vector< vector<uint64_t> > journeyPairs(primaryIds.size());
+    performanceLog << timestamp << "PrimaryGraph edge creation begins begins." << endl;
+    for(const auto& journey: journeys) {
+        for(uint64_t i1=1; i1<journey.size(); i1++) {
+            const uint64_t i0 = i1 - 1;
+            const uint64_t localPrimaryId0 = journey[i0].second;
+            const uint64_t localPrimaryId1 = journey[i1].second;
+            journeyPairs[localPrimaryId0].push_back(localPrimaryId1);
+        }
+     }
+     vector<uint64_t> count;
+     for(uint64_t localPrimaryId0=0; localPrimaryId0<primaryIds.size(); localPrimaryId0++) {
+         const PrimaryGraph::vertex_descriptor v0 = vertexDescriptors[localPrimaryId0];
+         const MarkerGraphEdgeId edgeId0 = primaryGraph[v0].edgeId;
+         auto journeyPairs0 = journeyPairs[localPrimaryId0];
+         deduplicateAndCount(journeyPairs0, count);
+         SHASTA_ASSERT(journeyPairs0.size() == count.size());
+         for(uint64_t j=0; j<journeyPairs0.size(); j++) {
+             const uint64_t localPrimaryId1 = journeyPairs0[j];
+             const uint64_t coverage = count[j];
+             const PrimaryGraph::vertex_descriptor v1 = vertexDescriptors[localPrimaryId1];
+             const MarkerGraphEdgeId edgeId1 = primaryGraph[v1].edgeId;
+             MarkerGraphEdgePairInfo info;
+             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+             primaryGraph.addEdgeFromVertexDescriptors(v0, v1, info, coverage);
+         }
+     }
+     performanceLog << timestamp << "PrimaryGraph edge creation ends." << endl;
+
+     cout << "The PrimaryGraph for this connected component has " <<
+         num_vertices(primaryGraph) << " and " << num_edges(primaryGraph) << " edges." << endl;
 }

@@ -388,11 +388,23 @@ void PrimaryGraph::localTransitiveReduction(
 
 
 
-void PrimaryGraph::addVertex(MarkerGraphEdgeId edgeId)
+PrimaryGraph::vertex_descriptor PrimaryGraph::addVertex(MarkerGraphEdgeId edgeId)
 {
     SHASTA_ASSERT(not vertexMap.contains(edgeId));
     const vertex_descriptor v = add_vertex({edgeId}, *this);
     vertexMap.insert({edgeId, v});
+    return v;
+}
+
+
+
+void PrimaryGraph::addEdgeFromVertexDescriptors(
+    vertex_descriptor v0,
+    vertex_descriptor v1,
+    const MarkerGraphEdgePairInfo& info,
+    uint64_t coverage)
+{
+    add_edge(v0, v1, {info, coverage}, *this);
 }
 
 
@@ -410,7 +422,7 @@ void PrimaryGraph::addEdge(
     const vertex_descriptor v0 = it0->second;
     const vertex_descriptor v1 = it1->second;
 
-    add_edge(v0, v1, {info, coverage}, *this);
+    addEdgeFromVertexDescriptors(v0, v1, info, coverage);
 }
 
 

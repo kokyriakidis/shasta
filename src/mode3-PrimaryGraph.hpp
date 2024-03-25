@@ -106,11 +106,16 @@ class shasta::mode3::PrimaryGraph : public PrimaryGraphBaseClass {
 public:
 
     std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
-    void addVertex(MarkerGraphEdgeId);
+    vertex_descriptor addVertex(MarkerGraphEdgeId);
 
     void addEdge(
         MarkerGraphEdgeId,
         MarkerGraphEdgeId,
+        const MarkerGraphEdgePairInfo&,
+        uint64_t coverage);
+    void addEdgeFromVertexDescriptors(
+        vertex_descriptor,
+        vertex_descriptor,
         const MarkerGraphEdgePairInfo&,
         uint64_t coverage);
 
