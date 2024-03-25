@@ -87,9 +87,6 @@ public:
 class shasta::mode3::PrimaryGraphVertex {
 public:
 
-    // The corresponding GlobalPathGraph vertexId.
-    uint64_t vertexId;
-
     // The corresponding marker graph edgeId.
     MarkerGraphEdgeId edgeId;
 };
@@ -109,9 +106,7 @@ class shasta::mode3::PrimaryGraph : public PrimaryGraphBaseClass {
 public:
 
     std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
-    void addVertex(
-        uint64_t vertexId,
-        MarkerGraphEdgeId);
+    void addVertex(MarkerGraphEdgeId);
 
     void addEdge(
         MarkerGraphEdgeId,

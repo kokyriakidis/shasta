@@ -211,7 +211,7 @@ void GlobalPathGraph::createComponents(
     for(uint64_t vertexId=0; vertexId<n; vertexId++) {
         const GlobalPathGraphVertex& vertex = verticesVector[vertexId];
         const uint64_t componentId = disjointSets.find_set(vertexId);
-        allComponents[componentId]->addVertex(vertexId, vertex.edgeId);
+        allComponents[componentId]->addVertex(vertex.edgeId);
     }
 
     // Create edges of each connected component.
@@ -388,12 +388,10 @@ void PrimaryGraph::localTransitiveReduction(
 
 
 
-void PrimaryGraph::addVertex(
-    uint64_t vertexId,
-    MarkerGraphEdgeId edgeId)
+void PrimaryGraph::addVertex(MarkerGraphEdgeId edgeId)
 {
     SHASTA_ASSERT(not vertexMap.contains(edgeId));
-    const vertex_descriptor v = add_vertex({vertexId, edgeId}, *this);
+    const vertex_descriptor v = add_vertex({edgeId}, *this);
     vertexMap.insert({edgeId, v});
 }
 
@@ -607,9 +605,7 @@ vector< shared_ptr<PrimaryGraph> > PrimaryGraph::createConnectedComponents(
             componentPointer = make_shared<PrimaryGraph>();
         }
         PrimaryGraph& component = *componentPointer;
-        component.addVertex(
-            vertex.vertexId,
-            vertex.edgeId);
+        component.addVertex(vertex.edgeId);
     }
 
 
