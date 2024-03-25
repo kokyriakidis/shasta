@@ -227,4 +227,22 @@ void Mode3Assembler::assembleConnectedComponent(uint64_t componentId)
     for(vector< pair<uint32_t, uint64_t> >& journey: journeys) {
         sort(journey.begin(), journey.end(), OrderPairsByFirstOnly<uint32_t, uint64_t>());
     }
+
+    // Check that the journeys computed in this way are identical to the ones stored in the MarkerGraph.
+    // The ones stored in the MarkerGraph will eventually go away.
+    for(uint64_t i=0; i<orientedReadIds.size(); i++) {
+        const OrientedReadId orientedReadId = orientedReadIds[i];
+        const auto journey = journeys[i];
+        const auto storedJourney = assembler.markerGraph.primaryJourneys[orientedReadId.getValue()];
+        SHASTA_ASSERT(journey.size() == storedJourney.size());
+
+        for(uint64_t j=0; j<journey.size(); j++) {
+            const auto& p = journey[j];
+            const uint64_t localPrimaryId = p.second;
+            const uint64_t primaryId = connectedComponent.primaryIds[localPrimaryId];
+            const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
+            // cout << orientedReadId << " " << storedJourney[j].edgeId << " " << edgeId << endl;
+            SHASTA_ASSERT(edgeId == storedJourney[j].edgeId);
+        }
+    }
 }
