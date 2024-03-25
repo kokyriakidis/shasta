@@ -3,6 +3,7 @@
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
 #include "dset64-gccAtomic.hpp"
+#include "mode3-AssemblyGraph.hpp"
 #include "mode3-PrimaryGraph.hpp"
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"
@@ -21,6 +22,7 @@ template class MultithreadedObject<Mode3Assembler>;
 
 Mode3Assembler::Mode3Assembler(
     const Assembler& assembler,
+    uint64_t threadCount,
     bool debug) :
     MultithreadedObject<Mode3Assembler>(*this),
     MappedMemoryOwner(assembler),
@@ -31,7 +33,7 @@ Mode3Assembler::Mode3Assembler(
 
     gatherPrimaryMarkerGraphEdgeIds();
     computeConnectedComponents();
-    assembleConnectedComponents();
+    assembleConnectedComponents(threadCount);
 
     performanceLog << timestamp << "Mode 3 assembly ends." << endl;
 }
@@ -181,19 +183,25 @@ void Mode3Assembler::computeConnectedComponents()
 
 
 
-void Mode3Assembler::assembleConnectedComponents()
+void Mode3Assembler::assembleConnectedComponents(uint64_t threadCount)
 {
     performanceLog << timestamp << "Mode3Assembler::assembleConnectedComponents begins." << endl;
     for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
-        assembleConnectedComponent(componentId);
+        assembleConnectedComponent(componentId, threadCount);
     }
     performanceLog << timestamp << "Mode3Assembler::assembleConnectedComponents ends." << endl;
 }
 
 
 
-void Mode3Assembler::assembleConnectedComponent(uint64_t componentId)
+void Mode3Assembler::assembleConnectedComponent(uint64_t componentId, uint64_t threadCount)
 {
+    // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
+    const double maxLoss = 0.1;
+    const uint64_t crossEdgesLowCoverageThreshold = 1;
+    const uint64_t crossEdgesHighCoverageThreshold = 3;
+    const uint64_t crossEdgesMinOffset = 0;
+
     performanceLog << timestamp << "Assembling connected component " <<
         componentId << " of " << connectedComponents.size() << endl;
     cout << timestamp << "Assembling connected component " <<
@@ -272,7 +280,7 @@ void Mode3Assembler::assembleConnectedComponent(uint64_t componentId)
     // For now use a simple vector of vector and sequential code, but later
     // switch to MemoryMapped::VectorOfVectors<uint64_t, uint64_t> and multithreaded code.
     vector< vector<uint64_t> > journeyPairs(primaryIds.size());
-    performanceLog << timestamp << "PrimaryGraph edge creation begins begins." << endl;
+    performanceLog << timestamp << "PrimaryGraph edge creation begins." << endl;
     for(const auto& journey: journeys) {
         for(uint64_t i1=1; i1<journey.size(); i1++) {
             const uint64_t i0 = i1 - 1;
@@ -302,4 +310,40 @@ void Mode3Assembler::assembleConnectedComponent(uint64_t componentId)
 
      cout << "The PrimaryGraph for this connected component has " <<
          num_vertices(primaryGraph) << " and " << num_edges(primaryGraph) << " edges." << endl;
+
+
+     // Graphviz output.
+     if(false) {
+         GlobalPathGraphDisplayOptions options;
+         options.showNonTransitiveReductionEdges = true;
+         primaryGraph.writeGraphviz(
+             "PathGraphInitial" + to_string(componentId), options, assembler.markerGraph);
+         options.makeCompact();
+         primaryGraph.writeGraphviz(
+             "PathGraphCompactInitial" + to_string(componentId), options, assembler.markerGraph);
+         primaryGraph.writeEdgeCoverageHistogram("PathGraphInitial" + to_string(componentId) + "-EdgeCoverageHistogram.csv");
+     }
+
+     // Remove weak edges..
+     primaryGraph.removeWeakEdges(maxLoss);
+
+     // Remove cross-edges.
+     primaryGraph.removeCrossEdges(
+         crossEdgesLowCoverageThreshold,
+         crossEdgesHighCoverageThreshold,
+         crossEdgesMinOffset);
+
+     // Graphviz output.
+     if(false) {
+         GlobalPathGraphDisplayOptions options;
+         options.showNonTransitiveReductionEdges = false;
+         primaryGraph.writeGraphviz(
+             "PrimaryGraph" + to_string(componentId), options, assembler.markerGraph);
+         options.makeCompact();
+         primaryGraph.writeGraphviz(
+             "PrimaryGraphCompact" + to_string(componentId), options, assembler.markerGraph);
+     }
+
+     // Create the assembly graph.
+     AssemblyGraph cGraph(primaryGraph, componentId, assembler, threadCount, threadCount);
 }

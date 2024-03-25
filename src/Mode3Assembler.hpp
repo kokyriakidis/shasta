@@ -20,7 +20,7 @@ class shasta::Mode3Assembler :
     public MultithreadedObject<Mode3Assembler>,
     public MappedMemoryOwner {
 public:
-    Mode3Assembler(const Assembler&, bool debug);
+    Mode3Assembler(const Assembler&, uint64_t threadCount, bool debug);
 private:
     const Assembler& assembler;
     bool debug;
@@ -58,6 +58,6 @@ private:
     // for that connected component.
     vector< pair<uint64_t, uint64_t> > orientedReadIdTable;
 
-    void assembleConnectedComponents();
-    void assembleConnectedComponent(uint64_t componentId);
+    void assembleConnectedComponents(uint64_t threadCount);
+    void assembleConnectedComponent(uint64_t componentId, uint64_t threadCount);
 };

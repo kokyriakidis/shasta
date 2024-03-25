@@ -85,7 +85,7 @@ void Assembler::mode3Assembly1(
     bool debug
     )
 {
-    mode3Assembler = make_shared<Mode3Assembler>(*this, debug);
+    mode3Assembler = make_shared<Mode3Assembler>(*this, threadCount, debug);
 }
 
 
