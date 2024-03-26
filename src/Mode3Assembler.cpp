@@ -310,7 +310,7 @@ void Mode3Assembler::assembleConnectedComponent(uint64_t componentId, uint64_t t
      performanceLog << timestamp << "PrimaryGraph edge creation ends." << endl;
 
      cout << "The PrimaryGraph for this connected component has " <<
-         num_vertices(primaryGraph) << " and " << num_edges(primaryGraph) << " edges." << endl;
+         num_vertices(primaryGraph) << " vertices and " << num_edges(primaryGraph) << " edges." << endl;
 
 
      // Graphviz output.
