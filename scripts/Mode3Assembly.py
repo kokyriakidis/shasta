@@ -15,6 +15,7 @@ parser.add_argument('threadCount0', type=int,
 parser.add_argument('threadCount1', type=int, 
     help='Number of threads for low level parallelization')
     
+"""
 parser.add_argument(
     "--recomputePrimaryJourneys",
     dest="recomputePrimaryJourneys",
@@ -23,7 +24,8 @@ parser.add_argument(
          "are recomputed. This is only necessary if "
          "--MarkerGraph.minPrimaryEdgeCoverage or "
          "--MarkerGraph.maxPrimaryEdgeCoverage have changed."
-)    
+) 
+"""  
         
 parser.add_argument(
     "--debug",
@@ -43,11 +45,12 @@ a.accessMarkerGraphVertices()
 a.accessMarkerGraphEdges(True)
 a.accessMarkerGraphReverseComplementEdge()
 a.accessMarkerGraphConsensus()
-a.accessMarkerGraphPrimaryJourneys()
+# a.accessMarkerGraphPrimaryJourneys()
 
 # Open a performance log.
 shasta.openPerformanceLog('Mode3Assembly.log')
 
+"""
 # If requested, recompute the primary journeys.
 if arguments.recomputePrimaryJourneys:
     a.flagPrimaryMarkerGraphEdges(
@@ -55,6 +58,7 @@ if arguments.recomputePrimaryJourneys:
         int(config['MarkerGraph']['maxPrimaryEdgeCoverage']), 
         0)
     a.createMarkerGraphPrimaryJourneys(0)
+"""
 
 # Run Mode 3 assembly.
 # a.mode3Assembly0(arguments.threadCount0, arguments.threadCount1)

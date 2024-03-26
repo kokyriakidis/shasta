@@ -1120,7 +1120,7 @@ void shasta::main::mode3Assembly(
     // Create marker graph primary journeys
     // (that is, the sequence of primary edges encountered
     // by each oriented read).
-    assembler.createMarkerGraphPrimaryJourneys(threadCount);
+    // assembler.createMarkerGraphPrimaryJourneys(threadCount);
 
     // Use the complete marker graph to run Mode 3 assembly.
     assembler.mode3Assembly1(threadCount, false);

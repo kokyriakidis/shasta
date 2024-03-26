@@ -241,6 +241,7 @@ void Mode3Assembler::assembleConnectedComponent(uint64_t componentId, uint64_t t
     }
     performanceLog << timestamp << "Journey computation ends." << endl;
 
+#if 0
     // Check that the journeys computed in this way are identical to the ones stored in the MarkerGraph.
     // The ones stored in the MarkerGraph will eventually go away.
     for(uint64_t i=0; i<orientedReadIds.size(); i++) {
@@ -258,7 +259,7 @@ void Mode3Assembler::assembleConnectedComponent(uint64_t componentId, uint64_t t
             SHASTA_ASSERT(edgeId == storedJourney[j].edgeId);
         }
     }
-
+#endif
 
 
     // Now we can create the PrimaryGraph for this connected component.
