@@ -6,7 +6,7 @@ project(shastaDynamicLibrary)
 add_definitions(-std=c++20)
 
 # Compilation warnings.
-add_definitions(-Wall -Wconversion -Wno-unused-result -Wno-trigraphs)
+add_definitions(-Wall -Wconversion -Wno-unused-result -Wno-trigraphs -Wno-psabi)
 
 # Optimization and debug options.
 if(BUILD_DEBUG)
