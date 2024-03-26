@@ -175,12 +175,15 @@ AssemblyGraph::AssemblyGraph(
     componentId(componentId),
     assembler(assembler)
 {
+    performanceLog << timestamp << "Creating the assembly graph for component " << componentId << endl;
     create(graph);
 
     // Serialize it so we can restore it to facilitate debugging.
     save("AssemblyGraph-" + to_string(componentId) + ".data");
 
+    performanceLog << timestamp << "Processing the assembly graph for component " << componentId << endl;
     run(threadCount0, threadCount1, true);
+    performanceLog << timestamp << "Done with the assembly graph for component " << componentId << endl;
 }
 
 
@@ -225,6 +228,8 @@ void AssemblyGraph::run(
     // Must do compress to make sure all bubbles are in bubble chains.
     compress();
     for(uint64_t iteration=0; ; iteration ++) {
+        performanceLog << timestamp << "Iteration " << iteration <<
+            " of bubble cleanup begins." << endl;
         const uint64_t cleanedUpBubbleCount = cleanupBubbles(false, 1000, chainTerminalCommonThreshold);
         cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
         if(cleanedUpBubbleCount == 0) {
@@ -253,6 +258,7 @@ void AssemblyGraph::run(
     expand();
 
     // Detangle.
+    performanceLog << timestamp << "Detangling begins." << endl;
     while(compressSequentialEdges());
     compressBubbleChains();
     detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
@@ -263,6 +269,7 @@ void AssemblyGraph::run(
     compressBubbleChains();
     detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
     // detangleShortSuperbubbles(false, 30000, detangleToleranceLow, detangleToleranceHigh);
+    performanceLog << timestamp << "Detangling ends." << endl;
 
     compress();
     compressBubbleChains();
@@ -1834,6 +1841,7 @@ void AssemblyGraph::cleanupSuperbubbles(
     uint64_t chainTerminalCommonThreshold
     )
 {
+    performanceLog << "AssemblyGraph::cleanupSuperbubbles begins." << endl;
     AssemblyGraph& cGraph = *this;
 
     if(debug) {
@@ -1869,6 +1877,7 @@ void AssemblyGraph::cleanupSuperbubbles(
     if(debug) {
         cout << "cleanupSuperbubbles ends." << endl;
     }
+    performanceLog << "AssemblyGraph::cleanupSuperbubbles ends." << endl;
 
 }
 
@@ -5182,6 +5191,7 @@ void AssemblyGraph::phaseBubbleChainsUsingPhasingTable(
     if(debug) {
         cout << "phaseBubbleChainsUsingPhasingTable begins." << endl;
     }
+    performanceLog << timestamp << "AssemblyGraph::phaseBubbleChainsUsingPhasingTable begins." << endl;
 
     // If debug output was requested, make sure we have a directory
     // where the debug output files will go.
@@ -5205,6 +5215,7 @@ void AssemblyGraph::phaseBubbleChainsUsingPhasingTable(
     if(debug) {
         cout << "phaseBubbleChainsUsingPhasingTable ends." << endl;
     }
+    performanceLog << timestamp << "AssemblyGraph::phaseBubbleChainsUsingPhasingTable ends." << endl;
 
 }
 
@@ -6811,6 +6822,7 @@ void AssemblyGraph::assembleChains(
 
     ofstream csv("ChainsAssemblyDetails.csv");
     cout << timestamp << "Assembling sequence." << endl;
+    performanceLog << timestamp << "AssemblyGraph::assembleChains begins." << endl;
 
     // ****** THIS SHOULD BE MADE MULTITHREADED USING threadCount0 threads.
     BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
@@ -6829,6 +6841,7 @@ void AssemblyGraph::assembleChains(
         }
     }
     cout << timestamp << "Done assembling sequence." << endl;
+    performanceLog << timestamp << "AssemblyGraph::assembleChains ends." << endl;
 }
 
 
