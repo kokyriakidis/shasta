@@ -1841,7 +1841,7 @@ void AssemblyGraph::cleanupSuperbubbles(
     uint64_t chainTerminalCommonThreshold
     )
 {
-    performanceLog << "AssemblyGraph::cleanupSuperbubbles begins." << endl;
+    performanceLog << timestamp << "AssemblyGraph::cleanupSuperbubbles begins." << endl;
     AssemblyGraph& cGraph = *this;
 
     if(debug) {
@@ -1877,7 +1877,7 @@ void AssemblyGraph::cleanupSuperbubbles(
     if(debug) {
         cout << "cleanupSuperbubbles ends." << endl;
     }
-    performanceLog << "AssemblyGraph::cleanupSuperbubbles ends." << endl;
+    performanceLog << timestamp << "AssemblyGraph::cleanupSuperbubbles ends." << endl;
 
 }
 
