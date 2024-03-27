@@ -244,6 +244,11 @@ private:
     // Estimated offset in bases between vertexIdA and vertexIdB.
     // The estimate is done using the oriented reads that appear
     // both in edgeIdA and edgeIdB.
+    // If the offset cannot be estimated because there are no
+    // common oriented reads between egeIdA and edgeIdB,
+    // it is set to invalid<int64_t>.
+    // In that case, or if the offset is negative,
+    // the assembly fails, which results in empty secondary sequence.
     int64_t estimatedABOffset;
     void estimateOffset();
 

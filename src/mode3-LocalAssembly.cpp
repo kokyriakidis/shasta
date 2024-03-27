@@ -106,9 +106,9 @@ LocalAssembly::LocalAssembly(
     // to estimate the base offset between vertexIdA and vertexIdB.
     estimateOffset();
 
-    // If the offset is negative, stop here.
+    // If the offset is negative or cannot be estimated, stop here.
     // This is pathological and results in empty assembled sequence.
-    if(estimatedABOffset <= 0) {
+    if((estimatedABOffset == invalid<int64_t>) or (estimatedABOffset <= 0)) {
         if(html) {
             html << "<br>The estimated offset is not positive." << endl;
         }
@@ -464,10 +464,19 @@ void LocalAssembly::estimateOffset()
             ++n;
         }
     }
-    estimatedABOffset = int64_t(std::round(double(sum) / double(n)));
+    if(n == 0) {
+        estimatedABOffset = invalid<int64_t>;
 
-    if(html) {
-        html << "<br>Estimated position offset is " << estimatedABOffset << " bases.";
+        if(html) {
+            html << "<br>The offset cannot be estimated because there are no common oriented reads between " <<
+                edgeIdA << " and " << edgeIdB;
+        }
+    } else {
+        estimatedABOffset = int64_t(std::round(double(sum) / double(n)));
+
+        if(html) {
+            html << "<br>Estimated position offset is " << estimatedABOffset << " bases.";
+        }
     }
 }
 
