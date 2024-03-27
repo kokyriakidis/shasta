@@ -1295,9 +1295,16 @@ uint64_t Assembler::estimateBaseOffsetUnsafe(
     if(countCommonOrientedReadsUnsafe(edgeIdA, edgeIdB) > 0) {
         MarkerGraphEdgePairInfo info;
         SHASTA_ASSERT(analyzeMarkerGraphEdgePair(edgeIdA, edgeIdB, info));
-        return info.offsetInBases;
+        if(info.offsetInBases >= 0) {
+            return info.offsetInBases;
+        } else {
+            return invalid<uint64_t>;
+        }
+    } else {
+        return invalid<uint64_t>;
     }
 
+#if 0
     // There are no common oriented reads between the two edges.
     // Find a primary marker graph edge in-between that has common
     // oriented reads with both edgeIdA and edgeIdB.
@@ -1426,6 +1433,7 @@ uint64_t Assembler::estimateBaseOffsetUnsafe(
     SHASTA_ASSERT(infoA.common > 0);
     SHASTA_ASSERT(infoB.common > 0);
     return infoA.offsetInBases + infoB.offsetInBases;
+#endif
 }
 
 

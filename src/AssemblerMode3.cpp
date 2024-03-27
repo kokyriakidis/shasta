@@ -35,7 +35,7 @@ void Assembler::flagPrimaryMarkerGraphEdges(
 }
 
 
-
+#if 0
 void Assembler::createMarkerGraphPrimaryJourneys(uint64_t threadCount)
 {
     checkMarkersAreOpen();
@@ -68,7 +68,6 @@ void Assembler::writeMarkerGraphPrimaryJourneys()
 }
 
 
-
 void Assembler::mode3Assembly0(
     uint64_t threadCount0,  // High level parallelization
     uint64_t threadCount1   // Low level parallelization
@@ -76,6 +75,7 @@ void Assembler::mode3Assembly0(
 {
     mode3::GlobalPathGraph::assemble(*this, threadCount0, threadCount1);
 }
+#endif
 
 
 

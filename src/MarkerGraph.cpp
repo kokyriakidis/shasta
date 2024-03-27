@@ -871,6 +871,7 @@ bool MarkerGraph::isPrimaryEdge(
 
 
 
+#if 0
 void MarkerGraph::createPrimaryJourneys(
     uint64_t orientedReadCount,
     uint64_t threadCount)
@@ -1059,4 +1060,4 @@ void MarkerGraph::followPrimaryJourneysBackward(
     SHASTA_ASSERT(edgeIds.size() == count.size());
 
 }
-
+#endif

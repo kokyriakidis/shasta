@@ -404,7 +404,8 @@ private:
     FlagPrimaryEdgesData flagPrimaryEdgesData;
 
 
-
+#if 0
+    // PRIMARY JOURNEYS ARE NOW COMPUTED LOCALLY BY CLASS Mode3Assembler.
     // The primary journey of an oriented read is the sequence of primary
     // marker graph edges encountered by the oriented read.
     // Indexed by OrientedReadId::getValue().
@@ -444,7 +445,7 @@ public:
         vector<MarkerGraphEdgeId>&,
         vector<uint64_t>& count
         ) const;
-
+#endif
 };
 
 #endif

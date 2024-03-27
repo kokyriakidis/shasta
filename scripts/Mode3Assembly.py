@@ -45,7 +45,6 @@ a.accessMarkerGraphVertices()
 a.accessMarkerGraphEdges(True)
 a.accessMarkerGraphReverseComplementEdge()
 a.accessMarkerGraphConsensus()
-# a.accessMarkerGraphPrimaryJourneys()
 
 # Open a performance log.
 shasta.openPerformanceLog('Mode3Assembly.log')

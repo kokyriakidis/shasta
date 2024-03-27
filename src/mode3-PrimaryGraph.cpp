@@ -88,7 +88,7 @@ uint64_t GlobalPathGraph::getVertexId(MarkerGraphEdgeId edgeId) const
 }
 
 
-
+#if 0
 // Use the journeys stored in the MarkerGraph to create edges.
 // This can be converted to multithreaded code and use mapped memory.
 void GlobalPathGraph::createEdges()
@@ -157,6 +157,7 @@ void GlobalPathGraph::createEdges()
 
     performanceLog << timestamp << "GlobalPathGraph::createEdges ends." << endl;
 }
+#endif
 
 
 
@@ -774,7 +775,7 @@ void PrimaryGraph::removeWeakEdges(double maxLoss)
 }
 
 
-
+#if 0
 // Given sets of two primary in-edges and two primary out-edges,
 // find primary mid-edges in-between that can be used for detangling.
 void GlobalPathGraph::searchForDetangling(
@@ -908,3 +909,5 @@ void GlobalPathGraph::searchForDetangling(
         }
     }
 }
+#endif
+

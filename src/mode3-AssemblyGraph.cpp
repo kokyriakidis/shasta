@@ -31,7 +31,7 @@ using namespace mode3;
 #include "tuple.hpp"
 
 
-
+#if 0
 void GlobalPathGraph::assemble(
     const Assembler& assembler,
     uint64_t threadCount0,
@@ -92,7 +92,7 @@ void GlobalPathGraph::assemble(
             threadCount1);
     }
 }
-
+#endif
 
 
 void GlobalPathGraph::assembleComponent(
@@ -1218,8 +1218,8 @@ uint64_t AssemblyGraph::chainOffset(const Chain& chain) const
         const uint64_t offsetThisPair = assembler.estimateBaseOffsetUnsafe(edgeId0, edgeId1);
 
         if(offsetThisPair == invalid<uint64_t>) {
-            cout << "Offset cannot be computed for " << edgeId0 << " " << edgeId1 << endl;
-            SHASTA_ASSERT(0);
+            // cout << "Offset cannot be computed for " << edgeId0 << " " << edgeId1 << endl;
+            // SHASTA_ASSERT(0);
         } else if(offsetThisPair > 0) {
             offset += offsetThisPair;
         }
@@ -3954,7 +3954,7 @@ bool AssemblyGraph::detangleEdgeGeneral(
 }
 
 
-
+#if 0
 bool AssemblyGraph::detangleEdgesWithSearch(
     bool debug,
     uint64_t detangleToleranceLow,
@@ -4361,7 +4361,7 @@ bool AssemblyGraph::detangleEdgeWithSearch(
     return true;
 #endif
 }
-
+#endif
 
 
 // Detangle short superbubbles with any number of entrances and exits.
