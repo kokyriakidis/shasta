@@ -2358,19 +2358,10 @@ public:
         uint64_t maxEdgeCoverage,
         uint64_t threadCount);
 
-    void createMarkerGraphPrimaryJourneys(uint64_t threadCount);
-    void accessMarkerGraphPrimaryJourneys();
-    void writeMarkerGraphPrimaryJourneys();
-
     // Assemble sequence between two primary edges.
     void fillMode3AssemblyPathStep(const vector<string>&, ostream&);
 
-    // This works but is slow for large assemblies.
-    void mode3Assembly0(
-        uint64_t threadCount0,  // High level parallelization
-        uint64_t threadCount1   // Low level parallelization
-    ) const;
-    // This is incomplete and under development.
+    // Top level function for Mode 3 assembly, starting from the MarkerGraph.
     void mode3Assembly1(
         uint64_t threadCount,
         bool debug

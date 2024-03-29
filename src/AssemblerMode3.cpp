@@ -35,50 +35,6 @@ void Assembler::flagPrimaryMarkerGraphEdges(
 }
 
 
-#if 0
-void Assembler::createMarkerGraphPrimaryJourneys(uint64_t threadCount)
-{
-    checkMarkersAreOpen();
-    checkMarkerGraphVerticesAreAvailable();
-    checkMarkerGraphEdgesIsOpen();
-
-    if(markerGraph.primaryJourneys.isOpen()) {
-        markerGraph.primaryJourneys.remove();
-    }
-
-    markerGraph.primaryJourneys.createNew(
-        largeDataName("MarkerGraphPrimaryJourneys"), largeDataPageSize);
-    markerGraph.createPrimaryJourneys(markers.size(), threadCount);
-}
-
-
-
-void Assembler::accessMarkerGraphPrimaryJourneys()
-{
-    markerGraph.primaryJourneys.accessExistingReadOnly(
-        largeDataName("MarkerGraphPrimaryJourneys"));
-}
-
-
-
-void Assembler::writeMarkerGraphPrimaryJourneys()
-{
-    SHASTA_ASSERT(markerGraph.primaryJourneys.isOpen());
-    markerGraph.writePrimaryJourneys();
-}
-
-
-void Assembler::mode3Assembly0(
-    uint64_t threadCount0,  // High level parallelization
-    uint64_t threadCount1   // Low level parallelization
-    ) const
-{
-    mode3::GlobalPathGraph::assemble(*this, threadCount0, threadCount1);
-}
-#endif
-
-
-
 
 void Assembler::mode3Assembly1(
     uint64_t threadCount,

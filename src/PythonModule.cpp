@@ -609,27 +609,12 @@ PYBIND11_MODULE(shasta, shastaModule)
             arg("debug") = false)
 
         // Assembly mode 3.
-#if 0
-        .def("mode3Assembly0",
-            &Assembler::mode3Assembly0,
-            arg("threadCount0"),
-            arg("threadCount1"))
-#endif
         .def("mode3Assembly1",
             &Assembler::mode3Assembly1)
         .def("loadAndAssembleCompressedPathGraph",
             &Assembler::loadAndAssembleCompressedPathGraph)
         .def("flagPrimaryMarkerGraphEdges",
             &Assembler::flagPrimaryMarkerGraphEdges)
-#if 0
-        .def("createMarkerGraphPrimaryJourneys",
-            &Assembler::createMarkerGraphPrimaryJourneys)
-        .def("writeMarkerGraphPrimaryJourneys",
-            &Assembler::writeMarkerGraphPrimaryJourneys)
-        .def("accessMarkerGraphPrimaryJourneys",
-            &Assembler::accessMarkerGraphPrimaryJourneys)
-#endif
-
 
         // Consensus caller.
         .def("setupConsensusCaller",

@@ -9,24 +9,12 @@ config = GetConfig.getConfig()
 
 # Parse the command line arguments.
 parser = argparse.ArgumentParser(description=
-    'Rerun Mode 3 assembly.')
+    'Run Mode 3 assembly starting from the marker graph.')
 parser.add_argument('threadCount0', type=int, 
     help='Number of threads for high level parallelization')
 parser.add_argument('threadCount1', type=int, 
     help='Number of threads for low level parallelization')
-    
-"""
-parser.add_argument(
-    "--recomputePrimaryJourneys",
-    dest="recomputePrimaryJourneys",
-    action="store_true",
-    help="If this boolean flag is specified, the primary journeys "
-         "are recomputed. This is only necessary if "
-         "--MarkerGraph.minPrimaryEdgeCoverage or "
-         "--MarkerGraph.maxPrimaryEdgeCoverage have changed."
-) 
-"""  
-        
+            
 parser.add_argument(
     "--debug",
     dest="debug",
@@ -49,17 +37,12 @@ a.accessMarkerGraphConsensus()
 # Open a performance log.
 shasta.openPerformanceLog('Mode3Assembly.log')
 
-"""
-# If requested, recompute the primary journeys.
-if arguments.recomputePrimaryJourneys:
-    a.flagPrimaryMarkerGraphEdges(
-        int(config['MarkerGraph']['minPrimaryEdgeCoverage']), 
-        int(config['MarkerGraph']['maxPrimaryEdgeCoverage']), 
-        0)
-    a.createMarkerGraphPrimaryJourneys(0)
-"""
+# Flag primary marker graph edges.
+a.flagPrimaryMarkerGraphEdges(
+    int(config['MarkerGraph']['minPrimaryEdgeCoverage']), 
+    int(config['MarkerGraph']['maxPrimaryEdgeCoverage']), 
+    0)
 
 # Run Mode 3 assembly.
-# a.mode3Assembly0(arguments.threadCount0, arguments.threadCount1)
 a.mode3Assembly1(arguments.threadCount0, arguments.debug)
  
