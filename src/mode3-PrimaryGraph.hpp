@@ -43,7 +43,7 @@ namespace shasta {
             PrimaryGraphVertex,
             PrimaryGraphEdge>;
 
-        class GlobalPathGraphDisplayOptions;
+        class PrimaryGraphDisplayOptions;
 
     }
 }
@@ -51,7 +51,7 @@ namespace shasta {
 
 
 // Class to control Graphviz output of PrimaryGraph.
-class shasta::mode3::GlobalPathGraphDisplayOptions {
+class shasta::mode3::PrimaryGraphDisplayOptions {
 public:
     bool labels = true;
     bool tooltips = true;
@@ -66,7 +66,7 @@ public:
     double redJ;
     double greenJ;
 
-    GlobalPathGraphDisplayOptions(double redJ = 0., double greenJ = 1.) :
+    PrimaryGraphDisplayOptions(double redJ = 0., double greenJ = 1.) :
         redJ(redJ), greenJ(greenJ) {}
 
     void makeCompact()
@@ -117,7 +117,7 @@ public:
 
     void writeGraphviz(
         const string& name,
-        const GlobalPathGraphDisplayOptions&,
+        const PrimaryGraphDisplayOptions&,
         const MarkerGraph&) const;
 
     void writeEdgeCoverageHistogram(const string& fileName) const;

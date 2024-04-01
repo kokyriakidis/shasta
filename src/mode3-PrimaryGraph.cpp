@@ -67,7 +67,7 @@ void PrimaryGraph::addEdge(
 // Write a PrimaryGraph in graphviz format.
 void PrimaryGraph::writeGraphviz(
     const string& name,
-    const GlobalPathGraphDisplayOptions& options,
+    const PrimaryGraphDisplayOptions& options,
     const MarkerGraph& markerGraph) const
 {
     ofstream out(name + ".dot");

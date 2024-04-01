@@ -315,7 +315,7 @@ void Mode3Assembler::assembleConnectedComponent(uint64_t componentId, uint64_t t
 
      // Graphviz output.
      if(false) {
-         GlobalPathGraphDisplayOptions options;
+         PrimaryGraphDisplayOptions options;
          options.showNonTransitiveReductionEdges = true;
          primaryGraph.writeGraphviz(
              "PathGraphInitial" + to_string(componentId), options, assembler.markerGraph);
@@ -336,7 +336,7 @@ void Mode3Assembler::assembleConnectedComponent(uint64_t componentId, uint64_t t
 
      // Graphviz output.
      if(false) {
-         GlobalPathGraphDisplayOptions options;
+         PrimaryGraphDisplayOptions options;
          options.showNonTransitiveReductionEdges = false;
          primaryGraph.writeGraphviz(
              "PrimaryGraph" + to_string(componentId), options, assembler.markerGraph);
