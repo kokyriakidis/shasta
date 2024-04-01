@@ -23,5 +23,5 @@ a.accessMarkerGraphEdges()
 a.accessMarkerGraphReverseComplementEdge()
 a.accessMarkerGraphConsensus()
 shasta.openPerformanceLog('FindMode3Paths.log')
-a.loadAndAssembleCompressedPathGraph(arguments.fileName, arguments.threadCount0, arguments.threadCount1)
+a.mode3AssembleComponent(arguments.fileName, arguments.threadCount0, arguments.threadCount1)
  

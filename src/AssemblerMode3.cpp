@@ -2,6 +2,7 @@
 #include "Assembler.hpp"
 #include "LocalMarkerGraph1.hpp"
 #include "mode3-LocalAssembly.hpp"
+#include "mode3-AssemblyGraph.hpp"
 #include "mode3-PrimaryGraph.hpp"
 #include "mode3-AssemblyPath.hpp"
 #include "Mode3Assembler.hpp"
@@ -47,13 +48,13 @@ void Assembler::mode3Assembly1(
 
 
 
-void Assembler::loadAndAssembleCompressedPathGraph(
+void Assembler::mode3AssembleComponent(
     const string& fileName,
     uint64_t threadCount0,  // High level parallelization
     uint64_t threadCount1   // Low level parallelization
     ) const
 {
-    mode3::GlobalPathGraph::loadAndAssemble(*this, fileName, threadCount0, threadCount1);
+    mode3::AssemblyGraph cGraph(fileName, *this, threadCount0, threadCount1);
 }
 
 
