@@ -1,6 +1,6 @@
 // Shasta.
 #include "mode3-AssemblyGraph.hpp"
-#include "mode3-AssemblyPath.hpp"
+// #include "mode3-AssemblyPath.hpp"
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-PrimaryGraph.hpp"
 #include "mode3-PhasingTable.hpp"
@@ -6687,7 +6687,26 @@ void BubbleChain::compress()
 
 
 
-// Assemble sequence for a Chain.
+void AssemblyGraph::assembleChain(
+    Chain& chain,
+    uint64_t chainTerminalCommonThreshold)
+{
+    chain.stepSequences.resize(chain.size() - 1);
+
+    // Do all the assembly steps.
+    for(uint64_t positionInChain=0; positionInChain<chain.size()-1; positionInChain++) {
+        runAssemblyStep(chain, positionInChain, chainTerminalCommonThreshold);
+    }
+
+    combineStepSequences(chain);
+    chain.wasAssembled = true;
+}
+
+
+
+
+#if 0
+// Assemble sequence for a Chain. Old version that uses AssemblyPath.
 void AssemblyGraph::assembleChain(
     Chain& chain,
     uint64_t chainTerminalCommonThreshold) const
@@ -6739,6 +6758,7 @@ void AssemblyGraph::assembleChain(
     assemblyPath.getSequence(chain.sequence);
 
 }
+#endif
 
 
 

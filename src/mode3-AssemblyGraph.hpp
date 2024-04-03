@@ -746,7 +746,7 @@ private:
     // Assemble sequence for a single Chain.
     void assembleChain(
         Chain&,
-        uint64_t chainTerminalCommonThreshold) const;
+        uint64_t chainTerminalCommonThreshold);
 
     // Multithreaded version of sequence assembly.
     // This only assembles the chains that have the shouldBeAssembled flag set.
