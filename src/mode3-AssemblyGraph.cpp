@@ -6878,7 +6878,10 @@ void AssemblyGraph::assembleChainsMultithreaded(
             for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
                 assemblyStep.indexInBubble = indexInBubble;
                 Chain& chain = bubble[indexInBubble];
-                combineStepSequences(chain);
+                if(chain.shouldBeAssembled) {
+                    combineStepSequences(chain);
+                    chain.wasAssembled = true;
+                }
             }
         }
     }

@@ -66,6 +66,7 @@ public:
     // Flag used to indicate that this Chain needs to be assembled.
     // Used by assembleChainsMultithreaded.
     bool shouldBeAssembled = false;
+    bool wasAssembled = false;
 
     // Assembled sequence, including the sequence of the first and
     // last primary marker graph edges.
