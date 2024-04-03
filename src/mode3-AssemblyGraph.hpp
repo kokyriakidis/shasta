@@ -743,11 +743,7 @@ private:
         uint64_t k
         );
 
-    // Sequence assembly.
-    void assembleChains(
-        uint64_t chainTerminalCommonThreshold,
-        uint64_t threadCount0,
-        uint64_t threadCount1);
+    // Assemble sequence for a single Chain.
     void assembleChain(
         Chain&,
         uint64_t threadCount1,
@@ -755,8 +751,6 @@ private:
         uint64_t chainTerminalCommonThreshold,
         bool internalSequenceOnly,
         ostream& csv) const;
-
-
 
     // Multithreaded version of sequence assembly.
     // This only assembles the chains that have the shouldBeAssembled flag set.

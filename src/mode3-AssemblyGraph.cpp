@@ -6687,39 +6687,6 @@ void BubbleChain::compress()
 
 
 
-void AssemblyGraph::assembleChains(
-    uint64_t chainTerminalCommonThreshold,
-    uint64_t threadCount0,
-    uint64_t threadCount1)
-{
-    AssemblyGraph& cGraph = *this;
-
-    ofstream csv("ChainsAssemblyDetails.csv");
-    cout << timestamp << "Assembling sequence." << endl;
-    performanceLog << timestamp << "AssemblyGraph::assembleChains begins." << endl;
-
-    // ****** THIS SHOULD BE MADE MULTITHREADED USING threadCount0 threads.
-    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
-        BubbleChain& bubbleChain = cGraph[ce];
-
-        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size();
-            positionInBubbleChain++)  {
-            Bubble& bubble = bubbleChain[positionInBubbleChain];
-
-            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
-                Chain& chain = bubble[indexInBubble];
-                const string chainName = chainStringId(ce, positionInBubbleChain, indexInBubble);
-
-                assembleChain(chain, threadCount1, chainName, chainTerminalCommonThreshold, false, csv);
-            }
-        }
-    }
-    cout << timestamp << "Done assembling sequence." << endl;
-    performanceLog << timestamp << "AssemblyGraph::assembleChains ends." << endl;
-}
-
-
-
 // Assemble sequence for a Chain.
 void AssemblyGraph::assembleChain(
     Chain& chain,
