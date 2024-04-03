@@ -1957,7 +1957,7 @@ void AssemblyGraph::cleanupSuperbubble(
                 Chain& chain = entranceBubble[i];
                 chain = cGraph[entranceOutEdge].getOnlyChain();
                 chain.push_back(cGraph[exit].edgeId);
-                assembleChain(chain, 1, "", chainTerminalCommonThreshold, false, noCsv);
+                assembleChain(chain, chainTerminalCommonThreshold);
             }
 
             if(debug) {
@@ -2019,7 +2019,7 @@ void AssemblyGraph::cleanupSuperbubble(
                 chain.push_back(cGraph[entrance].edgeId);
                 const Chain& exitChain = cGraph[exitInEdge].getOnlyChain();
                 copy(exitChain.begin(), exitChain.end(), back_inserter(chain));
-                assembleChain(chain, 1, "", chainTerminalCommonThreshold, false, noCsv);
+                assembleChain(chain, chainTerminalCommonThreshold);
             }
 
             if(debug) {
@@ -6690,11 +6690,7 @@ void BubbleChain::compress()
 // Assemble sequence for a Chain.
 void AssemblyGraph::assembleChain(
     Chain& chain,
-    uint64_t threadCount1,
-    const string& chainName,
-    uint64_t chainTerminalCommonThreshold,
-    bool internalSequenceOnly,
-    ostream& csv) const
+    uint64_t chainTerminalCommonThreshold) const
 {
 
     vector<MarkerGraphEdgePairInfo> infos(chain.size() - 1);
@@ -6739,16 +6735,9 @@ void AssemblyGraph::assembleChain(
 
 
     AssemblyPath assemblyPath(assembler, chain, infos,
-        allowOrientedReadsOnFirst, allowOrientedReadsOnLast, threadCount1);
-    if(internalSequenceOnly) {
-        assemblyPath.getInternalSequence(chain.sequence);
-    } else {
-        assemblyPath.getSequence(chain.sequence);
-    }
+        allowOrientedReadsOnFirst, allowOrientedReadsOnLast, 1);
+    assemblyPath.getSequence(chain.sequence);
 
-    if(csv) {
-        assemblyPath.writeCsv(csv, chainName);
-    }
 }
 
 
