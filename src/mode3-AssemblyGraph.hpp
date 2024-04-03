@@ -4,6 +4,7 @@
 #include "Base.hpp"
 #include "invalid.hpp"
 #include "mode3-PhasedComponent.hpp"
+#include "MultithreadedObject.hpp"
 #include "shastaTypes.hpp"
 #include "SHASTA_ASSERT.hpp"
 
@@ -61,7 +62,15 @@ namespace shasta {
 // It can be used to generate an AssemblyPath.
 class shasta::mode3::Chain : public vector<MarkerGraphEdgeId> {
 public:
+
+    // Assembled sequence, including the sequence of the first and
+    // last primary marker graph edges.
     vector<Base> sequence;
+
+    // The internal sequence assembled between consecutive pairs
+    // of MarkerGraphEdgeIds in the chain.
+    vector< vector<Base> > stepSequences;
+
 
     MarkerGraphEdgeId second() const
     {
@@ -221,7 +230,9 @@ public:
 
 
 
-class shasta::mode3::AssemblyGraph: public AssemblyGraphBaseClass {
+class shasta::mode3::AssemblyGraph:
+    public AssemblyGraphBaseClass,
+    public MultithreadedObject<shasta::mode3::AssemblyGraph> {
 public:
 
     // Create from a PathGraph1, then call run.
@@ -240,6 +251,10 @@ public:
         uint64_t threadCount1);
 
 private:
+
+    // Hide Base defined by the base class.
+    using Base = shasta::Base;
+
     // Information stored by the constructor.
     uint64_t componentId;
     const Assembler& assembler;
@@ -728,6 +743,37 @@ private:
         uint64_t chainTerminalCommonThreshold,
         bool internalSequenceOnly,
         ostream& csv) const;
+
+
+
+    // Multithreaded version of sequence assembly.
+    void assembleChainsMultithreaded(
+        uint64_t chainTerminalCommonThreshold,
+        uint64_t threadCount);
+    void assembleChainsMultithreadedTheadFunction(uint64_t threadId);
+    void combineStepSequences(Chain&);
+    class AssemblyStep {
+    public:
+        edge_descriptor e;              // This identified the BubbleChain.
+        uint64_t positionInBubbleChain; // This identifies the Bubble.
+        uint64_t indexInBubble;         // This identifies the Chain.
+        uint64_t positionInChain;
+        uint64_t offsetInBases;
+
+        // For better load balancing, order them by decreasing offsetInBases.
+        bool operator<(const AssemblyStep& that) const
+        {
+            return offsetInBases > that.offsetInBases;
+        }
+    };
+    void runAssemblyStep(uint64_t chainTerminalCommonThreshold, const AssemblyStep&);
+    class AssembleChainsMultithreadedData {
+    public:
+        uint64_t chainTerminalCommonThreshold;
+        vector<AssemblyStep> assemblySteps;
+    };
+    AssembleChainsMultithreadedData assembleChainsMultithreadedData;
+
 
 
     // Output.

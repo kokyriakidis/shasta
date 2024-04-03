@@ -1,6 +1,7 @@
 // Shasta.
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-AssemblyPath.hpp"
+#include "mode3-LocalAssembly.hpp"
 #include "mode3-PrimaryGraph.hpp"
 #include "mode3-PhasingTable.hpp"
 #include "Assembler.hpp"
@@ -30,15 +31,19 @@ using namespace mode3;
 #include <queue>
 #include "tuple.hpp"
 
+// Explicit instantiation.
+#include "MultithreadedObject.tpp"
+template class MultithreadedObject<AssemblyGraph>;
 
 
-// Create from a PathGraph, then call run.
+// Create from a PrimaryGraph, then call run.
 AssemblyGraph::AssemblyGraph(
     const PrimaryGraph& graph,
     uint64_t componentId,
     const Assembler& assembler,
     uint64_t threadCount0,
     uint64_t threadCount1) :
+    MultithreadedObject<AssemblyGraph>(*this),
     componentId(componentId),
     assembler(assembler)
 {
@@ -61,6 +66,7 @@ AssemblyGraph::AssemblyGraph(
     const Assembler& assembler,
     uint64_t threadCount0,
     uint64_t threadCount1) :
+    MultithreadedObject<AssemblyGraph>(*this),
     assembler(assembler)
 {
     load(fileName);
@@ -155,7 +161,10 @@ void AssemblyGraph::run(
     if(assembleSequence) {
 
         // Assemble sequence.
-        assembleChains(chainTerminalCommonThreshold, threadCount0, threadCount1);
+        // assembleChains(chainTerminalCommonThreshold, threadCount0, threadCount1);
+
+        // Multithreaded version of sequence assembly.
+        assembleChainsMultithreaded(chainTerminalCommonThreshold, threadCount0);
 
         // Final output.
         write("Final", true);
@@ -6774,6 +6783,188 @@ void AssemblyGraph::assembleChain(
 
     if(csv) {
         assemblyPath.writeCsv(csv, chainName);
+    }
+}
+
+
+
+void AssemblyGraph::assembleChainsMultithreaded(
+    uint64_t chainTerminalCommonThreshold,
+    uint64_t threadCount)
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // Store the argument so the threads can see it.
+    assembleChainsMultithreadedData.chainTerminalCommonThreshold = chainTerminalCommonThreshold;
+
+    // Gather AssemblySteps for all the Chains.
+    auto& assemblySteps = assembleChainsMultithreadedData.assemblySteps;
+    assemblySteps.clear();
+
+    // Loop over BubbleChains.
+    AssemblyStep assemblyStep;
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        assemblyStep.e = e;
+        BubbleChain& bubbleChain = assemblyGraph[e];
+
+        // Loop over Bubbles in this BubbleChain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            assemblyStep.positionInBubbleChain = positionInBubbleChain;
+            Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+            // Loop over Chains in this Bubble.
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                assemblyStep.indexInBubble = indexInBubble;
+                Chain& chain = bubble[indexInBubble];
+                SHASTA_ASSERT(chain.size() >= 2);
+
+                // Prepare the vectors where the threads will store
+                // the internal sequence assembled for each AssemblyStep.
+                // Each of these vectors will be modified by only one thread.
+                chain.stepSequences.resize(chain.size() - 1);
+
+                // Loop over pairs of consecutive vertices in this Chain.
+                for(uint64_t positionInChain=0; positionInChain<chain.size()-1; positionInChain++) {
+                    assemblyStep.positionInChain = positionInChain;
+
+                    // Compute the offset.
+                    const MarkerGraphEdgeId edgeIdA = chain[positionInChain];
+                    const MarkerGraphEdgeId edgeIdB = chain[positionInChain + 1];
+                    MarkerGraphEdgePairInfo info;
+                    SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
+                        edgeIdA, edgeIdB, info));
+                    assemblyStep.offsetInBases = info.offsetInBases;
+
+                    // Store this assembly step.
+                    assemblySteps.push_back(assemblyStep);
+                }
+            }
+        }
+    }
+    cout << "There are " << assemblySteps.size() << " assembly steps." << endl;
+
+    // For better load balancing, sort them by decreasing offset.
+    sort(assemblySteps.begin(), assemblySteps.end());
+
+
+
+    // Assemble the steps in parallel.
+    setupLoadBalancing(assemblySteps.size(),  1);
+    cout << timestamp << "Multithreaded sequence assembly begins." << endl;
+    runThreads(&AssemblyGraph::assembleChainsMultithreadedTheadFunction, threadCount);
+    cout << timestamp << "Multithreaded sequence assembly ends." << endl;
+
+
+
+    // Now that all the AssemblySteps have been computed, the stepSequences
+    // of each Chain have been filled in.
+    // Combine those with the marker graph edge sequences to obtain the
+    // complete sequence of each chain.
+    // This can be parallelized.
+    cout << timestamp << "Combining assembled sequence for chains." << endl;
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        assemblyStep.e = e;
+        BubbleChain& bubbleChain = assemblyGraph[e];
+
+        // Loop over Bubbles in this BubbleChain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            assemblyStep.positionInBubbleChain = positionInBubbleChain;
+            Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+            // Loop over Chains in this Bubble.
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                assemblyStep.indexInBubble = indexInBubble;
+                Chain& chain = bubble[indexInBubble];
+                combineStepSequences(chain);
+            }
+        }
+    }
+    cout << timestamp << "Done combining assembled sequence for chains." << endl;
+}
+
+
+
+// Combine stepSequences of a Chain with the marker graph edge sequences to obtain the
+// complete sequence of the chain.
+void AssemblyGraph::combineStepSequences(Chain& chain)
+{
+    chain.sequence.clear();
+    for(uint64_t positionInChain=0; /* Check later */ ; positionInChain++) {
+
+        // Add the sequence for the marker graph primary edge.
+        const MarkerGraphEdgeId edgeId = chain[positionInChain];
+        const auto edgeSequence = assembler.markerGraph.edgeSequence[edgeId];
+        copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(chain.sequence));
+
+        // If this was the last primary edge for the chain, we are done.
+        if(positionInChain == chain.size() - 1) {
+            break;
+        }
+
+        // Add assembled sequence between this marker graph primayr edge and the next in the chain.
+        const vector<Base>& stepSequence = chain.stepSequences[positionInChain];
+        copy(stepSequence.begin(), stepSequence.end(), back_inserter(chain.sequence));
+
+    }
+}
+
+
+
+
+void AssemblyGraph::assembleChainsMultithreadedTheadFunction(uint64_t threadId)
+{
+    const uint64_t chainTerminalCommonThreshold = assembleChainsMultithreadedData.chainTerminalCommonThreshold;
+
+    // Loop over all batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over all assembly steps assigned to this batch.
+        for(uint64_t i=begin; i!=end; ++i) {
+            const auto& assemblyStep = assembleChainsMultithreadedData.assemblySteps[i];
+            runAssemblyStep(chainTerminalCommonThreshold, assemblyStep);
+        }
+    }
+}
+
+
+
+void AssemblyGraph::runAssemblyStep(
+    uint64_t chainTerminalCommonThreshold,
+    const AssemblyStep& assemblyStep)
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // Suppress html output from LocalAssembly.
+    ostream html(0);
+
+    // Get the BubbleChain.
+    BubbleChain& bubbleChain = assemblyGraph[assemblyStep.e];
+
+    // Get the Bubble.
+    Bubble& bubble = bubbleChain[assemblyStep.positionInBubbleChain];
+
+    // Get the Chain.
+    Chain& chain = bubble[assemblyStep.indexInBubble];
+
+    // Find the MarkerGraphEdgeIds for this local assembly.
+    const uint64_t positionInChain = assemblyStep.positionInChain;
+    const MarkerGraphEdgeId edgeIdA = chain[positionInChain];
+    const MarkerGraphEdgeId edgeIdB = chain[positionInChain + 1];
+
+    // Figure out if we should use the oriented reads on edgeIdA and edgeIdB.
+    bool useA = true;
+    bool useB = true;
+
+    // Do the local assembly between these two MarkerGraphEdgeIds.
+    try {
+        LocalAssembly localAssembly(assembler, edgeIdA, edgeIdB, 0, html, useA, useB);
+        localAssembly.getSecondarySequence(chain.stepSequences[positionInChain]);
+    } catch (...) {
+        std::lock_guard<std::mutex> lock(mutex);
+        cout << "Error occurred in local assembly between marker graph edges " <<
+            edgeIdA << " and " << edgeIdB << endl;
+        throw;
     }
 }
 
