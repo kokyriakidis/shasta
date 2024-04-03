@@ -6850,9 +6850,9 @@ void AssemblyGraph::assembleChainsMultithreaded(
 
     // Assemble the steps in parallel.
     setupLoadBalancing(assemblySteps.size(),  1);
-    cout << timestamp << "Multithreaded sequence assembly begins." << endl;
+    cout << timestamp << "Sequence assembly begins." << endl;
     runThreads(&AssemblyGraph::assembleChainsMultithreadedTheadFunction, threadCount);
-    cout << timestamp << "Multithreaded sequence assembly ends." << endl;
+    cout << timestamp << "Sequence assembly ends." << endl;
 
 
 
@@ -6861,7 +6861,6 @@ void AssemblyGraph::assembleChainsMultithreaded(
     // Combine those with the marker graph edge sequences to obtain the
     // complete sequence of each chain.
     // This can be parallelized.
-    cout << timestamp << "Combining assembled sequence for chains." << endl;
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
         assemblyStep.e = e;
         BubbleChain& bubbleChain = assemblyGraph[e];
@@ -6879,7 +6878,6 @@ void AssemblyGraph::assembleChainsMultithreaded(
             }
         }
     }
-    cout << timestamp << "Done combining assembled sequence for chains." << endl;
 }
 
 
@@ -6946,15 +6944,49 @@ void AssemblyGraph::runAssemblyStep(
 
     // Get the Chain.
     Chain& chain = bubble[assemblyStep.indexInBubble];
+    SHASTA_ASSERT(chain.size() >= 2);
 
     // Find the MarkerGraphEdgeIds for this local assembly.
     const uint64_t positionInChain = assemblyStep.positionInChain;
     const MarkerGraphEdgeId edgeIdA = chain[positionInChain];
     const MarkerGraphEdgeId edgeIdB = chain[positionInChain + 1];
 
+
+
     // Figure out if we should use the oriented reads on edgeIdA and edgeIdB.
     bool useA = true;
     bool useB = true;
+    // For chains of length 2, we leave useA and useB set to true.
+    // For the usual case of longer chains, there is more checking.
+    if(chain.size() != 2) {
+
+        // If we are at the beginning or end of the chain, we need to check
+        // the number of common oriented reads.
+        MarkerGraphEdgePairInfo info;
+        if((positionInChain == 0) or (positionInChain == chain.size() - 2)) {
+            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeIdA, edgeIdB, info));
+        }
+
+        // If this is the first step of the Chain, we want to set useA to false
+        // to avoid using reads that don't belong. But we only do it
+        // if this leaves us with enough reads to assemble.
+        if(positionInChain == 0) {
+            if(info.common >= chainTerminalCommonThreshold) {
+                useA = false;
+            }
+        }
+
+        // If this is the last step of the Chain, we want to set useB to false
+        // to avoid using reads that don't belong. But we only do it
+        // if this leaves us with enough reads to assemble.
+        else if(positionInChain == chain.size() - 2) {
+            if(info.common >= chainTerminalCommonThreshold) {
+                useB = false;
+            }
+        }
+    }
+
+
 
     // Do the local assembly between these two MarkerGraphEdgeIds.
     try {
