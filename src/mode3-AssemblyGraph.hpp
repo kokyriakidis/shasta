@@ -30,7 +30,6 @@ namespace shasta {
         // Each edge of the CompressedPathGraph describes a BubbleChain.
 
         // A Chain is a sequence of MarkerGraphEdgeIds.
-        // It can be used to generate an AssemblyPath.
         class Chain;
 
         // A Bubble is a set of Chains that begin and end at the same MarkerGraphEdgeId.
@@ -59,7 +58,6 @@ namespace shasta {
 
 
 // A Chain is a sequence of MarkerGraphEdgeIds.
-// It can be used to generate an AssemblyPath.
 class shasta::mode3::Chain : public vector<MarkerGraphEdgeId> {
 public:
 

@@ -4,7 +4,6 @@
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-PrimaryGraph.hpp"
-#include "mode3-AssemblyPath.hpp"
 #include "Mode3Assembler.hpp"
 #include "Reads.hpp"
 using namespace shasta;

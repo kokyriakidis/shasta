@@ -3,7 +3,6 @@
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
 #include "longestPath.hpp"
-#include "mode3-AssemblyPath.hpp"
 #include "MarkerGraph.hpp"
 #include "MurmurHash2.hpp"
 #include "orderPairs.hpp"

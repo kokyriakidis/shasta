@@ -1,6 +1,5 @@
 // Shasta.
 #include "mode3-AssemblyGraph.hpp"
-// #include "mode3-AssemblyPath.hpp"
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-PrimaryGraph.hpp"
 #include "mode3-PhasingTable.hpp"
@@ -6701,64 +6700,6 @@ void AssemblyGraph::assembleChain(
     combineStepSequences(chain);
     chain.wasAssembled = true;
 }
-
-
-
-
-#if 0
-// Assemble sequence for a Chain. Old version that uses AssemblyPath.
-void AssemblyGraph::assembleChain(
-    Chain& chain,
-    uint64_t chainTerminalCommonThreshold) const
-{
-
-    vector<MarkerGraphEdgePairInfo> infos(chain.size() - 1);
-    for(uint64_t i=0; i<infos.size(); i++) {
-        const MarkerGraphEdgeId edgeId0 = chain[i];
-        const MarkerGraphEdgeId edgeId1 = chain[i+1];
-        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
-            edgeId0, edgeId1, infos[i]));
-    }
-
-
-
-    // Figure out if we want to allow oriented reads on the first and last
-    // primary edge of the path.
-    bool allowOrientedReadsOnFirst;
-    bool allowOrientedReadsOnLast;
-    if(chain.size() == 2) {
-        allowOrientedReadsOnFirst = true;
-        allowOrientedReadsOnLast = true;
-    } else {
-        MarkerGraphEdgePairInfo info;
-        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
-            chain[0], chain[1], info));
-        const uint64_t commonFirst = info.common;
-        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
-            chain[chain.size() - 2], chain[chain.size() - 1], info));
-        const uint64_t commonLast = info.common;
-
-        if(commonFirst >= chainTerminalCommonThreshold) {
-            allowOrientedReadsOnFirst = false;
-        } else {
-            allowOrientedReadsOnFirst = true;
-        }
-
-        if(commonLast >= chainTerminalCommonThreshold) {
-            allowOrientedReadsOnLast = false;
-        } else {
-            allowOrientedReadsOnLast = true;
-        }
-    }
-
-
-
-    AssemblyPath assemblyPath(assembler, chain, infos,
-        allowOrientedReadsOnFirst, allowOrientedReadsOnLast, 1);
-    assemblyPath.getSequence(chain.sequence);
-
-}
-#endif
 
 
 
