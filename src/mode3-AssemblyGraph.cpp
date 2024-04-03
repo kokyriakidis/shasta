@@ -103,11 +103,12 @@ void AssemblyGraph::run(
     for(uint64_t iteration=0; ; iteration ++) {
         performanceLog << timestamp << "Iteration " << iteration <<
             " of bubble cleanup begins." << endl;
-        const uint64_t cleanedUpBubbleCount = cleanupBubbles(false, 1000, chainTerminalCommonThreshold);
-        cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
+        const uint64_t cleanedUpBubbleCount = cleanupBubbles(
+            false, 1000, chainTerminalCommonThreshold, threadCount0);
         if(cleanedUpBubbleCount == 0) {
             break;
         }
+        cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
         compressBubbleChains();
         compress();
     }
@@ -6845,7 +6846,6 @@ void AssemblyGraph::assembleChainsMultithreaded(
             }
         }
     }
-    cout << "There are " << assemblySteps.size() << " assembly steps." << endl;
 
     // For better load balancing, sort them by decreasing offset.
     sort(assemblySteps.begin(), assemblySteps.end());
@@ -6854,9 +6854,9 @@ void AssemblyGraph::assembleChainsMultithreaded(
 
     // Assemble the steps in parallel.
     setupLoadBalancing(assemblySteps.size(),  1);
-    cout << timestamp << "Sequence assembly begins." << endl;
+    performanceLog << timestamp << "Sequence assembly begins." << endl;
     runThreads(&AssemblyGraph::assembleChainsMultithreadedTheadFunction, threadCount);
-    cout << timestamp << "Sequence assembly ends." << endl;
+    performanceLog << timestamp << "Sequence assembly ends." << endl;
 
 
 
@@ -7817,15 +7817,58 @@ void AssemblyGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
 
 
 // Bubble cleanup (all bubbles), with the purpose of eliminating most bubbles caused by errors.
-uint64_t AssemblyGraph::cleanupBubbles(bool debug, uint64_t maxOffset, uint64_t chainTerminalCommonThreshold)
+uint64_t AssemblyGraph::cleanupBubbles(
+    bool debug,
+    uint64_t maxOffset,
+    uint64_t chainTerminalCommonThreshold,
+    uint64_t threadCount)
 {
-    const AssemblyGraph& cGraph = *this;
+    AssemblyGraph& graph = *this;
+    performanceLog << timestamp << "AssemblyGraph::cleanupBubbles begins." << endl;
+
+
+
+    // First, assemble sequence for all the chains of diploid bubbles with a small offset.
+    clearAllShouldBeAssembledFlags();
+    BGL_FORALL_EDGES(e, graph, AssemblyGraph) {
+        BubbleChain& bubbleChain = graph[e];
+        for(Bubble& bubble: bubbleChain) {
+
+            // If this bubble is not diploid, skip it.
+            if(bubble.size() != 2) {
+                continue;
+            }
+
+            // The bubble is diploid. Compute its maxOffset.
+            uint64_t averageOffset;
+            uint64_t minOffset;
+            uint64_t bubbleMaxOffset;
+            const uint64_t offsetWasComputed = bubbleOffsetNoException(
+                bubble, averageOffset, minOffset, bubbleMaxOffset);
+
+            // If the offset is large or could not be computed, we don't need to
+            // assemble this bubble.
+            if((not offsetWasComputed) or bubbleMaxOffset>maxOffset) {
+                continue;
+            }
+
+            // We need to assemble the Chains of this bubble.
+            for(Chain& chain: bubble) {
+                chain.shouldBeAssembled = true;
+            }
+        }
+    }
+    assembleChainsMultithreaded(chainTerminalCommonThreshold, threadCount);
+    performanceLog << timestamp << "Sequence assembly for AssemblyGraph::cleanupBubbles ends." << endl;
+
+
 
     uint64_t removedCount = 0;
-    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
+    BGL_FORALL_EDGES(ce, graph, AssemblyGraph) {
         removedCount += cleanupBubbles(debug, ce, maxOffset, chainTerminalCommonThreshold);
     }
 
+    performanceLog << timestamp << "AssemblyGraph::cleanupBubbles ends." << endl;
     return removedCount;
 }
 
@@ -7866,7 +7909,7 @@ uint64_t AssemblyGraph::cleanupBubbles(bool debug, edge_descriptor ce,
             uint64_t averageOffset;
             uint64_t minOffset;
             uint64_t bubbleMaxOffset;
-            const uint64_t offsetWasComputed = bubbleOffsetNoException(bubble, averageOffset, minOffset, bubbleMaxOffset);
+            const bool offsetWasComputed = bubbleOffsetNoException(bubble, averageOffset, minOffset, bubbleMaxOffset);
 
             if((not offsetWasComputed) or bubbleMaxOffset>maxOffset) {
 
@@ -7893,10 +7936,9 @@ uint64_t AssemblyGraph::cleanupBubbles(bool debug, edge_descriptor ce,
                 } else {
 
                     // The bubble has a small offset and ploidy 2.
-                    // Assemble the sequence of its two sides.
-                    ofstream noCsv;
+                    // Check that we assembled the sequence of its two sides.
                     for(Chain& chain: bubble) {
-                        assembleChain(chain, 1, "", chainTerminalCommonThreshold, false, noCsv);
+                        SHASTA_ASSERT(chain.wasAssembled);
                     }
 
                     if(debug) {

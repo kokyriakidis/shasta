@@ -446,9 +446,16 @@ private:
 
     // Bubble cleanup, with the purpose of eliminating most bubbles caused by errors.
     // See the code for details of what this does.
-    uint64_t cleanupBubbles(bool debug, uint64_t maxOffset, uint64_t chainTerminalCommonThreshold);
-    uint64_t cleanupBubbles(bool debug, edge_descriptor ce,
-        uint64_t maxOffset, uint64_t chainTerminalCommonThreshold);
+    uint64_t cleanupBubbles(
+        bool debug,
+        uint64_t maxOffset,
+        uint64_t chainTerminalCommonThreshold,
+        uint64_t threadCount);
+    uint64_t cleanupBubbles(
+        bool debug,
+        edge_descriptor ce,
+        uint64_t maxOffset,
+        uint64_t chainTerminalCommonThreshold);
 
 
 
