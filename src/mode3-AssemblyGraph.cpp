@@ -161,10 +161,7 @@ void AssemblyGraph::run(
     if(assembleSequence) {
 
         // Assemble sequence.
-        // assembleChains(chainTerminalCommonThreshold, threadCount0, threadCount1);
-
-        // Multithreaded version of sequence assembly.
-        assembleChainsMultithreaded(chainTerminalCommonThreshold, threadCount0);
+        assembleAllChainsMultithreaded(chainTerminalCommonThreshold, threadCount0);
 
         // Final output.
         write("Final", true);
@@ -6788,6 +6785,8 @@ void AssemblyGraph::assembleChain(
 
 
 
+// Multithreaded version of sequence assembly.
+// This only assembles the chains that have the shouldBeAssembled flag set.
 void AssemblyGraph::assembleChainsMultithreaded(
     uint64_t chainTerminalCommonThreshold,
     uint64_t threadCount)
@@ -6817,6 +6816,11 @@ void AssemblyGraph::assembleChainsMultithreaded(
                 assemblyStep.indexInBubble = indexInBubble;
                 Chain& chain = bubble[indexInBubble];
                 SHASTA_ASSERT(chain.size() >= 2);
+
+                // If this Chain is not marked to be assembled, skip it.
+                if(not chain.shouldBeAssembled) {
+                    continue;
+                }
 
                 // Prepare the vectors where the threads will store
                 // the internal sequence assembled for each AssemblyStep.
@@ -6878,6 +6882,60 @@ void AssemblyGraph::assembleChainsMultithreaded(
             }
         }
     }
+}
+
+
+
+// This sets the shouldBeAssembled flag for all chains, then
+// calls assembleChainsMultithreaded.
+void AssemblyGraph::assembleAllChainsMultithreaded(
+    uint64_t chainTerminalCommonThreshold,
+    uint64_t threadCount)
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // Loop over all bubble chains.
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        BubbleChain& bubbleChain = assemblyGraph[e];
+
+        // Loop over Bubbles in this BubbleChain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+            // Loop over Chains in this Bubble.
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                Chain& chain = bubble[indexInBubble];
+                chain.shouldBeAssembled = true;
+            }
+        }
+    }
+
+    assembleChainsMultithreaded(chainTerminalCommonThreshold, threadCount);
+}
+
+
+
+// This clears the shouldBeAssembled flag from all Chains.
+void AssemblyGraph::clearAllShouldBeAssembledFlags()
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // Loop over all bubble chains.
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        BubbleChain& bubbleChain = assemblyGraph[e];
+
+        // Loop over Bubbles in this BubbleChain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+            // Loop over Chains in this Bubble.
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                Chain& chain = bubble[indexInBubble];
+                chain.shouldBeAssembled = false;
+            }
+        }
+    }
+
 }
 
 

@@ -63,6 +63,10 @@ namespace shasta {
 class shasta::mode3::Chain : public vector<MarkerGraphEdgeId> {
 public:
 
+    // Flag used to indicate that this Chain needs to be assembled.
+    // Used by assembleChainsMultithreaded.
+    bool shouldBeAssembled = false;
+
     // Assembled sequence, including the sequence of the first and
     // last primary marker graph edges.
     vector<Base> sequence;
@@ -747,9 +751,18 @@ private:
 
 
     // Multithreaded version of sequence assembly.
+    // This only assembles the chains that have the shouldBeAssembled flag set.
     void assembleChainsMultithreaded(
         uint64_t chainTerminalCommonThreshold,
         uint64_t threadCount);
+    // This sets the shouldBeAssembled flag for all chains, then
+    // calls assembleChainsMultithreaded.
+    void assembleAllChainsMultithreaded(
+        uint64_t chainTerminalCommonThreshold,
+        uint64_t threadCount);
+    // This clears the shouldBeAssembled flag from all Chains.
+    void clearAllShouldBeAssembledFlags();
+
     void assembleChainsMultithreadedTheadFunction(uint64_t threadId);
     void combineStepSequences(Chain&);
     class AssemblyStep {
