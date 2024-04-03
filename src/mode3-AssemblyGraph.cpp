@@ -6950,9 +6950,6 @@ void AssemblyGraph::runAssemblyStep(
 {
     AssemblyGraph& assemblyGraph = *this;
 
-    // Suppress html output from LocalAssembly.
-    ostream html(0);
-
     // Get the BubbleChain.
     BubbleChain& bubbleChain = assemblyGraph[assemblyStep.e];
 
@@ -6963,10 +6960,24 @@ void AssemblyGraph::runAssemblyStep(
     Chain& chain = bubble[assemblyStep.indexInBubble];
     SHASTA_ASSERT(chain.size() >= 2);
 
+    // Do it.
+    runAssemblyStep(chain, assemblyStep.positionInChain, chainTerminalCommonThreshold);
+}
+
+
+
+void AssemblyGraph::runAssemblyStep(
+    Chain& chain,
+    uint64_t positionInChain,
+    uint64_t chainTerminalCommonThreshold)
+{
+
     // Find the MarkerGraphEdgeIds for this local assembly.
-    const uint64_t positionInChain = assemblyStep.positionInChain;
     const MarkerGraphEdgeId edgeIdA = chain[positionInChain];
     const MarkerGraphEdgeId edgeIdB = chain[positionInChain + 1];
+
+    // Suppress html output from LocalAssembly.
+    ostream html(0);
 
 
 

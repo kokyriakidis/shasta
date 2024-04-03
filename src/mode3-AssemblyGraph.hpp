@@ -778,6 +778,10 @@ private:
         }
     };
     void runAssemblyStep(uint64_t chainTerminalCommonThreshold, const AssemblyStep&);
+    void runAssemblyStep(
+        Chain& chain,
+        uint64_t positionInChain,
+        uint64_t chainTerminalCommonThreshold);
     class AssembleChainsMultithreadedData {
     public:
         uint64_t chainTerminalCommonThreshold;
