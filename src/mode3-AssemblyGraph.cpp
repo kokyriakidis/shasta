@@ -1057,14 +1057,21 @@ string AssemblyGraph::chainStringId(
     uint64_t positionInBubbleChain,
     uint64_t indexInBubble) const
 {
+    // Locate the bubble chain.
     const AssemblyGraph& cGraph = *this;
     const AssemblyGraphEdge& edge = cGraph[ce];
+    const BubbleChain& bubbleChain = edge;
+
+    // Find the ploidy.
+    const Bubble& bubble = bubbleChain[positionInBubbleChain];
+    const uint64_t ploidy = bubble.size();
 
     return
         to_string(componentId) + "-" +
         to_string(edge.id) + "-" +
         to_string(positionInBubbleChain) + "-" +
-        to_string(indexInBubble);
+        to_string(indexInBubble) + "-P" +
+        to_string(ploidy);
 }
 
 
