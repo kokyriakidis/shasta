@@ -7,12 +7,16 @@
 #include "shastaTypes.hpp"
 
 // Standard library.
+#include "memory.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
 
 namespace shasta {
     class Mode3Assembler;
     class Assembler;
+    namespace mode3 {
+        class AssemblyGraph;
+    }
 }
 
 
@@ -59,5 +63,5 @@ private:
     vector< pair<uint64_t, uint64_t> > orientedReadIdTable;
 
     void assembleConnectedComponents(uint64_t threadCount);
-    void assembleConnectedComponent(uint64_t componentId, uint64_t threadCount);
+    shared_ptr<mode3::AssemblyGraph> assembleConnectedComponent(uint64_t componentId, uint64_t threadCount);
 };

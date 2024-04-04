@@ -186,15 +186,50 @@ void Mode3Assembler::computeConnectedComponents()
 void Mode3Assembler::assembleConnectedComponents(uint64_t threadCount)
 {
     performanceLog << timestamp << "Mode3Assembler::assembleConnectedComponents begins." << endl;
+
+    vector< shared_ptr<mode3::AssemblyGraph> > assemblyGraphs;
     for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
-        assembleConnectedComponent(componentId, threadCount);
+        assemblyGraphs.push_back(assembleConnectedComponent(componentId, threadCount));
     }
+
+    // Create a global FASTA file with output from all the connected components.
+    {
+        ofstream fasta("Assembly.fasta");
+        for(const shared_ptr<mode3::AssemblyGraph>& assemblyGraph: assemblyGraphs) {
+            assemblyGraph->writeFastaExpanded(fasta);
+        }
+    }
+
+    // Create a global GFA file with output from all the connected components.
+    {
+        ofstream gfa("Assembly.gfa");
+        AssemblyGraph::writeGfaHeader(gfa);
+        for(const shared_ptr<mode3::AssemblyGraph>& assemblyGraph: assemblyGraphs) {
+            assemblyGraph->writeGfaSegmentsExpanded(gfa, true);
+        }
+        for(const shared_ptr<mode3::AssemblyGraph>& assemblyGraph: assemblyGraphs) {
+            assemblyGraph->writeGfaLinksExpanded(gfa);
+        }
+    }
+
+    // Also create a global GFA file without sequence.
+    ofstream gfa("Assembly-NoSequence.gfa");
+    {
+        AssemblyGraph::writeGfaHeader(gfa);
+        for(const shared_ptr<mode3::AssemblyGraph>& assemblyGraph: assemblyGraphs) {
+            assemblyGraph->writeGfaSegmentsExpanded(gfa, false);
+        }
+        for(const shared_ptr<mode3::AssemblyGraph>& assemblyGraph: assemblyGraphs) {
+            assemblyGraph->writeGfaLinksExpanded(gfa);
+        }
+    }
+
     performanceLog << timestamp << "Mode3Assembler::assembleConnectedComponents ends." << endl;
 }
 
 
 
-void Mode3Assembler::assembleConnectedComponent(uint64_t componentId, uint64_t threadCount)
+shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(uint64_t componentId, uint64_t threadCount)
 {
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
     const double maxLoss = 0.1;
@@ -345,6 +380,6 @@ void Mode3Assembler::assembleConnectedComponent(uint64_t componentId, uint64_t t
              "PrimaryGraphCompact" + to_string(componentId), options, assembler.markerGraph);
      }
 
-     // Create the assembly graph.
-     AssemblyGraph cGraph(primaryGraph, componentId, assembler, threadCount, threadCount);
+     // Create the assembly graph for this connected component.
+     return make_shared<AssemblyGraph>(primaryGraph, componentId, assembler, threadCount, threadCount);
 }

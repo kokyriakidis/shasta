@@ -164,12 +164,12 @@ void AssemblyGraph::run(
         assembleAllChainsMultithreaded(chainTerminalCommonThreshold, threadCount0);
 
         // Final output.
-        write("Final", true);
+        // write("Final", true);
 
     } else {
 
         // Skip sequence assembly.
-        write("Final");
+        // write("Final");
     }
 
 
@@ -1006,12 +1006,19 @@ void AssemblyGraph::writeGfaExpanded(
 
 
 
-void AssemblyGraph::writeFastaExpanded(
-    const string& fileNamePrefix) const
+
+void AssemblyGraph::writeFastaExpanded(const string& fileNamePrefix) const
+{
+    ofstream fasta(fileNamePrefix + "-" + to_string(componentId) + "-Expanded.fasta");
+    writeFastaExpanded(fasta);
+}
+
+
+
+void AssemblyGraph::writeFastaExpanded(ostream& fasta) const
 {
     const AssemblyGraph& cGraph = *this;
 
-    ofstream fasta(fileNamePrefix + "-" + to_string(componentId) + "-Expanded.fasta");
 
     // Loop over BubbleChains. Each Chain of each Bubble generates a GFA segment.
     BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
