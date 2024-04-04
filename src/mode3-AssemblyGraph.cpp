@@ -868,22 +868,22 @@ void AssemblyGraph::writeGfa(const string& fileNamePrefix) const
 
 
 
-// This version writes each chain as a segment, so it shows the
-// details of the BubbleChains.
-void AssemblyGraph::writeGfaExpanded(
-    const string& fileNamePrefix,
-    bool includeSequence) const
+void AssemblyGraph::writeGfaExpanded(ostream& gfa, bool includeSequence) const
 {
-    const AssemblyGraph& cGraph = *this;
+    writeGfaHeader(gfa);
+    writeGfaSegmentsExpanded(gfa, includeSequence);
+    writeGfaLinksExpanded(gfa);
+}
 
-    ofstream gfa(fileNamePrefix + "-" + to_string(componentId) + "-Expanded.gfa");
 
-    // Write the header line.
-    gfa << "H\tVN:Z:1.0\n";
+
+void AssemblyGraph::writeGfaSegmentsExpanded(ostream& gfa, bool includeSequence) const
+{
+    const AssemblyGraph& graph = *this;
 
     // Loop over BubbleChains. Each Chain of each Bubble generates a GFA segment.
-    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
-        const BubbleChain& bubbleChain = cGraph[ce];
+    BGL_FORALL_EDGES(ce, graph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = graph[ce];
 
         // Loop over Bubbles of this chain.
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size();
@@ -923,12 +923,17 @@ void AssemblyGraph::writeGfaExpanded(
             }
         }
     }
+}
 
 
+
+void AssemblyGraph::writeGfaLinksExpanded(ostream& gfa) const
+{
+    const AssemblyGraph& graph = *this;
 
     // Write links between adjacent Chains of each BubbleChain.
-    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
-        const BubbleChain& bubbleChain = cGraph[ce];
+    BGL_FORALL_EDGES(ce, graph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = graph[ce];
 
         // Loop over Bubbles of this chain.
         for(uint64_t positionInBubbleChain=1; positionInBubbleChain<bubbleChain.size();
@@ -954,12 +959,12 @@ void AssemblyGraph::writeGfaExpanded(
 
 
     // Write links between Chains in different bubble chains.
-    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
-        BGL_FORALL_INEDGES(cv, ce0, cGraph, AssemblyGraph) {
-            const BubbleChain& bubbleChain0 = cGraph[ce0];
+    BGL_FORALL_VERTICES(cv, graph, AssemblyGraph) {
+        BGL_FORALL_INEDGES(cv, ce0, graph, AssemblyGraph) {
+            const BubbleChain& bubbleChain0 = graph[ce0];
             const Bubble& bubble0 = bubbleChain0.back();
-            BGL_FORALL_OUTEDGES(cv, ce1, cGraph, AssemblyGraph) {
-                const BubbleChain& bubbleChain1 = cGraph[ce1];
+            BGL_FORALL_OUTEDGES(cv, ce1, graph, AssemblyGraph) {
+                const BubbleChain& bubbleChain1 = graph[ce1];
                 const Bubble& bubble1 = bubbleChain1.front();
 
                 for(uint64_t indexInBubble0=0; indexInBubble0<bubble0.size(); indexInBubble0++) {
@@ -978,6 +983,25 @@ void AssemblyGraph::writeGfaExpanded(
         }
     }
 
+
+}
+
+
+
+void AssemblyGraph::writeGfaHeader(ostream& gfa)
+{
+    gfa << "H\tVN:Z:1.0\n";
+}
+
+
+// This version writes each chain as a segment, so it shows the
+// details of the BubbleChains.
+void AssemblyGraph::writeGfaExpanded(
+    const string& fileNamePrefix,
+    bool includeSequence) const
+{
+    ofstream gfa(fileNamePrefix + "-" + to_string(componentId) + "-Expanded.gfa");
+    writeGfaExpanded(gfa, includeSequence);
 }
 
 

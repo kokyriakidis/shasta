@@ -801,6 +801,10 @@ private:
     void writeGraphviz(const string& fileNamePrefix, bool labels) const;
     void writeGfa(const string& fileNamePrefix) const;
     void writeGfaExpanded(const string& fileNamePrefix, bool includeSequence) const;
+    void writeGfaExpanded(ostream&, bool includeSequence) const;
+    void writeGfaSegmentsExpanded(ostream&, bool includeSequence) const;
+    void writeGfaLinksExpanded(ostream&) const;
+    static void writeGfaHeader(ostream&);
     void writeFastaExpanded(const string& fileNamePrefix) const;
     void writeSnapshot(uint64_t& snapshotNumber) const;
 
