@@ -49,11 +49,9 @@ void Assembler::mode3Assembly1(
 
 void Assembler::mode3AssembleComponent(
     const string& fileName,
-    uint64_t threadCount0,  // High level parallelization
-    uint64_t threadCount1   // Low level parallelization
-    ) const
+    uint64_t threadCount) const
 {
-    mode3::AssemblyGraph cGraph(fileName, *this, threadCount0, threadCount1);
+    mode3::AssemblyGraph(fileName, *this, threadCount);
 }
 
 

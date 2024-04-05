@@ -2369,9 +2369,7 @@ public:
 
     void mode3AssembleComponent(
         const string& fileName,
-        uint64_t threadCount0,  // High level parallelization
-        uint64_t threadCount1   // Low level parallelization
-        ) const;
+        uint64_t threadCount) const;
 
 public:
     void test();

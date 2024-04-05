@@ -381,5 +381,5 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(uint64_t co
      }
 
      // Create the assembly graph for this connected component.
-     return make_shared<AssemblyGraph>(primaryGraph, componentId, assembler, threadCount, threadCount);
+     return make_shared<AssemblyGraph>(primaryGraph, componentId, assembler, threadCount);
 }

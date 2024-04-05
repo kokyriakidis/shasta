@@ -4,16 +4,15 @@ import shasta
 import argparse
 
 parser = argparse.ArgumentParser(description=
-    'Load a CompressedPathGraph1B and assemble it.')
+    'Load a mode3::AssemblyGraph representing a connected component of the primary graph and assemble it.')
 parser.add_argument('fileName', type=str, 
     help='Filename ')
-parser.add_argument('threadCount0', type=int, 
-    help='Number of threads for high level parallelization')
-parser.add_argument('threadCount1', type=int, 
-    help='Number of threads for low level parallelization')
+parser.add_argument('threadCount', type=int, 
+    help='Number of threads.')
+
         
 arguments = parser.parse_args() 
-if arguments.threadCount0 <= 0 or arguments.threadCount1 <=0:
+if arguments.threadCount <= 0:
     raise Exception("Numbers of threads must be positive.")    
 
 a = shasta.Assembler()
@@ -23,5 +22,5 @@ a.accessMarkerGraphEdges()
 a.accessMarkerGraphReverseComplementEdge()
 a.accessMarkerGraphConsensus()
 shasta.openPerformanceLog('FindMode3Paths.log')
-a.mode3AssembleComponent(arguments.fileName, arguments.threadCount0, arguments.threadCount1)
+a.mode3AssembleComponent(arguments.fileName, arguments.threadCount)
  

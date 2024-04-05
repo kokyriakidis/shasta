@@ -40,8 +40,7 @@ AssemblyGraph::AssemblyGraph(
     const PrimaryGraph& graph,
     uint64_t componentId,
     const Assembler& assembler,
-    uint64_t threadCount0,
-    uint64_t threadCount1) :
+    uint64_t threadCount) :
     MultithreadedObject<AssemblyGraph>(*this),
     componentId(componentId),
     assembler(assembler)
@@ -53,7 +52,7 @@ AssemblyGraph::AssemblyGraph(
     save("AssemblyGraph-" + to_string(componentId) + ".data");
 
     performanceLog << timestamp << "Processing the assembly graph for component " << componentId << endl;
-    run(threadCount0, threadCount1, true);
+    run(threadCount, true);
     performanceLog << timestamp << "Done with the assembly graph for component " << componentId << endl;
 }
 
@@ -63,20 +62,18 @@ AssemblyGraph::AssemblyGraph(
 AssemblyGraph::AssemblyGraph(
     const string& fileName,
     const Assembler& assembler,
-    uint64_t threadCount0,
-    uint64_t threadCount1) :
+    uint64_t threadCount) :
     MultithreadedObject<AssemblyGraph>(*this),
     assembler(assembler)
 {
     load(fileName);
-    run(threadCount0, threadCount1, true);
+    run(threadCount, true);
 }
 
 
 
 void AssemblyGraph::run(
-    uint64_t threadCount0,
-    uint64_t threadCount1,
+    uint64_t threadCount,
     bool assembleSequence)
 {
     // *** EXPOSE WHEN CODE STABILIZES
@@ -103,7 +100,7 @@ void AssemblyGraph::run(
         performanceLog << timestamp << "Iteration " << iteration <<
             " of bubble cleanup begins." << endl;
         const uint64_t cleanedUpBubbleCount = cleanupBubbles(
-            false, 1000, chainTerminalCommonThreshold, threadCount0);
+            false, 1000, chainTerminalCommonThreshold, threadCount);
         if(cleanedUpBubbleCount == 0) {
             break;
         }
@@ -161,7 +158,7 @@ void AssemblyGraph::run(
     if(assembleSequence) {
 
         // Assemble sequence.
-        assembleAllChainsMultithreaded(chainTerminalCommonThreshold, threadCount0);
+        assembleAllChainsMultithreaded(chainTerminalCommonThreshold, threadCount);
 
         // Final output.
         // write("Final", true);

@@ -243,15 +243,13 @@ public:
         const PrimaryGraph&,
         uint64_t componentId,
         const Assembler&,
-        uint64_t threadCount0,
-        uint64_t threadCount1);
+        uint64_t threadCount);
 
     // Load it from a binary archive, then call run.
     AssemblyGraph(
         const string& fileName,
         const Assembler&,
-        uint64_t threadCount0,
-        uint64_t threadCount1);
+        uint64_t threadCount);
 
 private:
 
@@ -273,8 +271,7 @@ private:
     void load(const string& fileName);
 
     void run(
-        uint64_t threadCount0,
-        uint64_t threadCount1,
+        uint64_t threadCount,
         bool assembleSequence);
 
 
