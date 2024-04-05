@@ -609,8 +609,8 @@ PYBIND11_MODULE(shasta, shastaModule)
             arg("debug") = false)
 
         // Assembly mode 3.
-        .def("mode3Assembly1",
-            &Assembler::mode3Assembly1)
+        .def("mode3Assembly",
+            &Assembler::mode3Assembly)
         .def("mode3AssembleComponent",
             &Assembler::mode3AssembleComponent)
         .def("flagPrimaryMarkerGraphEdges",

@@ -42,5 +42,5 @@ a.flagPrimaryMarkerGraphEdges(
     0)
 
 # Run Mode 3 assembly.
-a.mode3Assembly1(arguments.threadCount, arguments.debug)
+a.mode3Assembly(arguments.threadCount, arguments.debug)
  

@@ -36,7 +36,7 @@ void Assembler::flagPrimaryMarkerGraphEdges(
 
 
 
-void Assembler::mode3Assembly1(
+void Assembler::mode3Assembly(
     uint64_t threadCount,
     bool debug
     )

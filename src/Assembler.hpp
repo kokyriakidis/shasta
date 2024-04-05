@@ -2362,7 +2362,7 @@ public:
     void fillMode3AssemblyPathStep(const vector<string>&, ostream&);
 
     // Top level function for Mode 3 assembly, starting from the MarkerGraph.
-    void mode3Assembly1(
+    void mode3Assembly(
         uint64_t threadCount,
         bool debug
     );
