@@ -593,8 +593,6 @@ PYBIND11_MODULE(shasta, shastaModule)
             arg("diagonalReadCountMin"),
             arg("offDiagonalReadCountMax"),
             arg("offDiagonalRatio"))
-        .def("alignPseudoPaths",
-            &Assembler::alignPseudoPaths)
         .def("removeAssemblyGraph",
             &Assembler::removeAssemblyGraph)
 

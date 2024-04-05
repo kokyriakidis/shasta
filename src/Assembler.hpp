@@ -2094,11 +2094,6 @@ public:
 
 
 
-    // Analyze pseudo-paths of oriented reads.
-    void alignPseudoPaths(ReadId, Strand, ReadId, Strand);
-
-
-
     // Data and functions used for the http server.
     // This function puts the server into an endless loop
     // of processing requests.

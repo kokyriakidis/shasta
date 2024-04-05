@@ -13,9 +13,8 @@ using namespace mode0;
 
 
 
-// This use PseudoPaths to decide which alignments
+// This uses PseudoPaths to decide which alignments
 // should be included in the read graph.
-// See Assembler::alignPseudoPaths in AssemblerAnalyzePaths.cpp.
 void Assembler::createReadGraphUsingPseudoPaths(
     int64_t matchScore,
     int64_t mismatchScore,
