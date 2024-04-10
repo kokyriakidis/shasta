@@ -1115,6 +1115,10 @@ void PhasingTable::constructPhasedComponents(bool debug)
     // priority to larger PhasedComponents.
     if(phasedComponents.size() > 1) {
 
+        if(debug) {
+            cout << "More than one phased components found. Removing overlaps." << endl;
+        }
+
         // Sort the phased components by decreasing size.
         class SortHelper {
         public:
@@ -1134,7 +1138,7 @@ void PhasingTable::constructPhasedComponents(bool debug)
 
         // Process the PhasedComponents in order of decreasing size.
         vector< pair<uint64_t, uint64_t> > forbiddenRanges; // (min, max)
-        for(const auto& phasedComponent: phasedComponents) {
+        for(auto& phasedComponent: phasedComponents) {
 
             // See if it overlaps any of the forbidden ranges.
             bool overlaps = false;
@@ -1147,15 +1151,77 @@ void PhasingTable::constructPhasedComponents(bool debug)
                 }
             }
 
+            if(debug) {
+                cout << "Phased component at " << phasedComponent->minPositionInBubbleChain << " " <<
+                    phasedComponent->maxPositionInBubbleChain;
+                if(overlaps) {
+                    cout << " overlaps a previous phased component." << endl;
+                } else {
+                    cout << " has no overlaps with previous phased components." << endl;
+                }
+            }
+
             if(not overlaps) {
                 forbiddenRanges.push_back(
                     {phasedComponent->minPositionInBubbleChain, phasedComponent->maxPositionInBubbleChain});
                 continue;
             }
 
+
+
             // This PhasedComponent overlaps a forbiddenRange.
             // We need to remove the offending bubbles.
-            SHASTA_ASSERT(0);   // Missing code.
+            shared_ptr<PhasedComponent> newPhasedComponent = make_shared<PhasedComponent>();
+            for(const auto& p: *phasedComponent) {
+                const uint64_t positionInBubbleChain = p.first;
+
+                // See if this bubble overlaps any forbidden ranges.
+                bool overlaps = false;
+                for(const auto& forbiddenRange: forbiddenRanges) {
+                    if( positionInBubbleChain >= forbiddenRange.first and
+                        positionInBubbleChain <= forbiddenRange.second) {
+                        overlaps = true;
+                        break;
+                    }
+                }
+
+                // Only keep it if there is no overlap.
+                if(not overlaps) {
+                    newPhasedComponent->push_back(p);
+                }
+
+            }
+
+            // Replace this phased component with the new one.
+            phasedComponent = newPhasedComponent;
+            phasedComponent->computePositionRange();
+            forbiddenRanges.push_back({phasedComponent->minPositionInBubbleChain, phasedComponent->maxPositionInBubbleChain});
+
+            if(debug) {
+                cout << "After removing overlap, this phased component has " << phasedComponent->size() <<
+                    " diploid bubbles and position range " << phasedComponent->minPositionInBubbleChain << " " <<
+                    phasedComponent->maxPositionInBubbleChain << endl;
+            }
+        }
+    }
+
+
+
+    // This could have created empty PhasedComponents.
+    // Remove them if they are present.
+    {
+        vector< shared_ptr<PhasedComponent> > nonEmptyPhasedComponents;
+        for(const shared_ptr<PhasedComponent>& phasedComponent: phasedComponents) {
+            if(not phasedComponent->empty()) {
+                nonEmptyPhasedComponents.push_back(phasedComponent);
+            } else {
+                if(debug) {
+                    cout << "Removing empty phased component." << endl;
+                }
+            }
+        }
+        if(nonEmptyPhasedComponents.size() != phasedComponents.size()) {
+            phasedComponents.swap(nonEmptyPhasedComponents);
         }
     }
 
