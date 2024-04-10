@@ -10,8 +10,6 @@ config = GetConfig.getConfig()
 # Parse the command line arguments.
 parser = argparse.ArgumentParser(description=
     'Run Mode 3 assembly starting from the marker graph.')
-parser.add_argument('threadCount', type=int, 
-    help='Number of threads.')
             
 parser.add_argument(
     "--debug",
@@ -20,8 +18,7 @@ parser.add_argument(
 )    
         
 arguments = parser.parse_args() 
-if arguments.threadCount <=0:
-    raise Exception("Numbers of threads must be positive.")    
+
 
 
 # Create the Assembler object and access what we need.
@@ -42,5 +39,5 @@ a.flagPrimaryMarkerGraphEdges(
     0)
 
 # Run Mode 3 assembly.
-a.mode3Assembly(arguments.threadCount, arguments.debug)
+a.mode3Assembly(0, arguments.debug)
  
