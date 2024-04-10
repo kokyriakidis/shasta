@@ -33,7 +33,7 @@ Mode3Assembler::Mode3Assembler(
 
     gatherPrimaryMarkerGraphEdgeIds();
     computeConnectedComponents();
-    assembleConnectedComponents(threadCount);
+    assembleConnectedComponents(threadCount, debug);
 
     performanceLog << timestamp << "Mode 3 assembly ends." << endl;
 }
@@ -183,13 +183,15 @@ void Mode3Assembler::computeConnectedComponents()
 
 
 
-void Mode3Assembler::assembleConnectedComponents(uint64_t threadCount)
+void Mode3Assembler::assembleConnectedComponents(
+    uint64_t threadCount,
+    bool debug)
 {
     performanceLog << timestamp << "Mode3Assembler::assembleConnectedComponents begins." << endl;
 
     vector< shared_ptr<mode3::AssemblyGraph> > assemblyGraphs;
     for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
-        assemblyGraphs.push_back(assembleConnectedComponent(componentId, threadCount));
+        assemblyGraphs.push_back(assembleConnectedComponent(componentId, threadCount, debug));
     }
 
     // Create a global FASTA file with output from all the connected components.
@@ -229,7 +231,10 @@ void Mode3Assembler::assembleConnectedComponents(uint64_t threadCount)
 
 
 
-shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(uint64_t componentId, uint64_t threadCount)
+shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
+    uint64_t componentId,
+    uint64_t threadCount,
+    bool debug)
 {
     // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
     const double maxLoss = 0.1;
@@ -349,7 +354,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(uint64_t co
 
 
      // Graphviz output.
-     if(false) {
+     if(debug) {
          PrimaryGraphDisplayOptions options;
          options.showNonTransitiveReductionEdges = true;
          primaryGraph.writeGraphviz(
@@ -370,7 +375,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(uint64_t co
          crossEdgesMinOffset);
 
      // Graphviz output.
-     if(false) {
+     if(debug) {
          PrimaryGraphDisplayOptions options;
          options.showNonTransitiveReductionEdges = false;
          primaryGraph.writeGraphviz(
@@ -381,5 +386,5 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(uint64_t co
      }
 
      // Create the assembly graph for this connected component.
-     return make_shared<AssemblyGraph>(primaryGraph, componentId, assembler, threadCount);
+     return make_shared<AssemblyGraph>(primaryGraph, componentId, assembler, threadCount, debug);
 }

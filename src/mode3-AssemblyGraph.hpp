@@ -238,12 +238,13 @@ class shasta::mode3::AssemblyGraph:
     public MultithreadedObject<shasta::mode3::AssemblyGraph> {
 public:
 
-    // Create from a PathGraph1, then call run.
+    // Create from a connected component of the PrimaryGraph, then call run.
     AssemblyGraph(
         const PrimaryGraph&,
         uint64_t componentId,
         const Assembler&,
-        uint64_t threadCount);
+        uint64_t threadCount,
+        bool debug);
 
     // Load it from a binary archive, then call run.
     AssemblyGraph(

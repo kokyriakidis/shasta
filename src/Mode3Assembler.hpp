@@ -62,6 +62,10 @@ private:
     // for that connected component.
     vector< pair<uint64_t, uint64_t> > orientedReadIdTable;
 
-    void assembleConnectedComponents(uint64_t threadCount);
-    shared_ptr<mode3::AssemblyGraph> assembleConnectedComponent(uint64_t componentId, uint64_t threadCount);
+    void assembleConnectedComponents(
+        uint64_t threadCount, bool debug);
+    shared_ptr<mode3::AssemblyGraph> assembleConnectedComponent(
+        uint64_t componentId,
+        uint64_t threadCount,
+        bool debug);
 };

@@ -35,12 +35,13 @@ using namespace mode3;
 template class MultithreadedObject<AssemblyGraph>;
 
 
-// Create from a PrimaryGraph, then call run.
+// Create from a connected component of the PrimaryGraph, then call run.
 AssemblyGraph::AssemblyGraph(
     const PrimaryGraph& graph,
     uint64_t componentId,
     const Assembler& assembler,
-    uint64_t threadCount) :
+    uint64_t threadCount,
+    bool debug) :
     MultithreadedObject<AssemblyGraph>(*this),
     componentId(componentId),
     assembler(assembler)
