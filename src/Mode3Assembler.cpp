@@ -358,11 +358,11 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
          PrimaryGraphDisplayOptions options;
          options.showNonTransitiveReductionEdges = true;
          primaryGraph.writeGraphviz(
-             "PathGraphInitial" + to_string(componentId), options, assembler.markerGraph);
+             "PrimaryGraphInitial" + to_string(componentId), options, assembler.markerGraph);
          options.makeCompact();
          primaryGraph.writeGraphviz(
-             "PathGraphCompactInitial" + to_string(componentId), options, assembler.markerGraph);
-         primaryGraph.writeEdgeCoverageHistogram("PathGraphInitial" + to_string(componentId) + "-EdgeCoverageHistogram.csv");
+             "PrimaryGraphCompactInitial" + to_string(componentId), options, assembler.markerGraph);
+         primaryGraph.writeEdgeCoverageHistogram("PrimaryGraphInitial" + to_string(componentId) + "-EdgeCoverageHistogram.csv");
      }
 
      // Remove weak edges..

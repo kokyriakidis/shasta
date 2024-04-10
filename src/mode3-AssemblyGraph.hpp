@@ -274,14 +274,15 @@ private:
 
     void run(
         uint64_t threadCount,
-        bool assembleSequence);
+        bool assembleSequence,
+        bool debug);
 
 
 
     // Initial creation from the PrimaryGraph.
     // Each linear chain of edges in the PrimaryGraph after transitive reduction generates
     // an AssemblyGraphEdge (BubbleChain) consisting of a single haploid bubble.
-    void create(const PrimaryGraph&);
+    void create(const PrimaryGraph&, bool debug);
     uint64_t nextEdgeId = 0;
     void renumberEdges();
 

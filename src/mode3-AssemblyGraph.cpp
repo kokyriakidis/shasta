@@ -52,13 +52,13 @@ AssemblyGraph::AssemblyGraph(
     }
 
     performanceLog << timestamp << "Creating the assembly graph for component " << componentId << endl;
-    create(graph);
+    create(graph, debug);
 
     // Serialize it so we can restore it to facilitate debugging.
     save("AssemblyGraph-" + to_string(componentId) + ".data");
 
     performanceLog << timestamp << "Processing the assembly graph for component " << componentId << endl;
-    run(threadCount, true);
+    run(threadCount, true, debug);
     performanceLog << timestamp << "Done with the assembly graph for component " << componentId << endl;
 }
 
@@ -79,14 +79,15 @@ AssemblyGraph::AssemblyGraph(
     }
 
     load(fileName);
-    run(threadCount, true);
+    run(threadCount, true, debug);
 }
 
 
 
 void AssemblyGraph::run(
     uint64_t threadCount,
-    bool assembleSequence)
+    bool assembleSequence,
+    bool debug)
 {
     // *** EXPOSE WHEN CODE STABILIZES
     const uint64_t detangleToleranceLow = 0;
@@ -189,7 +190,7 @@ void AssemblyGraph::run(
 // Initial creation from the PrimaryGraph.
 // Each linear chain of edges in the PrimaryGraph after transitive reduction generates
 // an AssemblyGraphEdge (BubbleChain) consisting of a single haploid bubble.
-void AssemblyGraph::create(const PrimaryGraph& graph)
+void AssemblyGraph::create(const PrimaryGraph& graph, bool debug)
 {
     AssemblyGraph& cGraph = *this;
 
