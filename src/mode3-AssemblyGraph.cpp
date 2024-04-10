@@ -46,6 +46,11 @@ AssemblyGraph::AssemblyGraph(
     componentId(componentId),
     assembler(assembler)
 {
+    // Adjust the numbers of threads, if necessary.
+    if(threadCount == 0) {
+        threadCount = std::thread::hardware_concurrency();
+    }
+
     performanceLog << timestamp << "Creating the assembly graph for component " << componentId << endl;
     create(graph);
 
@@ -68,6 +73,11 @@ AssemblyGraph::AssemblyGraph(
     MultithreadedObject<AssemblyGraph>(*this),
     assembler(assembler)
 {
+    // Adjust the numbers of threads, if necessary.
+    if(threadCount == 0) {
+        threadCount = std::thread::hardware_concurrency();
+    }
+
     load(fileName);
     run(threadCount, true);
 }
