@@ -2364,7 +2364,8 @@ public:
 
     void mode3AssembleComponent(
         const string& fileName,
-        uint64_t threadCount) const;
+        uint64_t threadCount,
+        bool debug) const;
 
 public:
     void test();

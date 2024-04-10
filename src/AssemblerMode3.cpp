@@ -49,9 +49,10 @@ void Assembler::mode3Assembly(
 
 void Assembler::mode3AssembleComponent(
     const string& fileName,
-    uint64_t threadCount) const
+    uint64_t threadCount,
+    bool debug) const
 {
-    mode3::AssemblyGraph(fileName, *this, threadCount);
+    mode3::AssemblyGraph(fileName, *this, threadCount, debug);
 }
 
 

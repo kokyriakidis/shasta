@@ -9,7 +9,11 @@ parser.add_argument('fileName', type=str,
     help='Filename ')
 parser.add_argument('threadCount', type=int, 
     help='Number of threads.')
-
+parser.add_argument(
+    "--debug",
+    dest="debug",
+    action="store_true",
+)  
         
 arguments = parser.parse_args() 
 if arguments.threadCount <= 0:
@@ -21,6 +25,6 @@ a.accessMarkerGraphVertices()
 a.accessMarkerGraphEdges()
 a.accessMarkerGraphReverseComplementEdge()
 a.accessMarkerGraphConsensus()
-shasta.openPerformanceLog('FindMode3Paths.log')
-a.mode3AssembleComponent(arguments.fileName, arguments.threadCount)
+shasta.openPerformanceLog('Mode3AssembleComponent.log')
+a.mode3AssembleComponent(arguments.fileName, arguments.threadCount, arguments.debug)
  

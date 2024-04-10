@@ -63,7 +63,8 @@ AssemblyGraph::AssemblyGraph(
 AssemblyGraph::AssemblyGraph(
     const string& fileName,
     const Assembler& assembler,
-    uint64_t threadCount) :
+    uint64_t threadCount,
+    bool debug) :
     MultithreadedObject<AssemblyGraph>(*this),
     assembler(assembler)
 {

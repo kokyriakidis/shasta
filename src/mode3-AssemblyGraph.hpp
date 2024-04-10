@@ -250,7 +250,8 @@ public:
     AssemblyGraph(
         const string& fileName,
         const Assembler&,
-        uint64_t threadCount);
+        uint64_t threadCount,
+        bool debug);
 
 private:
 
