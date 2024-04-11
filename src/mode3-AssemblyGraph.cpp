@@ -104,6 +104,8 @@ void AssemblyGraph::run(
     // const uint64_t optimizeChainsMinCommon = 3;
     // const uint64_t optimizeChainsK = 100;
 
+    if(debug) write("A");
+
     // Don't do any detangling before cleanup of bubbles and superbubbles.
 
     // Cleanup bubbles and superbubbles.
@@ -121,6 +123,7 @@ void AssemblyGraph::run(
         compressBubbleChains();
         compress();
     }
+    if(debug) write("B");
     cleanupSuperbubbles(false, 30000, chainTerminalCommonThreshold);
     compress();
 
@@ -130,8 +133,9 @@ void AssemblyGraph::run(
 
     // Phase.
     compressBubbleChains();
+    if(debug) write("C");
     phaseBubbleChainsUsingPhasingTable(
-        "",
+        debug ? "C" : "",
         phaseErrorThreshold,
         bubbleErrorThreshold,
         longBubbleThreshold);
@@ -141,6 +145,7 @@ void AssemblyGraph::run(
     expand();
 
     // Detangle.
+    if(debug) write("D");
     performanceLog << timestamp << "Detangling begins." << endl;
     while(compressSequentialEdges());
     compressBubbleChains();
@@ -156,6 +161,7 @@ void AssemblyGraph::run(
 
     compress();
     compressBubbleChains();
+    if(debug) write("E");
 
 #if 0
     // Optimize the chains.
@@ -167,6 +173,7 @@ void AssemblyGraph::run(
 
     // Before final output, renumber the edges contiguously.
     renumberEdges();
+    if(debug) write("F");
 
     if(assembleSequence) {
 
@@ -174,12 +181,12 @@ void AssemblyGraph::run(
         assembleAllChainsMultithreaded(chainTerminalCommonThreshold, threadCount);
 
         // Final output.
-        // write("Final", true);
+        if(debug) write("G", true);
 
     } else {
 
         // Skip sequence assembly.
-        // write("Final");
+        if(debug) write("G");
     }
 
 
