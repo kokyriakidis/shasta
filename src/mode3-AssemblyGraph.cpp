@@ -1134,47 +1134,10 @@ uint64_t AssemblyGraph::chainOffset(const Chain& chain) const
         const MarkerGraphEdgeId edgeId0 = chain[i-1];
         const MarkerGraphEdgeId edgeId1 = chain[i];
 
-#if 0
-        MarkerGraphEdgePairInfo info;
-        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
-        if(info.common == 0) {
-            cout << "No common oriented reads for " << edgeId0 << " " << edgeId1 << endl;
-        }
-        SHASTA_ASSERT(info.common > 0);
-#endif
-
         const uint64_t offsetThisPair = assembler.estimateBaseOffsetUnsafe(edgeId0, edgeId1);
 
-        if(offsetThisPair == invalid<uint64_t>) {
-            // cout << "Offset cannot be computed for " << edgeId0 << " " << edgeId1 << endl;
-            // SHASTA_ASSERT(0);
-        } else if(offsetThisPair > 0) {
+        if(offsetThisPair != invalid<uint64_t>) {
             offset += offsetThisPair;
-        }
-    }
-    return offset;
-}
-
-
-
-uint64_t AssemblyGraph::chainOffsetNoException(const Chain& chain) const
-{
-    const uint64_t length = chain.size();
-    SHASTA_ASSERT(length >= 2);
-
-    uint64_t offset = 0;
-    for(uint64_t i=1; i<length; i++) {
-        const MarkerGraphEdgeId edgeId0 = chain[i-1];
-        const MarkerGraphEdgeId edgeId1 = chain[i];
-
-        MarkerGraphEdgePairInfo info;
-        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
-        if(info.common == 0) {
-            return invalid<uint64_t>;
-        }
-        SHASTA_ASSERT(info.common > 0);
-        if(info.offsetInBases > 0) {
-            offset += info.offsetInBases;
         }
     }
     return offset;
@@ -1217,7 +1180,7 @@ bool AssemblyGraph::bubbleOffsetNoException(
     maxOffset = 0;
 
     for(const Chain& chain: bubble) {
-        const uint64_t offset = chainOffsetNoException(chain);
+        const uint64_t offset = chainOffset(chain);
         if(offset == invalid<uint64_t>) {
             return false;
         }

@@ -817,7 +817,6 @@ private:
     string chainStringId(edge_descriptor, uint64_t positionInBubbleChain, uint64_t indexInBubble) const;
 
     uint64_t chainOffset(const Chain&) const;
-    uint64_t chainOffsetNoException(const Chain&) const;
     void bubbleOffset(
         const Bubble&,
         uint64_t& averageOffset,
