@@ -957,6 +957,7 @@ void AssemblyGraph::writeGfaLinksExpanded(ostream& gfa) const
             ++positionInBubbleChain) {
             const Bubble& bubble0 = bubbleChain[positionInBubbleChain - 1];
             const Bubble& bubble1 = bubbleChain[positionInBubbleChain];
+            const uint64_t overlapLength = assembler.markerGraph.edgeSequence[bubble1.front().front()].size();
 
             for(uint64_t indexInBubble0=0; indexInBubble0<bubble0.size(); indexInBubble0++) {
                 const string chain0StringId = chainStringId(ce, positionInBubbleChain-1, indexInBubble0);
@@ -967,7 +968,7 @@ void AssemblyGraph::writeGfaLinksExpanded(ostream& gfa) const
                    gfa <<
                        "L\t" <<
                        chain0StringId << "\t+\t" <<
-                       chain1StringId << "\t+\t*\n";
+                       chain1StringId << "\t+\t" << overlapLength << "M\n";
                 }
             }
         }
@@ -977,6 +978,8 @@ void AssemblyGraph::writeGfaLinksExpanded(ostream& gfa) const
 
     // Write links between Chains in different bubble chains.
     BGL_FORALL_VERTICES(cv, graph, AssemblyGraph) {
+        const uint64_t overlapLength = assembler.markerGraph.edgeSequence[graph[cv].edgeId].size();
+
         BGL_FORALL_INEDGES(cv, ce0, graph, AssemblyGraph) {
             const BubbleChain& bubbleChain0 = graph[ce0];
             const Bubble& bubble0 = bubbleChain0.back();
@@ -993,7 +996,7 @@ void AssemblyGraph::writeGfaLinksExpanded(ostream& gfa) const
                        gfa <<
                            "L\t" <<
                            chain0StringId << "\t+\t" <<
-                           chain1StringId << "\t+\t*\n";
+                           chain1StringId << "\t+\t" << overlapLength << "M\n";
                     }
                 }
             }
