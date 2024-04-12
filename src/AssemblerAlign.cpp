@@ -214,7 +214,6 @@ void Assembler::computeAlignments(
     size_t threadCount
 )
 {
-    const uint64_t maxMarkerFrequency = 1; // EXPOSE? ******
 
     const auto tBegin = steady_clock::now();
     performanceLog << timestamp << "Begin computing alignments for ";
@@ -243,8 +242,8 @@ void Assembler::computeAlignments(
 
     // For alignment method 5, compute low frequency markers.
     if(alignOptions.alignMethod == 5) {
-        cout << timestamp << "Computing low frequency markers." << endl;
-        computeLowFrequencyMarkers(maxMarkerFrequency, threadCount);
+        cout << timestamp << "Computing unique markers." << endl;
+        computeLowFrequencyMarkers(1, threadCount);
     }
 
     // Pick the batch size for computing alignments.
