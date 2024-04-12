@@ -19,7 +19,6 @@ void Assembler::alignOrientedReads5(
 {
 
     // EXPOSE WHEN CODE STABILIZES *******
-    const uint64_t maxMarkerFrequency = 1;
     const double driftRateTolerance = 0.02;
     const uint64_t minBandExtend = 10;
 
@@ -53,7 +52,7 @@ void Assembler::alignOrientedReads5(
     else {
         // Compute them and store in the local vectors, then have the spans point to them.
         for(uint64_t i=0; i<2; i++) {
-            computeLowFrequencyMarkers(allMarkerKmerIds[i], maxMarkerFrequency, lowFrequencyOrdinalsVectors[i]);
+            computeLowFrequencyMarkers(allMarkerKmerIds[i], 1, lowFrequencyOrdinalsVectors[i]);
             lowFrequencyOrdinals[i] = span<uint32_t>(lowFrequencyOrdinalsVectors[i]);
         }
     }
@@ -63,8 +62,7 @@ void Assembler::alignOrientedReads5(
     if(html) {
         for(uint64_t i=0; i<2; i++) {
             html << "<br>" << (i==0 ? orientedReadId0 : orientedReadId1) << " has " << allMarkerKmerIds[i].size() <<
-                " markers of which " << lowFrequencyOrdinals[i].size() << " appear up to " <<
-                maxMarkerFrequency << " times." << endl;
+                " markers of which " << lowFrequencyOrdinals[i].size() << " are unique." << endl;
         }
     }
 
