@@ -806,6 +806,8 @@ public:
         int matchScore,
         int mismatchScore,
         int gapScore,
+        double driftRateTolerance,
+        uint64_t minBandExtend,
         Alignment&,
         AlignmentInfo&,
         ostream& html);
@@ -2215,6 +2217,8 @@ public:
         uint64_t align4DeltaY,
         uint64_t align4MinEntryCountPerCell,
         uint64_t align4MaxDistanceFromBoundary,
+        double align5DriftRateTolerance,
+        uint64_t align5MinBandExtend,
         ostream& html
     );
     void writeColorPicker(ostream& html, string svgId);
@@ -2245,7 +2249,7 @@ public:
 
     // Compute all alignments for a given read.
     // This can be slow for large assemblies,
-    // and therefore the computation in multithreaded.
+    // and therefore the computation is multithreaded.
     void computeAllAlignments(const vector<string>&, ostream&);
     void computeAllAlignmentsThreadFunction(size_t threadId);
     class ComputeAllAlignmentsData {
@@ -2269,6 +2273,8 @@ public:
         uint64_t align4DeltaY;
         uint64_t align4MinEntryCountPerCell;
         uint64_t align4MaxDistanceFromBoundary;
+        double align5DriftRateTolerance;
+        uint64_t align5MinBandExtend;
         // The alignments found by each thread.
         vector< vector< pair<OrientedReadId, AlignmentInfo> > > threadAlignments;
     };

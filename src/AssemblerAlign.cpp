@@ -343,6 +343,8 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
     const int bandExtend = data.alignOptions->bandExtend;
     const int maxBand = data.alignOptions->maxBand;
     const bool suppressContainments = data.alignOptions->suppressContainments;
+    const double align5DriftRateTolerance = data.alignOptions->align5DriftRateTolerance;
+    const uint64_t align5MinBandExtend = data.alignOptions->align5MinBandExtend;
 
 
     // Align4-specific items.
@@ -433,6 +435,7 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                     ofstream nullStream;
                     alignOrientedReads5(orientedReadIds[0], orientedReadIds[1],
                         matchScore, mismatchScore, gapScore,
+                        align5DriftRateTolerance, align5MinBandExtend,
                         alignment, alignmentInfo,
                         nullStream);
                 } else {

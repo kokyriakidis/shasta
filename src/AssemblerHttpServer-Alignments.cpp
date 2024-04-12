@@ -1106,6 +1106,12 @@ void Assembler::exploreAlignment(
     uint64_t align4MaxDistanceFromBoundary = httpServerData.assemblerOptions->alignOptions.align4MaxDistanceFromBoundary;
     getParameterValue(request, "align4MaxDistanceFromBoundary", align4MaxDistanceFromBoundary);
 
+    // Parameters for alignment method 5.
+    double align5DriftRateTolerance = httpServerData.assemblerOptions->alignOptions.align5DriftRateTolerance;
+    getParameterValue(request, "align5DriftRateTolerance", align5DriftRateTolerance);
+    uint64_t align5MinBandExtend = httpServerData.assemblerOptions->alignOptions.align5MinBandExtend;
+    getParameterValue(request, "align5MinBandExtend", align5MinBandExtend);
+
 
     string displayMatrixString;
     bool displayMatrix = getParameterValue(request, "displayMatrix", displayMatrixString);
@@ -1154,6 +1160,8 @@ void Assembler::exploreAlignment(
         align4DeltaY,
         align4MinEntryCountPerCell,
         align4MaxDistanceFromBoundary,
+        align5DriftRateTolerance,
+        align5MinBandExtend,
         html
     );
 
@@ -1239,6 +1247,7 @@ void Assembler::exploreAlignment(
         alignOrientedReads5(
             orientedReadId0, orientedReadId1,
             matchScore, mismatchScore, gapScore,
+            align5DriftRateTolerance, align5MinBandExtend,
             alignment, alignmentInfo, displayDebugInfo ? html : nullStream);
     } else {
         SHASTA_ASSERT(0);
@@ -1772,6 +1781,8 @@ void Assembler::renderEditableAlignmentConfig(
     uint64_t align4DeltaY,
     uint64_t align4MinEntryCountPerCell,
     uint64_t align4MaxDistanceFromBoundary,
+    double align5DriftRateTolerance,
+    uint64_t align5MinBandExtend,
     ostream& html
 ) {
     const auto& descriptions = httpServerData.assemblerOptions->allOptionsDescription;
@@ -1888,6 +1899,18 @@ void Assembler::renderEditableAlignmentConfig(
             "<input type=text style='text-align:center;border:none' name=align4MaxDistanceFromBoundary size=16 value=" << align4MaxDistanceFromBoundary << ">"
         "<td class=smaller>" << descriptions.find("Align.align4.maxDistanceFromBoundary", false).description();
 
+    html << "<tr>"
+        "<th class=left>align5.driftRateTolerance"
+        "<td class=centered>"
+            "<input type=text style='text-align:center;border:none' name=align5DriftRateTolerance size=16 value=" << align5DriftRateTolerance << ">"
+        "<td class=smaller>" << descriptions.find("Align.align5.driftRateTolerance", false).description();
+
+    html << "<tr>"
+        "<th class=left>align5.minBandExtend"
+        "<td class=centered>"
+            "<input type=text style='text-align:center;border:none' name=align5MinBandExtend size=16 value=" << align5MinBandExtend << ">"
+        "<td class=smaller>" << descriptions.find("Align.align5.minBandExtend", false).description();
+
     html << "</table>";
 }
 
@@ -1943,6 +1966,12 @@ void Assembler::computeAllAlignments(
     computeAllAlignmentsData.align4MaxDistanceFromBoundary = httpServerData.assemblerOptions->alignOptions.align4MaxDistanceFromBoundary;
     getParameterValue(request, "align4MaxDistanceFromBoundary", computeAllAlignmentsData.align4MaxDistanceFromBoundary);
 
+    // Parameters for alignment method 5.
+    computeAllAlignmentsData.align5DriftRateTolerance = httpServerData.assemblerOptions->alignOptions.align5DriftRateTolerance;
+    getParameterValue(request, "align5DriftRateTolerance", computeAllAlignmentsData.align5DriftRateTolerance);
+    computeAllAlignmentsData.align5MinBandExtend = httpServerData.assemblerOptions->alignOptions.align5MinBandExtend;
+    getParameterValue(request, "align5MinBandExtend", computeAllAlignmentsData.align5MinBandExtend);
+
 
     // Write the form.
     html <<
@@ -1973,6 +2002,8 @@ void Assembler::computeAllAlignments(
         computeAllAlignmentsData.align4DeltaY,
         computeAllAlignmentsData.align4MinEntryCountPerCell,
         computeAllAlignmentsData.align4MaxDistanceFromBoundary,
+        computeAllAlignmentsData.align5DriftRateTolerance,
+        computeAllAlignmentsData.align5MinBandExtend,
         html
     );
 
@@ -2401,6 +2432,11 @@ void Assembler::assessAlignments(
     computeAllAlignmentsData. align4MaxDistanceFromBoundary = httpServerData.assemblerOptions->alignOptions.align4MaxDistanceFromBoundary;
     getParameterValue(request, "align4MaxDistanceFromBoundary", computeAllAlignmentsData.align4MaxDistanceFromBoundary);
 
+    // Parameters for alignment method 5.
+    computeAllAlignmentsData.align5DriftRateTolerance = httpServerData.assemblerOptions->alignOptions.align5DriftRateTolerance;
+    getParameterValue(request, "align5DriftRateTolerance", computeAllAlignmentsData.align5DriftRateTolerance);
+    computeAllAlignmentsData.align5MinBandExtend = httpServerData.assemblerOptions->alignOptions.align5MinBandExtend;
+    getParameterValue(request, "align5MinBandExtend", computeAllAlignmentsData.align5MinBandExtend);
 
 
     html << "<h1>Alignment statistics</h1>";
@@ -2460,6 +2496,8 @@ void Assembler::assessAlignments(
             computeAllAlignmentsData.align4DeltaY,
             computeAllAlignmentsData.align4MinEntryCountPerCell,
             computeAllAlignmentsData.align4MaxDistanceFromBoundary,
+            computeAllAlignmentsData.align5DriftRateTolerance,
+            computeAllAlignmentsData.align5MinBandExtend,
             html
     );
 
@@ -2752,6 +2790,8 @@ void Assembler::computeAllAlignmentsThreadFunction(size_t threadId)
     const uint64_t align4DeltaY = computeAllAlignmentsData.align4DeltaY;
     const uint64_t align4MinEntryCountPerCell = computeAllAlignmentsData.align4MinEntryCountPerCell;
     const uint64_t align4MaxDistanceFromBoundary = computeAllAlignmentsData.align4MaxDistanceFromBoundary;
+    const double align5DriftRateTolerance = computeAllAlignmentsData.align5DriftRateTolerance;
+    const uint64_t align5MinBandExtend = computeAllAlignmentsData.align5MinBandExtend;
 
     // Vector where this thread will store the alignments it finds.
     vector< pair<OrientedReadId, AlignmentInfo> >& alignments =
@@ -2841,6 +2881,7 @@ void Assembler::computeAllAlignmentsThreadFunction(size_t threadId)
                         ofstream nullStream;
                         alignOrientedReads5(orientedReadId0, orientedReadId1,
                             matchScore, mismatchScore, gapScore,
+                            align5DriftRateTolerance, align5MinBandExtend,
                             alignment, alignmentInfo,
                             nullStream);
                     } else {

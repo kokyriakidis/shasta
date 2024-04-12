@@ -13,14 +13,12 @@ void Assembler::alignOrientedReads5(
     int matchScore,
     int mismatchScore,
     int gapScore,
+    double driftRateTolerance,
+    uint64_t minBandExtend,
     Alignment& alignment,
     AlignmentInfo& alignmentInfo,
     ostream& html)
 {
-
-    // EXPOSE WHEN CODE STABILIZES *******
-    const double driftRateTolerance = 0.02;
-    const uint64_t minBandExtend = 10;
 
     // Get the marker KmerIds for the two oriented reads.
     array<span<KmerId>, 2> allMarkerKmerIds;

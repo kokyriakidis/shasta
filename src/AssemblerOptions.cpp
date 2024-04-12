@@ -493,6 +493,16 @@ void AssemblerOptions::addConfigurableOptions()
         default_value(100),
         "Only used for alignment method 4 (experimental).")
 
+        ("Align.align5.driftRateTolerance",
+        value<double>(&alignOptions.align5DriftRateTolerance)->
+        default_value(0.02),
+        "Maximum allowed drift rate for alignment method 5.")
+
+        ("Align.align5.minBandExtend",
+        value<uint64_t>(&alignOptions.align5MinBandExtend)->
+        default_value(10),
+        "Minimum band extension for alignment method 5.")
+
         ("ReadGraph.creationMethod",
         value<int>(&readGraphOptions.creationMethod)->
         default_value(0),
@@ -1022,6 +1032,8 @@ void AlignOptions::write(ostream& s) const
     s << "align4.deltaY = " << align4DeltaY << "\n";
     s << "align4.minEntryCountPerCell = " << align4MinEntryCountPerCell << "\n";
     s << "align4.maxDistanceFromBoundary = " << align4MaxDistanceFromBoundary << "\n";
+    s << "align5.driftRateTolerance = " << align5DriftRateTolerance << "\n";
+    s << "align5.minBandExtend = " << align5MinBandExtend << "\n";
 }
 
 

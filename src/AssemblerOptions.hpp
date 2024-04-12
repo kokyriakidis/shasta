@@ -205,6 +205,8 @@ public:
     uint64_t align4DeltaY;
     uint64_t align4MinEntryCountPerCell;
     uint64_t align4MaxDistanceFromBoundary;
+    double align5DriftRateTolerance;
+    uint64_t align5MinBandExtend;
     void write(ostream&) const;
 };
 
