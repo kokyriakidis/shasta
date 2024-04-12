@@ -179,8 +179,8 @@ void AssemblyGraph::run(
 
         // Assemble sequence.
         assembleAllChainsMultithreaded(chainTerminalCommonThreshold, threadCount);
+        writeAssemblyDetails();
 
-        // Final output.
         if(debug) write("G", true);
 
     } else {
@@ -6939,6 +6939,103 @@ void AssemblyGraph::combineStepSequences(Chain& chain)
     }
 }
 
+
+
+// This writes the details of sequence assembly for all Chains in the AssemblyGraph.
+void AssemblyGraph::writeAssemblyDetails() const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+
+    // Opeb the csv file and write the header.
+    ofstream csv("AssemblyDetails-" + to_string(componentId) + ".csv");
+    csv << "Chain,Component,Bubble chain,Position in bubble chain,Index in bubble,"
+        "Position in chain,Type,Marker graph edge id,"
+        "Length,Sequence begin,Sequence end,Coverage,Common\n";
+
+    // Loop over all bubble chains.
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = assemblyGraph[e];
+
+        // Loop over Bubbles in this BubbleChain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            const Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+            // Loop over Chains in this Bubble.
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                const Chain& chain = bubble[indexInBubble];
+                SHASTA_ASSERT(chain.wasAssembled);
+                SHASTA_ASSERT(chain.stepSequences.size() == chain.size() - 1);
+                const string chainString = chainStringId(e, positionInBubbleChain, indexInBubble);
+
+                // Loop over positions in this Chain.
+                uint64_t positionInSequence = 0;
+                for(uint64_t positionInChain=0; /* Check later */ ; positionInChain++) {
+
+                    // Write one line to csv with information about the sequence
+                    // contributed by this the marker graph primary edge.
+                    {
+                        const MarkerGraphEdgeId edgeId = chain[positionInChain];
+                        const uint64_t coverage = assembler.markerGraph.edgeMarkerIntervals[edgeId].size();
+                        const uint64_t edgeSequenceLength = assembler.markerGraph.edgeSequence[edgeId].size();
+                        const uint64_t beginInSequence = positionInSequence;
+                        const uint64_t endInSequence = positionInSequence + edgeSequenceLength;
+                        csv << chainString << ",";
+                        csv << componentId << ",";
+                        csv << assemblyGraph[e].id << ",";
+                        csv << positionInBubbleChain << ",";
+                        csv << indexInBubble << ",";
+                        csv << positionInChain << ",";
+                        csv << "E,";
+                        csv << edgeId << ",";
+                        csv << edgeSequenceLength << ",";
+                        csv << beginInSequence << ",";
+                        csv << endInSequence << ",";
+                        csv << coverage << ",";
+                        csv << ",";
+                        csv << "\n";
+                        positionInSequence = endInSequence;
+                    }
+
+
+                    // If this was the last primary edge for the chain, we are done.
+                    if(positionInChain == chain.size() - 1) {
+                        SHASTA_ASSERT(positionInSequence == chain.sequence.size());
+                        break;
+                    }
+
+                    // Write one line to csv with information about the sequence
+                    // contributed by the assemby step between this marker graph primary edge
+                    // and the next in the chain.
+                    {
+                        const MarkerGraphEdgeId edgeId = chain[positionInChain];
+                        const MarkerGraphEdgeId nextEdgeId = chain[positionInChain + 1];
+                        const uint64_t commonCount = assembler.countCommonOrientedReadsUnsafe(
+                            edgeId, nextEdgeId);
+                        const uint64_t stepSequenceLength = chain.stepSequences[positionInChain].size();
+                        const uint64_t beginInSequence = positionInSequence;
+                        const uint64_t endInSequence = positionInSequence + stepSequenceLength;
+                        csv << chainString << ",";
+                        csv << componentId << ",";
+                        csv << assemblyGraph[e].id << ",";
+                        csv << positionInBubbleChain << ",";
+                        csv << indexInBubble << ",";
+                        csv << ",";
+                        csv << "S,";
+                        csv << ",";
+                        csv << stepSequenceLength << ",";
+                        csv << beginInSequence << ",";
+                        csv << endInSequence << ",";
+                        csv << ",";
+                        csv << commonCount << ",";
+                        csv << "\n";
+                        positionInSequence = endInSequence;
+                    }
+
+                }
+            }
+        }
+    }
+}
 
 
 

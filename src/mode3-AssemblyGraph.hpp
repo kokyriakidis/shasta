@@ -802,6 +802,7 @@ private:
     void writeGfa(const string& fileNamePrefix) const;
     void writeGfaExpanded(const string& fileNamePrefix, bool includeSequence) const;
     void writeGfaExpanded(ostream&, bool includeSequence) const;
+    void writeAssemblyDetails() const;
 public:
     void writeGfaSegmentsExpanded(ostream&, bool includeSequence) const;
     void writeGfaLinksExpanded(ostream&) const;
