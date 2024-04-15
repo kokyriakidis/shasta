@@ -76,6 +76,7 @@ namespace shasta {
     class MarkerGraphOptions;
     class MinHashOptions;
     class Mode2AssemblyOptions;
+    class Mode3AssemblyOptions;
     class PalindromicReadOptions;
     class ReadsOptions;
     class ReadGraphOptions;
@@ -320,6 +321,56 @@ public:
 
 
 
+// Assembly options that are specific to Mode 3 assembly.
+// See source code in the mode3 namespace
+// (source files with a mode3-) prefix for more information
+class shasta::Mode3AssemblyOptions {
+public:
+
+    // Options used by class mode3::LocalAssembly
+    class LocalAssemblyOptions {
+    public:
+
+        // The estimated offset gets extended by this ratio to
+        // decide how much to extend reads that only appear in edgeIdA or edgeIdB.
+        double estimatedOffsetRatio;
+
+        // Vertex sampling rate, used to set minVertexCoverage.
+        // Only used if minVertexCoverage is 0 on input to
+        // mode3::LocalAssembly constructor.
+        double vertexSamplingRate;
+
+        // Alignment parameters.
+        int64_t matchScore;
+        int64_t mismatchScore;
+        int64_t gapScore;
+
+        // Number of bases (not markers) that can be skipped by an alignment.
+        uint64_t maxSkipBases;
+
+        // The maximum tolerated length drift of each read.
+        // Used to compute the band for banded alignments.
+        double maxDrift;
+
+        // Minimum half band, in markers.
+        uint64_t minHalfBand;
+
+        // Minimum ration of scorew to best possible score for
+        // an alignment to be used.
+        double minScoreRatio;
+
+        // The maximum length of an MSA alignment we are willing to compute.
+        uint64_t maxMsaLength;
+
+        void write(ostream&) const;
+    };
+    LocalAssemblyOptions localAssemblyOptions;
+
+    void write(ostream&) const;
+};
+
+
+
 // Options in the [Assembly] section of the configuration file.
 // Can also be entered on the command line with option names
 // beginning with "Assembly.".
@@ -355,6 +406,9 @@ public:
 
     // Mode 2 assembly options.
     Mode2AssemblyOptions mode2Options;
+
+    // Mode 3 assembly options.
+    Mode3AssemblyOptions mode3Options;
 
     void write(ostream&) const;
 

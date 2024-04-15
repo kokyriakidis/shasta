@@ -946,6 +946,66 @@ void AssemblerOptions::addConfigurableOptions()
         default_value(false),
         "Suppress output of haploid representation of the assembly (Mode 2 assembly only).")
 
+        ("Assembly.mode3.localAssembly.estimatedOffsetRatio",
+        value<double>(&assemblyOptions.mode3Options.localAssemblyOptions.estimatedOffsetRatio)->
+        default_value(1.1),
+        "For local assembly, the estimated offset between edgeIdA and edgeIdB gets "
+        "extended by this ratio to decide how much to extend reads that only appear in edgeIdA or edgeIdB. "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.localAssembly.vertexSamplingRate",
+        value<double>(&assemblyOptions.mode3Options.localAssemblyOptions.vertexSamplingRate)->
+        default_value(0.8),
+        "Vertex sampling rate for local assembly, used to set minVertexCoverage. "
+        "Only used if minVertexCoverage is 0 on input to mode3::LocalAssembly constructor. "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.localAssembly.matchScore",
+        value<int64_t>(&assemblyOptions.mode3Options.localAssemblyOptions.matchScore)->
+        default_value(6),
+        "Match score for local assembly. (Mode 3 assembly only).")
+
+        ("Assembly.mode3.localAssembly.mismatchScore",
+        value<int64_t>(&assemblyOptions.mode3Options.localAssemblyOptions.mismatchScore)->
+        default_value(-1),
+        "Mismatch score for local assembly. (Mode 3 assembly only).")
+
+        ("Assembly.mode3.localAssembly.gapScore",
+        value<int64_t>(&assemblyOptions.mode3Options.localAssemblyOptions.gapScore)->
+        default_value(-1),
+        "Gap score for local assembly. (Mode 3 assembly only).")
+
+        ("Assembly.mode3.localAssembly.maxSkipBases",
+        value<uint64_t>(&assemblyOptions.mode3Options.localAssemblyOptions.maxSkipBases)->
+        default_value(500),
+        "Number of bases (not markers) that can be skipped by an alignment in local assembly. "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.localAssembly.maxDrift",
+        value<double>(&assemblyOptions.mode3Options.localAssemblyOptions.maxDrift)->
+        default_value(0.005),
+        "The maximum tolerated length drift of each read. "
+        "Used to compute the band for banded alignments in local assembly. "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.localAssembly.minHalfBand",
+        value<uint64_t>(&assemblyOptions.mode3Options.localAssemblyOptions.minHalfBand)->
+        default_value(100),
+        "Minimum half band, in markers, for local assembly. "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.localAssembly.minScoreRatio",
+        value<double>(&assemblyOptions.mode3Options.localAssemblyOptions.minScoreRatio)->
+        default_value(0.7),
+        "Score threshold for discarding alignments in for local assembly. "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.localAssembly.maxMsaLength",
+        value<uint64_t>(&assemblyOptions.mode3Options.localAssemblyOptions.maxMsaLength)->
+        default_value(5000),
+        "Maximum length of a multiple sequence alignment for local assembly. "
+        "(Mode 3 assembly only).")
+
         ;
 }
 
@@ -1130,6 +1190,7 @@ void AssemblyOptions::write(ostream& s) const
     s << "iterative.bridgeRemovalMaxDistance = " << iterativeBridgeRemovalMaxDistance << "\n";
 
     mode2Options.write(s);
+    mode3Options.write(s);
 }
 
 
@@ -1155,6 +1216,35 @@ void Mode2AssemblyOptions::write(ostream& s) const
     s << "mode2.suppressDetailedOutput = " << convertBoolToPythonString(suppressDetailedOutput) << "\n";
     s << "mode2.suppressPhasedOutput = " << convertBoolToPythonString(suppressPhasedOutput) << "\n";
     s << "mode2.suppressHaploidOutput = " << convertBoolToPythonString(suppressHaploidOutput) << "\n";
+}
+
+
+
+void Mode3AssemblyOptions::write(ostream& s) const
+{
+    localAssemblyOptions.write(s);
+}
+
+
+
+void Mode3AssemblyOptions::LocalAssemblyOptions::write(ostream& s) const
+{
+    s << "mode3.localAssembly.estimatedOffsetRatio = " << estimatedOffsetRatio << "\n";
+    s << "mode3.localAssembly.vertexSamplingRate = " << vertexSamplingRate << "\n";
+
+    s << "mode3.localAssembly.matchScore = " << matchScore << "\n";
+    s << "mode3.localAssembly.mismatchScore = " << mismatchScore << "\n";
+    s << "mode3.localAssembly.gapScore = " << gapScore << "\n";
+
+    s << "mode3.localAssembly.maxSkipBases = " << maxSkipBases << "\n";
+
+    s << "mode3.localAssembly.maxDrift = " << maxDrift << "\n";
+
+    s << "mode3.localAssembly.minHalfBand = " << minHalfBand << "\n";
+
+    s << "mode3.localAssembly.minScoreRatio = " << minScoreRatio << "\n";
+
+    s << "mode3.localAssembly.maxMsaLength = " << maxMsaLength << "\n";
 }
 
 
