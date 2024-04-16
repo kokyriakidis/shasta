@@ -344,6 +344,29 @@ public:
 
 
 
+    class AssemblyGraphOptions {
+    public:
+
+        // Detangle tolerances.
+        uint64_t detangleToleranceLow;
+        uint64_t detangleToleranceHigh;
+
+        // Bayesian model.
+        double epsilon;
+        double minLogP;
+
+        // Other thresholds used by the mode3::AssemblyGraph
+        uint64_t longBubbleThreshold;
+        double phaseErrorThreshold;
+        double bubbleErrorThreshold;
+        uint64_t chainTerminalCommonThreshold;
+
+        void write(ostream&) const;
+    };
+    AssemblyGraphOptions assemblyGraphOptions;
+
+
+
     // Options used by class mode3::LocalAssembly
     class LocalAssemblyOptions {
     public:

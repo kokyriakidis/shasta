@@ -964,6 +964,54 @@ void AssemblerOptions::addConfigurableOptions()
         "High coverage threshold for cross edge removal in the primary graph. "
         "(Mode 3 assembly only).")
 
+        ("Assembly.mode3.assemblyGraph.detangleToleranceLow",
+        value<uint64_t>(&assemblyOptions.mode3Options.assemblyGraphOptions.detangleToleranceLow)->
+        default_value(0),
+        "Used for detangling of the assembly graph "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.assemblyGraph.detangleToleranceHigh",
+        value<uint64_t>(&assemblyOptions.mode3Options.assemblyGraphOptions.detangleToleranceHigh)->
+        default_value(2),
+        "Used for detangling of the assembly graph "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.assemblyGraph.epsilon",
+        value<double>(&assemblyOptions.mode3Options.assemblyGraphOptions.epsilon)->
+        default_value(0.1),
+        "Epsilon value for the Bayesian model used for detangling the assembly graph "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.assemblyGraph.minLogP",
+        value<double>(&assemblyOptions.mode3Options.assemblyGraphOptions.minLogP)->
+        default_value(20.),
+        "MinLogP value (in dB) for the Bayesian model used for detangling the assembly graph "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.assemblyGraph.longBubbleThreshold",
+        value<uint64_t>(&assemblyOptions.mode3Options.assemblyGraphOptions.longBubbleThreshold)->
+        default_value(5000),
+        "Long bubble threshold "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.assemblyGraph.phaseErrorThreshold",
+        value<double>(&assemblyOptions.mode3Options.assemblyGraphOptions.phaseErrorThreshold)->
+        default_value(0.1),
+        "Phase error threshold for phasing "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.assemblyGraph.bubbleErrorThreshold",
+        value<double>(&assemblyOptions.mode3Options.assemblyGraphOptions.bubbleErrorThreshold)->
+        default_value(0.03),
+        "Bubble error threshold for bubble cleanup "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.assemblyGraph.chainTerminalCommonThreshold",
+        value<uint64_t>(&assemblyOptions.mode3Options.assemblyGraphOptions.chainTerminalCommonThreshold)->
+        default_value(3),
+        "Used for bubble cleanup "
+        "(Mode 3 assembly only).")
+
         ("Assembly.mode3.localAssembly.estimatedOffsetRatio",
         value<double>(&assemblyOptions.mode3Options.localAssemblyOptions.estimatedOffsetRatio)->
         default_value(1.1),
@@ -1241,6 +1289,7 @@ void Mode2AssemblyOptions::write(ostream& s) const
 void Mode3AssemblyOptions::write(ostream& s) const
 {
     primaryGraphOptions.write(s);
+    assemblyGraphOptions.write(s);
     localAssemblyOptions.write(s);
 }
 
@@ -1252,6 +1301,20 @@ void Mode3AssemblyOptions::PrimaryGraphOptions::write(ostream& s) const
     s << "mode3.primaryGraph.crossEdgesLowCoverageThreshold = " << crossEdgesLowCoverageThreshold << "\n";
     s << "mode3.primaryGraph.crossEdgesHighCoverageThreshold = " << crossEdgesHighCoverageThreshold << "\n";
 
+}
+
+
+
+void Mode3AssemblyOptions::AssemblyGraphOptions::write(ostream& s) const
+{
+    s << "mode3.assemblyGraph.detangleToleranceLow = " << detangleToleranceLow << "\n";
+    s << "mode3.assemblyGraph.detangleToleranceHigh = " << detangleToleranceHigh << "\n";
+    s << "mode3.assemblyGraph.epsilon = " << epsilon << "\n";
+    s << "mode3.assemblyGraph.minLogP = " << minLogP << "\n";
+    s << "mode3.assemblyGraph.longBubbleThreshold = " << longBubbleThreshold << "\n";
+    s << "mode3.assemblyGraph.phaseErrorThreshold = " << phaseErrorThreshold << "\n";
+    s << "mode3.assemblyGraph.bubbleErrorThreshold = " << bubbleErrorThreshold << "\n";
+    s << "mode3.assemblyGraph.chainTerminalCommonThreshold = " << chainTerminalCommonThreshold << "\n";
 }
 
 
