@@ -247,7 +247,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     cout << timestamp << "Assembling connected component " <<
         componentId << " of " << connectedComponents.size() << endl;
 
-    ConnectedComponent connectedComponent = connectedComponents[componentId];
+    const ConnectedComponent& connectedComponent = connectedComponents[componentId];
     const vector<OrientedReadId>& orientedReadIds = connectedComponent.orientedReadIds;
     const vector<uint64_t>& primaryIds = connectedComponent.primaryIds;
 
