@@ -472,8 +472,18 @@ public:
     MarkerGraphOptions markerGraphOptions;
     AssemblyOptions assemblyOptions;
 
-    // Constructor.
+    // Constructor from a command line.
+    // If the command line includes a --config option,
+    // the specified built-in configuration or configuration file
+    // is used to fill the AssemblyOptions,
+    // but values specified on the command line take precedence.
     AssemblerOptions(int argumentCount, const char** arguments);
+
+    // Constructor from a configuration file.
+    // This only fills in the configurable options specified in
+    // the given configuration file. Command line only options
+    // are left at their defaults.
+    AssemblerOptions(const string& fileName);
 
     // Add configurable options to the Boost option description object.
     void addCommandLineOnlyOptions();

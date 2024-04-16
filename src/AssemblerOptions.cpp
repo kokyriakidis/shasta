@@ -14,7 +14,11 @@ using namespace shasta;
 
 
 
-// Constructor.
+// Constructor from a command line.
+// If the command line includes a --config option,
+// the specified built-in configuration or configuration file
+// is used to fill the AssemblyOptions,
+// but values specified on the command line take precedence.
 AssemblerOptions::AssemblerOptions(int argumentCount, const char** arguments) :
     commandLineOnlyOptionsDescription("Options allowed only on the command line"),
     configurableOptionsDescription("Options allowed on the command line and in the config file")
@@ -110,6 +114,41 @@ AssemblerOptions::AssemblerOptions(int argumentCount, const char** arguments) :
     }
 
 
+
+    // Parse MarkerGraph.simplifyMaxLength.
+    markerGraphOptions.parseSimplifyMaxLength();
+
+    // Parse ReadOptions.desiredCoverageString into its numeric value.
+    readsOptions.parseDesiredCoverageString();
+
+    // Unpack the consensuscaller and replace relative path with the absolute
+    // one if necessary.
+    assemblyOptions.parseConsensusCallerString();
+}
+
+
+
+// Constructor from a configuration file.
+// This only fills in the configurable options specified in
+// the given configuration file. Command line only options
+// are left at their defaults.
+AssemblerOptions::AssemblerOptions(const string& fileName)
+{
+
+    using boost::program_options::positional_options_description;
+    using boost::program_options::value;
+    using boost::program_options::variables_map;
+    using boost::program_options::command_line_parser;
+
+    addConfigurableOptions();
+
+    ifstream configFile(fileName);
+    if (not configFile) {
+        throw runtime_error("Invalid configuration file " + fileName + " specified.\n");
+    }
+    variables_map variablesMap;
+    store(parse_config_file(configFile, configurableOptionsDescription), variablesMap);
+    notify(variablesMap);
 
     // Parse MarkerGraph.simplifyMaxLength.
     markerGraphOptions.parseSimplifyMaxLength();
