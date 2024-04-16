@@ -4,6 +4,7 @@
 #include "mode3-PrimaryGraph.hpp"
 #include "mode3-PhasingTable.hpp"
 #include "Assembler.hpp"
+#include "AssemblerOptions.hpp"
 #include "copyNumber.hpp"
 #include "deduplicate.hpp"
 #include "diploidBayesianPhase.hpp"
@@ -41,10 +42,12 @@ AssemblyGraph::AssemblyGraph(
     uint64_t componentId,
     const Assembler& assembler,
     uint64_t threadCount,
+    const Mode3AssemblyOptions& options,
     bool debug) :
     MultithreadedObject<AssemblyGraph>(*this),
     componentId(componentId),
-    assembler(assembler)
+    assembler(assembler),
+    options(options)
 {
     // Adjust the numbers of threads, if necessary.
     if(threadCount == 0) {
@@ -69,9 +72,11 @@ AssemblyGraph::AssemblyGraph(
     const string& fileName,
     const Assembler& assembler,
     uint64_t threadCount,
+    const Mode3AssemblyOptions& options,
     bool debug) :
     MultithreadedObject<AssemblyGraph>(*this),
-    assembler(assembler)
+    assembler(assembler),
+    options(options)
 {
     // Adjust the numbers of threads, if necessary.
     if(threadCount == 0) {
@@ -89,18 +94,9 @@ void AssemblyGraph::run(
     bool assembleSequence,
     bool debug)
 {
-    // *** EXPOSE WHEN CODE STABILIZES
-    const uint64_t detangleToleranceLow = 0;
-    const uint64_t detangleToleranceHigh = 2;
+    const bool useBayesianModel = true;
     // const uint64_t detangleWithSearchToleranceLow = 1;
     // const uint64_t detangleWithSearchToleranceHigh = 6;
-    const bool useBayesianModel = true;
-    const double epsilon = 0.1;
-    const double minLogP = 20.;
-    const uint64_t longBubbleThreshold = 5000;
-    const double phaseErrorThreshold = 0.1;
-    const double bubbleErrorThreshold = 0.03;
-    const uint64_t chainTerminalCommonThreshold = 3;
     // const uint64_t optimizeChainsMinCommon = 3;
     // const uint64_t optimizeChainsK = 100;
 
@@ -115,7 +111,7 @@ void AssemblyGraph::run(
         performanceLog << timestamp << "Iteration " << iteration <<
             " of bubble cleanup begins." << endl;
         const uint64_t cleanedUpBubbleCount = cleanupBubbles(
-            false, 1000, chainTerminalCommonThreshold, threadCount);
+            false, 1000, options.assemblyGraphOptions.chainTerminalCommonThreshold, threadCount);
         if(cleanedUpBubbleCount == 0) {
             break;
         }
@@ -124,7 +120,7 @@ void AssemblyGraph::run(
         compress();
     }
     if(debug) write("B");
-    cleanupSuperbubbles(false, 30000, chainTerminalCommonThreshold);
+    cleanupSuperbubbles(false, 30000, options.assemblyGraphOptions.chainTerminalCommonThreshold);
     compress();
 
     // Remove short superbubbles.
@@ -136,9 +132,9 @@ void AssemblyGraph::run(
     if(debug) write("C");
     phaseBubbleChainsUsingPhasingTable(
         debug ? "C" : "",
-        phaseErrorThreshold,
-        bubbleErrorThreshold,
-        longBubbleThreshold);
+        options.assemblyGraphOptions.phaseErrorThreshold,
+        options.assemblyGraphOptions.bubbleErrorThreshold,
+        options.assemblyGraphOptions.longBubbleThreshold);
     compress();
 
     // For detangling, expand all bubble chains.
@@ -149,13 +145,28 @@ void AssemblyGraph::run(
     performanceLog << timestamp << "Detangling begins." << endl;
     while(compressSequentialEdges());
     compressBubbleChains();
-    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    detangleEdges(false,
+        options.assemblyGraphOptions.detangleToleranceLow,
+        options.assemblyGraphOptions.detangleToleranceHigh,
+        useBayesianModel,
+        options.assemblyGraphOptions.epsilon,
+        options.assemblyGraphOptions.minLogP);
     while(compressSequentialEdges());
     compressBubbleChains();
-    detangleVertices(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    detangleVertices(false,
+        options.assemblyGraphOptions.detangleToleranceLow,
+        options.assemblyGraphOptions.detangleToleranceHigh,
+        useBayesianModel,
+        options.assemblyGraphOptions.epsilon,
+        options.assemblyGraphOptions.minLogP);
     while(compressSequentialEdges());
     compressBubbleChains();
-    detangleEdges(false, detangleToleranceLow, detangleToleranceHigh, useBayesianModel, epsilon, minLogP);
+    detangleEdges(false,
+        options.assemblyGraphOptions.detangleToleranceLow,
+        options.assemblyGraphOptions.detangleToleranceHigh,
+        useBayesianModel,
+        options.assemblyGraphOptions.epsilon,
+        options.assemblyGraphOptions.minLogP);
     // detangleShortSuperbubbles(false, 30000, detangleToleranceLow, detangleToleranceHigh);
     performanceLog << timestamp << "Detangling ends." << endl;
 
@@ -178,7 +189,9 @@ void AssemblyGraph::run(
     if(assembleSequence) {
 
         // Assemble sequence.
-        assembleAllChainsMultithreaded(chainTerminalCommonThreshold, threadCount);
+        assembleAllChainsMultithreaded(
+            options.assemblyGraphOptions.chainTerminalCommonThreshold,
+            threadCount);
         writeAssemblyDetails();
 
         if(debug) write("G", true);
@@ -1698,9 +1711,7 @@ void AssemblyGraph::cleanupSuperbubbles(
     bool debug,
     uint64_t maxOffset1,    // Used to define superbubbles
     uint64_t maxOffset2,    // Compared against the offset between entry and exit
-    uint64_t chainTerminalCommonThreshold
-
-)
+    uint64_t chainTerminalCommonThreshold)
 {
     AssemblyGraph& cGraph = *this;
 
@@ -1732,8 +1743,7 @@ void AssemblyGraph::cleanupSuperbubbles(
 void AssemblyGraph::cleanupSuperbubbles(
     bool debug,
     uint64_t maxOffset2,     // Compared against the offset between entry and exit
-    uint64_t chainTerminalCommonThreshold
-    )
+    uint64_t chainTerminalCommonThreshold)
 {
     performanceLog << timestamp << "AssemblyGraph::cleanupSuperbubbles begins." << endl;
     AssemblyGraph& cGraph = *this;
@@ -7097,7 +7107,7 @@ void AssemblyGraph::runAssemblyStep(
 
     // Do the local assembly between these two MarkerGraphEdgeIds.
     try {
-        LocalAssembly localAssembly(assembler, edgeIdA, edgeIdB, 0, html, useA, useB);
+        LocalAssembly localAssembly(assembler, edgeIdA, edgeIdB, 0, html, options.localAssemblyOptions, useA, useB);
         localAssembly.getSecondarySequence(chain.stepSequences[positionInChain]);
     } catch (...) {
         std::lock_guard<std::mutex> lock(mutex);

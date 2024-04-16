@@ -1118,7 +1118,7 @@ void shasta::main::mode3Assembly(
         threadCount);
 
     // Run Mode 3 assembly.
-    assembler.mode3Assembly(threadCount, false);
+    assembler.mode3Assembly(threadCount, assemblerOptions.assemblyOptions.mode3Options, false);
 }
 
 

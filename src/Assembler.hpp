@@ -53,6 +53,7 @@ namespace shasta {
     class MarkerConnectivityGraph;
     class MarkerConnectivityGraphVertexMap;
     class Mode2AssemblyOptions;
+    class Mode3AssemblyOptions;
     class Mode3Assembler;
     class OrientedReadPair;
     class Reads;
@@ -2365,12 +2366,14 @@ public:
     // Top level function for Mode 3 assembly, starting from the MarkerGraph.
     void mode3Assembly(
         uint64_t threadCount,
+        const Mode3AssemblyOptions&,
         bool debug
     );
 
     void mode3AssembleComponent(
         const string& fileName,
         uint64_t threadCount,
+        const Mode3AssemblyOptions&,
         bool debug) const;
 
 public:

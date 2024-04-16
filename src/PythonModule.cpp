@@ -662,9 +662,7 @@ PYBIND11_MODULE(shasta, shastaModule)
     class_<AssemblyOptions>(shastaModule, "AssemblyOptions")
         .def_readonly("mode3Options", &AssemblyOptions::mode3Options)
         ;
-    class_<Mode3AssemblyOptions>(shastaModule, "Mode3AssemblyOptions")
-        .def_readonly("primaryGraphOptions", &Mode3AssemblyOptions::primaryGraphOptions)
-        ;
+    class_<Mode3AssemblyOptions>(shastaModule, "Mode3AssemblyOptions");
 
 
 

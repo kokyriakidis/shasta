@@ -22,6 +22,7 @@ arguments = parser.parse_args()
 
 
 # Create the Assembler object and access what we need.
+options = shasta.AssemblerOptions('shasta.conf')
 a = shasta.Assembler()
 a.accessMarkers()
 a.accessMarkerGraphVertices()
@@ -39,5 +40,5 @@ a.flagPrimaryMarkerGraphEdges(
     0)
 
 # Run Mode 3 assembly.
-a.mode3Assembly(0, arguments.debug)
+a.mode3Assembly(0, options.assemblyOptions.mode3Options, arguments.debug)
  

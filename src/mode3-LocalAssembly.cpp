@@ -46,39 +46,16 @@ LocalAssembly::LocalAssembly(
     MarkerGraphEdgeId edgeIdA,
     MarkerGraphEdgeId edgeIdB,
     uint64_t minVertexCoverage, // 0 = automatic
-    const LocalAssemblyDisplayOptions& options,
+    const LocalAssemblyDisplayOptions& displayOptions,
+    const Mode3AssemblyOptions::LocalAssemblyOptions& options,
     bool useA,
     bool useB) :
     assembler(assembler),
     edgeIdA(edgeIdA),
     edgeIdB(edgeIdB),
-    options(options),
-    html(options.html)
+    options(displayOptions),
+    html(displayOptions.html)
 {
-
-    // PARAMETERS THAT SHOULD BE EXPOSED WHEN CODE STABILIZES.
-
-    // The estimated offset gets extended by this ratio to
-    // decide how much to extend reads that only appear in edgeIdA or edgeIdB.
-    double estimatedOffsetRatio = 1.1;
-
-    // Vertex sampling rate, used to set minVertexCoverage.
-    // Only used if minVertexCoverage is 0 on input.
-    const double vertexSamplingRate = 0.8;
-
-    // Alignment parameters.
-    int64_t matchScore = 6;
-    int64_t mismatchScore = -1;
-    int64_t gapScore = -1;
-    const uint64_t maxSkipBases = 500;
-    // maxDrift is the maximum tolerated length drift of each read.
-    // Used to compute the band for banded alignments.
-    const double maxDrift = 0.005;
-    const uint64_t minHalfBand = 100;   // In markers.
-    const double minScoreRatio = 0.7;
-
-    const uint64_t maxMsaLength = 5000;
-
 
 
     // Store the source target of edgeIdA and the source vertex of edgeIdB.
@@ -116,21 +93,21 @@ LocalAssembly::LocalAssembly(
     }
 
     // Markers.
-    gatherMarkers(estimatedOffsetRatio);
+    gatherMarkers(options.estimatedOffsetRatio);
     writeOrientedReads();
     writeOrientedReadsSequences();
 
     // Assembly graph.
     alignAndDisjointSets(
-        matchScore, mismatchScore, gapScore,
-        maxSkipBases,
-        maxDrift, minHalfBand, minScoreRatio);
+        options.matchScore, options.mismatchScore, options.gapScore,
+        options.maxSkipBases,
+        options.maxDrift, options.minHalfBand, options.minScoreRatio);
     writeMarkers();
 
     // Iteration to reduce minVertexCoverage if a long MSA is encountered.
     while(true) {
 
-        minVertexCoverage = createVertices(minVertexCoverage, vertexSamplingRate);
+        minVertexCoverage = createVertices(minVertexCoverage, options.vertexSamplingRate);
         createEdges();
         writeGraph("Initial assembly graph");
 
@@ -153,18 +130,18 @@ LocalAssembly::LocalAssembly(
         findAssemblyPath();
         if(minVertexCoverage > 2) {
             try {
-                assembleAssemblyPathEdges(maxMsaLength, LongMsaPolicy::throwException);
+                assembleAssemblyPathEdges(options.maxMsaLength, LongMsaPolicy::throwException);
             } catch(...) {
                 --minVertexCoverage;
                 clear();
-                if(html and options.showDebugInformation) {
+                if(html and displayOptions.showDebugInformation) {
                     html << "<br>minVertexCoverage reduced to " << minVertexCoverage;
                 }
                 continue;
             }
 
         } else {
-            assembleAssemblyPathEdges(maxMsaLength, LongMsaPolicy::assembleAtLowCoverage);
+            assembleAssemblyPathEdges(options.maxMsaLength, LongMsaPolicy::assembleAtLowCoverage);
         }
         writeGraph("Assembly graph after assembly");
 

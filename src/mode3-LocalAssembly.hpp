@@ -4,6 +4,7 @@
 // It uses a local marker graph.
 
 // Shasta.
+#include "AssemblerOptions.hpp"
 #include "Base.hpp"
 #include "invalid.hpp"
 #include "ReadId.hpp"
@@ -118,6 +119,7 @@ public:
         MarkerGraphEdgeId edgeIdB,
         uint64_t minVertexCoverage, // 0 = automatic
         const LocalAssemblyDisplayOptions&,
+        const Mode3AssemblyOptions::LocalAssemblyOptions&,
         bool useA = true,
         bool useB = true);
 

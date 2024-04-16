@@ -1,6 +1,7 @@
 // Shasta.
 #include "Mode3Assembler.hpp"
 #include "Assembler.hpp"
+#include "AssemblerOptions.hpp"
 #include "deduplicate.hpp"
 #include "dset64-gccAtomic.hpp"
 #include "mode3-AssemblyGraph.hpp"
@@ -23,6 +24,7 @@ template class MultithreadedObject<Mode3Assembler>;
 Mode3Assembler::Mode3Assembler(
     const Assembler& assembler,
     uint64_t threadCount,
+    const Mode3AssemblyOptions& options,
     bool debug) :
     MultithreadedObject<Mode3Assembler>(*this),
     MappedMemoryOwner(assembler),
@@ -33,7 +35,7 @@ Mode3Assembler::Mode3Assembler(
 
     gatherPrimaryMarkerGraphEdgeIds();
     computeConnectedComponents();
-    assembleConnectedComponents(threadCount, debug);
+    assembleConnectedComponents(threadCount, options, debug);
 
     performanceLog << timestamp << "Mode 3 assembly ends." << endl;
 }
@@ -185,13 +187,14 @@ void Mode3Assembler::computeConnectedComponents()
 
 void Mode3Assembler::assembleConnectedComponents(
     uint64_t threadCount,
+    const Mode3AssemblyOptions& options,
     bool debug)
 {
     performanceLog << timestamp << "Mode3Assembler::assembleConnectedComponents begins." << endl;
 
     vector< shared_ptr<mode3::AssemblyGraph> > assemblyGraphs;
     for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
-        assemblyGraphs.push_back(assembleConnectedComponent(componentId, threadCount, debug));
+        assemblyGraphs.push_back(assembleConnectedComponent(componentId, threadCount, options, debug));
     }
 
     // Create a global FASTA file with output from all the connected components.
@@ -234,14 +237,9 @@ void Mode3Assembler::assembleConnectedComponents(
 shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     uint64_t componentId,
     uint64_t threadCount,
+    const Mode3AssemblyOptions& options,
     bool debug)
 {
-    // PARAMETERS TO BE EXPOSED WHEN CODE STABILIZES
-    const double maxLoss = 0.1;
-    const uint64_t crossEdgesLowCoverageThreshold = 1;
-    const uint64_t crossEdgesHighCoverageThreshold = 3;
-    const uint64_t crossEdgesMinOffset = 0;
-
     performanceLog << timestamp << "Assembling connected component " <<
         componentId << " of " << connectedComponents.size() << endl;
     cout << timestamp << "Assembling connected component " <<
@@ -366,13 +364,13 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      }
 
      // Remove weak edges..
-     primaryGraph.removeWeakEdges(maxLoss);
+     primaryGraph.removeWeakEdges(options.primaryGraphOptions.maxLoss);
 
      // Remove cross-edges.
      primaryGraph.removeCrossEdges(
-         crossEdgesLowCoverageThreshold,
-         crossEdgesHighCoverageThreshold,
-         crossEdgesMinOffset);
+         options.primaryGraphOptions.crossEdgesLowCoverageThreshold,
+         options.primaryGraphOptions.crossEdgesHighCoverageThreshold,
+         0);
 
      // Graphviz output.
      if(debug) {
@@ -386,5 +384,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      }
 
      // Create the assembly graph for this connected component.
-     return make_shared<AssemblyGraph>(primaryGraph, componentId, assembler, threadCount, debug);
+     return make_shared<AssemblyGraph>(
+         primaryGraph, componentId, assembler, threadCount,
+         options, debug);
 }

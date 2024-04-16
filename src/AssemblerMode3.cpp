@@ -38,10 +38,11 @@ void Assembler::flagPrimaryMarkerGraphEdges(
 
 void Assembler::mode3Assembly(
     uint64_t threadCount,
+    const Mode3AssemblyOptions& options,
     bool debug
     )
 {
-    mode3Assembler = make_shared<Mode3Assembler>(*this, threadCount, debug);
+    mode3Assembler = make_shared<Mode3Assembler>(*this, threadCount, options, debug);
 }
 
 
@@ -50,9 +51,10 @@ void Assembler::mode3Assembly(
 void Assembler::mode3AssembleComponent(
     const string& fileName,
     uint64_t threadCount,
+    const Mode3AssemblyOptions& options,
     bool debug) const
 {
-    mode3::AssemblyGraph(fileName, *this, threadCount, debug);
+    mode3::AssemblyGraph(fileName, *this, threadCount, options, debug);
 }
 
 
@@ -225,5 +227,8 @@ void Assembler::fillMode3AssemblyPathStep(const vector<string>& request, ostream
     }
 
     // Local assembly for this assembly step.
-    mode3::LocalAssembly localAssembly(*this, edgeIdA, edgeIdB, minVertexCoverage, options, useA, useB);
+    mode3::LocalAssembly localAssembly(*this, edgeIdA, edgeIdB, minVertexCoverage,
+        options,
+        httpServerData.assemblerOptions->assemblyOptions.mode3Options.localAssemblyOptions,
+        useA, useB);
 }

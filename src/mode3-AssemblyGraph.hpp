@@ -52,6 +52,7 @@ namespace shasta {
         class PrimaryGraph;
     }
     class Assembler;
+    class Mode3AssemblyOptions;
     class OrientedReadId;
 }
 
@@ -244,6 +245,7 @@ public:
         uint64_t componentId,
         const Assembler&,
         uint64_t threadCount,
+        const Mode3AssemblyOptions& options,
         bool debug);
 
     // Load it from a binary archive, then call run.
@@ -251,6 +253,7 @@ public:
         const string& fileName,
         const Assembler&,
         uint64_t threadCount,
+        const Mode3AssemblyOptions& options,
         bool debug);
 
 private:
@@ -261,6 +264,7 @@ private:
     // Information stored by the constructor.
     uint64_t componentId;
     const Assembler& assembler;
+    const Mode3AssemblyOptions& options;
 
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive & ar, const unsigned int version)
@@ -775,7 +779,9 @@ private:
             return offsetInBases > that.offsetInBases;
         }
     };
-    void runAssemblyStep(uint64_t chainTerminalCommonThreshold, const AssemblyStep&);
+    void runAssemblyStep(
+        uint64_t chainTerminalCommonThreshold,
+        const AssemblyStep&);
     void runAssemblyStep(
         Chain& chain,
         uint64_t positionInChain,

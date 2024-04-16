@@ -17,6 +17,7 @@ arguments = parser.parse_args()
 
 
 
+options = shasta.AssemblerOptions('shasta.conf')
 a = shasta.Assembler()
 a.accessMarkers()
 a.accessMarkerGraphVertices()
@@ -25,5 +26,5 @@ a.accessMarkerGraphReverseComplementEdge()
 a.accessMarkerGraphConsensus()
 shasta.openPerformanceLog('Mode3AssembleComponent.log')
 fileName = 'AssemblyGraph-' + str(arguments.component) + '.data'
-a.mode3AssembleComponent(fileName, 0, arguments.debug)
+a.mode3AssembleComponent(fileName, 0, options.assemblyOptions.mode3Options, arguments.debug)
  
