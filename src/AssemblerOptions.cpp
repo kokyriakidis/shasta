@@ -946,6 +946,24 @@ void AssemblerOptions::addConfigurableOptions()
         default_value(false),
         "Suppress output of haploid representation of the assembly (Mode 2 assembly only).")
 
+        ("Assembly.mode3.primaryGraph.maxLoss",
+        value<double>(&assemblyOptions.mode3Options.primaryGraphOptions.maxLoss)->
+        default_value(0.1),
+        "Use for weak edge removal in the primary graph. "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.primaryGraph.crossEdgesLowCoverageThreshold",
+        value<uint64_t>(&assemblyOptions.mode3Options.primaryGraphOptions.crossEdgesLowCoverageThreshold)->
+        default_value(1),
+        "Low coverage threshold for cross edge removal in the primary graph. "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.primaryGraph.crossEdgesHighCoverageThreshold",
+        value<uint64_t>(&assemblyOptions.mode3Options.primaryGraphOptions.crossEdgesHighCoverageThreshold)->
+        default_value(3),
+        "High coverage threshold for cross edge removal in the primary graph. "
+        "(Mode 3 assembly only).")
+
         ("Assembly.mode3.localAssembly.estimatedOffsetRatio",
         value<double>(&assemblyOptions.mode3Options.localAssemblyOptions.estimatedOffsetRatio)->
         default_value(1.1),
@@ -1222,7 +1240,18 @@ void Mode2AssemblyOptions::write(ostream& s) const
 
 void Mode3AssemblyOptions::write(ostream& s) const
 {
+    primaryGraphOptions.write(s);
     localAssemblyOptions.write(s);
+}
+
+
+
+void Mode3AssemblyOptions::PrimaryGraphOptions::write(ostream& s) const
+{
+    s << "mode3.primaryGraph.maxLoss = " << maxLoss << "\n";
+    s << "mode3.primaryGraph.crossEdgesLowCoverageThreshold = " << crossEdgesLowCoverageThreshold << "\n";
+    s << "mode3.primaryGraph.crossEdgesHighCoverageThreshold = " << crossEdgesHighCoverageThreshold << "\n";
+
 }
 
 

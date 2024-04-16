@@ -327,6 +327,23 @@ public:
 class shasta::Mode3AssemblyOptions {
 public:
 
+    // Options used to clean up the PrimaryGraph.
+    class PrimaryGraphOptions {
+    public:
+
+        // Parameter to control removal of weak edges.
+        double maxLoss;
+
+        // Parameters ot control removal of cross edges.
+        uint64_t crossEdgesLowCoverageThreshold;
+        uint64_t crossEdgesHighCoverageThreshold;
+
+        void write(ostream&) const;
+    };
+    PrimaryGraphOptions primaryGraphOptions;
+
+
+
     // Options used by class mode3::LocalAssembly
     class LocalAssemblyOptions {
     public:
