@@ -654,6 +654,20 @@ PYBIND11_MODULE(shasta, shastaModule)
 
 
 
+    // Expose portions of class AssemblerOptions to Python.
+    class_<AssemblerOptions>(shastaModule, "AssemblerOptions")
+        .def(pybind11::init<const string&>())
+        .def_readonly("assemblyOptions", &AssemblerOptions::assemblyOptions)
+        ;
+    class_<AssemblyOptions>(shastaModule, "AssemblyOptions")
+        .def_readonly("mode3Options", &AssemblyOptions::mode3Options)
+        ;
+    class_<Mode3AssemblyOptions>(shastaModule, "Mode3AssemblyOptions")
+        .def_readonly("primaryGraphOptions", &Mode3AssemblyOptions::primaryGraphOptions)
+        ;
+
+
+
     // Constants.
     shastaModule.attr("invalidGlobalMarkerGraphVertexId") = MarkerGraph::invalidVertexId;
     shastaModule.attr("invalidCompressedGlobalMarkerGraphVertexId") =
