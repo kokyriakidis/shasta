@@ -959,7 +959,136 @@ This is a
 If set, output of the haploid representation of the assembly is suppressed. Mode 2 assembly only.
 <a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
 
+<tr id='Assembly.mode3.primaryGraph.maxLoss'>
+<td><code>--Assembly.mode3.primaryGraph.maxLoss</code>
+<td class=centered><code>0.1</code><td>
+Used for weak edge removal in the primary graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.primaryGraph.crossEdgesLowCoverageThreshold'>
+<td><code>--Assembly.mode3.primaryGraph.crossEdgesLowCoverageThreshold</code>
+<td class=centered><code>1</code><td>
+Low coverage threshold for cross edge removal in the primary graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.primaryGraph.crossEdgesHighCoverageThreshold'>
+<td><code>--Assembly.mode3.primaryGraph.crossEdgesHighCoverageThreshold</code>
+<td class=centered><code>3</code><td>
+High coverage threshold for cross edge removal in the primary graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.detangleToleranceLow'>
+<td><code>--Assembly.mode3.assemblyGraph.detangleToleranceLow</code>
+<td class=centered><code>0</code><td>
+Used for detangling of the assembly graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.detangleToleranceHigh'>
+<td><code>--Assembly.mode3.assemblyGraph.detangleToleranceHigh</code>
+<td class=centered><code>2</code><td>
+Used for detangling of the assembly graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.epsilon'>
+<td><code>--Assembly.mode3.assemblyGraph.epsilon</code>
+<td class=centered><code>0.1</code><td>
+&epsilon; value for the Bayesian model used for detangling the assembly graph. 
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.minLogP'>
+<td><code>--Assembly.mode3.assemblyGraph.minLogP</code>
+<td class=centered><code>20</code><td>
+<code>MinLogP</code> value (in dB) for the Bayesian model used for detangling the assembly graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.longBubbleThreshold'>
+<td><code>--Assembly.mode3.assemblyGraph.longBubbleThreshold</code>
+<td class=centered><code>5000</code><td>
+Long bubble threshold . 
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.phaseErrorThreshold'>
+<td><code>--Assembly.mode3.assemblyGraph.phaseErrorThreshold</code>
+<td class=centered><code>0.1</code><td>
+Phase error threshold for phasing.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.bubbleErrorThreshold'>
+<td><code>--Assembly.mode3.assemblyGraph.bubbleErrorThreshold</code>
+<td class=centered><code>0.03</code><td>
+Bubble error threshold for bubble cleanup.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.chainTerminalCommonThreshold'>
+<td><code>--Assembly.mode3.assemblyGraph.chainTerminalCommonThreshold</code>
+<td class=centered><code>3</code><td>
+Used for bubble cleanup.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.estimatedOffsetRatio'>
+<td><code>--Assembly.mode3.localAssembly.estimatedOffsetRatio</code>
+<td class=centered><code>1.1</code><td>
+For local assembly, the estimated offset between the left and right gets
+extended by this ratio to decide how much to extend reads that only appear on one side only.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.vertexSamplingRate'>
+<td><code>--Assembly.mode3.localAssembly.vertexSamplingRate</code>
+<td class=centered><code>0.8</code><td>
+Vertex sampling rate for local assembly, used to set minVertexCoverage.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.matchScore'>
+<td><code>--Assembly.mode3.localAssembly.matchScore</code>
+<td class=centered><code>6</code><td>
+Match score for alignment computation in local assembly.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.mismatchScore'>
+<td><code>--Assembly.mode3.localAssembly.mismatchScore</code>
+<td class=centered><code>-1</code><td>
+Mismatch score for alignment computation in local assembly.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.gapScore'>
+<td><code>--Assembly.mode3.localAssembly.gapScore</code>
+<td class=centered><code>-1</code><td>
+Gap score for alignment computation in local assembly.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.maxSkipBases'>
+<td><code>--Assembly.mode3.localAssembly.maxSkipBases</code>
+<td class=centered><code>500</code><td>
+Number of bases (not markers) that can be skipped by an alignment in local assembly.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.maxDrift'>
+<td><code>--Assembly.mode3.localAssembly.maxDrift</code>
+<td class=centered><code>0.005</code><td>
+The maximum tolerated length drift of each read. 
+Used to compute the band for banded alignments in local assembly. 
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.minHalfBand'>
+<td><code>--Assembly.mode3.localAssembly.minHalfBand</code>
+<td class=centered><code>100</code><td>
+Minimum half band, in markers, for alignment computations in local assembly.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.minScoreRatio'>
+<td><code>--Assembly.mode3.localAssembly.minScoreRatio</code>
+<td class=centered><code>0.7</code><td>
+Score threshold for discarding alignments in for local assembly. 
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.maxMsaLength'>
+<td><code>--Assembly.mode3.localAssembly.maxMsaLength</code>
+<td class=centered><code>5000</code><td>
+Maximum allowed length of a multiple sequence alignment computation for local assembly.
+Mode 3 assembly only.
+
 </table>
+
 
 <div class="goto-index"><a href="index.html">Table of contents</a></div>
 
