@@ -1117,25 +1117,49 @@ string AssemblyGraph::bubbleStringId(
 
 
 string AssemblyGraph::chainStringId(
-    edge_descriptor ce,
+    edge_descriptor e,
     uint64_t positionInBubbleChain,
     uint64_t indexInBubble) const
 {
-    // Locate the bubble chain.
+    // Locate the AssemblyGraphEdge.
     const AssemblyGraph& cGraph = *this;
-    const AssemblyGraphEdge& edge = cGraph[ce];
-    const BubbleChain& bubbleChain = edge;
+    const AssemblyGraphEdge& edge = cGraph[e];
 
-    // Find the ploidy.
-    const Bubble& bubble = bubbleChain[positionInBubbleChain];
-    const uint64_t ploidy = bubble.size();
+    // Get the P-value for the Chain.
+    const uint64_t pValue = chainPValue(e, positionInBubbleChain, indexInBubble);
 
     return
         to_string(componentId) + "-" +
         to_string(edge.id) + "-" +
         to_string(positionInBubbleChain) + "-" +
         to_string(indexInBubble) + "-P" +
-        to_string(ploidy);
+        to_string(pValue);
+}
+
+
+
+// This returns a "P-value" for a Chain defined as follows:
+// If the Chain is the only chain of a BubbleChain, the P-value is 0.
+// Otherwise, the P-value is the ploidy of the Bubble that the Chain belongs to.
+// The P-value is used to create the -P suffix in the name (stringId) of the Chain.
+uint64_t AssemblyGraph::chainPValue(
+    edge_descriptor e,
+    uint64_t positionInBubbleChain,
+    uint64_t indexInBubble) const
+{
+    // Locate the chain.
+    const AssemblyGraph& cGraph = *this;
+    const AssemblyGraphEdge& edge = cGraph[e];
+    const BubbleChain& bubbleChain = edge;
+    const Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+    if(bubbleChain.size() == 1 and bubble.size() == 1) {
+        // This is the only Chain in this BubbleChain.
+        return 0;
+    } else {
+        // Return the ploidy of the Bubble this Chain belongs to.
+        return bubble.size();
+    }
 }
 
 

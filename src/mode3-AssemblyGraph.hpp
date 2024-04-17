@@ -822,6 +822,11 @@ private:
     string bubbleStringId(edge_descriptor, uint64_t positionInBubbleChain) const;
     string chainStringId(edge_descriptor, uint64_t positionInBubbleChain, uint64_t indexInBubble) const;
 
+    // This returns a "P-value" for a Chain defined as follows:
+    // If the Chain is the only chain of a BubbleChain, the P-value is 0.
+    // Otherwise, the P-value is the ploidy of the Bubble that the Chain belongs to.
+    uint64_t chainPValue(edge_descriptor, uint64_t positionInBubbleChain, uint64_t indexInBubble) const;
+
     uint64_t chainOffset(const Chain&) const;
     void bubbleOffset(
         const Bubble&,
