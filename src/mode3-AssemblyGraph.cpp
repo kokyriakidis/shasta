@@ -115,7 +115,9 @@ void AssemblyGraph::run(
         if(cleanedUpBubbleCount == 0) {
             break;
         }
-        cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
+        if(debug) {
+            cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
+        }
         compressBubbleChains();
         compress();
     }
@@ -1161,6 +1163,68 @@ uint64_t AssemblyGraph::chainPValue(
         return bubble.size();
     }
 }
+
+
+
+// Get the lengths of Chains assembled sequence for each Chain P-value.
+// On return, chainLengths[pValue] contains the lengths of all
+// Chains with that pValue, sorted in decreasing order.
+// This can be used for N50 statistics.
+void AssemblyGraph::getChainLengthsByPValue(vector< vector<uint64_t> >& chainLengths) const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+    chainLengths.clear();
+
+    // Loop over all BubbleChains.
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = assemblyGraph[e];
+
+        // Loop over all Bubbles in this BubbleChain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            const Bubble& bubble = bubbleChain[positionInBubbleChain];
+            const uint64_t ploidy = bubble.size();
+
+            // Loop over all Chains in this Bubble.
+            for(uint64_t indexInBubble=0; indexInBubble<ploidy; indexInBubble++) {
+                const Chain& chain = bubble[indexInBubble];
+                const uint64_t pValue = chainPValue(e, positionInBubbleChain, indexInBubble);
+
+                // Make sure we have a vector for this pValue.
+                if(pValue >= chainLengths.size()) {
+                    chainLengths.resize(pValue + 1);
+                }
+
+                // Store the sequence length of this chain.
+                chainLengths[pValue].push_back(chain.sequence.size());
+            }
+        }
+    }
+
+    // Sort by decreasing Chain lengths.
+    for(auto& v: chainLengths) {
+        sort(v.begin(), v.end(), std::greater<uint64_t>());
+    }
+}
+
+
+
+// Given a vector of lengths in decreasing order, compute the total length and N50.
+pair<uint64_t, uint64_t> AssemblyGraph::n50(const vector<uint64_t>& lengths)
+{
+    // Compute the total length.
+    const uint64_t totalLength = accumulate(lengths.begin(), lengths.end(), 0);
+
+    // Compute the N50.
+    uint64_t cumulativeLength = 0;
+    for(const uint64_t length: lengths) {
+        cumulativeLength += length;
+        if(2 * cumulativeLength >= totalLength) {
+            return {totalLength, length};
+        }
+    }
+    SHASTA_ASSERT(0);
+}
+
 
 
 

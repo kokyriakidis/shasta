@@ -192,10 +192,69 @@ void Mode3Assembler::assembleConnectedComponents(
 {
     performanceLog << timestamp << "Mode3Assembler::assembleConnectedComponents begins." << endl;
 
+    vector< vector<uint64_t> > assemblyChainLengthsByPValue;
+
+
     vector< shared_ptr<mode3::AssemblyGraph> > assemblyGraphs;
     for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
-        assemblyGraphs.push_back(assembleConnectedComponent(componentId, threadCount, options, debug));
+        const shared_ptr<AssemblyGraph> assemblyGraph =
+            assembleConnectedComponent(componentId, threadCount, options, debug);
+        assemblyGraphs.push_back(assemblyGraph);
+
+        // Chain length statistics.
+        vector< vector<uint64_t> > chainLengths;
+        assemblyGraph->getChainLengthsByPValue(chainLengths);
+
+        // Assembly statistics by P-value.
+        cout << "Assembly statistics by P-Value for component " << componentId << ":" << endl;
+        for(uint64_t pValue=0; pValue<chainLengths.size(); pValue++) {
+            uint64_t totalLength, n50;
+            tie(totalLength, n50) = AssemblyGraph::n50(chainLengths[pValue]);
+            cout << "P-value " << pValue << ": total assembled length " << totalLength <<
+                ", N50 " << n50 << endl;
+        }
+
+        // Combined assembly statistics for this component.
+        vector<uint64_t> allChainLengths;
+        for(const auto& v: chainLengths) {
+            copy(v.begin(), v.end(), back_inserter(allChainLengths));
+        }
+        sort(allChainLengths.begin(), allChainLengths.end(), std::greater<uint64_t>());
+        uint64_t totalLength, n50;
+        tie(totalLength, n50) = AssemblyGraph::n50(allChainLengths);
+        cout << "Combined for this component: total assembled length " << totalLength <<
+            ", N50 " << n50 << endl;
+
+        // Store the chain lengths.
+        if(assemblyChainLengthsByPValue.size() < chainLengths.size()) {
+            assemblyChainLengthsByPValue.resize(chainLengths.size());
+        }
+        for(uint64_t pValue=0; pValue<chainLengths.size(); pValue++) {
+            copy(chainLengths[pValue].begin(), chainLengths[pValue].end(),
+                back_inserter(assemblyChainLengthsByPValue[pValue]));
+        }
     }
+
+    cout << "Global assembly statistics by P-Value:" << endl;
+    for(uint64_t pValue=0; pValue<assemblyChainLengthsByPValue.size(); pValue++) {
+        sort(assemblyChainLengthsByPValue[pValue].begin(), assemblyChainLengthsByPValue[pValue].end(),
+            std::greater<uint64_t>());
+        uint64_t totalLength, n50;
+        tie(totalLength, n50) = AssemblyGraph::n50(assemblyChainLengthsByPValue[pValue]);
+        cout << "P-value " << pValue << ": total assembled length " << totalLength <<
+            ", N50 " << n50 << endl;
+    }
+    vector<uint64_t> allChainLengths;
+    for(const auto& v: assemblyChainLengthsByPValue) {
+        copy(v.begin(), v.end(), back_inserter(allChainLengths));
+    }
+    sort(allChainLengths.begin(), allChainLengths.end(), std::greater<uint64_t>());
+    uint64_t totalLength, n50;
+    tie(totalLength, n50) = AssemblyGraph::n50(allChainLengths);
+    cout << "Global assembly statistics, conbined for all P-values: total assembled length " << totalLength <<
+        ", N50 " << n50 << endl;
+
+
 
     // Create a global FASTA file with output from all the connected components.
     {

@@ -795,6 +795,17 @@ private:
 
 
 
+    // Get the lengths of Chains assembled sequence for each Chain P-value.
+    // On return, chainLengths[pValue] contains the lengths of all
+    // Chains with that pValue, sorted in decreasing order.
+    // This can be used for N50 statistics.
+public:
+    void getChainLengthsByPValue(vector< vector<uint64_t> >& chainLengths) const;
+
+    // Given a vector of lengths in decreasing order, compute the total length and N50.
+    static pair<uint64_t, uint64_t> n50(const vector<uint64_t>&);
+private:
+
     // Output.
     void write(const string& name, bool writeSequence = false) const;
     void writeCsv(const string& fileNamePrefix) const;
