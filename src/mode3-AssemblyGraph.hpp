@@ -817,11 +817,20 @@ private:
     void writeChainDetailsCsv(ostream&, edge_descriptor, bool writeHeader) const;
     void writeGraphviz(const string& fileNamePrefix, bool labels) const;
     void writeGfa(const string& fileNamePrefix) const;
-    void writeGfaExpanded(const string& fileNamePrefix, bool includeSequence) const;
-    void writeGfaExpanded(ostream&, bool includeSequence) const;
+    void writeGfaExpanded(
+        const string& fileNamePrefix,
+        bool includeSequence,
+        bool useSequenceLength) const;
+    void writeGfaExpanded(
+        ostream&,
+        bool includeSequence,
+        bool useSequenceLength) const;
     void writeAssemblyDetails() const;
 public:
-    void writeGfaSegmentsExpanded(ostream&, bool includeSequence) const;
+    void writeGfaSegmentsExpanded(
+        ostream&,
+        bool includeSequence,
+        bool useSequenceLength) const;
     void writeGfaLinksExpanded(ostream&) const;
     static void writeGfaHeader(ostream&);
     void writeFastaExpanded(ostream&) const;

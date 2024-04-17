@@ -269,7 +269,7 @@ void Mode3Assembler::assembleConnectedComponents(
         ofstream gfa("Assembly.gfa");
         AssemblyGraph::writeGfaHeader(gfa);
         for(const shared_ptr<mode3::AssemblyGraph>& assemblyGraph: assemblyGraphs) {
-            assemblyGraph->writeGfaSegmentsExpanded(gfa, true);
+            assemblyGraph->writeGfaSegmentsExpanded(gfa, true, true);
         }
         for(const shared_ptr<mode3::AssemblyGraph>& assemblyGraph: assemblyGraphs) {
             assemblyGraph->writeGfaLinksExpanded(gfa);
@@ -281,7 +281,7 @@ void Mode3Assembler::assembleConnectedComponents(
     {
         AssemblyGraph::writeGfaHeader(gfa);
         for(const shared_ptr<mode3::AssemblyGraph>& assemblyGraph: assemblyGraphs) {
-            assemblyGraph->writeGfaSegmentsExpanded(gfa, false);
+            assemblyGraph->writeGfaSegmentsExpanded(gfa, false, true);
         }
         for(const shared_ptr<mode3::AssemblyGraph>& assemblyGraph: assemblyGraphs) {
             assemblyGraph->writeGfaLinksExpanded(gfa);

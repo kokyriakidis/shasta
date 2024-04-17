@@ -587,7 +587,7 @@ void AssemblyGraph::write(const string& name, bool writeSequence) const
     writeGraphviz(fileNamePrefix, true);
     writeGraphviz(fileNamePrefix, false);
     writeGfa(fileNamePrefix);
-    writeGfaExpanded(name, writeSequence);
+    writeGfaExpanded(name, writeSequence, writeSequence);
     if(writeSequence) {
         writeFastaExpanded(name);
     }
@@ -900,17 +900,28 @@ void AssemblyGraph::writeGfa(const string& fileNamePrefix) const
 
 
 
-void AssemblyGraph::writeGfaExpanded(ostream& gfa, bool includeSequence) const
+void AssemblyGraph::writeGfaExpanded(
+    ostream& gfa,
+    bool includeSequence,
+    bool useSequenceLength) const
 {
     writeGfaHeader(gfa);
-    writeGfaSegmentsExpanded(gfa, includeSequence);
+    writeGfaSegmentsExpanded(gfa, includeSequence, useSequenceLength);
     writeGfaLinksExpanded(gfa);
 }
 
 
 
-void AssemblyGraph::writeGfaSegmentsExpanded(ostream& gfa, bool includeSequence) const
+void AssemblyGraph::writeGfaSegmentsExpanded(
+    ostream& gfa,
+    bool includeSequence,
+    bool useSequenceLength
+) const
 {
+    if(includeSequence) {
+        SHASTA_ASSERT(useSequenceLength);
+    }
+
     const AssemblyGraph& graph = *this;
 
     // Loop over BubbleChains. Each Chain of each Bubble generates a GFA segment.
@@ -925,7 +936,6 @@ void AssemblyGraph::writeGfaSegmentsExpanded(ostream& gfa, bool includeSequence)
             // Loop over chains of this bubble.
             for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
                 const Chain& chain = bubble[indexInBubble];
-                const uint64_t offset = chainOffset(chain);
 
                 // Record type.
                 gfa << "S\t";
@@ -950,7 +960,12 @@ void AssemblyGraph::writeGfaSegmentsExpanded(ostream& gfa, bool includeSequence)
                     gfa << "*\t";
 
                     // Sequence length in bases.
-                    gfa << "LN:i:" << offset << "\n";
+                    if(useSequenceLength) {
+                        gfa << "LN:i:" << chain.sequence.size() << "\n";
+                    } else {
+                        const uint64_t offset = chainOffset(chain);
+                        gfa << "LN:i:" << offset << "\n";
+                    }
                 }
             }
         }
@@ -1033,10 +1048,11 @@ void AssemblyGraph::writeGfaHeader(ostream& gfa)
 // details of the BubbleChains.
 void AssemblyGraph::writeGfaExpanded(
     const string& fileNamePrefix,
-    bool includeSequence) const
+    bool includeSequence,
+    bool useSequenceLength) const
 {
     ofstream gfa(fileNamePrefix + "-" + to_string(componentId) + "-Expanded.gfa");
-    writeGfaExpanded(gfa, includeSequence);
+    writeGfaExpanded(gfa, includeSequence, useSequenceLength);
 }
 
 
@@ -1089,7 +1105,7 @@ void AssemblyGraph::writeSnapshot(uint64_t& snapshotNumber) const
 {
     const string name = to_string(snapshotNumber++);
     write(name);
-    writeGfaExpanded(name, false);
+    writeGfaExpanded(name, false, false);
 }
 
 
