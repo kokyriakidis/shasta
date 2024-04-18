@@ -809,6 +809,9 @@ private:
     // Output.
     void write(const string& name, bool writeSequence = false) const;
     void writeCsv(const string& fileNamePrefix) const;
+public:
+    void writeCsvSummary(ostream&) const;
+private:
     void writeBubbleChainsCsv(const string& fileNamePrefix) const;
     void writeBubbleChainsPhasingTables(const string& fileNamePrefix, double phaseErrorThreshold) const;
     void writeBubblesCsv(const string& fileNamePrefix) const;

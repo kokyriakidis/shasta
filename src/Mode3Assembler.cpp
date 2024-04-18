@@ -251,10 +251,20 @@ void Mode3Assembler::assembleConnectedComponents(
     sort(allChainLengths.begin(), allChainLengths.end(), std::greater<uint64_t>());
     uint64_t totalLength, n50;
     tie(totalLength, n50) = AssemblyGraph::n50(allChainLengths);
-    cout << "Global assembly statistics, conbined for all P-values: total assembled length " << totalLength <<
+    cout << "Global assembly statistics, combined for all P-values: total assembled length " << totalLength <<
         ", N50 " << n50 << endl;
 
 
+
+    // Create a csv file with one line for each assembled segment.
+    // This can also be loaded in Bandage.
+    {
+        ofstream csv("Assembly.csv");
+        csv << "Chain,Component,Bubble chain,Position in bubble chain,Index in bubble,Sequence length,P value,Color,\n";
+        for(const shared_ptr<mode3::AssemblyGraph>& assemblyGraph: assemblyGraphs) {;
+            assemblyGraph->writeCsvSummary(csv);
+        }
+    }
 
     // Create a global FASTA file with output from all the connected components.
     {

@@ -974,6 +974,83 @@ void AssemblyGraph::writeGfaSegmentsExpanded(
 
 
 
+// This writes a csv summary with one line for each assembled segment.
+void AssemblyGraph::writeCsvSummary(ostream& csv) const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+
+    // Loop over BubbleChains. Each Chain of each Bubble generates a GFA segment.
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        const AssemblyGraphEdge& edge = assemblyGraph[e];
+        const BubbleChain& bubbleChain = edge;
+
+        // Loop over Bubbles of this chain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size();
+            ++positionInBubbleChain) {
+            const Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+            // Loop over chains of this bubble.
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                const Chain& chain = bubble[indexInBubble];
+                const uint64_t pValue = chainPValue(e, positionInBubbleChain, indexInBubble);
+
+                // Set the color for display in Bandage.
+                // The colors below are constructed using HSV(hue,75%,100%).
+                // Bandage support for HSV appears to be buggy.
+                string color;
+                switch(pValue) {
+
+                case 0:
+                    {
+                        // The only Chain of this BubbleChain.
+                        // Figure out if it is dangling.
+                        const vertex_descriptor v0 = source(e, assemblyGraph);
+                        const vertex_descriptor v1 = target(e, assemblyGraph);
+                        const bool isDanglingBackward = (in_degree(v0, assemblyGraph) == 0);
+                        const bool isDanglingForward = (out_degree(v1, assemblyGraph) == 0);
+                        const bool isIsolated = (isDanglingBackward and isDanglingForward);
+                        const bool isDangling = (isDanglingBackward or isDanglingForward);
+
+                        if(isIsolated) {
+                            color = "#4040ff";
+                        } else if(isDangling) {
+                            color = "#40ffff";
+                        } else {
+                            color = "#ff40ff";
+                        }
+                    }
+                    break;
+
+                case 1:
+                    // Haploid Chain in a non-trivial BubbleChain.
+                    color = "#ff4040";
+                    break;
+                case 2:
+                    // Diploid segment.
+                    color = "#40ff40";
+                    break;
+                default:
+                    // Ploidy > 2.
+                    color = "#ff9f40";
+                    break;
+                }
+
+                csv << chainStringId(e, positionInBubbleChain, indexInBubble) << ",";
+                csv << componentId << ",";
+                csv << edge.id << ",";
+                csv << positionInBubbleChain << ",";
+                csv << indexInBubble << ",";
+                csv << chain.sequence.size() << ",";
+                csv << pValue << ",";
+                csv << color << ",";
+                csv << "\n";
+            }
+        }
+    }
+}
+
+
+
 void AssemblyGraph::writeGfaLinksExpanded(ostream& gfa) const
 {
     const AssemblyGraph& graph = *this;
@@ -1228,7 +1305,7 @@ void AssemblyGraph::getChainLengthsByPValue(vector< vector<uint64_t> >& chainLen
 pair<uint64_t, uint64_t> AssemblyGraph::n50(const vector<uint64_t>& lengths)
 {
     // Compute the total length.
-    const uint64_t totalLength = accumulate(lengths.begin(), lengths.end(), 0);
+    const uint64_t totalLength = accumulate(lengths.begin(), lengths.end(), 0UL);
 
     // Compute the N50.
     uint64_t cumulativeLength = 0;
@@ -1239,8 +1316,7 @@ pair<uint64_t, uint64_t> AssemblyGraph::n50(const vector<uint64_t>& lengths)
         }
     }
 
-    // This can only happen in exceptional circumstances.
-    return {totalLength, 0};
+    SHASTA_ASSERT(0);
 }
 
 
