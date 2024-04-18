@@ -1238,7 +1238,9 @@ pair<uint64_t, uint64_t> AssemblyGraph::n50(const vector<uint64_t>& lengths)
             return {totalLength, length};
         }
     }
-    SHASTA_ASSERT(0);
+
+    // This can only happen in exceptional circumstances.
+    return {totalLength, 0};
 }
 
 
