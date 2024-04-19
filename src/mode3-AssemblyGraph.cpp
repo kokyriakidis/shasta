@@ -1304,6 +1304,11 @@ void AssemblyGraph::getChainLengthsByPValue(vector< vector<uint64_t> >& chainLen
 // Given a vector of lengths in decreasing order, compute the total length and N50.
 pair<uint64_t, uint64_t> AssemblyGraph::n50(const vector<uint64_t>& lengths)
 {
+    // Handle the trivial case.
+    if(lengths.empty()) {
+        return {0, 0};
+    }
+
     // Compute the total length.
     const uint64_t totalLength = accumulate(lengths.begin(), lengths.end(), 0UL);
 
@@ -1314,6 +1319,30 @@ pair<uint64_t, uint64_t> AssemblyGraph::n50(const vector<uint64_t>& lengths)
         if(2 * cumulativeLength >= totalLength) {
             return {totalLength, length};
         }
+    }
+
+
+
+    // We should never get here.
+    // Before asserting, write some diagnostics.
+    ofstream csv("Assertion.csv");
+    csv << "N," << lengths.size() << endl;
+    csv << "Total length," << totalLength << endl;
+
+    // Check that it is sorted in decreasing order.
+    if(lengths.size() > 1) {
+        for(uint64_ i1=1; i1<lengths.size(); i1++) {
+            const uint64_t i0 = i1 - 1;
+            if(lengths[i0] < lengths[i1]) {
+                csv << "Not sorted at," << i0 << "," << i1 << "," <<
+                    lengths[i0] << "," << lengths[i1] << endl;
+            }
+        }
+    }
+
+    // Write it all out.
+    for(uint64_ i=0; i<lengths.size(); i++) {
+        csv << i << "," << lengths[i] << endl;
     }
 
     SHASTA_ASSERT(0);
