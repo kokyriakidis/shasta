@@ -246,6 +246,7 @@ public:
         const Assembler&,
         uint64_t threadCount,
         const Mode3AssemblyOptions& options,
+        bool assembleSequence,
         bool debug);
 
     // Load it from a binary archive, then call run.
@@ -254,6 +255,7 @@ public:
         const Assembler&,
         uint64_t threadCount,
         const Mode3AssemblyOptions& options,
+        bool assembleSequence,
         bool debug);
 
 private:

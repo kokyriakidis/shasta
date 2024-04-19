@@ -2374,6 +2374,7 @@ public:
         const string& fileName,
         uint64_t threadCount,
         const Mode3AssemblyOptions&,
+        bool assembleSequence,
         bool debug) const;
 
 public:

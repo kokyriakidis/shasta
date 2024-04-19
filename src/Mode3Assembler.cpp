@@ -198,7 +198,7 @@ void Mode3Assembler::assembleConnectedComponents(
     vector< shared_ptr<mode3::AssemblyGraph> > assemblyGraphs;
     for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
         const shared_ptr<AssemblyGraph> assemblyGraph =
-            assembleConnectedComponent(componentId, threadCount, options, debug);
+            assembleConnectedComponent(componentId, threadCount, options, true, debug);
         assemblyGraphs.push_back(assemblyGraph);
 
         // Chain length statistics.
@@ -310,6 +310,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     uint64_t componentId,
     uint64_t threadCount,
     const Mode3AssemblyOptions& options,
+    bool assembleSequence,
     bool debug)
 {
     performanceLog << timestamp << "Assembling connected component " <<
@@ -458,5 +459,5 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      // Create the assembly graph for this connected component.
      return make_shared<AssemblyGraph>(
          primaryGraph, componentId, assembler, threadCount,
-         options, debug);
+         options, assembleSequence, debug);
 }

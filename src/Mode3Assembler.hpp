@@ -75,5 +75,6 @@ private:
         uint64_t componentId,
         uint64_t threadCount,
         const Mode3AssemblyOptions&,
+        bool assembleSequence,
         bool debug);
 };

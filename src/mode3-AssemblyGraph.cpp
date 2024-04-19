@@ -43,6 +43,7 @@ AssemblyGraph::AssemblyGraph(
     const Assembler& assembler,
     uint64_t threadCount,
     const Mode3AssemblyOptions& options,
+    bool assembleSequence,
     bool debug) :
     MultithreadedObject<AssemblyGraph>(*this),
     componentId(componentId),
@@ -61,7 +62,7 @@ AssemblyGraph::AssemblyGraph(
     save("AssemblyGraph-" + to_string(componentId) + ".data");
 
     performanceLog << timestamp << "Processing the assembly graph for component " << componentId << endl;
-    run(threadCount, true, debug);
+    run(threadCount, assembleSequence, debug);
     performanceLog << timestamp << "Done with the assembly graph for component " << componentId << endl;
 }
 
@@ -73,6 +74,7 @@ AssemblyGraph::AssemblyGraph(
     const Assembler& assembler,
     uint64_t threadCount,
     const Mode3AssemblyOptions& options,
+    bool assembleSequence,
     bool debug) :
     MultithreadedObject<AssemblyGraph>(*this),
     assembler(assembler),
@@ -84,7 +86,7 @@ AssemblyGraph::AssemblyGraph(
     }
 
     load(fileName);
-    run(threadCount, true, debug);
+    run(threadCount, assembleSequence, debug);
 }
 
 
