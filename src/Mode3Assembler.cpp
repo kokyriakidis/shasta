@@ -261,7 +261,7 @@ void Mode3Assembler::assembleConnectedComponents(
     {
         ofstream csv("Assembly.csv");
         csv << "Chain,Connectivity,Component,Bubble chain,Position in bubble chain,Index in bubble,"
-            "Sequence length,P value,Color,"
+            "Sequence length,Primary coverage,P value,Color,"
             "Preceded by,Followed by,"
             "\n";
         for(const shared_ptr<mode3::AssemblyGraph>& assemblyGraph: assemblyGraphs) {;

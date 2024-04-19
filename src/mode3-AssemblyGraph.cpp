@@ -1067,6 +1067,10 @@ void AssemblyGraph::writeCsvSummary(ostream& csv) const
                 csv << positionInBubbleChain << ",";
                 csv << indexInBubble << ",";
                 csv << chain.sequence.size() << ",";
+                if(chain.size() > 2) {
+                    csv << std::fixed << std::setprecision(1) << primaryCoverage(chain);
+                }
+                csv << ",";
                 csv << pValue << ",";
                 csv << color << ",";
 
@@ -1467,6 +1471,26 @@ uint64_t AssemblyGraph::chainOffset(const Chain& chain) const
         }
     }
     return offset;
+}
+
+
+
+// Return average coverage for the internal MarkerGraphEdgeIds of a Chain.
+// For chain of length 2, this returns 0.
+double AssemblyGraph::primaryCoverage(const Chain& chain) const
+{
+    if(chain.size() < 3) {
+        return 0.;
+    }
+
+    uint64_t sum = 0;
+    for(uint64_t positionInChain=1; positionInChain<chain.size()-2; positionInChain++) {
+        const MarkerGraphEdgeId markerGraphEdgeId = chain[positionInChain];
+        const uint64_t coverage = assembler.markerGraph.edgeCoverage(markerGraphEdgeId);
+        sum += coverage;
+    }
+
+    return double(sum) / double(chain.size() - 2);
 }
 
 

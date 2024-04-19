@@ -845,6 +845,11 @@ private:
     string bubbleStringId(edge_descriptor, uint64_t positionInBubbleChain) const;
     string chainStringId(edge_descriptor, uint64_t positionInBubbleChain, uint64_t indexInBubble) const;
 
+
+    // Return average coverage for the internal MarkerGraphEdgeIds of a Chain.
+    // For chain of length 2, this returns 0.
+    double primaryCoverage(const Chain&) const;
+
     // This returns a "P-value" for a Chain defined as follows:
     // If the Chain is the only chain of a BubbleChain, the P-value is 0.
     // Otherwise, the P-value is the ploidy of the Bubble that the Chain belongs to.
