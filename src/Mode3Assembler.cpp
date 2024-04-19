@@ -260,7 +260,10 @@ void Mode3Assembler::assembleConnectedComponents(
     // This can also be loaded in Bandage.
     {
         ofstream csv("Assembly.csv");
-        csv << "Chain,Component,Bubble chain,Position in bubble chain,Index in bubble,Sequence length,P value,Color,\n";
+        csv << "Chain,Component,Bubble chain,Position in bubble chain,Index in bubble,"
+            "Sequence length,P value,Color,"
+            "Preceded by,Followed by,"
+            "\n";
         for(const shared_ptr<mode3::AssemblyGraph>& assemblyGraph: assemblyGraphs) {;
             assemblyGraph->writeCsvSummary(csv);
         }

@@ -983,6 +983,8 @@ void AssemblyGraph::writeCsvSummary(ostream& csv) const
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
         const AssemblyGraphEdge& edge = assemblyGraph[e];
         const BubbleChain& bubbleChain = edge;
+        const vertex_descriptor v0 = source(e, assemblyGraph);
+        const vertex_descriptor v1 = target(e, assemblyGraph);
 
         // Loop over Bubbles of this chain.
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size();
@@ -1043,6 +1045,79 @@ void AssemblyGraph::writeCsvSummary(ostream& csv) const
                 csv << chain.sequence.size() << ",";
                 csv << pValue << ",";
                 csv << color << ",";
+
+
+
+                // Write the preceding segments.
+                if(positionInBubbleChain == 0) {
+
+                    // The preceding segments are the Chains of the last Bubble
+                    // of each previous BubbleChain.
+                    bool isFirst = true;
+                    BGL_FORALL_INEDGES(v0, e, assemblyGraph, AssemblyGraph) {
+                        const AssemblyGraphEdge& edge = assemblyGraph[e];
+                        const BubbleChain& bubbleChain = edge;
+                        const uint64_t positionInBubbleChain = bubbleChain.size() - 1;
+                        const Bubble& bubble = bubbleChain[positionInBubbleChain];
+                        for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                            if(isFirst) {
+                                isFirst = false;
+                            } else {
+                                csv << " ";
+                            }
+                            csv << chainStringId(e, positionInBubbleChain, indexInBubble);
+                        }
+                    }
+                } else {
+
+                    // The preceding segments are the Chains of the previous Bubble
+                    // in this BubbleChain.
+                    const Bubble& bubble = bubbleChain[positionInBubbleChain - 1];
+                    for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                        if(indexInBubble != 0) {
+                            csv << " ";
+                        }
+                        csv << chainStringId(e, positionInBubbleChain - 1, indexInBubble);
+                    }
+                }
+                csv << ",";
+
+
+
+                // Write the following segments.
+                if(positionInBubbleChain == bubbleChain.size() - 1) {
+
+                    // The following segments are the Chains of the first Bubble
+                    // of each next BubbleChain.
+                    bool isFirst = true;
+                    BGL_FORALL_OUTEDGES(v1, e, assemblyGraph, AssemblyGraph) {
+                        const AssemblyGraphEdge& edge = assemblyGraph[e];
+                        const BubbleChain& bubbleChain = edge;
+                        const uint64_t positionInBubbleChain = 0;
+                        const Bubble& bubble = bubbleChain[positionInBubbleChain];
+                        for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                            if(isFirst) {
+                                isFirst = false;
+                            } else {
+                                csv << " ";
+                            }
+                            csv << chainStringId(e, positionInBubbleChain, indexInBubble);
+                        }
+                    }
+                } else {
+
+                    // The following segments are the Chains of the next Bubble
+                    // in this BubbleChain.
+                    const Bubble& bubble = bubbleChain[positionInBubbleChain + 1];
+                    for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                        if(indexInBubble != 0) {
+                            csv << " ";
+                        }
+                        csv << chainStringId(e, positionInBubbleChain + 1, indexInBubble);
+                    }
+                }
+                csv << ",";
+
                 csv << "\n";
             }
         }
@@ -1331,7 +1406,7 @@ pair<uint64_t, uint64_t> AssemblyGraph::n50(const vector<uint64_t>& lengths)
 
     // Check that it is sorted in decreasing order.
     if(lengths.size() > 1) {
-        for(uint64_ i1=1; i1<lengths.size(); i1++) {
+        for(uint64_t i1=1; i1<lengths.size(); i1++) {
             const uint64_t i0 = i1 - 1;
             if(lengths[i0] < lengths[i1]) {
                 csv << "Not sorted at," << i0 << "," << i1 << "," <<
@@ -1341,7 +1416,7 @@ pair<uint64_t, uint64_t> AssemblyGraph::n50(const vector<uint64_t>& lengths)
     }
 
     // Write it all out.
-    for(uint64_ i=0; i<lengths.size(); i++) {
+    for(uint64_t i=0; i<lengths.size(); i++) {
         csv << i << "," << lengths[i] << endl;
     }
 
