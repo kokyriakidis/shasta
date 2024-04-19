@@ -996,6 +996,29 @@ void AssemblyGraph::writeCsvSummary(ostream& csv) const
                 const Chain& chain = bubble[indexInBubble];
                 const uint64_t pValue = chainPValue(e, positionInBubbleChain, indexInBubble);
 
+                // Define connectivity string.
+                string connectivity;
+                if(pValue == 0) {
+                    const bool danglingAtBeginning = (in_degree(v0, assemblyGraph) == 0);
+                    const bool danglingAtEnd = (out_degree(v1, assemblyGraph) == 0);
+                    const bool isDangling = (danglingAtBeginning or danglingAtEnd);
+                    const bool isIsolated = (danglingAtBeginning and danglingAtEnd);
+                    if(isIsolated) {
+                        connectivity = "Isolated";
+                    } else if(isDangling) {
+                        connectivity = "Dangling";
+                    } else {
+                        connectivity = "Complex";
+                    }
+
+                } else if(pValue == 1) {
+                    connectivity = "Haploid";
+                } else if(pValue == 2) {
+                    connectivity = "Diploid";
+                } else {
+                    connectivity = "Ploidy-" + to_string(pValue);
+                }
+
                 // Set the color for display in Bandage.
                 // The colors below are constructed using HSV(hue,75%,100%).
                 // Bandage support for HSV appears to be buggy.
@@ -1038,6 +1061,7 @@ void AssemblyGraph::writeCsvSummary(ostream& csv) const
                 }
 
                 csv << chainStringId(e, positionInBubbleChain, indexInBubble) << ",";
+                csv << connectivity << ",";
                 csv << componentId << ",";
                 csv << edge.id << ",";
                 csv << positionInBubbleChain << ",";

@@ -260,7 +260,7 @@ void Mode3Assembler::assembleConnectedComponents(
     // This can also be loaded in Bandage.
     {
         ofstream csv("Assembly.csv");
-        csv << "Chain,Component,Bubble chain,Position in bubble chain,Index in bubble,"
+        csv << "Chain,Connectivity,Component,Bubble chain,Position in bubble chain,Index in bubble,"
             "Sequence length,P value,Color,"
             "Preceded by,Followed by,"
             "\n";
