@@ -1020,7 +1020,7 @@ void AssemblyGraph::writeCsvSummary(ostream& csv) const
                 }
 
                 // Set the color for display in Bandage.
-                // The colors below are constructed using HSV(hue,75%,100%).
+                // The colors below are constructed using HSV(hue,75%,750%).
                 // Bandage support for HSV appears to be buggy.
                 string color;
                 switch(pValue) {
@@ -1037,26 +1037,26 @@ void AssemblyGraph::writeCsvSummary(ostream& csv) const
                         const bool isDangling = (isDanglingBackward or isDanglingForward);
 
                         if(isIsolated) {
-                            color = "#4040ff";
+                            color = "#3030bf";  // Blue
                         } else if(isDangling) {
-                            color = "#40ffff";
+                            color = "#30bfbf";  // Cyan
                         } else {
-                            color = "#ff40ff";
+                            color = "#bf30bf";  // Purple
                         }
                     }
                     break;
 
                 case 1:
                     // Haploid Chain in a non-trivial BubbleChain.
-                    color = "#ff4040";
+                    color = "#bf3030";  // Red
                     break;
                 case 2:
                     // Diploid segment.
-                    color = "#40ff40";
+                    color = "#30bf30";  // Green
                     break;
                 default:
                     // Ploidy > 2.
-                    color = "#ff9f40";
+                    color = "#bfbf30";  // Yellow
                     break;
                 }
 
@@ -1484,7 +1484,7 @@ double AssemblyGraph::primaryCoverage(const Chain& chain) const
     }
 
     uint64_t sum = 0;
-    for(uint64_t positionInChain=1; positionInChain<chain.size()-2; positionInChain++) {
+    for(uint64_t positionInChain=1; positionInChain<chain.size()-1; positionInChain++) {
         const MarkerGraphEdgeId markerGraphEdgeId = chain[positionInChain];
         const uint64_t coverage = assembler.markerGraph.edgeCoverage(markerGraphEdgeId);
         sum += coverage;
