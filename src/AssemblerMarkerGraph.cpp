@@ -223,6 +223,23 @@ void Assembler::createMarkerGraphVertices(
             ++histogram[markerCount];
         }
 
+        // Store the disjoint sets histogram in a MemoryMapped::Vector.
+        // This is used when flagging primary marker graph edges for Mode 3 assembly.
+        // This stored pairs(coverage, frequency).
+        // Only pairs where the frequency is not zero are stored.
+        {
+            MemoryMapped::Vector< pair<uint64_t, uint64_t> > storedHistogram;
+            storedHistogram.createNew(
+                largeDataName("DisjointSetsHistogram"),
+                largeDataPageSize);
+            for(uint64_t coverage=0; coverage<histogram.size(); coverage++) {
+                const uint64_t frequency = histogram[coverage];
+                if(frequency) {
+                    storedHistogram.push_back({coverage, frequency});
+                }
+            }
+        }
+
         ofstream csv("DisjointSetsHistogram.csv");
         csv << "Coverage,Frequency\n";
         for(uint64_t coverage=0; coverage<histogram.size(); coverage++) {
