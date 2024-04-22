@@ -387,6 +387,7 @@ public:
         uint64_t minPrimaryEdgeCoverage,
         uint64_t maxPrimaryEdgeCoverage,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+        const MemoryMapped::Vector< pair<uint64_t, uint64_t> >& disjointSetsHistogram,
         uint64_t threadCount);
 private:
     void flagPrimaryEdgesThreadFunction(uint64_t threadId);

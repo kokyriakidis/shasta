@@ -782,8 +782,56 @@ void MarkerGraph::flagPrimaryEdges(
     uint64_t minPrimaryEdgeCoverage,
     uint64_t maxPrimaryEdgeCoverage,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+    const MemoryMapped::Vector< pair<uint64_t, uint64_t> >& disjointSetsHistogram,
     uint64_t threadCount)
 {
+    // If minPrimaryEdgeCoverage and maxPrimaryEdgeCoverage are both 0,
+    // use the disjoint sets histogram and simple heuristics to choose
+    // appropriate values.
+    if((minPrimaryEdgeCoverage == 0) and (maxPrimaryEdgeCoverage == 0)) {
+
+        // Set minPrimaryEdgeCoverage to the first value where the
+        // disjointSetsHistogram starts increasing.
+        bool done = false;
+        uint64_t frequencyAtMinPrimaryEdgeCoverage = 0;
+        for(uint64_t i=1; i<disjointSetsHistogram.size(); i++) {
+            const uint64_t coverage = disjointSetsHistogram[i].first;
+            const uint64_t frequency = disjointSetsHistogram[i].second;
+            const uint64_t previousCoverage = disjointSetsHistogram[i-1].first;
+            const uint64_t previousFrequency = disjointSetsHistogram[i-1].second;
+            if(
+                (coverage != previousCoverage+1) // Frequency at coverage-1 is zero, so the histogram went up.
+                or
+                frequency > previousFrequency    // The histogram went up.
+                ) {
+                minPrimaryEdgeCoverage = coverage;
+                frequencyAtMinPrimaryEdgeCoverage = frequency;
+                done = true;
+                break;
+            }
+        }
+        SHASTA_ASSERT(done);
+
+        // Set maxPrimaryEdgeCoverage to the last coverage with frequency
+        // at least equal to frequencyAtMinPrimaryEdgeCoverage.
+        done = false;
+        for(uint64_t i=disjointSetsHistogram.size()-1; i>0; i--) {
+            const uint64_t coverage = disjointSetsHistogram[i].first;
+            const uint64_t frequency = disjointSetsHistogram[i].second;
+            if(frequency >= frequencyAtMinPrimaryEdgeCoverage) {
+                maxPrimaryEdgeCoverage = coverage;
+                done= true;
+                break;
+            }
+        }
+        SHASTA_ASSERT(done);
+
+        cout << "Automatically set: minPrimaryEdgeCoverage = " << minPrimaryEdgeCoverage <<
+            ", maxPrimaryEdgeCoverage = " << maxPrimaryEdgeCoverage << endl;
+    }
+
+
+
     // Store the arguments so the threads can see them.
     flagPrimaryEdgesData.minPrimaryEdgeCoverage = minPrimaryEdgeCoverage;
     flagPrimaryEdgesData.maxPrimaryEdgeCoverage = maxPrimaryEdgeCoverage;

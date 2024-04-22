@@ -27,10 +27,14 @@ void Assembler::flagPrimaryMarkerGraphEdges(
     checkMarkerGraphVerticesAreAvailable();
     SHASTA_ASSERT(markerGraph.edges.isOpenWithWriteAccess);
 
+    MemoryMapped::Vector< pair<uint64_t, uint64_t> > histogram;
+    histogram.accessExistingReadOnly(largeDataName("DisjointSetsHistogram"));
+
     markerGraph.flagPrimaryEdges(
         minPrimaryEdgeCoverage,
         maxPrimaryEdgeCoverage,
         markers,
+        histogram,
         threadCount);
 }
 
