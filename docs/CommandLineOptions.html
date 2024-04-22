@@ -367,11 +367,15 @@ If <code>--MinHash.minHashIterationCount</code> is not 0, this is not used.
 <tr id='MinHash.minBucketSize'>
 <td><code>--MinHash.minBucketSize</code><td class=centered><code>0</code><td>
 The minimum size for a bucket to be used by the MinHash/LowHash algoritm.
+If minBucketSize and maxBucketSize are both 0, they are adjusted automatically
+at each iteration using simple heuristics.
 <a class=qm href='ComputationalMethods.html#FindingOverlappingReads'/>
 
 <tr id='MinHash.maxBucketSize'>
 <td><code>--MinHash.maxBucketSize</code><td class=centered><code>10</code><td>
 The maximum size for a bucket to be used by the MinHash/LowHash algoritm.
+If minBucketSize and maxBucketSize are both 0, they are adjusted automatically
+at each iteration using simple heuristics.
 <a class=qm href='ComputationalMethods.html#FindingOverlappingReads'/>
 
 <tr id='MinHash.minFrequency'>

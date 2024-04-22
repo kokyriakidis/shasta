@@ -246,9 +246,12 @@ void shasta::main::assemble(
     }
 
     // Check assemblerOptions.minHashOptions minimum/maximum bucket size.
-    if( assemblerOptions.minHashOptions.maxBucketSize <=
-        assemblerOptions.minHashOptions.minBucketSize) {
-        throw runtime_error("MinHash maximum bucket size must be greater than minimum bucket size. "
+    const bool dynamicMinHashBucketRange =
+        (assemblerOptions.minHashOptions.minBucketSize == 0) and
+        (assemblerOptions.minHashOptions.maxBucketSize == 0);
+    if((not dynamicMinHashBucketRange) and (assemblerOptions.minHashOptions.maxBucketSize <=
+        assemblerOptions.minHashOptions.minBucketSize)) {
+        throw runtime_error("Invalid MinHash min/max bucket sizes specified. "
             "The following values were specified:"
             " minimum bucket size " +
             to_string(assemblerOptions.minHashOptions.minBucketSize) +

@@ -171,12 +171,14 @@ private:
 
 
     // Compute a histogram of the number of entries in each histogram.
-    void computeBucketHistogram();
+    void computeBucketHistogram(vector<uint64_t>& bucketHistogram);
     void computeBucketHistogramThreadFunction(size_t threadId);
     vector< vector<uint64_t> > threadBucketHistogram;
     ofstream histogramCsv;
 
-
+    // Adjust minBucketSize and maxBucketSize based on the current
+    // bucket size histogram.
+    void adjustMinMaxBucketSizes(const vector<uint64_t>& bucketHistogram);
 
     // Thread functions.
 

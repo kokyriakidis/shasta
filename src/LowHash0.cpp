@@ -118,6 +118,9 @@ LowHash0::LowHash0(
     // Write the header of the histogram file.
     histogramCsv << "Iteration,BucketSize,BucketCount,FeatureCount\n";
 
+    // If minBucketSize and maxBucketSize are both zero,
+    // they are chosen automatically for each iteration.
+    const bool dynamicMinMaxBucketSizes = ((minBucketSize == 0) and (maxBucketSize == 0));
 
 
     // LowHash0 iteration loop.
@@ -165,7 +168,16 @@ LowHash0::LowHash0(
         setupLoadBalancing(readCount, batchSize);
         runThreads(&LowHash0::pass2ThreadFunction, threadCount);
         buckets.endPass2(false, false);
-        computeBucketHistogram();
+
+        // Compute a histogram of bucket size.
+        vector<uint64_t> bucketHistogram;
+        computeBucketHistogram(bucketHistogram);
+
+        // If dynamic adjustment of min/max bucket size was requested,
+        // do it now for this iteration, based on the current bucket size histogram.
+        if(dynamicMinMaxBucketSizes) {
+            adjustMinMaxBucketSizes(bucketHistogram);
+        }
 
         // Pass 3: inspect the buckets to find candidates.
         batchSize = 10000;
@@ -506,7 +518,7 @@ void LowHash0::merge(
 
 
 
-void LowHash0::computeBucketHistogram()
+void LowHash0::computeBucketHistogram(vector<uint64_t>& bucketHistogram)
 {
     threadBucketHistogram.clear();
     threadBucketHistogram.resize(threadCount);
@@ -519,7 +531,8 @@ void LowHash0::computeBucketHistogram()
     for(const vector<uint64_t>& histogram: threadBucketHistogram) {
         largestBucketSize = max(largestBucketSize, uint64_t(histogram.size()));
     }
-    vector<uint64_t> bucketHistogram(largestBucketSize, 0);
+    bucketHistogram.clear();
+    bucketHistogram.resize(largestBucketSize, 0);
     for(const vector<uint64_t>& histogram: threadBucketHistogram) {
         for(uint64_t bucketSize=0; bucketSize<histogram.size(); bucketSize++) {
             bucketHistogram[bucketSize] += histogram[bucketSize];
@@ -554,3 +567,37 @@ void LowHash0::computeBucketHistogramThreadFunction(size_t threadId)
         }
     }
 }
+
+
+
+// Adjust minBucketSize and maxBucketSize based on the current
+// bucket size histogram.
+void LowHash0::adjustMinMaxBucketSizes(const vector<uint64_t>& histogram)
+{
+    // Set minBucketSize to the lowest bucket size B0
+    // such that histogram[B0] > histogram[B0-1].
+    bool done = false;
+    for(uint64_t B0=1; B0<histogram.size(); B0++) {
+        if(histogram[B0] > histogram[B0 - 1]) {
+            minBucketSize = B0;
+            done = true;
+            break;
+        }
+    }
+    SHASTA_ASSERT(done);
+
+    // Set maxBucketSize to the largest bucket size B1 such that histogram[B1] >= histogram[B0] = histogram[minBucketSize]
+    done = false;
+    for(uint64_t B1=histogram.size()-1; B1>=minBucketSize; B1--) {
+        if(histogram[B1] >= histogram[minBucketSize]) {
+            maxBucketSize = B1;
+            done = true;
+            break;
+        }
+    }
+    SHASTA_ASSERT(done);
+
+    cout << "Automatic settings for this iteration: minBucketSize " << minBucketSize <<
+        ", maxBucketSize " << maxBucketSize << endl;
+}
+
