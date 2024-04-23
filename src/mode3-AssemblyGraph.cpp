@@ -171,7 +171,9 @@ void AssemblyGraph::run(
         useBayesianModel,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP);
-    // detangleShortSuperbubbles(false, 30000, detangleToleranceLow, detangleToleranceHigh);
+    detangleShortSuperbubbles(false, 30000,
+        options.assemblyGraphOptions.detangleToleranceLow,
+        options.assemblyGraphOptions.detangleToleranceHigh);
     performanceLog << timestamp << "Detangling ends." << endl;
 
     compress();
