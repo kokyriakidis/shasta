@@ -782,9 +782,10 @@ void MarkerGraph::flagPrimaryEdges(
     uint64_t minPrimaryEdgeCoverage,
     uint64_t maxPrimaryEdgeCoverage,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
-    const MemoryMapped::Vector< pair<uint64_t, uint64_t> >& disjointSetsHistogram,
     uint64_t threadCount)
 {
+    SHASTA_ASSERT(disjointSetsHistogram.isOpen);
+
     // If minPrimaryEdgeCoverage and maxPrimaryEdgeCoverage are both 0,
     // use the disjoint sets histogram and simple heuristics to choose
     // appropriate values.

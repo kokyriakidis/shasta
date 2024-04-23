@@ -154,7 +154,11 @@ private:
     CreateVerticesFromVertexTableData createVerticesFromVertexTableData;
 public:
 
-
+    // The disjoint sets histogram in a MemoryMapped::Vector.
+    // This is used when flagging primary marker graph edges for Mode 3 assembly.
+    // This stored pairs(coverage, frequency).
+    // Only pairs where the frequency is not zero are stored.
+    MemoryMapped::Vector< pair<uint64_t, uint64_t> > disjointSetsHistogram;
 
     // Remove marker graph vertices and update vertices and vertexTable.
     // After this is called, the only
@@ -387,7 +391,6 @@ public:
         uint64_t minPrimaryEdgeCoverage,
         uint64_t maxPrimaryEdgeCoverage,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
-        const MemoryMapped::Vector< pair<uint64_t, uint64_t> >& disjointSetsHistogram,
         uint64_t threadCount);
 private:
     void flagPrimaryEdgesThreadFunction(uint64_t threadId);

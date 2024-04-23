@@ -1221,6 +1221,7 @@ public:
     void accessMarkerGraphVertices(bool readWriteAccess = false);
     void accessMarkerGraphReverseComplementVertex(bool readWriteAccess = false);
     void removeMarkerGraphVertices();
+    void accessDisjointSetsHistogram();
 private:
     void findMarkerGraphReverseComplementVerticesThreadFunction1(size_t threadId);
     void findMarkerGraphReverseComplementVerticesThreadFunction2(size_t threadId);

@@ -29,6 +29,7 @@ a.accessMarkerGraphVertices()
 a.accessMarkerGraphEdges(True)
 a.accessMarkerGraphReverseComplementEdge()
 a.accessMarkerGraphConsensus()
+a.accessDisjointSetsHistogram()
 
 # Open a performance log.
 shasta.openPerformanceLog('Mode3Assembly.log')

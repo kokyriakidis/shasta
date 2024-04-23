@@ -10,6 +10,7 @@ a = shasta.Assembler()
 a.accessMarkers()
 a.accessMarkerGraphVertices()
 a.accessMarkerGraphEdges(True)
+a.accessDisjointSetsHistogram()
 a.flagPrimaryMarkerGraphEdges(
     int(config['MarkerGraph']['minPrimaryEdgeCoverage']), 
     int(config['MarkerGraph']['maxPrimaryEdgeCoverage']), 

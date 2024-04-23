@@ -399,6 +399,8 @@ PYBIND11_MODULE(shasta, shastaModule)
         .def("accessMarkerGraphVertices",
              &Assembler::accessMarkerGraphVertices,
              arg("readWriteAccess") = false)
+        .def("accessDisjointSetsHistogram",
+             &Assembler::accessDisjointSetsHistogram)
         .def("getGlobalMarkerGraphVertex",
             (
                 MarkerGraph::VertexId (Assembler::*)

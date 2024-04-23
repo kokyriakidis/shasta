@@ -228,14 +228,13 @@ void Assembler::createMarkerGraphVertices(
         // This stored pairs(coverage, frequency).
         // Only pairs where the frequency is not zero are stored.
         {
-            MemoryMapped::Vector< pair<uint64_t, uint64_t> > storedHistogram;
-            storedHistogram.createNew(
+            markerGraph.disjointSetsHistogram.createNew(
                 largeDataName("DisjointSetsHistogram"),
                 largeDataPageSize);
             for(uint64_t coverage=0; coverage<histogram.size(); coverage++) {
                 const uint64_t frequency = histogram[coverage];
                 if(frequency) {
-                    storedHistogram.push_back({coverage, frequency});
+                    markerGraph.disjointSetsHistogram.push_back({coverage, frequency});
                 }
             }
         }
@@ -1254,6 +1253,11 @@ void Assembler::accessMarkerGraphReverseComplementVertex(bool readWriteAccess)
     markerGraph.reverseComplementVertex.accessExisting(
         largeDataName("MarkerGraphReverseComplementeVertex"),
         readWriteAccess);
+}
+
+void Assembler::accessDisjointSetsHistogram()
+{
+    markerGraph.disjointSetsHistogram.accessExistingReadOnly(largeDataName("DisjointSetsHistogram"));
 }
 
 
