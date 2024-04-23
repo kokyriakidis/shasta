@@ -636,6 +636,20 @@ Minimum edge coverage (number of supporting oriented reads)
 on each strand for a marker graph edge to be created.
 Experimental. Only used with <code>--Assembly.mode 2</code>.
 
+<tr id='MarkerGraph.minPrimaryEdgeCoverage'>
+<td><code>--MarkerGraph.minPrimaryEdgeCoverage</code><td class=centered><code>0</code><td>
+Minimum edge coverage for a primary marker graph edge.
+If <code>minPrimaryEdgeCoverage</code> and <code>maxPrimaryEdgeCoverage</code> are both 0, 
+they are set automatically to appropriate values using a simple heuristic.
+Only used with <code>--Assembly.mode 3</code>.
+
+<tr id='MarkerGraph.maxPrimaryEdgeCoverage'>
+<td><code>--MarkerGraph.maxPrimaryEdgeCoverage</code><td class=centered><code>0</code><td>
+Maximum edge coverage for a primary marker graph edge.
+If <code>minPrimaryEdgeCoverage</code> and <code>maxPrimaryEdgeCoverage</code> are both 0, 
+they are set automatically to appropriate values using a simple heuristic.
+Only used with <code>--Assembly.mode 3</code>.
+
 <tr id='MarkerGraph.allowDuplicateMarkers'>
 <td><code>--MarkerGraph.allowDuplicateMarkers</code><td class=centered><code>False</code><td>
 This is a 

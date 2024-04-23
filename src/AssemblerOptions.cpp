@@ -669,14 +669,18 @@ void AssemblerOptions::addConfigurableOptions()
 
         ("MarkerGraph.minPrimaryEdgeCoverage",
         value<uint64_t>(&markerGraphOptions.minPrimaryEdgeCoverage)->
-        default_value(8),
+        default_value(0),
         "Minimum edge coverage for a primary marker graph edge. "
+        "If minPrimaryEdgeCoverage and maxPrimaryEdgeCoverage are both 0, "
+        "they are set automatically to appropriate values using a simple heuristic."
         "Only used with --Assembly.mode 3.")
 
         ("MarkerGraph.maxPrimaryEdgeCoverage",
         value<uint64_t>(&markerGraphOptions.maxPrimaryEdgeCoverage)->
-        default_value(60),
+        default_value(0),
         "Maximum edge coverage for a primary marker graph edge. "
+        "If minPrimaryEdgeCoverage and maxPrimaryEdgeCoverage are both 0, "
+        "they are set automatically to appropriate values using a simple heuristic."
         "Only used with --Assembly.mode 3.")
 
         ("MarkerGraph.allowDuplicateMarkers",
