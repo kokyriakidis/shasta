@@ -167,19 +167,6 @@ void Mode3Assembler::computeConnectedComponents()
         }
     }
 
-    // Summarize in a csv file the connected components we kept.
-    {
-        ofstream csv("Mode3Assembler-OrientedReadIdComponents.csv");
-        csv << "Rank,OrientedReads,First OrientedReadId,Primary edges\n";
-        for(uint64_t i=0; i<connectedComponents.size(); i++) {
-            const ConnectedComponent& connectedComponent = connectedComponents[i];
-            csv << i << "," << connectedComponent.orientedReadIds.size() << "," <<
-                connectedComponent.orientedReadIds.front() << "," <<
-                connectedComponent.primaryIds.size() << "\n";
-        }
-    }
-
-
     performanceLog << timestamp << "Mode3Assembler::computeConnectedComponents ends." << endl;
 }
 
@@ -194,6 +181,8 @@ void Mode3Assembler::assembleConnectedComponents(
 
     vector< vector<uint64_t> > assemblyChainLengthsByPValue;
 
+    ofstream summaryCsv("Components.csv");
+    summaryCsv << "Component,Reads,Segments,Sequence,N50\n";
 
     vector< shared_ptr<mode3::AssemblyGraph> > assemblyGraphs;
     for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
@@ -224,6 +213,12 @@ void Mode3Assembler::assembleConnectedComponents(
         tie(totalLength, n50) = AssemblyGraph::n50(allChainLengths);
         cout << "Combined for this component: total assembled length " << totalLength <<
             ", N50 " << n50 << endl;
+
+        summaryCsv << componentId << ",";
+        summaryCsv << connectedComponents[componentId].orientedReadIds.size() << ",";
+        summaryCsv << allChainLengths.size() << ",";
+        summaryCsv << totalLength << ",";
+        summaryCsv << n50 << "\n";
 
         // Store the chain lengths.
         if(assemblyChainLengthsByPValue.size() < chainLengths.size()) {
