@@ -2896,6 +2896,38 @@ bool AssemblyGraph::detangleVertex(
         return false;
     }
 
+
+
+    // If a MarkerGraphEdgeId appears both in the inEdges and in the outEdges,
+    // detangling could generate a chain with two consecutive copies of the same
+    // MarkerGraphEdgeId. Don't detangle.
+    for(const edge_descriptor ce0: inEdges) {
+        const BubbleChain& bubbleChain0 = cGraph[ce0];
+        const Bubble& bubble0 = bubbleChain0.lastBubble();
+        SHASTA_ASSERT(bubble0.isHaploid());
+        const Chain& chain0 = bubble0.front();
+        SHASTA_ASSERT(chain0.size() >= 2);
+        const MarkerGraphEdgeId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
+
+        for(const edge_descriptor ce1: outEdges) {
+            const BubbleChain& bubbleChain1 = cGraph[ce1];
+            const Bubble& bubble1 = bubbleChain1.firstBubble();
+            SHASTA_ASSERT(bubble1.isHaploid());
+            const Chain& chain1 = bubble1.front();
+            SHASTA_ASSERT(chain1.size() >= 2);
+            const MarkerGraphEdgeId markerGraphEdgeId1 = chain1[1];  // Exclude first
+
+            if(markerGraphEdgeId0 == markerGraphEdgeId1) {
+                if(debug) {
+                    cout << "Not detangling due to cycle." << endl;
+                }
+                return false;
+            }
+        }
+    }
+
+
+
     // Compute the tangle matrix.
     vector< vector<uint64_t> > tangleMatrix;
     computeTangleMatrix(inEdges, outEdges, tangleMatrix, false);
@@ -3727,6 +3759,38 @@ bool AssemblyGraph::detangleEdge(
         }
         return false;
     }
+
+
+
+    // If a MarkerGraphEdgeId appears both in the inEdges and in the outEdges,
+    // detangling could generate a chain with two consecutive copies of the same
+    // MarkerGraphEdgeId. Don't detangle.
+    for(const edge_descriptor ce0: inEdges) {
+        const BubbleChain& bubbleChain0 = cGraph[ce0];
+        const Bubble& bubble0 = bubbleChain0.lastBubble();
+        SHASTA_ASSERT(bubble0.isHaploid());
+        const Chain& chain0 = bubble0.front();
+        SHASTA_ASSERT(chain0.size() >= 2);
+        const MarkerGraphEdgeId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
+
+        for(const edge_descriptor ce1: outEdges) {
+            const BubbleChain& bubbleChain1 = cGraph[ce1];
+            const Bubble& bubble1 = bubbleChain1.firstBubble();
+            SHASTA_ASSERT(bubble1.isHaploid());
+            const Chain& chain1 = bubble1.front();
+            SHASTA_ASSERT(chain1.size() >= 2);
+            const MarkerGraphEdgeId markerGraphEdgeId1 = chain1[1];  // Exclude first
+
+            if(markerGraphEdgeId0 == markerGraphEdgeId1) {
+                if(debug) {
+                    cout << "Not detangling due to cycle." << endl;
+                }
+                return false;
+            }
+        }
+    }
+
+
 
     // Compute the tangle matrix.
     vector< vector<uint64_t> > tangleMatrix;
@@ -4731,6 +4795,37 @@ bool AssemblyGraph::detangleShortSuperbubble(
     if(not canDo) {
         return false;
     }
+
+
+
+    // If a MarkerGraphEdgeId appears both in the inEdges and in the outEdges,
+    // detangling could generate a chain with two consecutive copies of the same
+    // MarkerGraphEdgeId. Don't detangle.
+    for(const edge_descriptor ce0: inEdges) {
+        const BubbleChain& bubbleChain0 = cGraph[ce0];
+        const Bubble& bubble0 = bubbleChain0.lastBubble();
+        SHASTA_ASSERT(bubble0.isHaploid());
+        const Chain& chain0 = bubble0.front();
+        SHASTA_ASSERT(chain0.size() >= 2);
+        const MarkerGraphEdgeId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
+
+        for(const edge_descriptor ce1: outEdges) {
+            const BubbleChain& bubbleChain1 = cGraph[ce1];
+            const Bubble& bubble1 = bubbleChain1.firstBubble();
+            SHASTA_ASSERT(bubble1.isHaploid());
+            const Chain& chain1 = bubble1.front();
+            SHASTA_ASSERT(chain1.size() >= 2);
+            const MarkerGraphEdgeId markerGraphEdgeId1 = chain1[1];  // Exclude first
+
+            if(markerGraphEdgeId0 == markerGraphEdgeId1) {
+                if(debug) {
+                    cout << "Not detangling due to cycle." << endl;
+                }
+                return false;
+            }
+        }
+    }
+
 
 
     // Compute the tangle matrix.
