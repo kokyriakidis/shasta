@@ -484,10 +484,11 @@ bool AssemblyGraph::compress()
     bool changesWereMade = false;
 
     while(true) {
+        const bool compressBubbleChainChanges = compressBubbleChains();
         const bool compressParallelChanges = compressParallelEdges();
         const bool compressSequentialChanges = compressSequentialEdges();
 
-        if(compressParallelChanges or compressSequentialChanges) {
+        if(compressBubbleChainChanges or compressParallelChanges or compressSequentialChanges) {
             // Something changed. Continue the iteration loop.
             changesWereMade = true;
             continue;

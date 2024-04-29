@@ -322,11 +322,12 @@ private:
     // Compress linear sequences of edges (BubbleChains) into longer BubbleChains.
     bool compressSequentialEdges();
 
-    // Call compressParallelEdges and compressSequentialEdges iteratively until nothing changes.
-    bool compress();
-
     // Call compress on all BubbleChains to merge adjacent haploid bubbles.
     bool compressBubbleChains();
+
+    // Call compressParallelEdges, compressSequentialEdges, and compressBubbleChains
+    // iteratively until nothing changes.
+    bool compress();
 
     // This does the opposite of compress. All bubble chains that
     // consist of more than one simple haploid bubble are expanded into one
