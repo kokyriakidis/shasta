@@ -7120,6 +7120,29 @@ void BubbleChain::compress()
     BubbleChain& bubbleChain = *this;
     BubbleChain newBubbleChain;
 
+    // If this bubble chain consists of a single bubble, there is nothing to compress.
+    if(size() == 1) {
+        return;
+    }
+
+    // Look for pairs of consecutive haploid bubbles.
+    // If none found, return.
+    bool found = false;
+    for(uint64_t i1=1; i1<size(); i1++) {
+        const uint64_t i0 = i1 - 1;
+        const Bubble& bubble0 = bubbleChain[i0];
+        const Bubble& bubble1 = bubbleChain[i1];
+        if(bubble0.isHaploid() and bubble1.isHaploid()) {
+            found = true;
+            break;
+        }
+    }
+    if(not found) {
+        return;
+    }
+
+
+
     // Find sets of consecutive haploid bubbles.
     for(uint64_t i=0; i<size(); i++) {
         const Bubble& bubble = bubbleChain[i];
