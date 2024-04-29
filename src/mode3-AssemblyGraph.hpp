@@ -191,6 +191,10 @@ public:
         return markerGraphEdgeId;
     }
 
+    // Return the total lenght of this bubble chain.
+    uint64_t totalLength() const;
+
+
     template<class Archive> void serialize(Archive & ar, const unsigned int version)
     {
         ar & boost::serialization::base_object< vector<Bubble> >(*this);
@@ -804,6 +808,9 @@ private:
     // This can be used for N50 statistics.
 public:
     void getChainLengthsByPValue(vector< vector<uint64_t> >& chainLengths) const;
+
+    // Get the lengths of all non-trivial bubble chains.
+    void getBubbleChainLengths(vector<uint64_t>&) const;
 
     // Given a vector of lengths in decreasing order, compute the total length and N50.
     static pair<uint64_t, uint64_t> n50(const vector<uint64_t>&);

@@ -1415,6 +1415,40 @@ void AssemblyGraph::getChainLengthsByPValue(vector< vector<uint64_t> >& chainLen
 
 
 
+// Get the lengths of all non-trivial bubble chains.
+void AssemblyGraph::getBubbleChainLengths(vector<uint64_t>& bubbleChainLengths) const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+
+    bubbleChainLengths.clear();
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = assemblyGraph[e];
+        if(not bubbleChain.isSimpleChain()) {
+            bubbleChainLengths.push_back(bubbleChain.totalLength());
+        }
+    }
+    sort(bubbleChainLengths.begin(), bubbleChainLengths.end(), std::greater<uint64_t>());
+}
+
+
+
+// Return the total lenght of this bubble chain.
+uint64_t BubbleChain::totalLength() const
+{
+    double length = 0.;
+    for(const Bubble& bubble: *this) {
+        uint64_t bubbleTotalLength = 0;
+        for(const Chain& chain: bubble) {
+            bubbleTotalLength += chain.sequence.size();
+        }
+        const double bubbleLength = double(bubbleTotalLength) / double(bubble.size());
+        length += bubbleLength;
+    }
+    return uint64_t(std::round(length));
+}
+
+
+
 // Given a vector of lengths in decreasing order, compute the total length and N50.
 pair<uint64_t, uint64_t> AssemblyGraph::n50(const vector<uint64_t>& lengths)
 {

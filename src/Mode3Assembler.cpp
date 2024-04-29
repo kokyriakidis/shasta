@@ -180,9 +180,10 @@ void Mode3Assembler::assembleConnectedComponents(
     performanceLog << timestamp << "Mode3Assembler::assembleConnectedComponents begins." << endl;
 
     vector< vector<uint64_t> > assemblyChainLengthsByPValue;
+    vector<uint64_t> assemblyBubbleChainLengths;
 
     ofstream summaryCsv("Components.csv");
-    summaryCsv << "Component,Reads,Segments,Sequence,N50\n";
+    summaryCsv << "Component,Reads,Segments,Sequence,N50,Total Bubble chain length,Bubble chain N50\n";
 
     vector< shared_ptr<mode3::AssemblyGraph> > assemblyGraphs;
     for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
@@ -203,7 +204,7 @@ void Mode3Assembler::assembleConnectedComponents(
                 ", N50 " << n50 << endl;
         }
 
-        // Combined assembly statistics for this component.
+        // Combined chain length statistics for this component.
         vector<uint64_t> allChainLengths;
         for(const auto& v: chainLengths) {
             copy(v.begin(), v.end(), back_inserter(allChainLengths));
@@ -214,11 +215,24 @@ void Mode3Assembler::assembleConnectedComponents(
         cout << "Combined for this component: total assembled length " << totalLength <<
             ", N50 " << n50 << endl;
 
+        // Bubble chain length statistics (non-trivial bubble chains only).
+        vector<uint64_t> bubbleChainLengths;
+        assemblyGraph->getBubbleChainLengths(bubbleChainLengths);
+        uint64_t totalBubbleChainLength, bubbleChainN50;
+        tie(totalBubbleChainLength, bubbleChainN50) = AssemblyGraph::n50(bubbleChainLengths);
+        copy(bubbleChainLengths.begin(), bubbleChainLengths.end(),
+            back_inserter(assemblyBubbleChainLengths));
+        cout << "Total non-trivial bubble chain length for this component " << totalBubbleChainLength <<
+            ", N50 " << bubbleChainN50 << endl;
+
+        // Write a line to the summaryCsv.
         summaryCsv << componentId << ",";
         summaryCsv << connectedComponents[componentId].orientedReadIds.size() << ",";
         summaryCsv << allChainLengths.size() << ",";
         summaryCsv << totalLength << ",";
-        summaryCsv << n50 << "\n";
+        summaryCsv << n50 << ",";
+        summaryCsv << totalBubbleChainLength << ",";
+        summaryCsv << bubbleChainN50 << "\n";
 
         // Store the chain lengths.
         if(assemblyChainLengthsByPValue.size() < chainLengths.size()) {
@@ -249,6 +263,11 @@ void Mode3Assembler::assembleConnectedComponents(
     cout << "Global assembly statistics, combined for all P-values: total assembled length " << totalLength <<
         ", N50 " << n50 << endl;
 
+    sort(assemblyBubbleChainLengths.begin(), assemblyBubbleChainLengths.end(), std::greater<uint64_t>());
+    uint64_t totalBubbleChainLength, bubbleChainN50;
+    tie(totalBubbleChainLength, bubbleChainN50) = AssemblyGraph::n50(assemblyBubbleChainLengths);
+    cout << "Total non-trivial bubble chain length " << totalBubbleChainLength <<
+        ", N50 " << bubbleChainN50 << endl;
 
 
     // Create a csv file with one line for each assembled segment.
