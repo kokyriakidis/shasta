@@ -503,12 +503,18 @@ bool AssemblyGraph::compress()
 
 
 // Call compress on all BubbleChains to merge adjacent haploid bubbles.
-void AssemblyGraph::compressBubbleChains()
+bool AssemblyGraph::compressBubbleChains()
 {
     AssemblyGraph& cGraph = *this;
+
+    bool changesWereMade = false;
     BGL_FORALL_EDGES(e, cGraph, AssemblyGraph) {
-        cGraph[e].compress();
+        if(cGraph[e].compress()) {
+            changesWereMade = true;
+        }
     }
+
+    return changesWereMade;
 }
 
 
@@ -7115,14 +7121,14 @@ void AssemblyGraph::TangleMatrix::analyze(
 
 
 // Collapse consecutive haploid bubbles of a BubbleChain.
-void BubbleChain::compress()
+bool BubbleChain::compress()
 {
     BubbleChain& bubbleChain = *this;
     BubbleChain newBubbleChain;
 
     // If this bubble chain consists of a single bubble, there is nothing to compress.
     if(size() == 1) {
-        return;
+        return false;
     }
 
     // Look for pairs of consecutive haploid bubbles.
@@ -7138,7 +7144,7 @@ void BubbleChain::compress()
         }
     }
     if(not found) {
-        return;
+        return false;
     }
 
 
@@ -7169,6 +7175,8 @@ void BubbleChain::compress()
 
     // Replace it with the new one.
     bubbleChain = newBubbleChain;
+
+    return true;
 }
 
 

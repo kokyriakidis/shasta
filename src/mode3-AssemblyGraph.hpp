@@ -167,7 +167,7 @@ public:
     }
 
     // Collapse consecutive haploid bubbles.
-    void compress();
+    bool compress();
 
     MarkerGraphEdgeId firstMarkerGraphEdgeId() const
     {
@@ -326,7 +326,7 @@ private:
     bool compress();
 
     // Call compress on all BubbleChains to merge adjacent haploid bubbles.
-    void compressBubbleChains();
+    bool compressBubbleChains();
 
     // This does the opposite of compress. All bubble chains that
     // consist of more than one simple haploid bubble are expanded into one
