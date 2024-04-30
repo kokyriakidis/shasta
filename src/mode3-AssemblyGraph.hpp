@@ -538,28 +538,20 @@ private:
         bool debug,
         uint64_t maxOffset1,    // Used to define superbubbles
         uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
+        uint64_t detangleToleranceHigh,
+        bool useBayesianModel,
+        double epsilon,
+        double minLogP);
     bool detangleShortSuperbubble(
         bool debug,
         const Superbubbles&,
         uint64_t superbubbleId,
         uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
+        uint64_t detangleToleranceHigh,
+        bool useBayesianModel,
+        double epsilon,
+        double minLogP);
 
-    // The above versions require the last bubble of superbubble in-edges
-    // and the first bubble of superbubble out-edges to be haploid.
-    // This version does not.
-    bool detangleShortSuperbubblesGeneral(
-        bool debug,
-        uint64_t maxOffset1,    // Used to define superbubbles
-        uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
-    bool detangleShortSuperbubbleGeneral(
-        bool debug,
-        const Superbubbles&,
-        uint64_t superbubbleId,
-        uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
 
     // Cleanup/simplify superbubbles that are likely to be caused by errors,
     // completely or in part.
