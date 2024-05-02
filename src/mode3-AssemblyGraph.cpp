@@ -104,7 +104,7 @@ void AssemblyGraph::run(
 
     if(debug) write("A");
 
-    // Don't do any detangling before cleanup of bubbles and superbubbles.
+    // Don't do any detangling before cleanup of bubbles and superbubbles and phasing.
 
     // Cleanup bubbles and superbubbles.
     // Must do compress to make sure all bubbles are in bubble chains.
@@ -113,7 +113,10 @@ void AssemblyGraph::run(
         performanceLog << timestamp << "Iteration " << iteration <<
             " of bubble cleanup begins." << endl;
         const uint64_t cleanedUpBubbleCount = cleanupBubbles(
-            false, 1000, options.assemblyGraphOptions.chainTerminalCommonThreshold, threadCount);
+            false,
+            options.assemblyGraphOptions.bubbleCleanupMaxOffset,
+            options.assemblyGraphOptions.chainTerminalCommonThreshold,
+            threadCount);
         if(cleanedUpBubbleCount == 0) {
             break;
         }
@@ -124,11 +127,15 @@ void AssemblyGraph::run(
         compress();
     }
     if(debug) write("B");
-    cleanupSuperbubbles(false, 30000, options.assemblyGraphOptions.chainTerminalCommonThreshold);
+    cleanupSuperbubbles(false,
+        options.assemblyGraphOptions.superbubbleLengthThreshold1,
+        options.assemblyGraphOptions.chainTerminalCommonThreshold);
     compress();
 
     // Remove short superbubbles.
-    removeShortSuperbubbles(false, 10000, 30000);
+    removeShortSuperbubbles(false,
+        options.assemblyGraphOptions.superbubbleLengthThreshold2,
+        options.assemblyGraphOptions.superbubbleLengthThreshold3);
     compress();
 
     // Phase.
@@ -171,13 +178,14 @@ void AssemblyGraph::run(
         useBayesianModel,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP);
-    detangleShortSuperbubbles(false, 30000,
+    detangleShortSuperbubbles(false,
+        options.assemblyGraphOptions.superbubbleLengthThreshold4,
         options.assemblyGraphOptions.detangleToleranceLow,
         options.assemblyGraphOptions.detangleToleranceHigh,
         useBayesianModel,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP);
-performanceLog << timestamp << "Detangling ends." << endl;
+    performanceLog << timestamp << "Detangling ends." << endl;
 
     compress();
     compressBubbleChains();
@@ -208,7 +216,7 @@ performanceLog << timestamp << "Detangling ends." << endl;
     } else {
 
         // Skip sequence assembly.
-        if(debug) write("G");
+        write("Final");
     }
 
 

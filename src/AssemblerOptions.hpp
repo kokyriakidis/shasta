@@ -359,7 +359,12 @@ public:
         uint64_t longBubbleThreshold;
         double phaseErrorThreshold;
         double bubbleErrorThreshold;
+        uint64_t bubbleCleanupMaxOffset;
         uint64_t chainTerminalCommonThreshold;
+        uint64_t superbubbleLengthThreshold1;
+        uint64_t superbubbleLengthThreshold2;
+        uint64_t superbubbleLengthThreshold3;
+        uint64_t superbubbleLengthThreshold4;
 
         void write(ostream&) const;
     };

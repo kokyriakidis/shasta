@@ -1053,10 +1053,40 @@ void AssemblerOptions::addConfigurableOptions()
         "Bubble error threshold for bubble cleanup "
         "(Mode 3 assembly only).")
 
+        ("Assembly.mode3.assemblyGraph.bubbleCleanupMaxOffset",
+        value<uint64_t>(&assemblyOptions.mode3Options.assemblyGraphOptions.bubbleCleanupMaxOffset)->
+        default_value(1000),
+        "Maximum bubble offset for bubble cleanup "
+        "(Mode 3 assembly only).")
+
         ("Assembly.mode3.assemblyGraph.chainTerminalCommonThreshold",
         value<uint64_t>(&assemblyOptions.mode3Options.assemblyGraphOptions.chainTerminalCommonThreshold)->
         default_value(3),
         "Used for bubble cleanup "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.assemblyGraph.superbubbleLengthThreshold1",
+        value<uint64_t>(&assemblyOptions.mode3Options.assemblyGraphOptions.superbubbleLengthThreshold1)->
+        default_value(30000),
+        "Length threshold used for superbubble cleanup "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.assemblyGraph.superbubbleLengthThreshold2",
+        value<uint64_t>(&assemblyOptions.mode3Options.assemblyGraphOptions.superbubbleLengthThreshold2)->
+        default_value(10000),
+        "Low length threshold used for superbubble removal "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.assemblyGraph.superbubbleLengthThreshold3",
+        value<uint64_t>(&assemblyOptions.mode3Options.assemblyGraphOptions.superbubbleLengthThreshold3)->
+        default_value(30000),
+        "High length threshold used for superbubble removal "
+        "(Mode 3 assembly only).")
+
+        ("Assembly.mode3.assemblyGraph.superbubbleLengthThreshold4",
+        value<uint64_t>(&assemblyOptions.mode3Options.assemblyGraphOptions.superbubbleLengthThreshold4)->
+        default_value(30000),
+        "Length threshold used for superbubble detangling "
         "(Mode 3 assembly only).")
 
         ("Assembly.mode3.localAssembly.estimatedOffsetRatio",
@@ -1361,7 +1391,12 @@ void Mode3AssemblyOptions::AssemblyGraphOptions::write(ostream& s) const
     s << "mode3.assemblyGraph.longBubbleThreshold = " << longBubbleThreshold << "\n";
     s << "mode3.assemblyGraph.phaseErrorThreshold = " << phaseErrorThreshold << "\n";
     s << "mode3.assemblyGraph.bubbleErrorThreshold = " << bubbleErrorThreshold << "\n";
+    s << "mode3.assemblyGraph.bubbleCleanupMaxOffset = " << bubbleCleanupMaxOffset << "\n";
     s << "mode3.assemblyGraph.chainTerminalCommonThreshold = " << chainTerminalCommonThreshold << "\n";
+    s << "mode3.assemblyGraph.superbubbleLengthThreshold1 = " << superbubbleLengthThreshold1 << "\n";
+    s << "mode3.assemblyGraph.superbubbleLengthThreshold2 = " << superbubbleLengthThreshold2 << "\n";
+    s << "mode3.assemblyGraph.superbubbleLengthThreshold3 = " << superbubbleLengthThreshold3 << "\n";
+    s << "mode3.assemblyGraph.superbubbleLengthThreshold4 = " << superbubbleLengthThreshold4 << "\n";
 }
 
 
