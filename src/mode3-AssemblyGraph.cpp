@@ -7200,8 +7200,8 @@ void AssemblyGraph::combineStepSequences(Chain& chain)
             break;
         }
 
-        // Add assembled sequence between this marker graph primayr edge and the next in the chain.
-        const vector<Base>& stepSequence = chain.stepSequences[positionInChain];
+        // Add assembled sequence between this marker graph primary edge and the next in the chain.
+        const vector<Base>& stepSequence = chain.stepSequences[positionInChain].sequence;
         copy(stepSequence.begin(), stepSequence.end(), back_inserter(chain.sequence));
 
     }
@@ -7218,7 +7218,7 @@ void AssemblyGraph::writeAssemblyDetails() const
     ofstream csv("AssemblyDetails-" + to_string(componentId) + ".csv");
     csv << "Chain,Component,Bubble chain,Position in bubble chain,Index in bubble,"
         "Position in chain,Type,Marker graph edge id,"
-        "Length,Sequence begin,Sequence end,Coverage,Common\n";
+        "Assembly status,Length,Sequence begin,Sequence end,Coverage,Common\n";
 
     // Loop over all bubble chains.
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
@@ -7254,7 +7254,7 @@ void AssemblyGraph::writeAssemblyDetails() const
                         csv << indexInBubble << ",";
                         csv << positionInChain << ",";
                         csv << "E,";
-                        csv << edgeId << ",";
+                        csv << edgeId << ",,";
                         csv << edgeSequenceLength << ",";
                         csv << beginInSequence << ",";
                         csv << endInSequence << ",";
@@ -7279,7 +7279,9 @@ void AssemblyGraph::writeAssemblyDetails() const
                         const MarkerGraphEdgeId nextEdgeId = chain[positionInChain + 1];
                         const uint64_t commonCount = assembler.countCommonOrientedReadsUnsafe(
                             edgeId, nextEdgeId);
-                        const uint64_t stepSequenceLength = chain.stepSequences[positionInChain].size();
+                        const auto& stepSequence = chain.stepSequences[positionInChain];
+                        const uint64_t stepSequenceLength = stepSequence.sequence.size();
+                        const bool success = stepSequence.success;
                         const uint64_t beginInSequence = positionInSequence;
                         const uint64_t endInSequence = positionInSequence + stepSequenceLength;
                         csv << chainString << ",";
@@ -7290,6 +7292,7 @@ void AssemblyGraph::writeAssemblyDetails() const
                         csv << ",";
                         csv << "S,";
                         csv << ",";
+                        csv << (success ? "Success," : "Failure,");
                         csv << stepSequenceLength << ",";
                         csv << beginInSequence << ",";
                         csv << endInSequence << ",";
@@ -7398,10 +7401,16 @@ void AssemblyGraph::runAssemblyStep(
 
 
     // Do the local assembly between these two MarkerGraphEdgeIds.
+    auto& stepSequence = chain.stepSequences[positionInChain];
     try {
         LocalAssembly localAssembly(assembler, edgeIdA, edgeIdB, 0, html, options.localAssemblyOptions, useA, useB);
-        localAssembly.getSecondarySequence(chain.stepSequences[positionInChain]);
+        localAssembly.getSecondarySequence(stepSequence.sequence);
+        stepSequence.success = true;
     } catch (...) {
+        // The local assembly failed.
+        // The sequence is empty and the success flag is false.
+        stepSequence.sequence.clear();
+        stepSequence.success = false;
         std::lock_guard<std::mutex> lock(mutex);
         cout << "Error occurred in local assembly between marker graph edges " <<
             edgeIdA << " and " << edgeIdB << endl;

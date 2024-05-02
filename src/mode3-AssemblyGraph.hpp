@@ -73,7 +73,13 @@ public:
 
     // The internal sequence assembled between consecutive pairs
     // of MarkerGraphEdgeIds in the chain.
-    vector< vector<Base> > stepSequences;
+    // If a local assembly fails, the success flag remains false and the sequence remains empty.
+    class StepSequence {
+    public:
+        vector<Base> sequence;
+        bool success = false;
+    };
+    vector<StepSequence> stepSequences;
 
 
     MarkerGraphEdgeId second() const
