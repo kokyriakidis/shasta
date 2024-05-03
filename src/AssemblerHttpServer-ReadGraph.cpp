@@ -413,6 +413,16 @@ void Assembler::exploreUndirectedReadGraph(
 
 
 
+    // Cross strand edges are drawn purple.
+    BGL_FORALL_EDGES(e, graph, LocalReadGraph) {
+        const LocalReadGraphEdge& edge = graph[e];
+        if(edge.crossesStrands) {
+            graph[e].color = "Purple";
+        }
+    }
+
+
+
     // Triangle analysis of the local read graph, if requested.
     LocalReadGraphTriangles triangles;
     if(alignmentAnalysis == "triangles") {
