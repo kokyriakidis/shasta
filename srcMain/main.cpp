@@ -549,8 +549,10 @@ void shasta::main::assemble(
     cout << "This assembly will use " << threadCount << " threads." << endl;
 
     // Set up the consensus caller.
-    cout << "Setting up consensus caller " <<
-        assemblerOptions.assemblyOptions.consensusCaller << endl;
+    if(assembler.getReads().representation == 1) {
+        cout << "Setting up consensus caller " <<
+            assemblerOptions.assemblyOptions.consensusCaller << endl;
+    }
     assembler.setupConsensusCaller(assemblerOptions.assemblyOptions.consensusCaller);
 
 
@@ -1279,8 +1281,10 @@ void shasta::main::explore(
     Assembler assembler("Data/", false, 1, 0);
 
     // Set up the consensus caller.
-    cout << "Setting up consensus caller " <<
-        assemblerOptions.assemblyOptions.consensusCaller << endl;
+    if(assembler.getReads().representation == 1) {
+        cout << "Setting up consensus caller " <<
+            assemblerOptions.assemblyOptions.consensusCaller << endl;
+    }
     assembler.setupConsensusCaller(assemblerOptions.assemblyOptions.consensusCaller);
 
     // Access all available binary data.

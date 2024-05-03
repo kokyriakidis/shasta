@@ -642,8 +642,7 @@ void Assembler::computeReadGraphConnectedComponents() const
             componentMap[componentId].push_back(orientedReadId);
         }
     }
-    cout << "The read graph has " << componentMap.size() <<
-        " connected components." << endl;
+    // cout << "The read graph has " << componentMap.size() << " connected components." << endl;
 
 
 
@@ -1215,8 +1214,7 @@ void Assembler::flagCrossStrandReadGraphEdges2()
             componentMap[componentId].push_back(orientedReadId);
         }
     }
-    cout << "The read graph has " << componentMap.size() <<
-        " connected components." << endl;
+    // cout << "The read graph has " << componentMap.size() << " connected components." << endl;
 
 
 
