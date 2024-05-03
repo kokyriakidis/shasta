@@ -178,9 +178,9 @@ void LocalReadGraph::Writer::operator()(std::ostream& s, edge_descriptor e) cons
     // Edge thickness is determined by the number of aligned markers.
     s << " penwidth=\"" << edgeThicknessScalingFactor * (1.e-4 * edge.markerCount) << "\"";
 
-    // An edge that crosses strands is drawn dashed.
+    // An edge that crosses strands is drawn purple.
     if(edge.crossesStrands) {
-        s << " style=dashed";
+        s << " color=purple";
     }
 
     s << "]";
