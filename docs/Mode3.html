@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<link rel=stylesheet href=style.css />
+</head>
+
+<body>
+<main>
+<div class="goto-index"><a href="index.html">Table of contents</a></div>
+
+<h1>Shasta Mode 3 assembly</h1>
+<h2>Summary</h2>
+<ul>
+
+<li>Uses new computational techniques to extract phased sequence from the marker graph. 
+
+<li>Preliminary version released with Shasta 0.12.0, despite known issues, to encourage experimentation.
+Please share your experiences by filing 
+<a href='https://github.com/paoloshasta/shasta/issues'>issues on the Shasta GitHub repository</a>.
+
+<li>Initially only supported for the new high accuracy Oxford Nanopore reads from the 
+<a href='https://labs.epi2me.io/gm24385_ncm23_preview/'>2023.12 data release</a>.
+It is possible that additional future releases will also support ONT R10 reads.
+
+<li>Despite the known issues, it produces useful phased assemblies.
+See <a>missing</a> for an analysis of assembly quality.
+
+<li>Released with minimal usage documentation (this page). 
+A description of computational techniques is not yet available.
+
+<li>Invoke using <code>--config Nanopore-TBD-May2024</code>.
+This assembly configuration was only tested on human genomes
+at coverage 40x to 60x, but may be functional at higher or lower coverage,
+within reasonable limits.
+It includes limited adaptivity to coverage.
+
+</ul>
+
+
+
+<h2>Output files</h2>
+
+<p>
+Shasta uses <a href='https://github.com/GFA-spec/GFA-spec'>GFA</a> terminology.
+A contiguous piece of assembled sequence is a <i>Segment</i>.
+<i>Links</i> define adjacency between segments.
+
+<table>
+<tr>
+<td><code>Assembly.gfa</code>
+<td>The assembly graph in GFA 1.0 format. 
+All link records include a Cigar string defining an exact overlap of a small
+but variable number of bases between adjacent segments.
+
+<tr>
+<td><code>Assembly-NoSequence.gfa</code>
+<td>Identical to <code>Assembly.gfa</code>, but does not contain any sequence.
+Faster to download, manipulate, and visualize in 
+<a href='https://github.com/asl/BandageNG'>Bandage</a>.
+
+<tr>
+<td><code>Assembly.fasta</code>
+<td>The sequences of all assembled segments, in FASTA format. 
+
+<tr>
+<td><code>Assembly.csv</code>
+<td>Contains one line of information for each assembled segment.
+It can be loaded in Bandage and also provides custom coloring of segments. 
+</table>
+
+
+
+<h2>Naming of assembled segments</h2>
+<p>
+Assembled segments are organized in bubble chains.
+A bubble chain is a linear sequence of bubbles of any ploidy
+without any incoming/outgoing connections to/from
+the middle of the bubble chain.
+Some of the bubbles have ploidy 1 (haploid) and usually correspond
+to low heterozygosity region where haplotypes could not be separated.
+
+<p>
+Assembled segment names are of the form <code>a-b-c-d-Pn</code>,
+where:
+<ul>
+<li><code>a-b</code> identifies the bubble chain.
+<li><code>c</code> is the position of the bubble in the bubble chain.
+<li><code>d</code> identifies the haplotype in the bubble.
+<li><code>n</code> is the ploidy of the bubble.
+</ul>
+For example, the figure below illustrates segment naming for bubble chain
+<code>1-341</code>. Segment lengths are not to scale.
+This bubble chain consists of 7 bubbles, numbered from 0 to 6.
+Bubbles 0, 2, 4, and 6 are haploid.
+Bubbles 1, 3, and 5 are diploid.
+
+Segment <code>1-341-3-1-P2</code> is haplotype <code>1</code> of the diploid
+bubble at position <code>3</code> in bubble chain <code>1-341</code>.
+
+<img src='Mode3Chain.png'>
+
+<p>
+The assembly will contain trivial bubble chains consisting of a single haploid bubble,
+that is, a single assembled segment. 
+These segments have similar naming, but <code>c</code>, <code>d</code>, and <code>n</code> are always
+<code>0</code>. For example, <code>1-136-0-0-P0</code>.
+
+<p>
+If <code>Assembly.csv</code> is loaded in Bandage, segments are displayed 
+with custom colors as follows:
+<ul>
+<li>Segments of haploid bubbles of non-trivial bubble chains (names ending with <code>-P1</code>): red.
+<li>Segments of diploid bubbles of non-trivial bubble chains (names ending with <code>-P2</code>): green.
+<li>Segments of higher ploidy bubbles of non-trivial bubble chains
+(names ending with <code>-Pn</code>) with <code>n > 2</code> : yellow.
+<li>Segments of trivial bubble chains consisting of a single haploid bubble 
+(names ending with <code>-P0</code>):
+<ul>
+<li>If isolated (two free ends): blue.
+<li>If dangling (one free end): cyan.
+<li>All others: purple.
+</ul>
+</ul>
+
+
+<p>
+<div class="goto-index"><a href="index.html">Table of contents</a></div>
+</main>
+</body>
+</html>
+
