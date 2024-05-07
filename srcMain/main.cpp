@@ -1118,8 +1118,8 @@ void shasta::main::mode3Assembly(
 
     // Flag primary marker graph edges.
     assembler.flagPrimaryMarkerGraphEdges(
-        assemblerOptions.markerGraphOptions.minPrimaryEdgeCoverage,
-        assemblerOptions.markerGraphOptions.maxPrimaryEdgeCoverage,
+        assemblerOptions.assemblyOptions.mode3Options.minPrimaryCoverage,
+        assemblerOptions.assemblyOptions.mode3Options.maxPrimaryCoverage,
         threadCount);
 
     // Run Mode 3 assembly.

@@ -18,8 +18,8 @@ using namespace shasta;
 
 
 void Assembler::flagPrimaryMarkerGraphEdges(
-    uint64_t minPrimaryEdgeCoverage,
-    uint64_t maxPrimaryEdgeCoverage,
+    uint64_t minPrimaryCoverage,
+    uint64_t maxPrimaryCoverage,
     uint64_t threadCount)
 {
     // Check that we have what we need.
@@ -29,8 +29,8 @@ void Assembler::flagPrimaryMarkerGraphEdges(
     SHASTA_ASSERT(markerGraph.disjointSetsHistogram.isOpen);
 
     markerGraph.flagPrimaryEdges(
-        minPrimaryEdgeCoverage,
-        maxPrimaryEdgeCoverage,
+        minPrimaryCoverage,
+        maxPrimaryCoverage,
         markers,
         threadCount);
 }

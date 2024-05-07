@@ -667,22 +667,6 @@ void AssemblerOptions::addConfigurableOptions()
         "for a marker graph edge to be created."
         "Only used with --Assembly.mode 2.")
 
-        ("MarkerGraph.minPrimaryEdgeCoverage",
-        value<uint64_t>(&markerGraphOptions.minPrimaryEdgeCoverage)->
-        default_value(0),
-        "Minimum edge coverage for a primary marker graph edge. "
-        "If minPrimaryEdgeCoverage and maxPrimaryEdgeCoverage are both 0, "
-        "they are set automatically to appropriate values using a simple heuristic."
-        "Only used with --Assembly.mode 3.")
-
-        ("MarkerGraph.maxPrimaryEdgeCoverage",
-        value<uint64_t>(&markerGraphOptions.maxPrimaryEdgeCoverage)->
-        default_value(0),
-        "Maximum edge coverage for a primary marker graph edge. "
-        "If minPrimaryEdgeCoverage and maxPrimaryEdgeCoverage are both 0, "
-        "they are set automatically to appropriate values using a simple heuristic."
-        "Only used with --Assembly.mode 3.")
-
         ("MarkerGraph.allowDuplicateMarkers",
         bool_switch(&markerGraphOptions.allowDuplicateMarkers)->
         default_value(false),
@@ -993,6 +977,22 @@ void AssemblerOptions::addConfigurableOptions()
         default_value(false),
         "Suppress output of haploid representation of the assembly (Mode 2 assembly only).")
 
+        ("Assembly.mode3.minPrimaryCoverage",
+        value<uint64_t>(&assemblyOptions.mode3Options.minPrimaryCoverage)->
+        default_value(0),
+        "Minimum primary coverage. "
+        "If minPrimaryCoverage and maxPrimaryCoverage are both 0, "
+        "they are set automatically to appropriate values using a simple heuristic."
+        "Only used with --Assembly.mode 3.")
+
+        ("Assembly.mode3.maxPrimaryCoverage",
+        value<uint64_t>(&assemblyOptions.mode3Options.maxPrimaryCoverage)->
+        default_value(0),
+        "Maximum primary coverage. "
+        "If minPrimaryCoverage and maxPrimaryCoverage are both 0, "
+        "they are set automatically to appropriate values using a simple heuristic."
+        "Only used with --Assembly.mode 3.")
+
         ("Assembly.mode3.primaryGraph.maxLoss",
         value<double>(&assemblyOptions.mode3Options.primaryGraphOptions.maxLoss)->
         default_value(0.1),
@@ -1276,8 +1276,6 @@ void MarkerGraphOptions::write(ostream& s) const
     s << "minCoveragePerStrand = " << minCoveragePerStrand << "\n";
     s << "minEdgeCoverage = " << minEdgeCoverage << "\n";
     s << "minEdgeCoveragePerStrand = " << minEdgeCoveragePerStrand << "\n";
-    s << "minPrimaryEdgeCoverage = " << minPrimaryEdgeCoverage << "\n";
-    s << "maxPrimaryEdgeCoverage = " << maxPrimaryEdgeCoverage << "\n";
     s << "allowDuplicateMarkers = " <<
         convertBoolToPythonString(allowDuplicateMarkers) << "\n";
     s << "cleanupDuplicateMarkers = " <<
@@ -1365,6 +1363,8 @@ void Mode2AssemblyOptions::write(ostream& s) const
 
 void Mode3AssemblyOptions::write(ostream& s) const
 {
+    s << "minPrimaryCoverage = " << minPrimaryCoverage << "\n";
+    s << "maxPrimaryCoverage = " << maxPrimaryCoverage << "\n";
     primaryGraphOptions.write(s);
     assemblyGraphOptions.write(s);
     localAssemblyOptions.write(s);

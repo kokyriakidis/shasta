@@ -36,8 +36,8 @@ shasta.openPerformanceLog('Mode3Assembly.log')
 
 # Flag primary marker graph edges.
 a.flagPrimaryMarkerGraphEdges(
-    int(config['MarkerGraph']['minPrimaryEdgeCoverage']), 
-    int(config['MarkerGraph']['maxPrimaryEdgeCoverage']), 
+    int(config['Assembly']['mode3.minPrimaryCoverage']), 
+    int(config['Assembly']['mode3.maxPrimaryCoverage']), 
     0)
 
 # Run Mode 3 assembly.

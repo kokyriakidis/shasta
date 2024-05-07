@@ -2357,8 +2357,8 @@ public:
     // Mode 3 assembly.
     shared_ptr<Mode3Assembler> mode3Assembler;
     void flagPrimaryMarkerGraphEdges(
-        uint64_t minEdgeCoverage,
-        uint64_t maxEdgeCoverage,
+        uint64_t minPrimaryCoverage,
+        uint64_t maxPrimaryCoverage,
         uint64_t threadCount);
 
     // Assemble sequence between two primary edges.

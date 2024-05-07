@@ -779,22 +779,22 @@ bool MarkerGraph::vertexHasDuplicateOrientedReadIds(
 
 // Flag primary edges (only used for Mode 3 assembly).
 void MarkerGraph::flagPrimaryEdges(
-    uint64_t minPrimaryEdgeCoverage,
-    uint64_t maxPrimaryEdgeCoverage,
+    uint64_t minPrimaryCoverage,
+    uint64_t maxPrimaryCoverage,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     uint64_t threadCount)
 {
     SHASTA_ASSERT(disjointSetsHistogram.isOpen);
 
-    // If minPrimaryEdgeCoverage and maxPrimaryEdgeCoverage are both 0,
+    // If minPrimaryCoverage and maxPrimaryCoverage are both 0,
     // use the disjoint sets histogram and simple heuristics to choose
     // appropriate values.
-    if((minPrimaryEdgeCoverage == 0) and (maxPrimaryEdgeCoverage == 0)) {
+    if((minPrimaryCoverage == 0) and (maxPrimaryCoverage == 0)) {
 
-        // Set minPrimaryEdgeCoverage to the first value where the
+        // Set minPrimaryCoverage to the first value where the
         // disjointSetsHistogram starts increasing.
         bool done = false;
-        uint64_t frequencyAtMinPrimaryEdgeCoverage = 0;
+        uint64_t frequencyAtMinPrimaryCoverage = 0;
         for(uint64_t i=1; i<disjointSetsHistogram.size(); i++) {
             const uint64_t coverage = disjointSetsHistogram[i].first;
             const uint64_t frequency = disjointSetsHistogram[i].second;
@@ -805,37 +805,37 @@ void MarkerGraph::flagPrimaryEdges(
                 or
                 frequency > previousFrequency    // The histogram went up.
                 ) {
-                minPrimaryEdgeCoverage = coverage;
-                frequencyAtMinPrimaryEdgeCoverage = frequency;
+                minPrimaryCoverage = coverage;
+                frequencyAtMinPrimaryCoverage = frequency;
                 done = true;
                 break;
             }
         }
         SHASTA_ASSERT(done);
 
-        // Set maxPrimaryEdgeCoverage to the last coverage with frequency
-        // at least equal to frequencyAtMinPrimaryEdgeCoverage.
+        // Set maxPrimaryCoverage to the last coverage with frequency
+        // at least equal to frequencyAtMinPrimaryCoverage.
         done = false;
         for(uint64_t i=disjointSetsHistogram.size()-1; i>0; i--) {
             const uint64_t coverage = disjointSetsHistogram[i].first;
             const uint64_t frequency = disjointSetsHistogram[i].second;
-            if(frequency >= frequencyAtMinPrimaryEdgeCoverage) {
-                maxPrimaryEdgeCoverage = coverage;
+            if(frequency >= frequencyAtMinPrimaryCoverage) {
+                maxPrimaryCoverage = coverage;
                 done= true;
                 break;
             }
         }
         SHASTA_ASSERT(done);
 
-        cout << "Automatically set: minPrimaryEdgeCoverage = " << minPrimaryEdgeCoverage <<
-            ", maxPrimaryEdgeCoverage = " << maxPrimaryEdgeCoverage << endl;
+        cout << "Automatically set: minPrimaryCoverage = " << minPrimaryCoverage <<
+            ", maxPrimaryCoverage = " << maxPrimaryCoverage << endl;
     }
 
 
 
     // Store the arguments so the threads can see them.
-    flagPrimaryEdgesData.minPrimaryEdgeCoverage = minPrimaryEdgeCoverage;
-    flagPrimaryEdgesData.maxPrimaryEdgeCoverage = maxPrimaryEdgeCoverage;
+    flagPrimaryEdgesData.minPrimaryCoverage = minPrimaryCoverage;
+    flagPrimaryEdgesData.maxPrimaryCoverage = maxPrimaryCoverage;
     flagPrimaryEdgesData.markersPointer = &markers;
 
     // Adjust the numbers of threads, if necessary.
@@ -867,15 +867,15 @@ void MarkerGraph::flagPrimaryEdges(
 
 void MarkerGraph::flagPrimaryEdgesThreadFunction(uint64_t threadId)
 {
-    const uint64_t minPrimaryEdgeCoverage = flagPrimaryEdgesData.minPrimaryEdgeCoverage;
-    const uint64_t maxPrimaryEdgeCoverage = flagPrimaryEdgesData.maxPrimaryEdgeCoverage;
+    const uint64_t minPrimaryCoverage = flagPrimaryEdgesData.minPrimaryCoverage;
+    const uint64_t maxPrimaryCoverage = flagPrimaryEdgesData.maxPrimaryCoverage;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers =
         *flagPrimaryEdgesData.markersPointer;
 
     uint64_t begin, end;
     while(getNextBatch(begin, end)) {
         for(EdgeId edgeId=begin; edgeId!=end; ++edgeId) {
-            if(isPrimaryEdge(edgeId, minPrimaryEdgeCoverage, maxPrimaryEdgeCoverage, markers)) {
+            if(isPrimaryEdge(edgeId, minPrimaryCoverage, maxPrimaryCoverage, markers)) {
                 edges[edgeId].isPrimary = 1;
             }
         }
@@ -888,16 +888,16 @@ void MarkerGraph::flagPrimaryEdgesThreadFunction(uint64_t threadId)
 // Only used for Mode 3 assembly.
 bool MarkerGraph::isPrimaryEdge(
     MarkerGraphEdgeId edgeId,
-    uint64_t minPrimaryEdgeCoverage,
-    uint64_t maxPrimaryEdgeCoverage,
+    uint64_t minPrimaryCoverage,
+    uint64_t maxPrimaryCoverage,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) const
 {
     // Check coverage.
     const uint64_t coverage = edgeCoverage(edgeId);
-    if(coverage < minPrimaryEdgeCoverage) {
+    if(coverage < minPrimaryCoverage) {
         return false;
     }
-    if(coverage > maxPrimaryEdgeCoverage) {
+    if(coverage > maxPrimaryCoverage) {
         return false;
     }
 

@@ -12,7 +12,7 @@ a.accessMarkerGraphVertices()
 a.accessMarkerGraphEdges(True)
 a.accessDisjointSetsHistogram()
 a.flagPrimaryMarkerGraphEdges(
-    int(config['MarkerGraph']['minPrimaryEdgeCoverage']), 
-    int(config['MarkerGraph']['maxPrimaryEdgeCoverage']), 
+    int(config['Assembly']['mode3.minPrimaryCoverage']), 
+    int(config['Assembly']['mode3.maxPrimaryCoverage']), 
     0)
  

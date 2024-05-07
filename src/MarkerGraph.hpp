@@ -388,21 +388,21 @@ public:
 
     // Flag primary edges (only used for Mode 3 assembly).
     void flagPrimaryEdges(
-        uint64_t minPrimaryEdgeCoverage,
-        uint64_t maxPrimaryEdgeCoverage,
+        uint64_t minPrimaryCoverage,
+        uint64_t maxPrimaryCoverage,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         uint64_t threadCount);
 private:
     void flagPrimaryEdgesThreadFunction(uint64_t threadId);
     bool isPrimaryEdge(
         EdgeId,
-        uint64_t minPrimaryEdgeCoverage,
-        uint64_t maxPrimaryEdgeCoverage,
+        uint64_t minPrimaryCoverage,
+        uint64_t maxPrimaryCoverage,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) const;
     class FlagPrimaryEdgesData {
     public:
-        uint64_t minPrimaryEdgeCoverage;
-        uint64_t maxPrimaryEdgeCoverage;
+        uint64_t minPrimaryCoverage;
+        uint64_t maxPrimaryCoverage;
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>* markersPointer;
     };
     FlagPrimaryEdgesData flagPrimaryEdgesData;

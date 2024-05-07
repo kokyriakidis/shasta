@@ -248,8 +248,6 @@ public:
     int minCoveragePerStrand;
     uint64_t minEdgeCoverage;
     uint64_t minEdgeCoveragePerStrand;
-    uint64_t minPrimaryEdgeCoverage;
-    uint64_t maxPrimaryEdgeCoverage;
     bool allowDuplicateMarkers;
     bool cleanupDuplicateMarkers;
     double duplicateMarkersPattern1Threshold;
@@ -327,6 +325,9 @@ public:
 class shasta::Mode3AssemblyOptions {
 public:
 
+    uint64_t minPrimaryCoverage;
+    uint64_t maxPrimaryCoverage;
+
     // Options used to clean up the PrimaryGraph.
     class PrimaryGraphOptions {
     public:
@@ -334,7 +335,7 @@ public:
         // Parameter to control removal of weak edges.
         double maxLoss;
 
-        // Parameters ot control removal of cross edges.
+        // Parameters to control removal of cross edges.
         uint64_t crossEdgesLowCoverageThreshold;
         uint64_t crossEdgesHighCoverageThreshold;
 
