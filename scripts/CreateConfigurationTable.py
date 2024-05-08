@@ -51,6 +51,7 @@ configurations = [
     'Nanopore-R10-Slow-Nov2022',
     'Nanopore-Phased-R10-Fast-Nov2022',
     'Nanopore-Phased-R10-Slow-Nov2022',
+    'Nanopore-ncm23-May2024',
     ]
 
 
