@@ -1,6 +1,11 @@
 # Shasta long read assembler
 
 De novo assembler for long reads, optimized for Oxford Nanopore (ONT) reads.
+
+🆕 [Mode 3 assembly: presentation of assembly results](https://paoloshasta.github.io/shasta/Shasta-0.12.0.pdf)
+
+🆕 [Mode 3 assembly: usage notes](https://paoloshasta.github.io/shasta/Mode3-0.12.0.html)
+
 ___
 
 **Shasta development continues in this fork.** 
