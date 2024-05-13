@@ -227,7 +227,7 @@ void AssemblyGraph::run(
 // Initial creation from the PrimaryGraph.
 // Each linear chain of edges in the PrimaryGraph after transitive reduction generates
 // an AssemblyGraphEdge (BubbleChain) consisting of a single haploid bubble.
-void AssemblyGraph::create(const PrimaryGraph& graph, bool debug)
+void AssemblyGraph::create(const PrimaryGraph& graph, bool /* debug */)
 {
     AssemblyGraph& cGraph = *this;
 
@@ -1365,7 +1365,7 @@ string AssemblyGraph::chainStringId(
 uint64_t AssemblyGraph::chainPValue(
     edge_descriptor e,
     uint64_t positionInBubbleChain,
-    uint64_t indexInBubble) const
+    uint64_t /* indexInBubble */) const
 {
     // Locate the chain.
     const AssemblyGraph& cGraph = *this;

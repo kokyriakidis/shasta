@@ -476,7 +476,7 @@ PhasingGraph::vertex_descriptor PhasingGraph::getVertex(uint64_t componentId)
 
 void PhasingGraph::writeEdgesCsv(
     const string& fileName,
-    const AssemblyGraph2& assemblyGraph2) const
+    const AssemblyGraph2&) const
 {
     const PhasingGraph& phasingGraph = *this;
 
