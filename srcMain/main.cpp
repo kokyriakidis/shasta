@@ -682,8 +682,7 @@ void shasta::main::assemble(
     // Create the read graph.
     if(assemblerOptions.readGraphOptions.creationMethod == 0) {
         assembler.createReadGraph(
-            assemblerOptions.readGraphOptions.maxAlignmentCount,
-            assemblerOptions.alignOptions.maxTrim);
+            assemblerOptions.readGraphOptions.maxAlignmentCount);
 
         // Actual alignment criteria are as specified in the command line options
         // and/or configuration.

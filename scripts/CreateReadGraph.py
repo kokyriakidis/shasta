@@ -14,7 +14,6 @@ a.accessAlignmentDataReadWrite()
 
 # Create the global read graph.
 a.createReadGraph(
-    maxAlignmentCount = int(config['ReadGraph']['maxAlignmentCount']),
-    maxTrim = int(config['Align']['maxTrim']))
+    maxAlignmentCount = int(config['ReadGraph']['maxAlignmentCount']))
 
 

@@ -943,9 +943,7 @@ private:
     // For more information, see comments in ReadGraph.hpp.
 public:
     ReadGraph readGraph;
-    void createReadGraph(
-        uint32_t maxAlignmentCount,
-        uint32_t maxTrim);
+    void createReadGraph(uint32_t maxAlignmentCount);
 
     void createReadGraph2(
         uint32_t maxAlignmentCount,
@@ -1081,8 +1079,6 @@ public:
     // alignments should be used in the read graph.
     void createReadGraphUsingSelectedAlignments(vector<bool>& keepAlignment);
 
-    // Add alignments to avoid coverage holes.
-    void fixCoverageHoles(vector<bool>& keepAlignment) const;
 
 
 public:

@@ -323,8 +323,7 @@ PYBIND11_MODULE(shasta, shastaModule)
         // Undirected read graph
         .def("createReadGraph",
             &Assembler::createReadGraph,
-            arg("maxAlignmentCount"),
-            arg("maxTrim"))
+            arg("maxAlignmentCount"))
         .def("createReadGraph2",
              &Assembler::createReadGraph2,
             arg("maxAlignmentCount"),

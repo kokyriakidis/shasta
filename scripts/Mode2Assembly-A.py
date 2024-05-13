@@ -31,8 +31,7 @@ a.setupConsensusCaller(config['Assembly']['consensusCaller'])
 readGraphCreationMethod = int(config['ReadGraph']['creationMethod'])
 if readGraphCreationMethod == 0:
     a.createReadGraph(
-        maxAlignmentCount = int(config['ReadGraph']['maxAlignmentCount']),
-        maxTrim = int(config['Align']['maxTrim']))
+        maxAlignmentCount = int(config['ReadGraph']['maxAlignmentCount']))
 
 elif readGraphCreationMethod == 2:
     a.createReadGraph2(
