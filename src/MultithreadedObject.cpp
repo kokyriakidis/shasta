@@ -28,7 +28,7 @@ public:
             z[i] = 18;
         }
     }
-    void compute(size_t threadId)
+    void compute(uint64_t)
     {
 
         uint64_t begin, end;

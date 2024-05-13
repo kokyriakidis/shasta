@@ -537,7 +537,7 @@ void Assembler::createMarkerGraphVertices(
 
 
 
-void Assembler::createMarkerGraphVerticesThreadFunction1(size_t threadId)
+void Assembler::createMarkerGraphVerticesThreadFunction1(uint64_t)
 {
 
     array<vector<MarkerWithOrdinal>, 2> markersSortedByKmerId;
@@ -626,7 +626,7 @@ void Assembler::createMarkerGraphVerticesThreadFunction1(size_t threadId)
 
 
 
-void Assembler::createMarkerGraphVerticesThreadFunction2(size_t threadId)
+void Assembler::createMarkerGraphVerticesThreadFunction2(uint64_t)
 {
     DisjointSets& disjointSets = *createMarkerGraphVerticesData.disjointSetsPointer;
 
@@ -639,7 +639,7 @@ void Assembler::createMarkerGraphVerticesThreadFunction2(size_t threadId)
     }
 }
 
-void Assembler::createMarkerGraphVerticesThreadFunction21(size_t threadId)
+void Assembler::createMarkerGraphVerticesThreadFunction21(uint64_t)
 {
     DisjointSets& disjointSets = *createMarkerGraphVerticesData.disjointSetsPointer;
     const auto& disjointSetTable = createMarkerGraphVerticesData.disjointSetTable;
@@ -657,7 +657,7 @@ void Assembler::createMarkerGraphVerticesThreadFunction21(size_t threadId)
 }
 
 
-void Assembler::createMarkerGraphVerticesThreadFunction3(size_t threadId)
+void Assembler::createMarkerGraphVerticesThreadFunction3(uint64_t)
 {
     const auto& disjointSetTable = createMarkerGraphVerticesData.disjointSetTable;
     auto& workArea = createMarkerGraphVerticesData.workArea;
@@ -675,21 +675,21 @@ void Assembler::createMarkerGraphVerticesThreadFunction3(size_t threadId)
 
 
 
-void Assembler::createMarkerGraphVerticesThreadFunction4(size_t threadId)
+void Assembler::createMarkerGraphVerticesThreadFunction4(uint64_t)
 {
     createMarkerGraphVerticesThreadFunction45(4);
 }
 
 
 
-void Assembler::createMarkerGraphVerticesThreadFunction5(size_t threadId)
+void Assembler::createMarkerGraphVerticesThreadFunction5(uint64_t)
 {
     createMarkerGraphVerticesThreadFunction45(5);
 }
 
 
 
-void Assembler::createMarkerGraphVerticesThreadFunction6(size_t threadId)
+void Assembler::createMarkerGraphVerticesThreadFunction6(uint64_t)
 {
     auto& disjointSetMarkers = createMarkerGraphVerticesData.disjointSetMarkers;
 
@@ -711,7 +711,7 @@ void Assembler::createMarkerGraphVerticesThreadFunction6(size_t threadId)
 //   (But this check if suppressed if allowDuplicateMarkers is set).
 // - It does not contain at least minCoveragePerStrand supporting
 //   oriented reads on each strand.
-void Assembler::createMarkerGraphVerticesThreadFunction7(size_t threadId)
+void Assembler::createMarkerGraphVerticesThreadFunction7(uint64_t)
 {
     const auto& disjointSetMarkers = createMarkerGraphVerticesData.disjointSetMarkers;
     auto& isBadDisjointSet = createMarkerGraphVerticesData.isBadDisjointSet;
@@ -1191,7 +1191,7 @@ void Assembler::findMarkerGraphReverseComplementVertices(size_t threadCount)
 
 
 
-void Assembler::findMarkerGraphReverseComplementVerticesThreadFunction1(size_t threadId)
+void Assembler::findMarkerGraphReverseComplementVerticesThreadFunction1(uint64_t)
 {
     using VertexId = MarkerGraph::VertexId;
 
@@ -1230,7 +1230,7 @@ void Assembler::findMarkerGraphReverseComplementVerticesThreadFunction1(size_t t
 
 
 
-void Assembler::findMarkerGraphReverseComplementVerticesThreadFunction2(size_t threadId)
+void Assembler::findMarkerGraphReverseComplementVerticesThreadFunction2(uint64_t)
 {
     using VertexId = MarkerGraph::VertexId;
 
@@ -1304,7 +1304,7 @@ void Assembler::findMarkerGraphReverseComplementEdges(size_t threadCount)
 
 
 
-void Assembler::findMarkerGraphReverseComplementEdgesThreadFunction1(size_t threadId)
+void Assembler::findMarkerGraphReverseComplementEdgesThreadFunction1(uint64_t)
 {
     using VertexId = MarkerGraph::VertexId;
     using EdgeId = MarkerGraph::EdgeId;
@@ -1387,7 +1387,7 @@ void Assembler::findMarkerGraphReverseComplementEdgesThreadFunction1(size_t thre
 
 // Check that the reverse complement of the reverse complement of an
 // edge is the edge itself.
-void Assembler::findMarkerGraphReverseComplementEdgesThreadFunction2(size_t threadId)
+void Assembler::findMarkerGraphReverseComplementEdgesThreadFunction2(uint64_t)
 {
     using EdgeId = MarkerGraph::EdgeId;
 
@@ -1458,7 +1458,7 @@ void Assembler::checkMarkerGraphIsStrandSymmetric(size_t threadCount)
 
 
 // Check the vertices.
-void Assembler::checkMarkerGraphIsStrandSymmetricThreadFunction1(size_t threadId)
+void Assembler::checkMarkerGraphIsStrandSymmetricThreadFunction1(uint64_t)
 {
 
     // Loop over all batches assigned to this thread.
@@ -1497,7 +1497,7 @@ void Assembler::checkMarkerGraphIsStrandSymmetricThreadFunction1(size_t threadId
 
 
 // Check the edges.
-void Assembler::checkMarkerGraphIsStrandSymmetricThreadFunction2(size_t threadId)
+void Assembler::checkMarkerGraphIsStrandSymmetricThreadFunction2(uint64_t)
 {
     using EdgeId = MarkerGraph::EdgeId;
 
@@ -2109,7 +2109,7 @@ void Assembler::createMarkerGraphEdgesThreadFunction2(size_t threadId)
 {
     createMarkerGraphEdgesThreadFunction12(threadId, 2);
 }
-void Assembler::createMarkerGraphEdgesThreadFunction12(size_t threadId, size_t pass)
+void Assembler::createMarkerGraphEdgesThreadFunction12(uint64_t, size_t pass)
 {
     SHASTA_ASSERT(pass==1 || pass==2);
 
@@ -4282,7 +4282,7 @@ void Assembler::assembleMarkerGraphVertices(size_t threadCount)
 
 
 
-void Assembler::assembleMarkerGraphVerticesThreadFunction(size_t threadId)
+void Assembler::assembleMarkerGraphVerticesThreadFunction(uint64_t)
 {
     vector<Base> sequence;
     vector<uint32_t> repeatCounts;

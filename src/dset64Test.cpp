@@ -161,7 +161,7 @@ Dset64Test::Dset64Test(
 
 
 
-void Dset64Test::threadFunction(size_t threadId)
+void Dset64Test::threadFunction(uint64_t)
 {
     uint64_t begin;
     uint64_t end;

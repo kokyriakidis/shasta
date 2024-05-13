@@ -210,7 +210,7 @@ void PhasingGraph::createEdges(
 
 
 
-void PhasingGraph::createEdgesThreadFunction(size_t threadId)
+void PhasingGraph::createEdgesThreadFunction(uint64_t)
 {
     PhasingGraph& phasingGraph = *this;
 

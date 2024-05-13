@@ -1011,7 +1011,7 @@ void Assembler::flagCrossStrandReadGraphEdges1(int maxDistance, size_t threadCou
 
 
 
-void Assembler::flagCrossStrandReadGraphEdges1ThreadFunction(size_t threadId)
+void Assembler::flagCrossStrandReadGraphEdges1ThreadFunction(uint64_t)
 {
     const size_t readCount = reads->readCount();
     const size_t maxDistance = flagCrossStrandReadGraphEdges1Data.maxDistance;
@@ -1883,7 +1883,7 @@ void Assembler::flagInconsistentAlignments(
 
 
 
-void Assembler::flagInconsistentAlignmentsThreadFunction1(size_t threadId)
+void Assembler::flagInconsistentAlignmentsThreadFunction1(uint64_t)
 {
     // Loop over all batches assigned to this thread.
     uint64_t begin, end;

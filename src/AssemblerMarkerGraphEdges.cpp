@@ -129,7 +129,7 @@ void Assembler::createMarkerGraphEdgesStrictPass2(size_t threadId)
 
 
 
-void Assembler::createMarkerGraphEdgesStrictPass12(size_t threadId, uint64_t pass)
+void Assembler::createMarkerGraphEdgesStrictPass12(uint64_t, uint64_t pass)
 {
     // Loop over all batches assigned to this thread.
     uint64_t begin, end;

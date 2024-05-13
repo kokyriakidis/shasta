@@ -634,11 +634,11 @@ void Assembler::computeLowFrequencyMarkers(
 
 
 
-void Assembler::computeLowFrequencyMarkersThreadFunctionPass1(uint64_t threadId)
+void Assembler::computeLowFrequencyMarkersThreadFunctionPass1(uint64_t)
 {
     computeLowFrequencyMarkersThreadFunctionPass12(1);
 }
-void Assembler::computeLowFrequencyMarkersThreadFunctionPass2(uint64_t threadId)
+void Assembler::computeLowFrequencyMarkersThreadFunctionPass2(uint64_t)
 {
     computeLowFrequencyMarkersThreadFunctionPass12(2);
 }

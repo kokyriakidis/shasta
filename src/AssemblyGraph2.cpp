@@ -777,7 +777,7 @@ void AssemblyGraph2::assembleParallel(uint64_t threadCount)
 
 
 
-void AssemblyGraph2::assembleThreadFunction(size_t threadId)
+void AssemblyGraph2::assembleThreadFunction(uint64_t)
 {
 
     // Loop over all batches assigned to this thread.
@@ -2159,7 +2159,7 @@ void AssemblyGraph2::storeReadInformationParallel(uint64_t threadCount)
 
 
 
-void AssemblyGraph2::storeReadInformationThreadFunction(size_t threadId)
+void AssemblyGraph2::storeReadInformationThreadFunction(uint64_t)
 {
     G& g = *this;
 

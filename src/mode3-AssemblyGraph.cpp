@@ -7310,7 +7310,7 @@ void AssemblyGraph::writeAssemblyDetails() const
 
 
 
-void AssemblyGraph::assembleChainsMultithreadedTheadFunction(uint64_t threadId)
+void AssemblyGraph::assembleChainsMultithreadedTheadFunction(uint64_t)
 {
     const uint64_t chainTerminalCommonThreshold = assembleChainsMultithreadedData.chainTerminalCommonThreshold;
 

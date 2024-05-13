@@ -56,7 +56,7 @@ MarkerFinder::MarkerFinder(
 
 
 
-void MarkerFinder::threadFunction(size_t threadId)
+void MarkerFinder::threadFunction(uint64_t)
 {
 
     // Loop over batches assigned to this thread.

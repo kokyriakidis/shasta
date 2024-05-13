@@ -223,7 +223,7 @@ void Assembler::computeSortedMarkers(uint64_t threadCount)
 
 
 
-void Assembler::computeSortedMarkersThreadFunction(size_t threadId)
+void Assembler::computeSortedMarkersThreadFunction(uint64_t)
 {
     // Loop over all batches assigned to this thread.
     uint64_t begin, end;

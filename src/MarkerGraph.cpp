@@ -239,7 +239,7 @@ void MarkerGraph::removeVertices(
 
 
 
-void MarkerGraph::removeVerticesThreadFunction1(size_t threadId)
+void MarkerGraph::removeVerticesThreadFunction1(uint64_t)
 {
     const MemoryMapped::Vector<VertexId>& verticesToBeKept =
         *removeVerticesData.verticesToBeKept;
@@ -260,7 +260,7 @@ void MarkerGraph::removeVerticesThreadFunction1(size_t threadId)
 
 
 
-void MarkerGraph::removeVerticesThreadFunction2(size_t threadId)
+void MarkerGraph::removeVerticesThreadFunction2(uint64_t)
 {
     const MemoryMapped::Vector<VertexId>& verticesToBeKept =
         *removeVerticesData.verticesToBeKept;
@@ -282,7 +282,7 @@ void MarkerGraph::removeVerticesThreadFunction2(size_t threadId)
 
 
 
-void MarkerGraph::removeVerticesThreadFunction3(size_t threadId)
+void MarkerGraph::removeVerticesThreadFunction3(uint64_t)
 {
 
     // Loop over all batches assigned to this thread.
@@ -398,7 +398,7 @@ MarkerGraph::VertexId MarkerGraph::renumberVertexTable(size_t threadCount, Verte
 
 
 
-void MarkerGraph::renumberVertexTableThreadFunction1(size_t threadId)
+void MarkerGraph::renumberVertexTableThreadFunction1(uint64_t)
 {
 
     // Loop over all batches assigned to this thread.
@@ -417,7 +417,7 @@ void MarkerGraph::renumberVertexTableThreadFunction1(size_t threadId)
 
 
 
-void MarkerGraph::renumberVertexTableThreadFunction2(size_t threadId)
+void MarkerGraph::renumberVertexTableThreadFunction2(uint64_t)
 {
 
     // Loop over all batches assigned to this thread.
@@ -532,7 +532,7 @@ void MarkerGraph::createVerticesFromVertexTable(size_t threadCount, VertexId max
 
 
 
-void MarkerGraph::createVerticesFromVertexTableThreadFunction1(size_t threadId)
+void MarkerGraph::createVerticesFromVertexTableThreadFunction1(uint64_t)
 {
     auto& vertices = createVerticesFromVertexTableData.vertices;
 
@@ -554,7 +554,7 @@ void MarkerGraph::createVerticesFromVertexTableThreadFunction1(size_t threadId)
 
 
 
-void MarkerGraph::createVerticesFromVertexTableThreadFunction2(size_t threadId)
+void MarkerGraph::createVerticesFromVertexTableThreadFunction2(uint64_t)
 {
     auto& vertices = createVerticesFromVertexTableData.vertices;
 
@@ -576,7 +576,7 @@ void MarkerGraph::createVerticesFromVertexTableThreadFunction2(size_t threadId)
 
 
 
-void MarkerGraph::createVerticesFromVertexTableThreadFunction3(size_t threadId)
+void MarkerGraph::createVerticesFromVertexTableThreadFunction3(uint64_t)
 {
     auto& vertices = createVerticesFromVertexTableData.vertices;
 
@@ -595,7 +595,7 @@ void MarkerGraph::createVerticesFromVertexTableThreadFunction3(size_t threadId)
 
 
 
-void MarkerGraph::createVerticesFromVertexTableThreadFunction4(size_t threadId)
+void MarkerGraph::createVerticesFromVertexTableThreadFunction4(uint64_t)
 {
 
     // Loop over all batches assigned to this thread.
@@ -865,7 +865,7 @@ void MarkerGraph::flagPrimaryEdges(
 
 
 
-void MarkerGraph::flagPrimaryEdgesThreadFunction(uint64_t threadId)
+void MarkerGraph::flagPrimaryEdgesThreadFunction(uint64_t)
 {
     const uint64_t minPrimaryCoverage = flagPrimaryEdgesData.minPrimaryCoverage;
     const uint64_t maxPrimaryCoverage = flagPrimaryEdgesData.maxPrimaryCoverage;

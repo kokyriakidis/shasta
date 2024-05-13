@@ -727,7 +727,7 @@ void Assembler::flagPalindromicReads(
 
 
 
-void Assembler::flagPalindromicReadsThreadFunction(size_t threadId)
+void Assembler::flagPalindromicReadsThreadFunction(uint64_t)
 {
 
     // Work areas used inside the loop and defined here
@@ -1181,7 +1181,7 @@ void Assembler::suppressAlignmentCandidates(
 
 
 
-void Assembler::suppressAlignmentCandidatesThreadFunction(size_t threadId)
+void Assembler::suppressAlignmentCandidatesThreadFunction(uint64_t)
 {
     const uint64_t delta = suppressAlignmentCandidatesData.delta;
 

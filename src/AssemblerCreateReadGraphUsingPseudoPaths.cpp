@@ -163,7 +163,7 @@ void Assembler::createReadGraphUsingPseudoPaths(
 
 
 // Thread function used to compute pseudoPaths.
-void Assembler::createReadGraphUsingPseudoPathsThreadFunction1(size_t threadId)
+void Assembler::createReadGraphUsingPseudoPathsThreadFunction1(uint64_t)
 {
     vector<MarkerGraph::EdgeId> path;
     vector< pair<uint32_t, uint32_t> > pathOrdinals;
@@ -190,7 +190,7 @@ void Assembler::createReadGraphUsingPseudoPathsThreadFunction1(size_t threadId)
 
 
 // Thread functions used to align pseudopaths.
-void Assembler::createReadGraphUsingPseudoPathsThreadFunction2(size_t threadId)
+void Assembler::createReadGraphUsingPseudoPathsThreadFunction2(uint64_t)
 {
 
     // Extract parameters.

@@ -215,7 +215,7 @@ void Assembler::cleanupMarkerKmerIds()
 
 
 
-void Assembler::computeMarkerKmerIdsThreadFunction(size_t threadId)
+void Assembler::computeMarkerKmerIdsThreadFunction(uint64_t)
 {
 
     // Loop over all batches assigned to this thread.

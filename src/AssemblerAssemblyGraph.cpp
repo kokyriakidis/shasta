@@ -1916,11 +1916,11 @@ void Assembler::gatherOrientedReadsByAssemblyGraphEdge(size_t threadCount)
 
 
 
-void Assembler::gatherOrientedReadsByAssemblyGraphEdgePass1(size_t threadId)
+void Assembler::gatherOrientedReadsByAssemblyGraphEdgePass1(uint64_t)
 {
     gatherOrientedReadsByAssemblyGraphEdgePass(1);
 }
-void Assembler::gatherOrientedReadsByAssemblyGraphEdgePass2(size_t threadId)
+void Assembler::gatherOrientedReadsByAssemblyGraphEdgePass2(uint64_t)
 {
     gatherOrientedReadsByAssemblyGraphEdgePass(2);
 }

@@ -258,7 +258,7 @@ LowHash0::LowHash0(
 
 // Pass1: compute the low hashes for each oriented read
 // and prepare the buckets for filling.
-void LowHash0::pass1ThreadFunction(size_t threadId)
+void LowHash0::pass1ThreadFunction(uint64_t)
 {
     const int featureByteCount = int(m * sizeof(KmerId));
     const uint64_t seed = iteration * 37;
@@ -313,7 +313,7 @@ void LowHash0::pass1ThreadFunction(size_t threadId)
 
 
 // Pass 2: fill the buckets.
-void LowHash0::pass2ThreadFunction(size_t threadId)
+void LowHash0::pass2ThreadFunction(uint64_t)
 {
 
     // Loop over batches assigned to this thread.
