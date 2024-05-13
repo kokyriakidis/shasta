@@ -699,7 +699,7 @@ void CompressedAssemblyGraph::writeGraphviz(
     ostream& s,
     uint64_t sizePixels,
     double vertexScalingFactor,
-    double edgeLengthScalingFactor,
+    double /* edgeLengthScalingFactor */,
     double edgeThicknessScalingFactor,
     double edgeArrowScalingFactor,
     std::map<vertex_descriptor, array<double, 2 > >& vertexPositions) const
