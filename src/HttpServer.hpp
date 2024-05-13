@@ -186,10 +186,7 @@ private:
     // Return true if the connection is a local connection
     // originating from a process owned by the same
     // user running the server.
-    // Argument is boost::asio::ip::tcp::iostream&,
-    // but make it templated to reduce include file dependencies.
-    template<class T> bool isLocalConnectionSameUser(T&, uint16_t port) const;
-    // bool isLocalConnectionSameUser(boost::asio::ip::tcp::iostream&, uint16_t port) const;
+    bool isLocalConnectionSameUser(uint16_t port) const;
 };
 
 

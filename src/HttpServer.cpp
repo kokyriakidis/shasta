@@ -138,7 +138,7 @@ void HttpServer::explore(uint16_t port, bool localOnly, bool sameUserOnly)
           // user running the server.
           if(sameUserOnly) {
               SHASTA_ASSERT(localOnly);
-              if(!isLocalConnectionSameUser(s, port)) {
+              if(!isLocalConnectionSameUser(port)) {
                   // Unceremoniously close the connection.
                   cout << timestamp << "Reset a local connection originating from a process "
                       "not owned by the same user running the server." << endl;
@@ -659,14 +659,7 @@ void HttpServer::processPostRequest(
 // user running the server.
 // We use the lsof command to find open sockets on 127.0.0.1
 // and the current port as source or destination.
-// Argument is boost::asio::ip::tcp::iostream&,
-// but make it templated to reduce include file dependencies.
-template<class T> bool HttpServer::isLocalConnectionSameUser(
-    T& s,
-    uint16_t port) const
-/* bool HttpServer::isLocalConnectionSameUser(
-    boost::asio::ip::tcp::iostream& s,
-    uint16_t port) const */
+bool HttpServer::isLocalConnectionSameUser(uint16_t port) const
 {
     // Get out process id.
     const string serverProcessId = to_string(::getpid());
