@@ -1748,20 +1748,6 @@ void Assembler::alignSequencesInBaseRepresentation(
 }
 
 
-void Assembler::alignSequencesInMarkerRepresentation(
-    const vector<string>& request,
-    ostream& html)
-{
-    html <<
-        "<h1>Align two sequences in marker representation</h1>"
-        "<form method=post enctype='multipart/form-data'>"
-        "<input style='font-family:monospace' type=text name=sequence0 required size=64>"
-        "<input style='font-family:monospace' type=text name=sequence1 required size=64>"
-        "<br><input type=submit value='Align'>"
-        "</form>";
-}
-
-
 
 void Assembler::renderEditableAlignmentConfig(
     const int method,

@@ -2142,7 +2142,6 @@ public:
     void exploreAlignmentCoverage(const vector<string>&, ostream&);
     void exploreAlignment(const vector<string>&, ostream&);
     void alignSequencesInBaseRepresentation(const vector<string>&, ostream&);
-    void alignSequencesInMarkerRepresentation(const vector<string>&, ostream&);
     void exploreAlignmentGraph(const vector<string>&, ostream&);
     void exploreReadGraph(const vector<string>&, ostream&);
     void exploreUndirectedReadGraph(const vector<string>&, ostream&);
