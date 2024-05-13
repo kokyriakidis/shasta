@@ -1363,8 +1363,8 @@ void Mode2AssemblyOptions::write(ostream& s) const
 
 void Mode3AssemblyOptions::write(ostream& s) const
 {
-    s << "minPrimaryCoverage = " << minPrimaryCoverage << "\n";
-    s << "maxPrimaryCoverage = " << maxPrimaryCoverage << "\n";
+    s << "mode3.minPrimaryCoverage = " << minPrimaryCoverage << "\n";
+    s << "mode3.maxPrimaryCoverage = " << maxPrimaryCoverage << "\n";
     primaryGraphOptions.write(s);
     assemblyGraphOptions.write(s);
     localAssemblyOptions.write(s);
