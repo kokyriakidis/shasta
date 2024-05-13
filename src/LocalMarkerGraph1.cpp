@@ -1051,7 +1051,7 @@ void LocalMarkerGraph1::removeLongLowCoverageChains(
 
     // Find low coverage chains.
     vector< vector<LocalMarkerGraph1::vertex_descriptor> > lowCoverageChains;
-    findLowCoverageChains(1, lowCoverageChains);
+    findLowCoverageChains(maxChainCoverage, lowCoverageChains);
 
     // Remove the long ones.
     for(const auto& chain: lowCoverageChains) {
