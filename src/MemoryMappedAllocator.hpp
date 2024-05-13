@@ -161,7 +161,7 @@ public:
     // Deallocate a block.
     // The memory does not actually get freed until the ByteAllocator
     // is destroyed.
-    void deallocate(pointer p, uint64_t n)
+    void deallocate(pointer, uint64_t)
     {
         byteAllocator.deallocate();
     }

@@ -327,7 +327,7 @@ void Aligner::writeAlignmentMatrixPng(
 
 void Aligner::writeCheckerboard(
     PngImage& image,
-    uint64_t maxDistanceFromBoundary) const
+    uint64_t /*maxDistanceFromBoundary*/) const
 {
     Coordinates xy;
     uint32_t& x = xy.first;
