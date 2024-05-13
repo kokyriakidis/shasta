@@ -93,7 +93,7 @@ public:
         return (*this)[size() - 2];
     }
 
-    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
     {
         ar & boost::serialization::base_object< vector<MarkerGraphEdgeId> >(*this);
     }
@@ -119,7 +119,7 @@ public:
     // Remove duplicate chains.
     void deduplicate();
 
-    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
     {
         ar & boost::serialization::base_object< vector<Chain> >(*this);
     }
@@ -201,7 +201,7 @@ public:
     uint64_t totalLength() const;
 
 
-    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
     {
         ar & boost::serialization::base_object< vector<Bubble> >(*this);
     }
@@ -223,7 +223,7 @@ public:
     // Stored by class Superbubbles.
     uint64_t superbubbleId = invalid<uint64_t>;
 
-    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
     {
         ar & edgeId;
     }
@@ -235,7 +235,7 @@ class shasta::mode3::AssemblyGraphEdge : public BubbleChain {
 public:
     uint64_t id = invalid<uint64_t>;
 
-    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
     {
         ar & boost::serialization::base_object<BubbleChain>(*this);
         ar & id;
@@ -279,7 +279,7 @@ private:
     const Mode3AssemblyOptions& options;
 
     friend class boost::serialization::access;
-    template<class Archive> void serialize(Archive & ar, const unsigned int version)
+    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
     {
         ar & boost::serialization::base_object<AssemblyGraphBaseClass>(*this);
         ar & componentId;
