@@ -13,6 +13,7 @@ Distance is number of edges on the global assembly graph.
 
 // Shasta
 #include "AssemblyGraph.hpp"
+#include "invalid.hpp"
 
 // Boost libraries.
 #include <boost/graph/adjacency_list.hpp>
@@ -70,7 +71,7 @@ class shasta::LocalAssemblyGraphEdge {
 public:
     // The global edge id of the edge of the global assembly
     // graph that corresponds to this edge.
-    mode0::AssemblyGraph::EdgeId edgeId;
+    mode0::AssemblyGraph::EdgeId edgeId = invalid<mode0::AssemblyGraph::EdgeId>;
 
     // Field used by approximateTopologicalSort.
     bool isDagEdge = true;
