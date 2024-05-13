@@ -16,6 +16,7 @@ using namespace shasta;
 
 // Standard libraries.
 #include "chrono.hpp"
+#include <cmath>
 #include <filesystem>
 #include "iterator.hpp"
 #include "tuple.hpp"
@@ -1118,7 +1119,7 @@ bool Assembler::suppressAlignment(
 
     // Suppress the alignment if the absolute difference of the
     // read meta data fields is less than delta.
-    return abs(r0 - r1) < int64_t(delta);
+    return std::abs(r0 - r1) < int64_t(delta);
 
 }
 
