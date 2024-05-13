@@ -448,17 +448,6 @@ private:
 
     bool removeSelfComplementaryEdges();
 
-    // Special treatment to detangle back edges that were too long
-    // to be handled by detangleEdges.
-    bool detangleBackEdges(
-        uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
-    bool detangleBackEdge(
-        std::map<uint64_t, edge_descriptor>& edgeMap,
-        std::map<uint64_t, edge_descriptor>::iterator&,
-        uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
-
     // Bubble cleanup, with the purpose of eliminating most bubbles caused by errors.
     // See the code for details of what this does.
     uint64_t cleanupBubbles(
