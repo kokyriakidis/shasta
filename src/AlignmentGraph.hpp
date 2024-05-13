@@ -101,8 +101,8 @@ public:
 
     // Data members used to find the shortest path.
     AlignmentGraphBaseClass::vertex_descriptor predecessor;
-    uint64_t distance;
-    uint8_t color;
+    uint64_t distance = 0;
+    uint8_t color = 0;
 
     // Order by ordinal in the first sequence.
     bool operator<(const AlignmentGraphVertex& that) const
