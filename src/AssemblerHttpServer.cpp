@@ -582,7 +582,7 @@ void Assembler::writeGnuPlotPngToHtml(
 
 
 void Assembler::exploreSummary(
-    const vector<string>& request,
+    const vector<string>& /* request */,
     ostream& html)
 {
     writeAssemblySummaryBody(html);
