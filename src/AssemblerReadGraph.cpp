@@ -1662,7 +1662,7 @@ void Assembler::leastSquareAnalysis(
 
     // We know that there must be a zero singular value because
     // the least square solution is defined up to a constant.
-    SHASTA_ASSERT(abs(S[N-1]) < 1.e-14);
+    SHASTA_ASSERT(fabs(S[N-1]) < 1.e-14);
 
 
 
@@ -2048,7 +2048,7 @@ void Assembler::flagInconsistentAlignmentsThreadFunction2(size_t threadId)
                                 const vertex_descriptor v1 = target(e, graph);
                                 const double x0 = graph[v0].leastSquarePosition;
                                 const double x1 = graph[v1].leastSquarePosition;
-                                const double residual = abs((x1 - x0) - graph[e].averageAlignmentOffset);
+                                const double residual = fabs((x1 - x0) - graph[e].averageAlignmentOffset);
                                 if(residual > maxResidual) {
                                     maxResidual = residual;
                                     itWorst = it;
