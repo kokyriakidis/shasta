@@ -322,6 +322,14 @@ private:
     // haploid Bubble with a Chain of length 2.
     edge_descriptor connect(vertex_descriptor cv0, vertex_descriptor cv1);
 
+    // Create a new edge consisting of the concatenation of two edges,
+    // which must be simple chains. The original edges are not removed.
+    // The concatenation is done connecting one of the last n
+    // MarkerGraphEdgeIds of e0 (excluding the very last) and
+    // one of the first n MarkerGraphEdgeIds of e1 (excluding the very first),
+    // choosing the pair with the largest number of common oriented reads.
+    edge_descriptor connect(bool debug, edge_descriptor e0, edge_descriptor e1, uint64_t n);
+
     // Compress parallel edges into bubbles, where possible.
     bool compressParallelEdges();
 
@@ -372,7 +380,9 @@ private:
         double epsilon,
         double minLogP);
 
-    // Edge detangling.
+    // Edge detangling using only
+    // the second-to-last MarkerGraphEdgeId of incoming chains and
+    // the second MarkerGraphEdgeId of outgoing chains.
     bool detangleEdges(
         bool debug,
         uint64_t detangleToleranceLow,
@@ -389,6 +399,22 @@ private:
         bool useBayesianModel,
         double epsilon,
         double minLogP);
+
+    // Edge detangling using up to n MarkerGraphEdgeIds
+    // of incoming and outgoing chains.
+    // This version only handles the 2 by 2 case and always uses the Bayesian model.
+    bool detangleEdges(
+        bool debug,
+        double epsilon,
+        double minLogP,
+        uint64_t n);
+    bool detangleEdge(
+        bool debug,
+        std::map<uint64_t, edge_descriptor>& edgeMap,
+        std::map<uint64_t, edge_descriptor>::iterator&,
+        double epsilon,
+        double minLogP,
+        uint64_t n);
 
 #if 0
     bool detangleEdgesWithSearch(

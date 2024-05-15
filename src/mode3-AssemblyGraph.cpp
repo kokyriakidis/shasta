@@ -185,6 +185,12 @@ void AssemblyGraph::run(
         useBayesianModel,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP);
+    write("D1");
+    detangleEdges(true,
+        options.assemblyGraphOptions.epsilon,
+        options.assemblyGraphOptions.minLogP,
+        6);
+    write("D2");
     performanceLog << timestamp << "Detangling ends." << endl;
 
     compress();
@@ -3201,6 +3207,9 @@ bool AssemblyGraph::detangleVertex(
 
 
 
+// Edge detangling using only
+// the second-to-last MarkerGraphEdgeId of incoming chains and
+// the second MarkerGraphEdgeId of outgoing chains.
 bool AssemblyGraph::detangleEdges(
     bool debug,
     uint64_t detangleToleranceLow,
@@ -3240,6 +3249,48 @@ bool AssemblyGraph::detangleEdges(
 
 
 
+// Edge detangling using up to n MarkerGraphEdgeIds
+// of incoming and outgoing chains.
+// This version only handles the 2 by 2 case and always uses the Bayesian model.
+bool AssemblyGraph::detangleEdges(
+    bool debug,
+    double epsilon,
+    double minLogP,
+    uint64_t n)
+{
+    if(debug) {
+        cout << "Detangling edges." << endl;
+    }
+
+    AssemblyGraph& cGraph = *this;
+
+    // To safely iterate over edges while removing edges we must use edge ids
+    // as unique identifiers, because edge descriptors can be reused as edges are
+    // deleted ndw new edges are created.
+    std::map<uint64_t, edge_descriptor> edgeMap;
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
+        edgeMap.insert({cGraph[ce].id, ce});
+    }
+
+    uint64_t detangleCount = 0;;
+    for(auto it=edgeMap.begin(); it!=edgeMap.end(); /* Incremented safely by detangleEdgeStrict */) {
+        if(detangleEdge(debug, edgeMap, it, epsilon, minLogP, n)) {
+            ++detangleCount;
+        }
+    }
+
+    if(debug) {
+        cout << "Detangled " << detangleCount << " edges." << endl;
+    }
+
+    return detangleCount > 0;
+}
+
+
+
+// Edge detangling using only
+// the second-to-last MarkerGraphEdgeId of incoming chains and
+// the second MarkerGraphEdgeId of outgoing chains.
 bool AssemblyGraph::detangleEdge(
     bool debug,
     std::map<uint64_t, edge_descriptor>& edgeMap,
@@ -3392,33 +3443,6 @@ bool AssemblyGraph::detangleEdge(
         cout << endl;
 
         cout << "Tangle matrix:" << endl;
-        for(uint64_t i0=0; i0<inEdges.size(); i0++) {
-            const edge_descriptor ce0 = inEdges[i0];
-            for(uint64_t i1=0; i1<outEdges.size(); i1++) {
-                const edge_descriptor ce1 = outEdges[i1];
-                cout <<
-                    bubbleChainStringId(ce0) << " " <<
-                    bubbleChainStringId(ce1) << " " <<
-                    tangleMatrix[i0][i1] << endl;
-            }
-        }
-    }
-
-
-    // Also compute the tangle matrix using the n MarkerGraphEdgeIds
-    // at the end of each inChain and at the beginning of each outChain.
-    if(debug) {
-        const uint64_t n = 6;
-        const array<const Chain*, 2> inChains = {
-            &cGraph[inEdges[0]].back().front(),
-            &cGraph[inEdges[1]].back().front()};
-        const array<const Chain*, 2> outChains = {
-            &cGraph[outEdges[0]].front().front(),
-            &cGraph[outEdges[1]].front().front()};
-        TangleMatrix tangleMatrix;
-        computeTangleMatrix(inChains, outChains, n, tangleMatrix);
-
-        cout << "Tangle matrix with n = " << n << ":" << endl;
         for(uint64_t i0=0; i0<inEdges.size(); i0++) {
             const edge_descriptor ce0 = inEdges[i0];
             for(uint64_t i1=0; i1<outEdges.size(); i1++) {
@@ -3633,6 +3657,289 @@ bool AssemblyGraph::detangleEdge(
     cGraph.removeVertex(cv1);
 
     return true;
+}
+
+
+
+// Edge detangling using up to n MarkerGraphEdgeIds
+// of incoming and outgoing chains.
+// This version only handles the 2 by 2 case and always uses the Bayesian model.
+bool AssemblyGraph::detangleEdge(
+    bool debug,
+    std::map<uint64_t, edge_descriptor>& edgeMap,
+    std::map<uint64_t, edge_descriptor>::iterator& it,
+    double epsilon,
+    double minLogP,
+    uint64_t n)
+{
+    AssemblyGraph& cGraph = *this;
+    const edge_descriptor ce = it->second;
+    ++it;
+
+    // This must be called when all bubble chains are simple chains,
+    // that is they consist of a single haploid bubble.
+    BubbleChain& bubbleChain = cGraph[ce];
+    SHASTA_ASSERT(bubbleChain.isSimpleChain());
+
+    // Get the vertices of the edge to be detangled.
+    const vertex_descriptor cv0 = source(ce, cGraph);
+    const vertex_descriptor cv1 = target(ce, cGraph);
+
+    // Check basic requirements for the edge to be detangled.
+    if(out_degree(cv0, cGraph) != 1) {
+        return false;
+    }
+    if(in_degree(cv1, cGraph) != 1) {
+        return false;
+    }
+
+    if(debug) {
+        cout << "Attempting to detangle edge " << bubbleChainStringId(ce) << endl;
+    }
+
+    // Gather the in-edges and check that the corresponding bubble chains are simple chains.
+    // Ignore in-edges coming from cv1 (back-edges).
+    vector<edge_descriptor> inEdges;
+    vector<edge_descriptor> backEdges;
+    BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        SHASTA_ASSERT(bubbleChain.isSimpleChain());
+        if(source(ce, cGraph) != cv1) {
+            inEdges.push_back(ce);
+        } else {
+            backEdges.push_back(ce);
+        }
+    }
+
+    // Gather the out-edges and check that the corresponding bubble chains are simple chains.
+    // Ignore out-edges going to cv0 (back-edges).
+    vector<edge_descriptor> outEdges;
+    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        SHASTA_ASSERT(bubbleChain.isSimpleChain());
+        if(target(ce, cGraph) != cv0) {
+            outEdges.push_back(ce);
+        }
+    }
+
+    // Check more conditions for detangling.
+    // This code only handles the 2 by 2 case.
+    if(inEdges.size() != 2 or outEdges.size() != 2) {
+        if(debug) {
+            cout << "Not detangling due to degree." << endl;
+        }
+        return false;
+    }
+
+
+
+    // Compute the tangle matrix using up to n MarkerGraphEdgeIds
+    // of incoming and outgoing chains.
+    const array<const Chain*, 2> inChains = {
+        &cGraph[inEdges[0]].back().front(),
+        &cGraph[inEdges[1]].back().front()};
+    const array<const Chain*, 2> outChains = {
+        &cGraph[outEdges[0]].front().front(),
+        &cGraph[outEdges[1]].front().front()};
+    TangleMatrix tangleMatrix;
+    computeTangleMatrix(inChains, outChains, n, tangleMatrix);
+
+    if(debug) {
+        cout << "Tangle matrix:" << endl;
+        for(uint64_t i0=0; i0<inEdges.size(); i0++) {
+            const edge_descriptor ce0 = inEdges[i0];
+            for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+                const edge_descriptor ce1 = outEdges[i1];
+                cout <<
+                    bubbleChainStringId(ce0) << " " <<
+                    bubbleChainStringId(ce1) << " " <<
+                    tangleMatrix[i0][i1] << endl;
+            }
+        }
+    }
+
+    // Run the 2 by 2 Bayesian model for detangling.
+    array< array<uint64_t, 2>, 2> tangleMatrix22;
+    for(uint64_t i=0; i<2; i++) {
+        for(uint64_t j=0; j<2; j++) {
+            tangleMatrix22[i][j] = tangleMatrix[i][j];
+        }
+    }
+
+    // Compute logarithmic probability ratio of in-phase and out-of-phase
+    // against random.
+    double logPin;
+    double logPout;
+    tie(logPin, logPout) = diploidBayesianPhase(tangleMatrix22, epsilon);
+    if(debug) {
+        cout << "logPin = " << logPin << ", logPout = " << logPout << endl;
+    }
+
+    // Ignore the random hypothesis.
+    const bool isInPhase    = (logPin - logPout) >= minLogP;
+    const bool isOutOfPhase = (logPout - logPin) >= minLogP;
+
+    const bool isAmbiguous = not (isInPhase or isOutOfPhase);
+    if(isAmbiguous) {
+        if(debug) {
+            cout << "Ambiguous, not detangling." << endl;
+        }
+        return false;
+    }
+
+    // We can detangle.
+
+    if(isInPhase) {
+        connect(debug, inEdges[0], outEdges[0], n);
+        connect(debug, inEdges[1], outEdges[1], n);
+        if(debug) {
+            cout << "In phase." << endl;
+            cout << "Connected " <<
+                bubbleChainStringId(inEdges[0]) << " and " <<
+                bubbleChainStringId(outEdges[0]) << endl;
+            cout << "Connected " <<
+                bubbleChainStringId(inEdges[1]) << " and " <<
+                bubbleChainStringId(outEdges[1]) << endl;
+        }
+    } else {
+        connect(debug, inEdges[0], outEdges[1], n);
+        connect(debug, inEdges[1], outEdges[0], n);
+        if(debug) {
+            cout << "In phase." << endl;
+            cout << "Connected " <<
+                bubbleChainStringId(inEdges[0]) << " and " <<
+                bubbleChainStringId(outEdges[1]) << endl;
+            cout << "Connected " <<
+                bubbleChainStringId(inEdges[1]) << " and " <<
+                bubbleChainStringId(outEdges[0]) << endl;
+        }
+    }
+
+
+    // Now we can remove cv0, cv1, ce, and all of the in-edges and out-edges.
+    // We have to do this while safely incrementing the edge iterator to point to the
+    // next edge that was not removed.
+    // We already incremented the iterator to point past ce.
+    boost::remove_edge(ce, cGraph);
+    for(const edge_descriptor ce: inEdges) {
+        if(it != edgeMap.end() and cGraph[ce].id == it->first) {
+            ++it;
+        }
+        edgeMap.erase(cGraph[ce].id);
+        boost::remove_edge(ce, cGraph);
+    }
+    for(const edge_descriptor ce: outEdges) {
+        if(it != edgeMap.end() and cGraph[ce].id == it->first) {
+            ++it;
+        }
+        edgeMap.erase(cGraph[ce].id);
+        boost::remove_edge(ce, cGraph);
+    }
+    for(const edge_descriptor ce: backEdges) {
+        if(it != edgeMap.end() and cGraph[ce].id == it->first) {
+            ++it;
+        }
+        edgeMap.erase(cGraph[ce].id);
+        boost::remove_edge(ce, cGraph);
+    }
+    cGraph.removeVertex(cv0);
+    cGraph.removeVertex(cv1);
+
+    return true;
+}
+
+
+
+// Create a new edge consisting of the concatenation of two edges,
+// which must be simple chains. The original edges are not removed.
+// The concatenation is done connecting one of the last n
+// MarkerGraphEdgeIds of e0 (excluding the very last) and
+// one of the first n MarkerGraphEdgeIds of e1 (excluding the very first),
+// choosing the pair with the largest number of common oriented reads.
+AssemblyGraph::edge_descriptor AssemblyGraph::connect(
+    bool debug,
+    edge_descriptor e0,
+    edge_descriptor e1,
+    uint64_t n)
+{
+    if(debug) {
+        cout << "Connecting " <<
+            bubbleChainStringId(e0) << " and " <<
+            bubbleChainStringId(e1) << endl;
+    }
+    AssemblyGraph& graph = *this;
+
+    // Get the chains we want to connect.
+    const BubbleChain& bubbleChain0 = graph[e0];
+    const BubbleChain& bubbleChain1 = graph[e1];
+    SHASTA_ASSERT(bubbleChain0.isSimpleChain());
+    SHASTA_ASSERT(bubbleChain1.isSimpleChain());
+    const Chain& chain0 = bubbleChain0.front().front();
+    const Chain& chain1 = bubbleChain1.front().front();
+
+    // Find the last n MarkerGraphEdgeIds of chain0 (excluding the very last).
+    const uint64_t last0 = chain0.size() - 2;                      // Exclude last MarkergraphEdgeId.
+    const uint64_t first0 = (last0 > (n-1)) ? last0 + 1 - n : 0;   // Use up to n.
+    SHASTA_ASSERT(first0 < chain0.size());
+    SHASTA_ASSERT(last0 < chain0.size());
+
+    // Find the first n MarkerGraphEdgeIds of chain0 (excluding the very first).
+    const uint64_t first1 = 1;   // / Exclude first MarkergraphEdgeId.
+    const uint64_t last1 = (chain1.size() > (n+1)) ? n : chain1.size() - 1;
+    SHASTA_ASSERT(first1 < chain1.size());
+    SHASTA_ASSERT(last1 < chain1.size());
+
+
+
+    // Among these, find the pair with the greatest number of common
+    // oriented reads.
+    uint64_t bestCommonCount = 0;
+    uint64_t i0Best = invalid<uint64_t>;
+    uint64_t i1Best = invalid<uint64_t>;
+    for(uint64_t i0=first0; i0<=last0; i0++) {
+        const MarkerGraphEdgeId edgeId0 = chain0[i0];
+        for(uint64_t i1=first1; i1<=last1; i1++) {
+            const MarkerGraphEdgeId edgeId1 = chain1[i1];
+
+            MarkerGraphEdgePairInfo info;
+            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+            const uint64_t commonCount = info.common;
+
+            if(debug) {
+                cout << "Positions in chains " << i0 << " " << i1 <<
+                    " MarkerGraphedgeIds " << edgeId0 << " " << edgeId1 <<
+                    ", common count " << commonCount << endl;
+            }
+
+            if(commonCount > bestCommonCount) {
+                bestCommonCount = commonCount;
+                i0Best = i0;
+                i1Best = i1;
+            }
+        }
+    }
+    SHASTA_ASSERT(bestCommonCount > 0);
+    SHASTA_ASSERT(i0Best != invalid<uint64_t>);
+    SHASTA_ASSERT(i1Best != invalid<uint64_t>);
+
+    // Create the new edge.
+    const vertex_descriptor v0 = source(e0, graph);
+    const vertex_descriptor v1 = target(e1, graph);
+    edge_descriptor eNew;
+    tie(eNew, ignore) = add_edge(v0, v1, graph);
+    AssemblyGraphEdge& newEdge = graph[eNew];
+    newEdge.id = nextEdgeId++;
+    BubbleChain& bubbleChain = newEdge;
+    bubbleChain.resize(1);
+    Bubble& newBubble = bubbleChain.front();
+    newBubble.resize(1);
+    Chain& newChain = newBubble.front();
+
+    // Store the new chain.
+    copy(chain0.begin(), chain0.begin() + i0Best + 1, back_inserter(newChain));
+    copy(chain1.begin() + i1Best, chain1.end(), back_inserter(newChain));
+
+    return eNew;
 }
 
 
