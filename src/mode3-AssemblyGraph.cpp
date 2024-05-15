@@ -3871,11 +3871,34 @@ bool AssemblyGraph::detangleEdge(
                 cout <<
                     bubbleChainStringId(ce0) << " " <<
                     bubbleChainStringId(ce1) << " " <<
-                    tangleMatrix[i0][i1];
-                if(tangleMatrix[i0][i1] == 0) {
-                    cout << " zero tangle matrix element";
-                }
-                cout << endl;
+                    tangleMatrix[i0][i1] << endl;
+            }
+        }
+    }
+
+
+    // Also compute the tangle matrix using the n MarkerGraphEdgeIds
+    // at the end of each inChain and at the beginning of each outChain.
+    if(debug) {
+        const uint64_t n = 6;
+        const array<const Chain*, 2> inChains = {
+            &cGraph[inEdges[0]].back().front(),
+            &cGraph[inEdges[1]].back().front()};
+        const array<const Chain*, 2> outChains = {
+            &cGraph[outEdges[0]].front().front(),
+            &cGraph[outEdges[1]].front().front()};
+        TangleMatrix tangleMatrix;
+        computeTangleMatrix(inChains, outChains, n, tangleMatrix);
+
+        cout << "Tangle matrix with n = " << n << ":" << endl;
+        for(uint64_t i0=0; i0<inEdges.size(); i0++) {
+            const edge_descriptor ce0 = inEdges[i0];
+            for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+                const edge_descriptor ce1 = outEdges[i1];
+                cout <<
+                    bubbleChainStringId(ce0) << " " <<
+                    bubbleChainStringId(ce1) << " " <<
+                    tangleMatrix[i0][i1] << endl;
             }
         }
     }
