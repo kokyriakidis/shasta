@@ -111,10 +111,6 @@ public:
     {
         return size() == 2;
     }
-    bool isGeneral() const
-    {
-        return size() > 2;
-    }
 
     // Remove duplicate chains.
     void deduplicate();
@@ -361,8 +357,6 @@ private:
     vertex_descriptor cloneAndTruncateAtBeginning(edge_descriptor);
 
     // Vertex detangling.
-    // bool detangleVerticesStrict(bool debug);
-    // bool detangleVertexStrict(vertex_descriptor, bool debug);
     bool detangleVertices(bool debug,
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh,
@@ -377,30 +371,6 @@ private:
         bool useBayesianModel,
         double epsilon,
         double minLogP);
-
-    // Vertex detangling that can deal with non-haploid bubbles adjacent to the
-    // vertex to be detangled.
-    bool detangleVerticesGeneral(bool debug,
-        uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh,
-        bool useBayesianModel,
-        double epsilon,
-        double minLogP);
-    bool detangleVertexGeneral(
-        vertex_descriptor,
-        bool debug,
-        uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh,
-        bool useBayesianModel,
-        double epsilon,
-        double minLogP);
-
-    // Split the first/last bubble of a bubble chain.
-    // Used by detangleVertexGeneral to eliminate
-    // non-haploid bubble adjacent to a vertex to be detangled.
-    void splitBubbleChainAtBeginning(edge_descriptor);
-    void splitBubbleChainAtEnd(edge_descriptor);
-
 
     // Edge detangling.
     bool detangleEdges(
@@ -419,22 +389,8 @@ private:
         bool useBayesianModel,
         double epsilon,
         double minLogP);
-    bool detangleEdgesGeneral(
-        bool debug,
-        uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh,
-        bool useBayesianModel,
-        double epsilon,
-        double minLogP);
-    bool detangleEdgeGeneral(
-        bool debug,
-        std::map<uint64_t, edge_descriptor>& edgeMap,
-        std::map<uint64_t, edge_descriptor>::iterator&,
-        uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh,
-        bool useBayesianModel,
-        double epsilon,
-        double minLogP);
+
+#if 0
     bool detangleEdgesWithSearch(
         bool debug,
         uint64_t detangleToleranceLow,
@@ -445,6 +401,7 @@ private:
         std::map<uint64_t, edge_descriptor>::iterator&,
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
+#endif
 
     bool removeSelfComplementaryEdges();
 
