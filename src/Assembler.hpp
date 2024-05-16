@@ -2356,6 +2356,10 @@ public:
         uint64_t maxPrimaryCoverage,
         uint64_t threadCount);
 
+    // If the coverage range for primary marker graph edges is not
+    // specified, this uses the disjoint sets histogram to compute reasonable values.
+    pair<uint64_t, uint64_t> getPrimaryCoverageRange();
+
     // Assemble sequence between two primary edges.
     void fillMode3AssemblyPathStep(const vector<string>&, ostream&);
 

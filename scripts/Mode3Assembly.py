@@ -26,19 +26,10 @@ options = shasta.AssemblerOptions('shasta.conf')
 a = shasta.Assembler()
 a.accessMarkers()
 a.accessMarkerGraphVertices()
-a.accessMarkerGraphEdges(True)
+a.accessMarkerGraphEdges()
 a.accessMarkerGraphReverseComplementEdge()
 a.accessMarkerGraphConsensus()
 a.accessDisjointSetsHistogram()
-
-# Open a performance log.
-shasta.openPerformanceLog('Mode3Assembly.log')
-
-# Flag primary marker graph edges.
-a.flagPrimaryMarkerGraphEdges(
-    int(config['Assembly']['mode3.minPrimaryCoverage']), 
-    int(config['Assembly']['mode3.maxPrimaryCoverage']), 
-    0)
 
 # Run Mode 3 assembly.
 a.mode3Assembly(0, options.assemblyOptions.mode3Options, arguments.debug)

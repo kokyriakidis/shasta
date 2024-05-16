@@ -1094,6 +1094,14 @@ void shasta::main::mode3Assembly(
         threadCount);
     assembler.findMarkerGraphReverseComplementVertices(threadCount);
 
+    // If the coverage range for primary marker graph edges is not
+    // specified, use the disjoint sets histogram to compute reasonable values.
+    uint64_t minPrimaryCoverage = assemblerOptions.assemblyOptions.mode3Options.minPrimaryCoverage;
+    uint64_t maxPrimaryCoverage = assemblerOptions.assemblyOptions.mode3Options.maxPrimaryCoverage;
+    if((minPrimaryCoverage == 0) and (maxPrimaryCoverage == 0)) {
+        tie(minPrimaryCoverage, maxPrimaryCoverage) = assembler.getPrimaryCoverageRange();
+    }
+
     // Create marker graph edges.
     // Use createMarkerGraphEdgesStrict so all oriented reads on an edge
     // have exactly the same sequence.
@@ -1117,8 +1125,8 @@ void shasta::main::mode3Assembly(
 
     // Flag primary marker graph edges.
     assembler.flagPrimaryMarkerGraphEdges(
-        assemblerOptions.assemblyOptions.mode3Options.minPrimaryCoverage,
-        assemblerOptions.assemblyOptions.mode3Options.maxPrimaryCoverage,
+        minPrimaryCoverage,
+        maxPrimaryCoverage,
         threadCount);
 
     // Run Mode 3 assembly.

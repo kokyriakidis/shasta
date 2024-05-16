@@ -786,53 +786,6 @@ void MarkerGraph::flagPrimaryEdges(
 {
     SHASTA_ASSERT(disjointSetsHistogram.isOpen);
 
-    // If minPrimaryCoverage and maxPrimaryCoverage are both 0,
-    // use the disjoint sets histogram and simple heuristics to choose
-    // appropriate values.
-    if((minPrimaryCoverage == 0) and (maxPrimaryCoverage == 0)) {
-
-        // Set minPrimaryCoverage to the first value where the
-        // disjointSetsHistogram starts increasing.
-        bool done = false;
-        uint64_t frequencyAtMinPrimaryCoverage = 0;
-        for(uint64_t i=1; i<disjointSetsHistogram.size(); i++) {
-            const uint64_t coverage = disjointSetsHistogram[i].first;
-            const uint64_t frequency = disjointSetsHistogram[i].second;
-            const uint64_t previousCoverage = disjointSetsHistogram[i-1].first;
-            const uint64_t previousFrequency = disjointSetsHistogram[i-1].second;
-            if(
-                (coverage != previousCoverage+1) // Frequency at coverage-1 is zero, so the histogram went up.
-                or
-                frequency > previousFrequency    // The histogram went up.
-                ) {
-                minPrimaryCoverage = coverage;
-                frequencyAtMinPrimaryCoverage = frequency;
-                done = true;
-                break;
-            }
-        }
-        SHASTA_ASSERT(done);
-
-        // Set maxPrimaryCoverage to the last coverage with frequency
-        // at least equal to frequencyAtMinPrimaryCoverage.
-        done = false;
-        for(uint64_t i=disjointSetsHistogram.size()-1; i>0; i--) {
-            const uint64_t coverage = disjointSetsHistogram[i].first;
-            const uint64_t frequency = disjointSetsHistogram[i].second;
-            if(frequency >= frequencyAtMinPrimaryCoverage) {
-                maxPrimaryCoverage = coverage;
-                done= true;
-                break;
-            }
-        }
-        SHASTA_ASSERT(done);
-
-        cout << "Automatically set: minPrimaryCoverage = " << minPrimaryCoverage <<
-            ", maxPrimaryCoverage = " << maxPrimaryCoverage << endl;
-    }
-
-
-
     // Store the arguments so the threads can see them.
     flagPrimaryEdgesData.minPrimaryCoverage = minPrimaryCoverage;
     flagPrimaryEdgesData.maxPrimaryCoverage = maxPrimaryCoverage;

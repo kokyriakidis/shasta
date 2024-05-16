@@ -37,6 +37,54 @@ void Assembler::flagPrimaryMarkerGraphEdges(
 
 
 
+// If the coverage range for primary marker graph edges is not
+// specified, this uses the disjoint sets histogram to compute reasonable values.
+pair<uint64_t, uint64_t> Assembler::getPrimaryCoverageRange()
+{
+    const auto& disjointSetsHistogram = markerGraph.disjointSetsHistogram;
+
+    // Set minPrimaryCoverage to the first value where the
+    // disjointSetsHistogram starts increasing.
+    uint64_t minPrimaryCoverage = invalid<uint64_t>;
+    uint64_t frequencyAtMinPrimaryCoverage = 0;
+    for(uint64_t i=1; i<disjointSetsHistogram.size(); i++) {
+        const uint64_t coverage = disjointSetsHistogram[i].first;
+        const uint64_t frequency = disjointSetsHistogram[i].second;
+        const uint64_t previousCoverage = disjointSetsHistogram[i-1].first;
+        const uint64_t previousFrequency = disjointSetsHistogram[i-1].second;
+        if(
+            (coverage != previousCoverage+1) // Frequency at coverage-1 is zero, so the histogram went up.
+            or
+            frequency > previousFrequency    // The histogram went up.
+            ) {
+            minPrimaryCoverage = coverage;
+            frequencyAtMinPrimaryCoverage = frequency;
+            break;
+        }
+    }
+    SHASTA_ASSERT(minPrimaryCoverage != invalid<uint64_t>);
+
+    // Set maxPrimaryCoverage to the last coverage with frequency
+    // at least equal to frequencyAtMinPrimaryCoverage.
+    uint64_t maxPrimaryCoverage = invalid<uint64_t>;
+    for(uint64_t i=disjointSetsHistogram.size()-1; i>0; i--) {
+        const uint64_t coverage = disjointSetsHistogram[i].first;
+        const uint64_t frequency = disjointSetsHistogram[i].second;
+        if(frequency >= frequencyAtMinPrimaryCoverage) {
+            maxPrimaryCoverage = coverage;
+            break;
+        }
+    }
+    SHASTA_ASSERT(maxPrimaryCoverage != invalid<uint64_t>);
+
+    cout << "Automatically set: minPrimaryCoverage = " << minPrimaryCoverage <<
+        ", maxPrimaryCoverage = " << maxPrimaryCoverage << endl;
+
+    return {minPrimaryCoverage, maxPrimaryCoverage};
+}
+
+
+
 void Assembler::mode3Assembly(
     uint64_t threadCount,
     const Mode3AssemblyOptions& options,
