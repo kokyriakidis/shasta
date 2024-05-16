@@ -355,8 +355,7 @@ private:
     void computeTangleMatrix(
         const vector<edge_descriptor>& inEdges,
         const vector<edge_descriptor>& outEdges,
-        vector< vector<uint64_t> >& tangleMatrix,
-        bool setToZeroForComplementaryPairs
+        vector< vector<uint64_t> >& tangleMatrix
         ) const;
 
     // Low level primitives used in detangling.
@@ -428,8 +427,6 @@ private:
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh);
 #endif
-
-    bool removeSelfComplementaryEdges();
 
     // Bubble cleanup, with the purpose of eliminating most bubbles caused by errors.
     // See the code for details of what this does.
@@ -556,8 +553,6 @@ private:
     // Split terminal haploid bubbles out of bubble chains, to facilitate detangling.
     void splitTerminalHaploidBubbles();
     void splitTerminalHaploidBubbles(edge_descriptor);
-
-    void removeSelfComplementarySquares();
 
     // Phasing of bubble chains using the PhasingGraph.
     void phaseBubbleChainsUsingPhasingGraph(

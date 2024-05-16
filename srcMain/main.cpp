@@ -1092,7 +1092,6 @@ void shasta::main::mode3Assembly(
         std::numeric_limits<double>::signaling_NaN(),   // For peak finder, unused because minVertexCoverage is not 0.
         invalid<uint64_t>,                              // For peak finder, unused because minVertexCoverage is not 0.
         threadCount);
-    assembler.findMarkerGraphReverseComplementVertices(threadCount);
 
     // If the coverage range for primary marker graph edges is not
     // specified, use the disjoint sets histogram to compute reasonable values.
@@ -1111,10 +1110,6 @@ void shasta::main::mode3Assembly(
         0,                      // minEdgeCoverage
         0,                      // minEdgeCoveragePerStrand
         threadCount);
-    assembler.findMarkerGraphReverseComplementEdges(threadCount);
-
-    // Coverage histograms for vertices and edges of the marker graph.
-    assembler.computeMarkerGraphCoverageHistogram();
 
     // Assemble sequence for marker graph edges.
     // This assembles MarkerGraph::edgeSequence which is

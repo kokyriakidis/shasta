@@ -2652,8 +2652,7 @@ bool AssemblyGraph::detangleVertices(
 void AssemblyGraph::computeTangleMatrix(
     const vector<edge_descriptor>& inEdges,
     const vector<edge_descriptor>& outEdges,
-    vector< vector<uint64_t> >& tangleMatrix,
-    bool setToZeroForComplementaryPairs
+    vector< vector<uint64_t> >& tangleMatrix
     ) const
 {
     const AssemblyGraph& cGraph = *this;
@@ -2679,14 +2678,9 @@ void AssemblyGraph::computeTangleMatrix(
             SHASTA_ASSERT(chain1.size() >= 2);
             const MarkerGraphEdgeId markerGraphEdgeId1 = chain1[1];  // Exclude first
 
-            if(setToZeroForComplementaryPairs and
-                assembler.markerGraph.reverseComplementEdge[markerGraphEdgeId0] == markerGraphEdgeId1) {
-                tangleMatrix[i0][i1] = 0;
-            } else {
-                MarkerGraphEdgePairInfo info;
-                SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(markerGraphEdgeId0, markerGraphEdgeId1, info));
-                tangleMatrix[i0][i1] = info.common;
-            }
+            MarkerGraphEdgePairInfo info;
+            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(markerGraphEdgeId0, markerGraphEdgeId1, info));
+            tangleMatrix[i0][i1] = info.common;
         }
     }
 }
@@ -2953,7 +2947,7 @@ bool AssemblyGraph::detangleVertex(
 
     // Compute the tangle matrix.
     vector< vector<uint64_t> > tangleMatrix;
-    computeTangleMatrix(inEdges, outEdges, tangleMatrix, false);
+    computeTangleMatrix(inEdges, outEdges, tangleMatrix);
 
     if(debug) {
         cout << "Tangle matrix for vertex " << cGraph[cv].edgeId << endl;
@@ -3425,7 +3419,7 @@ bool AssemblyGraph::detangleEdge(
 
     // Compute the tangle matrix.
     vector< vector<uint64_t> > tangleMatrix;
-    computeTangleMatrix(inEdges, outEdges, tangleMatrix, false);
+    computeTangleMatrix(inEdges, outEdges, tangleMatrix);
 
     if(debug) {
         cout << "Computing tangle matrix for edge " << bubbleChainStringId(ce) << endl;
@@ -4536,7 +4530,7 @@ bool AssemblyGraph::detangleShortSuperbubble(
 
     // Compute the tangle matrix.
     vector< vector<uint64_t> > tangleMatrix;
-    computeTangleMatrix(inEdges, outEdges, tangleMatrix, true);
+    computeTangleMatrix(inEdges, outEdges, tangleMatrix);
 
     if(debug) {
         cout << "Tangle matrix:" << endl;
@@ -7495,32 +7489,6 @@ void AssemblyGraph::optimizeChain(
 
 
 
-bool AssemblyGraph::removeSelfComplementaryEdges()
-{
-    AssemblyGraph& cGraph = *this;
-
-    vector<edge_descriptor> edgesToBeRemoved;
-    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
-        const vertex_descriptor v0 = source(ce, cGraph);
-        const vertex_descriptor v1 = target(ce, cGraph);
-        const MarkerGraphEdgeId edgeId0 = cGraph[v0].edgeId;
-        const MarkerGraphEdgeId edgeId1 = cGraph[v1].edgeId;
-
-        if(assembler.markerGraph.reverseComplementEdge[edgeId0] == edgeId1) {
-            SHASTA_ASSERT(assembler.markerGraph.reverseComplementEdge[edgeId1] == edgeId0);
-            edgesToBeRemoved.push_back(ce);
-        }
-    }
-
-    for(const edge_descriptor ce: edgesToBeRemoved) {
-        boost::remove_edge(ce, cGraph);
-    }
-
-    return not edgesToBeRemoved.empty();
-}
-
-
-
 // Split terminal haploid bubbles out of bubble chains, to facilitate detangling.
 void AssemblyGraph::splitTerminalHaploidBubbles()
 {
@@ -7833,150 +7801,4 @@ uint64_t AssemblyGraph::cleanupBubbles(bool debug, edge_descriptor ce,
 
     bubbleChain.swap(newBubbleChain);
     return removedCount;
-}
-
-
-
-// This finds squares of the form:
-// A->B
-// A->B'
-// B->A'
-// B'->A'
-// where a prime sign indicates reverse complementing.
-// It then one of two pairs of self-complementary edges:
-//     A->B  and B'->A'
-// or
-//     A->B' and B->A'
-// The pair to be removed is selected in such a way that its removal
-// does not introduce any dead ends.
-// The code uses the following names:
-// A0 = A
-// A1 = A'
-// B0 = B
-// B1 = B'
-void AssemblyGraph::removeSelfComplementarySquares()
-{
-    AssemblyGraph& cGraph = *this;
-    const bool debug = true;
-
-    vector< pair<edge_descriptor, vertex_descriptor> > outEdgesA0;
-
-
-    // Do this iteratively.
-    while(true) {
-
-
-        // Loop over all possible choices for A0.
-        bool done = false;
-        BGL_FORALL_VERTICES(A0, cGraph, AssemblyGraph) {
-
-            // Gather the children of A.
-            outEdgesA0.clear();
-            BGL_FORALL_OUTEDGES(A0, ce, cGraph, AssemblyGraph) {
-                outEdgesA0.push_back({ce, target(ce, cGraph)});
-            }
-
-            // Look for a reverse complementary pair (B0, B1)
-            // with edges B0->A1 and B1->A1.
-            for(uint64_t i1=0; i1<outEdgesA0.size(); i1++) {
-                const vertex_descriptor B1 = outEdgesA0[i1].second;
-                const uint64_t edgeIdB1 = cGraph[B1].edgeId;
-                const uint64_t edgeIdB0 = assembler.markerGraph.reverseComplementEdge[edgeIdB1];
-                for(uint64_t i0=0; i0<i1; i0++) {
-                    const vertex_descriptor B0 = outEdgesA0[i0].second;
-                    if(cGraph[B0].edgeId == edgeIdB0) {
-
-                        // We found it.
-
-                        // Look for the edges B0->A1 and B1->A1.
-                        const uint64_t edgeIdA0 = cGraph[A0].edgeId;
-                        const uint64_t edgeIdA1 = assembler.markerGraph.reverseComplementEdge[edgeIdA0];
-
-                        edge_descriptor B0A1;
-                        vertex_descriptor A10 = null_vertex();
-                        BGL_FORALL_OUTEDGES(B0, ce, cGraph, AssemblyGraph) {
-                            const vertex_descriptor v = target(ce, cGraph);
-                            if(cGraph[v].edgeId == edgeIdA1) {
-                                B0A1 = ce;
-                                A10 = v;
-                                break;
-                            }
-                        }
-                        if(A10 == null_vertex()) {
-                            continue;
-                        }
-
-                        edge_descriptor B1A1;
-                        vertex_descriptor A11 = null_vertex();
-                        BGL_FORALL_OUTEDGES(B1, ce, cGraph, AssemblyGraph) {
-                            const vertex_descriptor v = target(ce, cGraph);
-                            if(cGraph[v].edgeId == edgeIdA1) {
-                                B1A1 = ce;
-                                A11 = v;
-                                break;
-                            }
-                        }
-                        if(A11 == null_vertex()) {
-                            continue;
-                        }
-
-                        if(A10 != A11) {
-                            continue;
-                        }
-                        const vertex_descriptor A1 = A10;
-
-                        // We found a self-complementary square.
-                        const edge_descriptor A0B0 = outEdgesA0[i0].first;
-                        const edge_descriptor A0B1 = outEdgesA0[i1].first;
-
-                        if(debug) {
-                            cout << "Found a self-complementary square:\n" <<
-                                cGraph[A0].edgeId << " " <<
-                                cGraph[B0].edgeId << " " <<
-                                cGraph[B1].edgeId << " " <<
-                                cGraph[A1].edgeId << "\n" <<
-                                bubbleChainStringId(A0B0) << " " <<
-                                bubbleChainStringId(A0B1) << " " <<
-                                bubbleChainStringId(B0A1) << " " <<
-                                bubbleChainStringId(B1A1) << "\n";
-                        }
-
-                        // Remove two of the edges in the square,
-                        // making sure to not introduce dead ends.
-                        if(out_degree(A0, cGraph) > 1 and in_degree(A1, cGraph) > 1) {
-                            if(in_degree (B0, cGraph) > 1 and out_degree(B1, cGraph) > 1) {
-                                boost::remove_edge(A0B0, cGraph);
-                                boost::remove_edge(B1A1, cGraph);
-                                done = true;
-                            } else if(in_degree(B1, cGraph) > 1 and out_degree(B0, cGraph) > 1) {
-                                boost::remove_edge(A0B1, cGraph);
-                                boost::remove_edge(B0A1, cGraph);
-                                done = true;
-                            }
-                        }
-
-                        if(done) {
-                            break;
-                        }
-                    }
-
-                    if(done) {
-                        break;
-                    }
-
-                }
-                if(done) {
-                    break;
-                }
-            }
-            if(done) {
-                break;
-            }
-        }
-
-        // If nothing happened, stop the outer iteration.
-        if(not done) {
-            break;
-        }
-    }
 }
