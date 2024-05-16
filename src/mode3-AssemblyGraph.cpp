@@ -3910,6 +3910,11 @@ AssemblyGraph::edge_descriptor AssemblyGraph::connect(
         for(uint64_t i1=first1; i1<=last1; i1++) {
             const MarkerGraphEdgeId edgeId1 = chain1[i1];
 
+            // Don't allow generating a chain with identical consecutive MarkerGraphEdgeIds.
+            if(edgeId1 == edgeId0) {
+                continue;
+            }
+
             MarkerGraphEdgePairInfo info;
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
             const uint64_t commonCount = info.common;
