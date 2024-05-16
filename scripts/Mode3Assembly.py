@@ -19,7 +19,8 @@ parser.add_argument(
         
 arguments = parser.parse_args() 
 
-
+# Open a performance log.
+shasta.openPerformanceLog('Mode3Assembly.log')
 
 # Create the Assembler object and access what we need.
 options = shasta.AssemblerOptions('shasta.conf')
