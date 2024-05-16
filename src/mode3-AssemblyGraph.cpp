@@ -3787,32 +3787,47 @@ bool AssemblyGraph::detangleEdge(
         return false;
     }
 
-    // We can detangle.
+    // We can probably detangle.
+    // If we encounter problems, remove the edges we created.
+    vector<edge_descriptor> newEdges;
 
-    if(isInPhase) {
-        connect(debug, inEdges[0], outEdges[0], n);
-        connect(debug, inEdges[1], outEdges[1], n);
-        if(debug) {
-            cout << "In phase." << endl;
-            cout << "Connected " <<
-                bubbleChainStringId(inEdges[0]) << " and " <<
-                bubbleChainStringId(outEdges[0]) << endl;
-            cout << "Connected " <<
-                bubbleChainStringId(inEdges[1]) << " and " <<
-                bubbleChainStringId(outEdges[1]) << endl;
+    try {
+        if(isInPhase) {
+            if(debug) {
+                cout << "In phase." << endl;
+            }
+            newEdges.push_back(connect(debug, inEdges[0], outEdges[0], n));
+            newEdges.push_back(connect(debug, inEdges[1], outEdges[1], n));
+            if(debug) {
+                cout << "Connected " <<
+                    bubbleChainStringId(inEdges[0]) << " and " <<
+                    bubbleChainStringId(outEdges[0]) << endl;
+                cout << "Connected " <<
+                    bubbleChainStringId(inEdges[1]) << " and " <<
+                    bubbleChainStringId(outEdges[1]) << endl;
+            }
+        } else {
+            if(debug) {
+                cout << "Out of phase." << endl;
+            }
+            newEdges.push_back(connect(debug, inEdges[0], outEdges[1], n));
+            newEdges.push_back(connect(debug, inEdges[1], outEdges[0], n));
+            if(debug) {
+                cout << "In phase." << endl;
+                cout << "Connected " <<
+                    bubbleChainStringId(inEdges[0]) << " and " <<
+                    bubbleChainStringId(outEdges[1]) << endl;
+                cout << "Connected " <<
+                    bubbleChainStringId(inEdges[1]) << " and " <<
+                    bubbleChainStringId(outEdges[0]) << endl;
+            }
         }
-    } else {
-        connect(debug, inEdges[0], outEdges[1], n);
-        connect(debug, inEdges[1], outEdges[0], n);
-        if(debug) {
-            cout << "In phase." << endl;
-            cout << "Connected " <<
-                bubbleChainStringId(inEdges[0]) << " and " <<
-                bubbleChainStringId(outEdges[1]) << endl;
-            cout << "Connected " <<
-                bubbleChainStringId(inEdges[1]) << " and " <<
-                bubbleChainStringId(outEdges[0]) << endl;
+    } catch(std::exception&) {
+        cout << "Not detangled: could not connect." << endl;
+        for(const edge_descriptor e: newEdges) {
+            boost::remove_edge(e, cGraph);
         }
+        return false;
     }
 
 
