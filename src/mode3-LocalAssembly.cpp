@@ -1658,7 +1658,7 @@ void LocalAssembly::assembleEdge(
         uint64_t maxLength = 0;
         for(const auto& p: orientedReadSequences) {
             const vector<Base>& sequence = p.first;
-            maxLength = max(sequence.size(), maxMsaLength);
+            maxLength = max(sequence.size(), maxLength);
         }
         if(html and options.showDebugInformation) {
             html << "<br>Maximum sequence length " << maxLength;
