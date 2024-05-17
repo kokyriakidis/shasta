@@ -30,7 +30,6 @@ a = shasta.Assembler()
 a.accessMarkers()
 a.accessMarkerGraphVertices()
 a.accessMarkerGraphEdges()
-a.accessMarkerGraphReverseComplementEdge()
 a.accessMarkerGraphConsensus()
 shasta.openPerformanceLog('Mode3AssembleComponent.log')
 fileName = 'AssemblyGraph-' + str(arguments.component) + '.data'

@@ -28,7 +28,6 @@ a = shasta.Assembler()
 a.accessMarkers()
 a.accessMarkerGraphVertices()
 a.accessMarkerGraphEdges()
-a.accessMarkerGraphReverseComplementEdge()
 a.accessMarkerGraphConsensus()
 a.accessDisjointSetsHistogram()
 
