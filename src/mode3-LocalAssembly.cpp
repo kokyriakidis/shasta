@@ -1660,6 +1660,10 @@ void LocalAssembly::assembleEdge(
             const vector<Base>& sequence = p.first;
             maxLength = max(sequence.size(), maxMsaLength);
         }
+        if(html and options.showDebugInformation) {
+            html << "<br>Maximum sequence length " << maxLength;
+            html << "<br>Maximum allowed sequence length " << maxMsaLength;
+        }
 
         if(maxLength > maxMsaLength) {
             if(html and options.showDebugInformation) {
