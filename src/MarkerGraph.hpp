@@ -394,11 +394,13 @@ public:
         uint64_t threadCount);
 private:
     void flagPrimaryEdgesThreadFunction(uint64_t threadId);
+public:
     bool isPrimaryEdge(
         EdgeId,
         uint64_t minPrimaryCoverage,
         uint64_t maxPrimaryCoverage,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) const;
+private:
     class FlagPrimaryEdgesData {
     public:
         uint64_t minPrimaryCoverage;

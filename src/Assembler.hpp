@@ -1382,6 +1382,39 @@ private:
 
 
 
+    // Edge creation for Mode 3 assembly.
+    // - Like createMarkerGraphEdgesStrict, this
+    //   will only create edges in which all contributing oriented reads have
+    //   exactly the same sequence. If more than one distinct sequence
+    //   is present, the edge is split into two parallel edges.
+    // - This only generates primary marker graph edges, defined as follows:
+    //   * Edge coverage is >= minPrimaryCoverage and <= maxPrimaryCoverage.
+    //   * Both its vertices have no duplicate oriented read.
+    //   * The edge marker interval has no duplicate oriented read.
+    // - This will only create the MarkerGraph::edgeMarkerIntervals
+    //   and MarkerGraph::edgeSequence and nothing else.
+public:
+    void createPrimaryMarkerGraphEdges(
+        uint64_t minPrimaryCoverage,
+        uint64_t maxPrimaryCoverage,
+        uint64_t threadCount);
+private:
+    void createPrimaryMarkerGraphEdgesThreadFunction(uint64_t threadId);
+    class CreatePrimaryMarkerGraphEdgesData {
+    public:
+        uint64_t minPrimaryCoverage;
+        uint64_t maxPrimaryCoverage;
+
+        // The marker intervals of the edges found by each thread.
+        vector< shared_ptr< MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> > > threadMarkerIntervals;
+
+        // The corresponding sequences
+        vector< shared_ptr< MemoryMapped::VectorOfVectors<Base, uint64_t> > > threadSequences;
+    };
+    CreatePrimaryMarkerGraphEdgesData createPrimaryMarkerGraphEdgesData;
+
+
+
     // Write out the sets of parallel marker graph edges.
     // Only createMarkerGraphedgesStrict can create parallel edges.
 public:

@@ -454,6 +454,11 @@ PYBIND11_MODULE(shasta, shastaModule)
             arg("minEdgeCoverage"),
             arg("minEdgeCoveragePerStrand"),
             arg("threadCount") = 0)
+        .def("createPrimaryMarkerGraphEdges",
+            &Assembler::createPrimaryMarkerGraphEdges,
+            arg("minPrimaryCoverage"),
+            arg("maxPrimaryCoverage"),
+            arg("threadCount") = 0)
         .def("createMarkerGraphSecondaryEdges",
             (
                 void (Assembler::*) (uint32_t, size_t)
