@@ -185,12 +185,10 @@ void AssemblyGraph::run(
         useBayesianModel,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP);
-    write("D1");
     detangleEdges(true,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP,
         6);
-    write("D2");
     performanceLog << timestamp << "Detangling ends." << endl;
 
     compress();
