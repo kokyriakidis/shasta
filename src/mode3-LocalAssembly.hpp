@@ -141,9 +141,6 @@ private:
     const LocalAssemblyDisplayOptions& options;
     ostream& html;
 
-    MarkerGraphVertexId vertexIdA;  // The target vertex of marker graph edge edgeIdA.
-    MarkerGraphVertexId vertexIdB;  // The target vertex of marker graph edge edgeIdA.
-
     void checkAssumptions() const;
 
 

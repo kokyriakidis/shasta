@@ -1093,35 +1093,10 @@ void shasta::main::mode3Assembly(
         invalid<uint64_t>,                              // For peak finder, unused because minVertexCoverage is not 0.
         threadCount);
 
-    // If the coverage range for primary marker graph edges is not
-    // specified, use the disjoint sets histogram to compute reasonable values.
-    uint64_t minPrimaryCoverage = assemblerOptions.assemblyOptions.mode3Options.minPrimaryCoverage;
-    uint64_t maxPrimaryCoverage = assemblerOptions.assemblyOptions.mode3Options.maxPrimaryCoverage;
-    if((minPrimaryCoverage == 0) and (maxPrimaryCoverage == 0)) {
-        tie(minPrimaryCoverage, maxPrimaryCoverage) = assembler.getPrimaryCoverageRange();
-    }
-
     // Create marker graph edges.
-    // Use createMarkerGraphEdgesStrict so all oriented reads on an edge
-    // have exactly the same sequence.
-    // To create a complete marker graph, generate all edges
-    // regardless of coverage.
-    assembler.createMarkerGraphEdgesStrict(
-        0,                      // minEdgeCoverage
-        0,                      // minEdgeCoveragePerStrand
-        threadCount);
-
-    // Assemble sequence for marker graph edges.
-    // This assembles MarkerGraph::edgeSequence which is
-    // different from what happens in other assembly modes.
-    // See the comments before MarkerGraph::edgeSequence
-    // for more information.
-    assembler.assembleMarkerGraphEdgesMode3();
-
-    // Flag primary marker graph edges.
-    assembler.flagPrimaryMarkerGraphEdges(
-        minPrimaryCoverage,
-        maxPrimaryCoverage,
+    assembler.createPrimaryMarkerGraphEdges(
+        assemblerOptions.assemblyOptions.mode3Options.minPrimaryCoverage,
+        assemblerOptions.assemblyOptions.mode3Options.maxPrimaryCoverage,
         threadCount);
 
     // Run Mode 3 assembly.

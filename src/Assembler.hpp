@@ -1298,6 +1298,7 @@ private:
 public:
     void createMarkerGraphEdges(size_t threadCount);
     void accessMarkerGraphEdges(bool accessEdgesReadWrite, bool accessConnectivityReadWrite = false);
+    void accessMarkerGraphEdgeMarkerIntervals();
     void checkMarkerGraphEdgesIsOpen() const;
     void accessMarkerGraphConsensus();
 private:
@@ -2384,10 +2385,14 @@ public:
 
     // Mode 3 assembly.
     shared_ptr<Mode3Assembler> mode3Assembler;
+
+#if 0
+    // ALL MARKER GRAPH EDGES ARE NOW PRIMARY.
     void flagPrimaryMarkerGraphEdges(
         uint64_t minPrimaryCoverage,
         uint64_t maxPrimaryCoverage,
         uint64_t threadCount);
+#endif
 
     // If the coverage range for primary marker graph edges is not
     // specified, this uses the disjoint sets histogram to compute reasonable values.

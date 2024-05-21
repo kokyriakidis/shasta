@@ -27,7 +27,7 @@ options = shasta.AssemblerOptions('shasta.conf')
 a = shasta.Assembler()
 a.accessMarkers()
 a.accessMarkerGraphVertices()
-a.accessMarkerGraphEdges()
+a.accessMarkerGraphEdgeMarkerIntervals()
 a.accessMarkerGraphConsensus()
 a.accessDisjointSetsHistogram()
 

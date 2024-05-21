@@ -2163,6 +2163,14 @@ void Assembler::accessMarkerGraphEdges(
 }
 
 
+void Assembler::accessMarkerGraphEdgeMarkerIntervals()
+{
+    markerGraph.edgeMarkerIntervals.accessExistingReadOnly(
+        largeDataName("GlobalMarkerGraphEdgeMarkerIntervals"));
+}
+
+
+
 
 void Assembler::checkMarkerGraphEdgesIsOpen() const
 {

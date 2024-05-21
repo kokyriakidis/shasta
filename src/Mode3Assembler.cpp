@@ -44,15 +44,13 @@ Mode3Assembler::Mode3Assembler(
 
 void Mode3Assembler::gatherPrimaryMarkerGraphEdgeIds()
 {
-    const auto& markerGraphEdges = assembler.markerGraph.edges;
 
     primaryMarkerGraphEdgeIds.clear();
-    for(MarkerGraphEdgeId edgeId=0; edgeId<markerGraphEdges.size(); edgeId++) {
-        if(markerGraphEdges[edgeId].isPrimary) {
-            primaryMarkerGraphEdgeIds.push_back(edgeId);
-        }
+    for(MarkerGraphEdgeId edgeId=0; edgeId<assembler.markerGraph.edgeMarkerIntervals.size(); edgeId++) {
+        // All marker graph edges are now primary!
+        primaryMarkerGraphEdgeIds.push_back(edgeId);
     }
-    cout << "Of " << markerGraphEdges.size() << " marker graph edges, " <<
+    cout << "Of " << assembler.markerGraph.edgeMarkerIntervals.size() << " marker graph edges, " <<
         primaryMarkerGraphEdgeIds.size() << " are primary." << endl;
 }
 

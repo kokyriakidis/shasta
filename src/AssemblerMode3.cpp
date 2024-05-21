@@ -16,7 +16,7 @@ using namespace shasta;
 #include <map>
 
 
-
+#if 0
 void Assembler::flagPrimaryMarkerGraphEdges(
     uint64_t minPrimaryCoverage,
     uint64_t maxPrimaryCoverage,
@@ -34,6 +34,7 @@ void Assembler::flagPrimaryMarkerGraphEdges(
         markers,
         threadCount);
 }
+#endif
 
 
 

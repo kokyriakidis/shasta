@@ -239,8 +239,7 @@ public:
         // Assembly mode 2 only.
         uint8_t wasRemovedWhileSplittingSecondaryEdges : 1;
 
-        // This is set for primary edges (Mode 3 assembly only).
-        uint8_t isPrimary : 1;
+        uint8_t unused : 1;
 
         void clearFlags()
         {
@@ -251,7 +250,7 @@ public:
             wasAssembled = 0;
             isSecondary = 0;
             wasRemovedWhileSplittingSecondaryEdges = 0;
-            isPrimary = 0;
+            unused = 0;
         }
         Edge() :
             source(MarkerGraph::invalidCompressedVertexId),
@@ -298,6 +297,10 @@ public:
         uint32_t ordinalOffset,
         uint64_t direction // 0=forward, 1=backward.
         ) const;
+
+    // Find out if two edges are adjacent, using only the MarkerIntervals for the two edges.
+    // This is used for Mode 3 assembly, when the MarkerGraph is only partially constructed.
+    bool areAdjacentEdges(EdgeId, EdgeId) const;
 
     // Find out if an edge has duplicate oriented reads
     // in its MarkerIntervals.
@@ -386,6 +389,8 @@ public:
     //   be obtained by just concatenating the edge sequences.
     MemoryMapped::VectorOfVectors<Base, uint64_t> edgeSequence;
 
+#if 0
+    // ALL MARKER GRAPH EDGES ARE NOW PRIMARY IN MODE 3 ASSEMBLY.
     // Flag primary edges (only used for Mode 3 assembly).
     void flagPrimaryEdges(
         uint64_t minPrimaryCoverage,
@@ -408,6 +413,8 @@ private:
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>* markersPointer;
     };
     FlagPrimaryEdgesData flagPrimaryEdgesData;
+#endif
+
 
 
 #if 0

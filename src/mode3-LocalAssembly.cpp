@@ -58,15 +58,9 @@ LocalAssembly::LocalAssembly(
 {
 
 
-    // Store the source target of edgeIdA and the source vertex of edgeIdB.
-    const MarkerGraph::Edge& edgeA = assembler.markerGraph.edges[edgeIdA];
-    const MarkerGraph::Edge& edgeB = assembler.markerGraph.edges[edgeIdB];
-    vertexIdA = edgeA.target;
-    vertexIdB = edgeB.source;
-
-    // If the edges are adjacent, stop here, leaving the AssembnlyPath empty.
+    // If the edges are adjacent, stop here, leaving the AssemblyPath empty.
     // This results in empty secondary sequence.
-    if(vertexIdA == vertexIdB) {
+    if(assembler.markerGraph.areAdjacentEdges(edgeIdA, edgeIdB)) {
         if(html) {
             html << "<br>The two edges are adjacent. Intervening sequence is empty.";
         }
@@ -187,24 +181,17 @@ void LocalAssembly::checkAssumptions() const
     SHASTA_ASSERT(not assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdA));
     SHASTA_ASSERT(not assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdB));
 
-    const MarkerGraph& markerGraph = assembler.markerGraph;
-    const auto& markers = assembler.markers;
-
-    // edgeIdA and edgeIdB cannot have duplicate oriented reads.
-    if(markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdA)) {
-        throw runtime_error("Duplicated oriented read on edgeIdA.");
-    }
-    if(markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdB)) {
-        throw runtime_error("Duplicated oriented read on edgeIdB.");
-    }
-
+#if 0
     // Neither can their source and target vertices.
+    // This is checked when creating the marke rgraph edge in Mode 3 assembly,
+    // and it's too late now because we no longer have the vertices.
     if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdA, markers)) {
         throw runtime_error("Duplicated oriented read on target vertex of edgeIdA.");
     }
     if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdB, markers)) {
         throw runtime_error("Duplicated oriented read on source vertex of edgeIdB.");
     }
+#endif
 }
 
 

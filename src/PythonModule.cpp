@@ -480,6 +480,8 @@ PYBIND11_MODULE(shasta, shastaModule)
             &Assembler::accessMarkerGraphEdges,
             arg("accessEdgesReadWrite") = false,
             arg("accessConnectivityReadWrite") = false)
+        .def("accessMarkerGraphEdgeMarkerIntervals",
+            &Assembler::accessMarkerGraphEdgeMarkerIntervals)
         .def("transitiveReduction",
             &Assembler::transitiveReduction,
             arg("lowCoverageThreshold"),
@@ -617,9 +619,10 @@ PYBIND11_MODULE(shasta, shastaModule)
             &Assembler::mode3Assembly)
         .def("mode3AssembleComponent",
             &Assembler::mode3AssembleComponent)
+#if 0
         .def("flagPrimaryMarkerGraphEdges",
             &Assembler::flagPrimaryMarkerGraphEdges)
-
+#endif
         // Consensus caller.
         .def("setupConsensusCaller",
             &Assembler::setupConsensusCaller)

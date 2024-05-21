@@ -728,6 +728,44 @@ MarkerGraphEdgeId MarkerGraph::locateMarkerIntervalWithOffset(
 
 
 
+// Find out if two edges are adjacent, using only the MarkerIntervals for the two edges.
+// This is used for Mode 3 assembly, when the MarkerGraph is only partially constructed.
+// We look for a common pair (OrientedReadId, ordinal) that appears
+// in the end ordinals of the first edge and the begin ordnals of the second edge.
+// This assumes that there ar eno duplicate reads in the edges, an assumption
+// satisfied for Mode 3 assembly.
+bool MarkerGraph::areAdjacentEdges(EdgeId edgeId0, EdgeId edgeId1) const
+{
+    const auto markerIntervals0 = edgeMarkerIntervals[edgeId0];
+    const auto markerIntervals1 = edgeMarkerIntervals[edgeId1];
+
+    // Joint loop over the marker intervals.
+    auto it0 = markerIntervals0.begin();
+    auto it1 = markerIntervals1.begin();
+    const auto end0 = markerIntervals0.end();
+    const auto end1 = markerIntervals1.end();
+    while(it0 != end0 and it1 != end1) {
+        const OrientedReadId orientedReadId0 = it0->orientedReadId;
+        const OrientedReadId orientedReadId1 = it1->orientedReadId;
+
+        if(orientedReadId0 < orientedReadId1) {
+            ++it0;
+        } else if(orientedReadId1 < orientedReadId0) {
+            ++it1;
+        } else {
+            if(it0->ordinals[1] == it1->ordinals[0]) {
+                return true;
+            }
+            ++it0;
+            ++it1;
+        }
+    }
+
+    return false;
+}
+
+
+
 // Find out if an edge has duplicate oriented reads
 // in its MarkerIntervals.
 bool MarkerGraph::edgeHasDuplicateOrientedReadIds(EdgeId edgeId) const
@@ -777,6 +815,8 @@ bool MarkerGraph::vertexHasDuplicateOrientedReadIds(
 
 
 
+#if 0
+// WE NOW ONLY GENERATE PRIMARY MARKER GRAPH EDGES.
 // Flag primary edges (only used for Mode 3 assembly).
 void MarkerGraph::flagPrimaryEdges(
     uint64_t minPrimaryCoverage,
@@ -870,6 +910,7 @@ bool MarkerGraph::isPrimaryEdge(
     // If all above checks passed, this is a primary edge.
     return true;
 }
+#endif
 
 
 
