@@ -198,16 +198,20 @@ void Assembler::writeReadsSummary()
         csv << readGraph.connectivity.size(orientedReadId.getValue()) << ",";
 
         // Number and fraction of markers associated with a marker graph vertex.
-        uint64_t vertexCount = 0;
-        for(uint32_t ordinal=0; ordinal<readMarkers.size(); ordinal++) {
-            const MarkerId markerId = getMarkerId(orientedReadId, ordinal);
-            const MarkerGraph::VertexId vertexId = markerGraph.vertexTable[markerId];
-            if(vertexId != MarkerGraph::invalidCompressedVertexId) {
-                ++vertexCount;
+        if(markerGraph.vertexTable.isOpen) {
+            uint64_t vertexCount = 0;
+            for(uint32_t ordinal=0; ordinal<readMarkers.size(); ordinal++) {
+                const MarkerId markerId = getMarkerId(orientedReadId, ordinal);
+                const MarkerGraph::VertexId vertexId = markerGraph.vertexTable[markerId];
+                if(vertexId != MarkerGraph::invalidCompressedVertexId) {
+                    ++vertexCount;
+                }
             }
+            csv << vertexCount << ",";
+            csv << double(vertexCount) / double(markerCount) << ",";
+        } else {
+            csv << ",,";
         }
-        csv << vertexCount << ",";
-        csv << double(vertexCount) / double(markerCount) << ",";
 
         // Oxford Nanopore standard metadata.
         csv << reads->getMetaData(readId, "runid") << ",";

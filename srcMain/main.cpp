@@ -1099,6 +1099,10 @@ void shasta::main::mode3Assembly(
         assemblerOptions.assemblyOptions.mode3Options.maxPrimaryCoverage,
         threadCount);
 
+    // We can now remove the marker graph vertices.
+    assembler.markerGraph.vertices().remove();
+    assembler.markerGraph.vertexTable.remove();
+
     // Run Mode 3 assembly.
     assembler.mode3Assembly(threadCount, assemblerOptions.assemblyOptions.mode3Options, false);
 }

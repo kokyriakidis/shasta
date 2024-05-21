@@ -1089,22 +1089,23 @@ void Assembler::writeAssemblySummaryBody(ostream& html)
         "<tr><td>Non-isolated reads fraction"
         "<td class=centered>" << double(assemblerInfo->readCount-assemblerInfo->isolatedReadCount)/double(assemblerInfo->readCount) <<
         "<td class=centered>" << double(assemblerInfo->baseCount-assemblerInfo->isolatedReadBaseCount)/double(assemblerInfo->baseCount) <<
-        "</table>"
+        "</table>";
 
-
-
-        "<h3>Marker graph</h3>"
-        "<table>"
-        "<tr><td>Total number of vertices"
-        "<td class=right>" << markerGraph.vertexCount() <<
-        "<tr><td>Total number of edges"
-        "<td class=right>" << markerGraph.edges.size() <<
-        "<tr><td>Number of vertices that are not isolated after edge removal"
-        "<td class=right>" << assemblerInfo->markerGraphVerticesNotIsolatedCount <<
-        "<tr><td>Number of edges that were not removed"
-        "<td class=right>" << assemblerInfo->markerGraphEdgesNotRemovedCount <<
-        "</table>"
-        "<ul><li>The marker graph contains both strands.</ul>";
+    if(assemblerInfo->assemblyMode != 3) {
+        html <<
+            "<h3>Marker graph</h3>"
+            "<table>"
+            "<tr><td>Total number of vertices"
+            "<td class=right>" << markerGraph.vertexCount() <<
+            "<tr><td>Total number of edges"
+            "<td class=right>" << markerGraph.edges.size() <<
+            "<tr><td>Number of vertices that are not isolated after edge removal"
+            "<td class=right>" << assemblerInfo->markerGraphVerticesNotIsolatedCount <<
+            "<tr><td>Number of edges that were not removed"
+            "<td class=right>" << assemblerInfo->markerGraphEdgesNotRemovedCount <<
+            "</table>"
+            "<ul><li>The marker graph contains both strands.</ul>";
+    }
 
 
         if(assemblyGraphPointer) {
@@ -1387,18 +1388,19 @@ void Assembler::writeAssemblySummaryJson(ostream& json)
         "      \"Reads\": " << double(assemblerInfo->readCount-assemblerInfo->isolatedReadCount)/double(assemblerInfo->readCount) << ",\n"
         "      \"Bases\": " << double(assemblerInfo->baseCount-assemblerInfo->isolatedReadBaseCount)/double(assemblerInfo->baseCount) << "\n"
         "    }\n"
-        "  },\n"
-
-
-
-        "  \"Marker graph\":\n"
-        "  {\n"
-        "    \"Total number of vertices\": " << markerGraph.vertexCount() << ",\n"
-        "    \"Total number of edges\": " << markerGraph.edges.size() << ",\n"
-        "    \"Number of vertices that are not isolated after edge removal\": " <<
-        assemblerInfo->markerGraphVerticesNotIsolatedCount << ",\n"
-        "    \"Number of edges that were not removed\": " << assemblerInfo->markerGraphEdgesNotRemovedCount << "\n"
         "  },\n";
+
+    if(assemblerInfo->assemblyMode != 3) {
+        json <<
+            "  \"Marker graph\":\n"
+            "  {\n"
+            "    \"Total number of vertices\": " << markerGraph.vertexCount() << ",\n"
+            "    \"Total number of edges\": " << markerGraph.edges.size() << ",\n"
+            "    \"Number of vertices that are not isolated after edge removal\": " <<
+            assemblerInfo->markerGraphVerticesNotIsolatedCount << ",\n"
+            "    \"Number of edges that were not removed\": " << assemblerInfo->markerGraphEdgesNotRemovedCount << "\n"
+            "  },\n";
+    }
 
 
     if(assemblyGraphPointer) {
