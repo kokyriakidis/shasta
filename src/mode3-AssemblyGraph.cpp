@@ -185,7 +185,7 @@ void AssemblyGraph::run(
         useBayesianModel,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP);
-    detangleEdges(true,
+    detangleEdges(false,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP,
         6);
