@@ -992,13 +992,13 @@ void Assembler::displayAlignments(
             "<td class=centered>" << alignmentInfo.range(0) <<
             "<td class=centered>" << alignmentInfo.rightTrim(0) <<
             "<td class=centered>" << markerCount0 <<
-            "<td class=centered>" << std::setprecision(2) <<
+            "<td class=centered>" << std::setprecision(3) <<
             alignmentInfo.alignedFraction(0) <<
             "<td class=centered>" << alignmentInfo.leftTrim(1) <<
             "<td class=centered>" << alignmentInfo.range(1) <<
             "<td class=centered>" << alignmentInfo.rightTrim(1) <<
             "<td class=centered>" << markerCount1 <<
-            "<td class=centered>" << std::setprecision(2) <<
+            "<td class=centered>" << std::setprecision(3) <<
             alignmentInfo.alignedFraction(1);
 
 
