@@ -367,6 +367,26 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     }
     performanceLog << timestamp << "Journey computation ends." << endl;
 
+
+
+    // Write out the journeys.
+    if(debug) {
+        ofstream csv("Journeys-" + to_string(componentId) + ".csv");
+        for(uint64_t i=0; i<orientedReadIds.size(); i++) {
+            csv << orientedReadIds[i] << ",";
+            const auto& journey = journeys[i];
+            for(const auto& p: journey) {
+                const uint64_t localPrimaryId = p.second;
+                const uint64_t primaryId = primaryIds[localPrimaryId];
+                const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
+                csv << edgeId << ",";
+            }
+            csv << "\n";
+        }
+    }
+
+
+
 #if 0
     // Check that the journeys computed in this way are identical to the ones stored in the MarkerGraph.
     // The ones stored in the MarkerGraph will eventually go away.
