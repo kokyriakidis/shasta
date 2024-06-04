@@ -35,6 +35,9 @@ Mode3Assembler::Mode3Assembler(
 
     gatherPrimaryMarkerGraphEdgeIds();
     computeConnectedComponents();
+    if(debug) {
+        writeConnectedComponents();
+    }
     assembleConnectedComponents(threadCount, options, debug);
 
     performanceLog << timestamp << "Mode 3 assembly ends." << endl;
@@ -473,3 +476,53 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
          primaryGraph, componentId, assembler, threadCount,
          options, assembleSequence, debug);
 }
+
+
+
+// Debug output of all connected components.
+void Mode3Assembler::writeConnectedComponents() const
+{
+    for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
+        writeConnectedComponent(componentId);
+    }
+}
+
+
+
+// Debug output of a connected components.
+void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
+{
+    const ConnectedComponent& component = connectedComponents[componentId];
+    const vector<OrientedReadId>& orientedReadIds = component.orientedReadIds;
+    const vector<uint64_t>& primaryIds = component.primaryIds;
+
+    // Write the oriented reads.
+    {
+        ofstream csv("OrientedReadIds-" + to_string(componentId) + ".csv");
+        for(const OrientedReadId orientedReadId: orientedReadIds) {
+            csv << orientedReadId << "\n";
+        }
+    }
+
+
+
+    // Write the marker intervals.
+    {
+        ofstream csv("MarkerIntervals-" + to_string(componentId) + ".csv");
+        csv << "MarkerGraphEdgeId,OrientedReadId,Ordinal0,Ordinal1\n";
+
+        for(uint64_t localPrimaryId=0; localPrimaryId<component.primaryIds.size(); localPrimaryId++) {
+            const uint64_t primaryId = primaryIds[localPrimaryId];
+            const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
+            const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
+            for(const MarkerInterval& markerInterval: markerIntervals) {
+                csv << edgeId << ",";
+                csv << markerInterval.orientedReadId << ",";
+                csv << markerInterval.ordinals[0] << ",";
+                csv << markerInterval.ordinals[1] << "\n";
+            }
+        }
+
+    }
+}
+

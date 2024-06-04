@@ -58,6 +58,10 @@ private:
     vector<ConnectedComponent> connectedComponents;
     void computeConnectedComponents();
 
+    // Debug output of connected components.
+    void writeConnectedComponents() const;
+    void writeConnectedComponent(uint64_t componentId) const;
+
     // For each oriented read, store which ConnectedComponent it belongs to,
     // and at what position.
     // Indexed by OrientedReadId::getValue().
