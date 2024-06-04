@@ -178,6 +178,8 @@ void AssemblyGraph::run(
         useBayesianModel,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP);
+    while(compressSequentialEdges());
+    compressBubbleChains();
     detangleShortSuperbubbles(false,
         options.assemblyGraphOptions.superbubbleLengthThreshold4,
         options.assemblyGraphOptions.detangleToleranceLow,
@@ -185,6 +187,8 @@ void AssemblyGraph::run(
         useBayesianModel,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP);
+    while(compressSequentialEdges());
+    compressBubbleChains();
     detangleEdges(false,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP,
@@ -3280,6 +3284,44 @@ bool AssemblyGraph::detangleEdges(
 
 
 
+// More general version.
+bool AssemblyGraph::detangleEdges(
+    bool debug,
+    double epsilon,
+    double minLogP)
+{
+    if(debug) {
+        cout << "Detangling edges." << endl;
+    }
+
+    AssemblyGraph& cGraph = *this;
+
+    // To safely iterate over edges while removing edges we must use edge ids
+    // as unique identifiers, because edge descriptors can be reused as edges are
+    // deleted ndw new edges are created.
+    std::map<uint64_t, edge_descriptor> edgeMap;
+    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
+        edgeMap.insert({cGraph[ce].id, ce});
+    }
+
+    uint64_t detangleCount = 0;;
+    for(auto it=edgeMap.begin(); it!=edgeMap.end(); /* Incremented safely by detangleEdgeStrict */) {
+        if(detangleEdge(debug, edgeMap, it, epsilon, minLogP)) {
+            ++detangleCount;
+        }
+    }
+
+    if(debug) {
+        cout << "Detangled " << detangleCount << " edges." << endl;
+    }
+
+    return detangleCount > 0;
+}
+
+
+
+
+
 // Edge detangling using only
 // the second-to-last MarkerGraphEdgeId of incoming chains and
 // the second MarkerGraphEdgeId of outgoing chains.
@@ -3853,6 +3895,160 @@ bool AssemblyGraph::detangleEdge(
     cGraph.removeVertex(cv1);
 
     return true;
+}
+
+
+
+// More general version.
+bool AssemblyGraph::detangleEdge(
+    bool debug,
+    std::map<uint64_t, edge_descriptor>& edgeMap,
+    std::map<uint64_t, edge_descriptor>::iterator& it,
+    double epsilon,
+    double minLogP)
+{
+    AssemblyGraph& cGraph = *this;
+    const edge_descriptor ce = it->second;
+    ++it;
+
+    // This must be called when all bubble chains are simple chains,
+    // that is they consist of a single haploid bubble.
+    BubbleChain& bubbleChain = cGraph[ce];
+    SHASTA_ASSERT(bubbleChain.isSimpleChain());
+
+    // Get the vertices of the edge to be detangled.
+    const vertex_descriptor cv0 = source(ce, cGraph);
+    const vertex_descriptor cv1 = target(ce, cGraph);
+
+    // Check basic requirements for the edge to be detangled.
+    if(out_degree(cv0, cGraph) != 1) {
+        return false;
+    }
+    if(in_degree(cv1, cGraph) != 1) {
+        return false;
+    }
+
+    if(debug) {
+        cout << "Attempting to detangle edge " << bubbleChainStringId(ce) << endl;
+    }
+
+    // Gather the in-edges and check that the corresponding bubble chains are simple chains.
+    // Ignore in-edges coming from cv1 (back-edges).
+    vector<edge_descriptor> inEdges;
+    vector<edge_descriptor> backEdges;
+    BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        SHASTA_ASSERT(bubbleChain.isSimpleChain());
+        if(source(ce, cGraph) != cv1) {
+            inEdges.push_back(ce);
+        } else {
+            backEdges.push_back(ce);
+        }
+    }
+
+    // Gather the out-edges and check that the corresponding bubble chains are simple chains.
+    // Ignore out-edges going to cv0 (back-edges).
+    vector<edge_descriptor> outEdges;
+    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        SHASTA_ASSERT(bubbleChain.isSimpleChain());
+        if(target(ce, cGraph) != cv0) {
+            outEdges.push_back(ce);
+        }
+    }
+
+
+    // Check more conditions for detangling.
+    // This code only handles the 2 by 2 case.
+    if(inEdges.size() != 2 or outEdges.size() != 2) {
+        if(debug) {
+            cout << "Not detangling due to degree." << endl;
+        }
+        return false;
+    }
+
+    if(debug) {
+        cout << "inEdges: " << bubbleChainStringId(inEdges[0]) << " " << bubbleChainStringId(inEdges[1])<< endl;
+        cout << "outEdges: " << bubbleChainStringId(outEdges[0]) << " " << bubbleChainStringId(outEdges[1])<< endl;
+    }
+
+
+    array<std::map<OrientedReadId, uint64_t>, 2> inCount;
+    array<std::map<OrientedReadId, uint64_t>, 2> outCount;
+    for(uint64_t i=0; i<2; i++) {
+        countOrientedReadsInternalToChain(cGraph[inEdges[i]].front().front(), inCount[i]);
+        countOrientedReadsInternalToChain(cGraph[outEdges[i]].front().front(), outCount[i]);
+    }
+
+    // Consolidate the counts.
+    class Count {
+    public:
+        array<uint64_t, 2> inCount = {0, 0};
+        array<uint64_t, 2> outCount = {0, 0};
+        uint64_t totalInCount() const
+        {
+            return inCount[0] + inCount[1];
+        }
+        uint64_t totalOutCount() const
+        {
+            return outCount[0] + outCount[1];
+        }
+    };
+    std::map<OrientedReadId, Count> countMap;
+    for(uint64_t i=0; i<2; i++) {
+        for(const auto& p: inCount[i]) {
+            const OrientedReadId orientedReadId = p.first;
+            countMap[orientedReadId].inCount[i] += p.second;
+        }
+        for(const auto& p: outCount[i]) {
+            const OrientedReadId orientedReadId = p.first;
+            countMap[orientedReadId].outCount[i] += p.second;
+        }
+    }
+    if(debug) {
+        for(const auto& p: countMap) {;
+            const Count& count = p.second;
+            if((count.totalInCount() > 0) and (count.totalOutCount() > 0)) {
+                cout << p.first << " " <<
+                    count.inCount[0] << " " <<
+                    count.inCount[1] << " " <<
+                    count.outCount[0] << " " <<
+                    count.outCount[1] << endl;
+            }
+        }
+    }
+
+    return false;
+}
+
+
+
+void AssemblyGraph::countOrientedReadsInternalToChain(
+    const Chain& chain,
+    std::map<OrientedReadId, uint64_t>& countMap) const
+{
+    SHASTA_ASSERT(chain.size() >= 2);
+    countMap.clear();
+
+    // Loop over MarkerGraphEdgeIds internal to the chain.
+    for(uint64_t i=1; i<chain.size()-1; i++) {
+        const MarkerGraphEdgeId edgeId = chain[i];
+
+        // Get the MarkerIntervals.
+        const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
+
+        // Loop over OrientedReadId that appear in these MarkerIntervals.
+        for(const MarkerInterval& markerInterval: markerIntervals) {
+            const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+            const auto it = countMap.find(orientedReadId);
+            if(it == countMap.end()) {
+                countMap.insert({orientedReadId, 1});
+            } else {
+                ++(it->second);
+            }
+        }
+
+    }
 }
 
 

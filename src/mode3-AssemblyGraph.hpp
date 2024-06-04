@@ -415,6 +415,22 @@ private:
         double minLogP,
         uint64_t n);
 
+    // More general version of the above.
+    bool detangleEdges(
+        bool debug,
+        double epsilon,
+        double minLogP);
+    bool detangleEdge(
+        bool debug,
+        std::map<uint64_t, edge_descriptor>& edgeMap,
+        std::map<uint64_t, edge_descriptor>::iterator&,
+        double epsilon,
+        double minLogP);
+    void countOrientedReadsInternalToChain(
+        const Chain&,
+        std::map<OrientedReadId, uint64_t>&) const;
+
+
 #if 0
     bool detangleEdgesWithSearch(
         bool debug,
