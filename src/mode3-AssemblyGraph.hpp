@@ -426,9 +426,6 @@ private:
         std::map<uint64_t, edge_descriptor>::iterator&,
         double epsilon,
         double minLogP);
-    void countOrientedReadsInternalToChain(
-        const Chain&,
-        std::map<OrientedReadId, uint64_t>&) const;
 
 
 #if 0

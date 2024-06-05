@@ -3907,24 +3907,24 @@ bool AssemblyGraph::detangleEdge(
     double epsilon,
     double minLogP)
 {
-    AssemblyGraph& cGraph = *this;
+    AssemblyGraph& assemblyGraph = *this;
     const edge_descriptor ce = it->second;
     ++it;
 
     // This must be called when all bubble chains are simple chains,
     // that is they consist of a single haploid bubble.
-    BubbleChain& bubbleChain = cGraph[ce];
+    BubbleChain& bubbleChain = assemblyGraph[ce];
     SHASTA_ASSERT(bubbleChain.isSimpleChain());
 
     // Get the vertices of the edge to be detangled.
-    const vertex_descriptor cv0 = source(ce, cGraph);
-    const vertex_descriptor cv1 = target(ce, cGraph);
+    const vertex_descriptor cv0 = source(ce, assemblyGraph);
+    const vertex_descriptor cv1 = target(ce, assemblyGraph);
 
     // Check basic requirements for the edge to be detangled.
-    if(out_degree(cv0, cGraph) != 1) {
+    if(out_degree(cv0, assemblyGraph) != 1) {
         return false;
     }
-    if(in_degree(cv1, cGraph) != 1) {
+    if(in_degree(cv1, assemblyGraph) != 1) {
         return false;
     }
 
@@ -3936,10 +3936,10 @@ bool AssemblyGraph::detangleEdge(
     // Ignore in-edges coming from cv1 (back-edges).
     vector<edge_descriptor> inEdges;
     vector<edge_descriptor> backEdges;
-    BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
-        const BubbleChain& bubbleChain = cGraph[ce];
+    BGL_FORALL_INEDGES(cv0, ce, assemblyGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = assemblyGraph[ce];
         SHASTA_ASSERT(bubbleChain.isSimpleChain());
-        if(source(ce, cGraph) != cv1) {
+        if(source(ce, assemblyGraph) != cv1) {
             inEdges.push_back(ce);
         } else {
             backEdges.push_back(ce);
@@ -3949,10 +3949,10 @@ bool AssemblyGraph::detangleEdge(
     // Gather the out-edges and check that the corresponding bubble chains are simple chains.
     // Ignore out-edges going to cv0 (back-edges).
     vector<edge_descriptor> outEdges;
-    BGL_FORALL_OUTEDGES(cv1, ce, cGraph, AssemblyGraph) {
-        const BubbleChain& bubbleChain = cGraph[ce];
+    BGL_FORALL_OUTEDGES(cv1, ce, assemblyGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = assemblyGraph[ce];
         SHASTA_ASSERT(bubbleChain.isSimpleChain());
-        if(target(ce, cGraph) != cv0) {
+        if(target(ce, assemblyGraph) != cv0) {
             outEdges.push_back(ce);
         }
     }
@@ -3973,82 +3973,52 @@ bool AssemblyGraph::detangleEdge(
     }
 
 
-    array<std::map<OrientedReadId, uint64_t>, 2> inCount;
-    array<std::map<OrientedReadId, uint64_t>, 2> outCount;
-    for(uint64_t i=0; i<2; i++) {
-        countOrientedReadsInternalToChain(cGraph[inEdges[i]].front().front(), inCount[i]);
-        countOrientedReadsInternalToChain(cGraph[outEdges[i]].front().front(), outCount[i]);
-    }
 
-    // Consolidate the counts.
-    class Count {
+    // A bipartite graph in which the vertices can be oriented reads or primary marker graph edges.
+    // We only include primary marker graph edges that are internal to the chains
+    // in the inEdges and outEdges.
+    // An undirected edge is created if an oriented read is present in a primary marker graph edge.
+    class Vertex {
     public:
-        array<uint64_t, 2> inCount = {0, 0};
-        array<uint64_t, 2> outCount = {0, 0};
-        uint64_t totalInCount() const
-        {
-            return inCount[0] + inCount[1];
-        }
-        uint64_t totalOutCount() const
-        {
-            return outCount[0] + outCount[1];
-        }
+
+        // Only set for vertices that represent an oriented read.
+        OrientedReadId orientedReadId = OrientedReadId();
+
+        // Only set for vertices that represent a primary marker graph edge.
+        MarkerGraphEdgeId markerGraphEdgeId = invalid<MarkerGraphEdgeId>;
+        array<bool, 2> isOnInEdges = {false, false};
+        array<bool, 2> isOnOutEdges = {false, false};
     };
-    std::map<OrientedReadId, Count> countMap;
+    using Graph = boost::adjacency_list<
+        boost::listS,
+        boost::listS,
+        boost::undirectedS,
+        Vertex>;
+    Graph graph;
+    std::map<OrientedReadId, Graph::vertex_descriptor> orientedReadMap;
+
+    // To populate the Graph, loop over the journeys of oriented reads
+    // that appear internally to the chains in the inEdges and outEdges.
     for(uint64_t i=0; i<2; i++) {
-        for(const auto& p: inCount[i]) {
-            const OrientedReadId orientedReadId = p.first;
-            countMap[orientedReadId].inCount[i] += p.second;
-        }
-        for(const auto& p: outCount[i]) {
-            const OrientedReadId orientedReadId = p.first;
-            countMap[orientedReadId].outCount[i] += p.second;
-        }
-    }
-    if(debug) {
-        for(const auto& p: countMap) {;
-            const Count& count = p.second;
-            if((count.totalInCount() > 0) and (count.totalOutCount() > 0)) {
-                cout << p.first << " " <<
-                    count.inCount[0] << " " <<
-                    count.inCount[1] << " " <<
-                    count.outCount[0] << " " <<
-                    count.outCount[1] << endl;
+
+        const Chain& inChain = assemblyGraph[inEdges[i]].front().front();
+        SHASTA_ASSERT(inChain.size() >= 2);
+        for(uint64_t positionInChain=1; positionInChain<inChain.size()-1; positionInChain++) {
+            const MarkerGraphEdgeId markerGraphEdgeId = inChain[positionInChain];
+
+            // Get the MarkerIntervals.
+            const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[markerGraphEdgeId];
+
+            // Loop over OrientedReadId that appear in these MarkerIntervals.
+#if 0
+            for(const MarkerInterval& markerInterval: markerIntervals) {
+                const OrientedReadId orientedReadId = markerInterval.orientedReadId;
             }
+#endif
         }
     }
 
     return false;
-}
-
-
-
-void AssemblyGraph::countOrientedReadsInternalToChain(
-    const Chain& chain,
-    std::map<OrientedReadId, uint64_t>& countMap) const
-{
-    SHASTA_ASSERT(chain.size() >= 2);
-    countMap.clear();
-
-    // Loop over MarkerGraphEdgeIds internal to the chain.
-    for(uint64_t i=1; i<chain.size()-1; i++) {
-        const MarkerGraphEdgeId edgeId = chain[i];
-
-        // Get the MarkerIntervals.
-        const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
-
-        // Loop over OrientedReadId that appear in these MarkerIntervals.
-        for(const MarkerInterval& markerInterval: markerIntervals) {
-            const OrientedReadId orientedReadId = markerInterval.orientedReadId;
-            const auto it = countMap.find(orientedReadId);
-            if(it == countMap.end()) {
-                countMap.insert({orientedReadId, 1});
-            } else {
-                ++(it->second);
-            }
-        }
-
-    }
 }
 
 
