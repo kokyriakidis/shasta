@@ -379,6 +379,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
                 const uint64_t localPrimaryId = p.second;
                 const uint64_t primaryId = primaryIds[localPrimaryId];
                 const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
+                SHASTA_ASSERT(edgeId == primaryId);
                 csv << edgeId << ",";
             }
             csv << "\n";
@@ -493,7 +494,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
      // Create the assembly graph for this connected component.
      return make_shared<AssemblyGraph>(
-         primaryGraph, componentId, assembler, threadCount,
+         primaryGraph, componentId, assembler, orientedReadIds, primaryIds, threadCount,
          options, assembleSequence, debug);
 }
 

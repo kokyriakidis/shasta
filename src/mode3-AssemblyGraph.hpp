@@ -5,6 +5,7 @@
 #include "invalid.hpp"
 #include "mode3-PhasedComponent.hpp"
 #include "MultithreadedObject.hpp"
+#include "ReadId.hpp"
 #include "shastaTypes.hpp"
 #include "SHASTA_ASSERT.hpp"
 
@@ -250,6 +251,8 @@ public:
         const PrimaryGraph&,
         uint64_t componentId,
         const Assembler&,
+        const vector<OrientedReadId> orientedReadIds,
+        const vector<MarkerGraphEdgeId> markerGraphEdgeIds,
         uint64_t threadCount,
         const Mode3AssemblyOptions& options,
         bool assembleSequence,
@@ -274,12 +277,21 @@ private:
     const Assembler& assembler;
     const Mode3AssemblyOptions& options;
 
+    // The OrientedReadIds of the connected component that generated this AssemblyGraph.
+    vector<OrientedReadId> orientedReadIds;
+
+    // The MarkerGraphEdgeIds of the primary marker graph edges
+    // of the connected component that generated this AssemblyGraph.
+    vector<MarkerGraphEdgeId> markerGraphEdgeIds;
+
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
     {
         ar & boost::serialization::base_object<AssemblyGraphBaseClass>(*this);
         ar & componentId;
         ar & nextEdgeId;
+        ar & orientedReadIds;
+        ar & markerGraphEdgeIds;
     }
     void save(const string& fileName) const;
     void load(const string& fileName);

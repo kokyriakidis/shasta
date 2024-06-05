@@ -41,6 +41,8 @@ AssemblyGraph::AssemblyGraph(
     const PrimaryGraph& graph,
     uint64_t componentId,
     const Assembler& assembler,
+    const vector<OrientedReadId> orientedReadIds,
+    const vector<MarkerGraphEdgeId> markerGraphEdgeIds,
     uint64_t threadCount,
     const Mode3AssemblyOptions& options,
     bool assembleSequence,
@@ -48,7 +50,9 @@ AssemblyGraph::AssemblyGraph(
     MultithreadedObject<AssemblyGraph>(*this),
     componentId(componentId),
     assembler(assembler),
-    options(options)
+    options(options),
+    orientedReadIds(orientedReadIds),
+    markerGraphEdgeIds(markerGraphEdgeIds)
 {
     // Adjust the numbers of threads, if necessary.
     if(threadCount == 0) {
