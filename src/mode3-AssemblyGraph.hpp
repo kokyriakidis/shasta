@@ -284,6 +284,10 @@ private:
     // of the connected component that generated this AssemblyGraph.
     vector<MarkerGraphEdgeId> markerGraphEdgeIds;
 
+    // Compute the journeys of the oriented reads listed above.
+    vector< vector< pair<MarkerGraphEdgeId, uint32_t> > > journeys;
+    void computeJourneys(bool debug);
+
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
     {

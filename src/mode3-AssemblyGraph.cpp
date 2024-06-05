@@ -108,6 +108,10 @@ void AssemblyGraph::run(
 
     if(debug) write("A");
 
+    // Compute journeys of the oriented reads. They are used below
+    // for detangling.
+    computeJourneys(debug);
+
     // Don't do any detangling before cleanup of bubbles and superbubbles and phasing.
 
     // Cleanup bubbles and superbubbles.
@@ -7974,4 +7978,53 @@ uint64_t AssemblyGraph::cleanupBubbles(bool debug, edge_descriptor ce,
 
     bubbleChain.swap(newBubbleChain);
     return removedCount;
+}
+
+
+
+void AssemblyGraph::computeJourneys(bool debug)
+{
+    // A map that gives the index of a given OrientedReadId.
+    std::map<OrientedReadId, uint64_t> orientedReadIdMap;
+    for(uint64_t i=0; i<orientedReadIds.size(); i++) {
+        orientedReadIdMap.insert({orientedReadIds[i], i});
+    }
+
+    // Make space for the journeys.
+    journeys.clear();
+    journeys.resize(orientedReadIds.size());
+
+    performanceLog << timestamp << "Journey computation begins." << endl;
+
+    // Loop over MarkerGraphEdgeIds in the connected component that corresponds
+    // to this assembly graph.
+    for(const MarkerGraphEdgeId edgeId: markerGraphEdgeIds) {
+        const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
+        for(const MarkerInterval& markerInterval: markerIntervals) {
+            const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+            const uint64_t i = orientedReadIdMap[orientedReadId];
+            SHASTA_ASSERT(i < orientedReadIds.size());
+            journeys[i].push_back({edgeId, markerInterval.ordinals[0]});
+        }
+    }
+
+    // Sort the journeys.
+    for(vector< pair<uint64_t, uint32_t> >& journey: journeys) {
+        sort(journey.begin(), journey.end(), OrderPairsBySecondOnly<uint64_t, uint32_t>());
+    }
+
+    performanceLog << timestamp << "Journey computation ends." << endl;
+
+    // Write out the journeys.
+    if(debug) {
+        ofstream csv("Journeys-Check-" + to_string(componentId) + ".csv");
+        for(uint64_t i=0; i<orientedReadIds.size(); i++) {
+            csv << orientedReadIds[i] << ",";
+            const auto& journey = journeys[i];
+            for(const auto& p: journey) {
+                 csv << p.first << ",";
+            }
+            csv << "\n";
+        }
+    }
 }
