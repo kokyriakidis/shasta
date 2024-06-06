@@ -3298,6 +3298,7 @@ bool AssemblyGraph::detangleEdges(
     double epsilon,
     double minLogP)
 {
+#if 0
     if(debug) {
         cout << "Detangling edges." << endl;
     }
@@ -3324,6 +3325,8 @@ bool AssemblyGraph::detangleEdges(
     }
 
     return detangleCount > 0;
+#endif
+    return false;
 }
 
 
@@ -3915,6 +3918,7 @@ bool AssemblyGraph::detangleEdge(
     double epsilon,
     double minLogP)
 {
+#if 0
     AssemblyGraph& assemblyGraph = *this;
     const edge_descriptor ce = it->second;
     ++it;
@@ -3980,11 +3984,25 @@ bool AssemblyGraph::detangleEdge(
         cout << "outEdges: " << bubbleChainStringId(outEdges[0]) << " " << bubbleChainStringId(outEdges[1])<< endl;
     }
 
+    // Create the Tangle using these inEdges and outEdges.
+    Tangle tangle(*this, inEdges, outEdges);
+
+#if 0
+    // Gather the chains.
+    // First index = in/out.
+    // Second index: index in inEdges, outEdges.
+    array<array<const Chain*, 2>, 2> chains;
+    for(uint64_t i=0; i<2; i++) {
+        chains[0][i] = &(assemblyGraph[inEdges[i]].front().front());
+        chains[1][i] = &(assemblyGraph[outEdges[i]].front().front());
+    }
+
+
 
 
     // A bipartite graph in which the vertices can be oriented reads or primary marker graph edges.
-    // We only include primary marker graph edges that are internal to the chains
-    // in the inEdges and outEdges.
+    // We only include oriented reads that appear in primary marker graph edges
+    // that are internal to the chains in the inEdges and outEdges.
     // An undirected edge is created if an oriented read is present in a primary marker graph edge.
     class Vertex {
     public:
@@ -3994,8 +4012,6 @@ bool AssemblyGraph::detangleEdge(
 
         // Only set for vertices that represent a primary marker graph edge.
         MarkerGraphEdgeId markerGraphEdgeId = invalid<MarkerGraphEdgeId>;
-        array<bool, 2> isOnInEdges = {false, false};
-        array<bool, 2> isOnOutEdges = {false, false};
     };
     using Graph = boost::adjacency_list<
         boost::listS,
@@ -4003,29 +4019,225 @@ bool AssemblyGraph::detangleEdge(
         boost::undirectedS,
         Vertex>;
     Graph graph;
-    std::map<OrientedReadId, Graph::vertex_descriptor> orientedReadMap;
 
-    // To populate the Graph, loop over the journeys of oriented reads
-    // that appear internally to the chains in the inEdges and outEdges.
+
+    // Gather the oriented reads and generate corresponding vertices.
+    std::map<OrientedReadId, Graph::vertex_descriptor> orientedReadIdMap;
     for(uint64_t i=0; i<2; i++) {
+        for(uint64_t j=0; j<2; j++) {
 
-        const Chain& inChain = assemblyGraph[inEdges[i]].front().front();
-        SHASTA_ASSERT(inChain.size() >= 2);
-        for(uint64_t positionInChain=1; positionInChain<inChain.size()-1; positionInChain++) {
-            const MarkerGraphEdgeId markerGraphEdgeId = inChain[positionInChain];
+            const Chain& chain = *(chains[i][j]);
+            SHASTA_ASSERT(chain.size() >= 2);
+            for(uint64_t positionInChain=1; positionInChain<chain.size()-1; positionInChain++) {
+                const MarkerGraphEdgeId markerGraphEdgeId = chain[positionInChain];
 
-            // Get the MarkerIntervals.
-            const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[markerGraphEdgeId];
+                // Get the MarkerIntervals.
+                const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[markerGraphEdgeId];
 
-            // Loop over OrientedReadId that appear in these MarkerIntervals.
-#if 0
-            for(const MarkerInterval& markerInterval: markerIntervals) {
-                const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+                // Loop over OrientedReadId that appear in these MarkerIntervals.
+                for(const MarkerInterval& markerInterval: markerIntervals) {
+                    const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+                    if(orientedReadIdMap.find(orientedReadId) == orientedReadIdMap.end()) {
+                        Graph::vertex_descriptor v = boost::add_vertex(graph);
+                        graph[v].orientedReadId = orientedReadId;
+                        orientedReadIdMap.insert({orientedReadId, v});
+                    }
+                }
             }
-#endif
         }
     }
 
+
+
+    // Now loop over the journeys of these oriented reads and generate
+    // vertices corresponding to the MarkerGraphEdgeIds encountered.
+    // Also generate edges.
+    std::map<MarkerGraphEdgeId, Graph::vertex_descriptor> markerGraphEdgeIdMap;
+    for(const auto& p: orientedReadIdMap) {
+        const OrientedReadId orientedReadId = p.first;
+        const Graph::vertex_descriptor v0 = p.second;
+
+        // Loop over the journey of this oriented read.
+        const auto& journey = journeys[orientedReadIdTable[orientedReadId]];
+        for(const auto& p: journey) {
+            const MarkerGraphEdgeId markerGraphEdgeId = p.first;
+
+            // Get the vertex corresponding to this markerGraphEdgeId,
+            // creating it if necessary.
+            Graph::vertex_descriptor v1;
+            auto it = markerGraphEdgeIdMap.find(markerGraphEdgeId);
+            if(it == markerGraphEdgeIdMap.end()) {
+                v1 = boost::add_vertex(graph);
+                graph[v1].markerGraphEdgeId = markerGraphEdgeId;
+                markerGraphEdgeIdMap.insert({markerGraphEdgeId, v1});
+            } else {
+                v1 = it->second;
+            }
+
+            // Add the edge.
+            add_edge(v0, v1, graph);
+        }
+    }
+
+    if(debug) {
+        cout << "Initial bipartite graph:" << endl;
+        cout << markerGraphEdgeIdMap.size() << " marker graph edges." << endl;
+        cout << orientedReadIdMap.size() << " oriented reads." << endl;
+        cout << num_vertices(graph) << " vertices." << endl;
+        cout << num_edges(graph) << " edges." << endl;
+        SHASTA_ASSERT(markerGraphEdgeIdMap.size() + orientedReadIdMap.size() == num_vertices(graph));
+    }
+
+#if 0
+    for(uint64_t i=0; i<2; i++) {
+        for(uint64_t j=0; j<2; j++) {
+
+            const Chain& chain = *(chains[i][j]);
+            SHASTA_ASSERT(chain.size() >= 2);
+            for(uint64_t positionInChain=1; positionInChain<chain.size()-1; positionInChain++) {
+                const MarkerGraphEdgeId markerGraphEdgeId = chain[positionInChain];
+
+                // Get the vertex for this markerGraphEdgeId, creating it if necessary.
+                Graph::vertex_descriptor v0;
+                auto it0 = markerGraphEdgeIdMap.find(markerGraphEdgeId);
+                if(it0 == markerGraphEdgeIdMap.end()) {
+                    v0 = add_vertex(graph);
+                    Vertex& vertex0 = graph[v0];
+                    vertex0.markerGraphEdgeId = markerGraphEdgeId;
+                    markerGraphEdgeIdMap.insert({markerGraphEdgeId, v0});
+                } else {
+                    v0 = it0->second;
+                }
+
+                // Flag that it is on this chain.
+                Vertex& vertex0 = graph[v0];
+                if(i ==0) {
+                    vertex0.isOnInEdges[j] = true;
+                } else {
+                    vertex0.isOnOutEdges[j] = true;
+                }
+
+                // Get the MarkerIntervals.
+                const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[markerGraphEdgeId];
+
+                // Loop over OrientedReadId that appear in these MarkerIntervals.
+                for(const MarkerInterval& markerInterval: markerIntervals) {
+                    const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+
+                    // Get the vertex for this OrientedReadId, creating it if necessary.
+                    Graph::vertex_descriptor v1;
+                    auto it1 = orientedReadIdMap.find(orientedReadId);
+                    if(it1 == orientedReadIdMap.end()) {
+                        v1 = add_vertex(graph);
+                        Vertex& vertex1 = graph[v1];
+                        vertex1.orientedReadId = orientedReadId;
+                        orientedReadIdMap.insert({orientedReadId, v1});
+                    } else {
+                        v1 = it1->second;
+                    }
+
+                    // Add the edge.
+                    add_edge(v0, v1, graph);
+
+                }
+            }
+        }
+    }
+
+
+    std::map<MarkerGraphEdgeId, Graph::vertex_descriptor> markerGraphEdgeIdMap;
+
+    if(debug) {
+        cout << "Initial bipartite graph:" << endl;
+        cout << markerGraphEdgeIdMap.size() << " marker graph edges." << endl;
+        cout << orientedReadIdMap.size() << " oriented reads." << endl;
+        cout << num_vertices(graph) << " vertices." << endl;
+        cout << num_edges(graph) << " edges." << endl;
+        SHASTA_ASSERT(markerGraphEdgeIdMap.size() + orientedReadIdMap.size() == num_vertices(graph));
+    }
+
+#if 0
+    // Of all vertices corresponding to OrientedReadIds, only keep the ones that are connected
+    // to at least on MarkerGraphEdgeId in the inEdges and one in the outEdges.
+    vector<vertex_descriptor> verticesToBeRemoved;
+    BGL_FORALL_VERTICES(v1, graph, Graph) {
+        const Vertex& vertex1 = graph[v1];
+        const OrientedReadId orientedReadId = vertex1.orientedReadId;
+
+        // If this vertex does not correspond to an OrientedReadId, skip it.
+        if(orientedReadId == OrientedReadId()) {
+            continue;
+        }
+
+        // Loop over its neighors.
+        bool isOnInEdges = false;
+        bool isOnOutEdges = false;
+        BGL_FORALL_ADJ(v1, v0, graph, Graph) {
+            const Vertex& vertex0 = graph[v0];
+            isOnInEdges = isOnInEdges or (vertex0.isOnInEdges[0] or vertex0.isOnInEdges[1]);
+            isOnOutEdges = isOnOutEdges or (vertex0.isOnOutEdges[0] or vertex0.isOnOutEdges[1]);
+        }
+
+        if(not (isOnInEdges and isOnOutEdges)) {
+            verticesToBeRemoved.push_back(v1);
+        }
+    }
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        orientedReadIdMap.erase(graph[v].orientedReadId);
+        boost::remove_vertex(v, graph);
+    }
+    cout << "Removed " << verticesToBeRemoved.size() <<
+        " bipartite graph vertices corresponding to oriented reads on only one side of the tangle." << endl;
+
+    // Now remove all vertices that correspond to MarkerGraphEdgeIds and are isolated.
+    verticesToBeRemoved.clear();
+    BGL_FORALL_VERTICES(v, graph, Graph) {
+        if((graph[v].markerGraphEdgeId != invalid<MarkerGraphEdgeId>) and
+            (out_degree(v, graph) == 0)) {
+            verticesToBeRemoved.push_back(v);
+        }
+    }
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        markerGraphEdgeIdMap.erase(graph[v].markerGraphEdgeId);
+        boost::remove_vertex(v, graph);
+    }
+    cout << "Removed " << verticesToBeRemoved.size() <<
+        " bipartite graph vertices corresponding to isolated MarlerGraphEdgeIds." << endl;
+
+    if(debug) {
+        cout << "Bipartite graph after cleanup:" << endl;
+        cout << markerGraphEdgeIdMap.size() << " marker graph edges." << endl;
+        cout << orientedReadIdMap.size() << " oriented reads." << endl;
+        cout << num_vertices(graph) << " vertices." << endl;
+        cout << num_edges(graph) << " edges." << endl;
+        SHASTA_ASSERT(markerGraphEdgeIdMap.size() + orientedReadIdMap.size() == num_vertices(graph));
+    }
+
+    if(debug) {
+        ofstream dot ("BipartiteGraph-" + to_string(componentId) + ".dot");
+        dot << "graph BipartiteGraph {\n";
+    }
+#endif
+
+    // For each oriented read, histogram adjacent vertices by type.
+    vector<uint64_t> histogram(16);
+    for(const auto& p: orientedReadIdMap) {
+        const OrientedReadId orientedReadId = p.first;
+        const vertex_descriptor v1 = p.second;
+        fill(histogram.begin(), histogram.end(), 0);
+        BGL_FORALL_ADJ(v1, v0, graph, Graph) {
+            const Vertex& vertex0 = graph[v0];
+            ++histogram[vertex0.type()];
+        }
+        cout << orientedReadId << ",";
+        for(const uint64_t frequency: histogram) {
+            cout << frequency << ",";
+        }
+        cout << endl;
+    }
+#endif
+#endif
+#endif
     return false;
 }
 
@@ -7985,9 +8197,9 @@ uint64_t AssemblyGraph::cleanupBubbles(bool debug, edge_descriptor ce,
 void AssemblyGraph::computeJourneys(bool debug)
 {
     // A map that gives the index of a given OrientedReadId.
-    std::map<OrientedReadId, uint64_t> orientedReadIdMap;
+    orientedReadIdTable.clear();
     for(uint64_t i=0; i<orientedReadIds.size(); i++) {
-        orientedReadIdMap.insert({orientedReadIds[i], i});
+        orientedReadIdTable.insert({orientedReadIds[i], i});
     }
 
     // Make space for the journeys.
@@ -8002,7 +8214,7 @@ void AssemblyGraph::computeJourneys(bool debug)
         const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
         for(const MarkerInterval& markerInterval: markerIntervals) {
             const OrientedReadId orientedReadId = markerInterval.orientedReadId;
-            const uint64_t i = orientedReadIdMap[orientedReadId];
+            const uint64_t i = orientedReadIdTable[orientedReadId];
             SHASTA_ASSERT(i < orientedReadIds.size());
             journeys[i].push_back({edgeId, markerInterval.ordinals[0]});
         }

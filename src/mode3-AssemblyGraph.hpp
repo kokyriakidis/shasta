@@ -168,6 +168,11 @@ public:
         SHASTA_ASSERT(isSimpleChain());
         return firstBubble().front();
     }
+    const Chain& getOnlyChain() const
+    {
+        SHASTA_ASSERT(isSimpleChain());
+        return firstBubble().front();
+    }
 
     // Collapse consecutive haploid bubbles.
     bool compress();
@@ -279,6 +284,9 @@ private:
 
     // The OrientedReadIds of the connected component that generated this AssemblyGraph.
     vector<OrientedReadId> orientedReadIds;
+
+    // Map OrientedReads to indexes in the orientedReadIds vector.
+    std::map<OrientedReadId, uint64_t> orientedReadIdTable;
 
     // The MarkerGraphEdgeIds of the primary marker graph edges
     // of the connected component that generated this AssemblyGraph.
