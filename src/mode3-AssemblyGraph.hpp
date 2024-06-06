@@ -279,22 +279,36 @@ private:
 
     // Information stored by the constructor.
     uint64_t componentId;
+public:
     const Assembler& assembler;
     const Mode3AssemblyOptions& options;
 
     // The OrientedReadIds of the connected component that generated this AssemblyGraph.
+    // These are sorted.
     vector<OrientedReadId> orientedReadIds;
 
+    // Get the index of an OrientedReadId in the orientedReadIds sorted vector.
+    uint64_t getOrientedReadIndex(OrientedReadId) const;
+
+#if 0
     // Map OrientedReads to indexes in the orientedReadIds vector.
     std::map<OrientedReadId, uint64_t> orientedReadIdTable;
+#endif
 
     // The MarkerGraphEdgeIds of the primary marker graph edges
     // of the connected component that generated this AssemblyGraph.
+    // These are sorted.
     vector<MarkerGraphEdgeId> markerGraphEdgeIds;
 
+    // Get the index of a MarkerGraphEdgeId in the markerGraphEdgeIds vector.
+    uint64_t getMarkerGraphEdgeIndex(MarkerGraphEdgeId) const;
+
+#if 0
     // Compute the journeys of the oriented reads listed above.
     vector< vector< pair<MarkerGraphEdgeId, uint32_t> > > journeys;
-    void computeJourneys(bool debug);
+#endif
+private:
+    // void computeJourneys(bool debug);
 
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)

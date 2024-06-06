@@ -3,6 +3,7 @@
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-PrimaryGraph.hpp"
 #include "mode3-PhasingTable.hpp"
+#include "mode3-TangleGraph.hpp"
 #include "Assembler.hpp"
 #include "AssemblerOptions.hpp"
 #include "copyNumber.hpp"
@@ -13,6 +14,7 @@
 #include "findLinearChains.hpp"
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"
+#include "SHASTA_ASSERT.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3;
@@ -106,11 +108,14 @@ void AssemblyGraph::run(
     // const uint64_t optimizeChainsMinCommon = 3;
     // const uint64_t optimizeChainsK = 100;
 
+    SHASTA_ASSERT(std::is_sorted(orientedReadIds.begin(), orientedReadIds.end()));
+    SHASTA_ASSERT(std::is_sorted(markerGraphEdgeIds.begin(), markerGraphEdgeIds.end()));
+
     if(debug) write("A");
 
     // Compute journeys of the oriented reads. They are used below
     // for detangling.
-    computeJourneys(debug);
+    // computeJourneys(debug);
 
     // Don't do any detangling before cleanup of bubbles and superbubbles and phasing.
 
@@ -201,6 +206,10 @@ void AssemblyGraph::run(
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP,
         6);
+
+    // See if we can do more with a TangleGraph.
+    // const TangleGraph tangleGraph(*this);
+
     performanceLog << timestamp << "Detangling ends." << endl;
 
     compress();
@@ -8194,6 +8203,7 @@ uint64_t AssemblyGraph::cleanupBubbles(bool debug, edge_descriptor ce,
 
 
 
+#if 0
 void AssemblyGraph::computeJourneys(bool debug)
 {
     // A map that gives the index of a given OrientedReadId.
@@ -8239,4 +8249,26 @@ void AssemblyGraph::computeJourneys(bool debug)
             csv << "\n";
         }
     }
+}
+#endif
+
+
+// Get the index of an OrientedReadId in the orientedReadIds sorted vector.
+uint64_t AssemblyGraph::getOrientedReadIndex(OrientedReadId orientedReadId) const
+{
+    auto it = std::lower_bound(orientedReadIds.begin(), orientedReadIds.end(), orientedReadId);
+    SHASTA_ASSERT(it != orientedReadIds.end());
+    SHASTA_ASSERT(*it == orientedReadId);
+    return it - orientedReadIds.begin();
+}
+
+
+// Get the index of a MarkerGraphEdgeId in the markerGraphEdgeIds vector.
+uint64_t AssemblyGraph::getMarkerGraphEdgeIndex(MarkerGraphEdgeId markerGraphEdgeId) const
+{
+    auto it = std::lower_bound(markerGraphEdgeIds.begin(), markerGraphEdgeIds.end(), markerGraphEdgeId);
+    SHASTA_ASSERT(it != markerGraphEdgeIds.end());
+    SHASTA_ASSERT(*it == markerGraphEdgeId);
+    return it - markerGraphEdgeIds.begin();
+
 }
