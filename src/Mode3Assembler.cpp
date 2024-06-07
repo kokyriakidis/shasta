@@ -473,13 +473,14 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      }
 
      // Remove weak edges..
-     primaryGraph.removeWeakEdges(options.primaryGraphOptions.maxLoss);
+     primaryGraph.removeWeakEdges(options.primaryGraphOptions.maxLoss, debug);
 
      // Remove cross-edges.
      primaryGraph.removeCrossEdges(
          options.primaryGraphOptions.crossEdgesLowCoverageThreshold,
          options.primaryGraphOptions.crossEdgesHighCoverageThreshold,
-         0);
+         0,
+         debug);
 
      // Graphviz output.
      if(debug) {

@@ -315,7 +315,8 @@ vector< shared_ptr<PrimaryGraph> > PrimaryGraph::createConnectedComponents(
 void PrimaryGraph::removeCrossEdges(
     uint64_t lowCoverageThreshold,
     uint64_t highCoverageThreshold,
-    uint64_t minOffset)
+    uint64_t minOffset,
+    bool debug)
 {
     PrimaryGraph& graph = *this;
 
@@ -375,6 +376,13 @@ void PrimaryGraph::removeCrossEdges(
 
         // If all above checks passed, this edge will be removed.
         edgesToBeRemoved.push_back(e);
+        if(debug) {
+            const vertex_descriptor v0 = source(e, graph);
+            const vertex_descriptor v1 = target(e, graph);
+            cout << "Removing cross edge " <<
+                graph[v0].edgeId << "->" <<
+                graph[v1].edgeId << endl;
+        }
     }
 
     // Remove the edges we found.
@@ -386,7 +394,7 @@ void PrimaryGraph::removeCrossEdges(
 
 
 // Remove edges for which loss = (commonCount - coverage) / commonCount > maxLoss
-void PrimaryGraph::removeWeakEdges(double maxLoss)
+void PrimaryGraph::removeWeakEdges(double maxLoss, bool debug)
 {
     PrimaryGraph& graph = *this;
 
@@ -397,6 +405,14 @@ void PrimaryGraph::removeWeakEdges(double maxLoss)
         const double loss = double(edge.info.common - edge.coverage) / double(edge.info.common);
         if(loss > maxLoss) {
             edgesToBeRemoved.push_back(e);
+
+            if(debug) {
+                const vertex_descriptor v0 = source(e, graph);
+                const vertex_descriptor v1 = target(e, graph);
+                cout << "Removing weak edge " <<
+                    graph[v0].edgeId << "->" <<
+                    graph[v1].edgeId << ", loss " << loss << endl;
+            }
         }
     }
 

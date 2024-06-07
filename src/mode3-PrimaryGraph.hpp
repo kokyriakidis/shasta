@@ -139,10 +139,11 @@ public:
     void removeCrossEdges(
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold,
-        uint64_t minOffset);
+        uint64_t minOffset,
+        bool debug);
 
     // Remove edges for which loss = (commonCount - coverage) / commonCount > maxLoss
-    void removeWeakEdges(double maxLoss);
+    void removeWeakEdges(double maxLoss, bool debug);
 
 };
 
