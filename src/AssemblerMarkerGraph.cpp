@@ -2138,15 +2138,15 @@ void Assembler::accessMarkerGraphEdges(
     bool accessConnectivityReadWrite)
 {
     if(accessEdgesReadWrite) {
-        markerGraph.edges.accessExistingReadWrite(
-            largeDataName("GlobalMarkerGraphEdges"));
         markerGraph.edgeMarkerIntervals.accessExistingReadWrite(
             largeDataName("GlobalMarkerGraphEdgeMarkerIntervals"));
-    } else {
-        markerGraph.edges.accessExistingReadOnly(
+        markerGraph.edges.accessExistingReadWrite(
             largeDataName("GlobalMarkerGraphEdges"));
+    } else {
         markerGraph.edgeMarkerIntervals.accessExistingReadOnly(
             largeDataName("GlobalMarkerGraphEdgeMarkerIntervals"));
+        markerGraph.edges.accessExistingReadOnly(
+            largeDataName("GlobalMarkerGraphEdges"));
     }
 
     if(accessConnectivityReadWrite) {
