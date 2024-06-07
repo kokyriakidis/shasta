@@ -690,7 +690,7 @@ void AssemblyGraph::writeBubblesCsv(const string& fileNamePrefix) const
     const AssemblyGraph& cGraph = *this;
 
     ofstream csv(fileNamePrefix + "-Bubbles.csv");
-    csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,v0,v1,Ploidy,AverageOffset,MinOffset,MaxOffset,\n";
+    csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,First,Last,Ploidy,AverageOffset,MinOffset,MaxOffset,\n";
 
     BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
@@ -732,7 +732,7 @@ void AssemblyGraph::writeChainsCsv(const string& fileNamePrefix) const
     const AssemblyGraph& cGraph = *this;
 
     ofstream csv(fileNamePrefix + "-Chains.csv");
-    csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,Index in bubble,Length,Offset\n";
+    csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,Index in bubble,First,Last,Length,Offset\n";
 
     BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
         const BubbleChain& bubbleChain = cGraph[ce];
@@ -750,6 +750,8 @@ void AssemblyGraph::writeChainsCsv(const string& fileNamePrefix) const
                 csv << cGraph[ce].id << ",";
                 csv << positionInBubbleChain << ",";
                 csv << indexInBubble << ",";
+                csv << chain.front() << ",";
+                csv << chain.back() << ",";
                 csv << chain.size() << ",";
                 csv << chainOffset(chain) << ",";
                 csv << "\n";
