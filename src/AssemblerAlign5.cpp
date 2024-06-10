@@ -398,13 +398,25 @@ void Assembler::alignOrientedReads5(
             }
 
             vector< pair<bool, bool> > seqanAlignment;
-            seqanAlign(
-                kmerIds0.begin(), kmerIds0.end(),
-                kmerIds1.begin(), kmerIds1.end(),
-                matchScore, mismatchScore, gapScore,
-                bandMin, bandMax,
-                true, false,    // Free on left
-                seqanAlignment);
+            if(kmerIds0.size() == 1 or kmerIds1.size() == 1) {
+                // Workaround for a SeqAn bug.
+                // It cannot handle banded alignment if one or both sequences
+                // have length 1. Use non-banded alignment instead.
+                seqanAlign(
+                    kmerIds0.begin(), kmerIds0.end(),
+                    kmerIds1.begin(), kmerIds1.end(),
+                    matchScore, mismatchScore, gapScore,
+                    true, false,    // Free on left
+                    seqanAlignment);
+            } else {
+                seqanAlign(
+                    kmerIds0.begin(), kmerIds0.end(),
+                    kmerIds1.begin(), kmerIds1.end(),
+                    matchScore, mismatchScore, gapScore,
+                    bandMin, bandMax,
+                    true, false,    // Free on left
+                    seqanAlignment);
+            }
             uint32_t ordinal0 = 0;
             uint32_t ordinal1 = 0;
             for(const auto& p: seqanAlignment) {
@@ -467,22 +479,38 @@ void Assembler::alignOrientedReads5(
         bandMax += int64_t(totalBandExtend);
 
         if(html) {
-            html << "<br>Step " << step << " alignment lengths " << kmerIds0.size() << " " << kmerIds1.size() <<
+            html << "<br>Step " << step << ":";
+            html << "<br>Ordinals: " << ordinalA0 << "-" << ordinalB0 << " " << ordinalA1 << "-" << ordinalB1;
+            html << "<br>Alignment lengths " << kmerIds0.size() << " " << kmerIds1.size() <<
                 ", band " << bandMin << " " << bandMax;
         }
 
         // Do the banded alignment.
         vector< pair<bool, bool> > seqanAlignment;
-        const int64_t alignmentScore = seqanAlign(
-            kmerIds0.begin(), kmerIds0.end(),
-            kmerIds1.begin(), kmerIds1.end(),
-            matchScore, mismatchScore, gapScore,
-            bandMin, bandMax,
-            false, false,
-            seqanAlignment);
+        int64_t alignmentScore;
+        if(kmerIds0.size() == 1 or kmerIds1.size() == 1) {
+            // Workaround for a SeqAn bug.
+            // It cannot handle banded alignment if one or both sequences
+            // have length 1. Use non-banded alignment instead.
+            alignmentScore = seqanAlign(
+                kmerIds0.begin(), kmerIds0.end(),
+                kmerIds1.begin(), kmerIds1.end(),
+                matchScore, mismatchScore, gapScore,
+                false, false,
+                seqanAlignment);
+        } else {
+            alignmentScore = seqanAlign(
+                kmerIds0.begin(), kmerIds0.end(),
+                kmerIds1.begin(), kmerIds1.end(),
+                matchScore, mismatchScore, gapScore,
+                bandMin, bandMax,
+                false, false,
+                seqanAlignment);
+        }
         if(html) {
             html << "<br>Alignment score " << alignmentScore;
         }
+        SHASTA_ASSERT(not (alignmentScore == seqan::MinValue<int64_t>::VALUE));
 
         // Add to the alignment the ordinals of matching alignment positions.
         uint32_t ordinal0 = ordinalA0 + 1;
@@ -534,13 +562,25 @@ void Assembler::alignOrientedReads5(
             }
 
             vector< pair<bool, bool> > seqanAlignment;
-            seqanAlign(
-                kmerIds0.begin(), kmerIds0.end(),
-                kmerIds1.begin(), kmerIds1.end(),
-                matchScore, mismatchScore, gapScore,
-                bandMin, bandMax,
-                false, true,    // Free on right
-                seqanAlignment);
+            if(kmerIds0.size() == 1 or kmerIds1.size() == 1) {
+                // Workaround for a SeqAn bug.
+                // It cannot handle banded alignment if one or both sequences
+                // have length 1. Use non-banded alignment instead.
+                seqanAlign(
+                    kmerIds0.begin(), kmerIds0.end(),
+                    kmerIds1.begin(), kmerIds1.end(),
+                    matchScore, mismatchScore, gapScore,
+                    false, true,    // Free on right
+                    seqanAlignment);
+            } else {
+                seqanAlign(
+                    kmerIds0.begin(), kmerIds0.end(),
+                    kmerIds1.begin(), kmerIds1.end(),
+                    matchScore, mismatchScore, gapScore,
+                    bandMin, bandMax,
+                    false, true,    // Free on right
+                    seqanAlignment);
+            }
             uint32_t ordinal0 = ordinalA0;
             uint32_t ordinal1 = ordinalA1;
             for(const auto& p: seqanAlignment) {
