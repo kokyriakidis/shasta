@@ -417,7 +417,7 @@ void Assembler::exploreUndirectedReadGraph(
     BGL_FORALL_EDGES(e, graph, LocalReadGraph) {
         const LocalReadGraphEdge& edge = graph[e];
         if(edge.crossesStrands) {
-            graph[e].color = "Purple";
+            graph[e].color = "Orange";
         }
     }
 
