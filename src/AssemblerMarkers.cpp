@@ -2,6 +2,7 @@
 #include "Assembler.hpp"
 #include "extractKmer.hpp"
 #include "findMarkerId.hpp"
+#include "KmerCounter.hpp"
 #include "MarkerFinder.hpp"
 #include "performanceLog.hpp"
 #include "timestamp.hpp"
@@ -617,3 +618,10 @@ KmerId Assembler::getOrientedReadMarkerKmerId(OrientedReadId orientedReadId, uin
     }
 }
 
+
+
+void Assembler::countKmers(uint64_t threadCount)
+{
+    SHASTA_ASSERT(markers.isOpen());
+    kmerCounter = make_shared<KmerCounter>(assemblerInfo->k, getReads(), markers, *this, threadCount);
+}

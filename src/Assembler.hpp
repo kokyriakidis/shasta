@@ -41,6 +41,7 @@ namespace shasta {
     class Histogram2;
     class InducedAlignment;
     class KmerChecker;
+    class KmerCounter;
     class KmersOptions;
     class LocalAssemblyGraph;
     class LocalAlignmentCandidateGraph;
@@ -552,9 +553,13 @@ private:
     // reverse complemented marker.
     MarkerId findReverseComplement(MarkerId) const;
 
+    // Counting of marker Kmers.
+    shared_ptr<KmerCounter> kmerCounter;
+public:
+    void countKmers(uint64_t threadCount);
+
 
     // Flag palindromic reads.
-public:
     void flagPalindromicReads(
         uint32_t maxSkip,
         uint32_t maxDrift,

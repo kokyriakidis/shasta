@@ -22,7 +22,8 @@ namespace shasta {
     // Remove duplicate elements in a vector and count occurrences of each
     template<class T, class Int> void deduplicateAndCount(
         vector<T>& v,
-        vector<Int>& count)
+        vector<Int>& count,
+        bool alreadySorted = false)
     {
         // Clear the count vector.
         count.clear();
@@ -33,7 +34,9 @@ namespace shasta {
         }
 
         // Sort the vector.
-        sort(v.begin(), v.end());
+        if(not alreadySorted) {
+            sort(v.begin(), v.end());
+        }
 
         // Add elements, keeping track of the number
         // of occurrences of each.

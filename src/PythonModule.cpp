@@ -182,6 +182,9 @@ PYBIND11_MODULE(shasta, shastaModule)
             arg("threadCount") = 0)
         .def("accessSortedMarkers",
             &Assembler::accessSortedMarkers)
+        .def("countKmers",
+            &Assembler::countKmers,
+            arg("threadCount") = 0)
 
 
         // Alignment candidates.
