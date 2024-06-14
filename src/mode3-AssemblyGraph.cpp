@@ -1715,11 +1715,15 @@ AssemblyGraph::Superbubbles::Superbubbles(
         Superbubble& superbubble = getSuperbubble(superbubbleId);
 
         // Find entrances. These are superbubble vertices with in-edges
-        // from outside the superbubble.
+        // from outside the superbubble or average offset up to maxOffset1.
         for(const vertex_descriptor cv0: superbubble) {
             BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
+                uint64_t averageOffset;
+                uint64_t minOffset;
+                uint64_t maxOffset;
+                cGraph.bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
                 const vertex_descriptor cv1 = source(ce, cGraph);
-                if(not isInSuperbubble(superbubbleId, cv1)) {
+                if((not isInSuperbubble(superbubbleId, cv1)) or (averageOffset > maxOffset1)) {
                     superbubble.entrances.push_back(cv0);
                     break;
                 }
@@ -1727,12 +1731,16 @@ AssemblyGraph::Superbubbles::Superbubbles(
         }
 
         // Find exits. These are superbubble vertices with out-edges
-        // to outside the superbubble.
+        // to outside the superbubble or average offset up to maxOffset1.
         vector<vertex_descriptor> exits;
         for(const vertex_descriptor cv0: superbubble) {
             BGL_FORALL_OUTEDGES(cv0, ce, cGraph, AssemblyGraph) {
+                uint64_t averageOffset;
+                uint64_t minOffset;
+                uint64_t maxOffset;
+                cGraph.bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
                 const vertex_descriptor cv1 = target(ce, cGraph);
-                if(not isInSuperbubble(superbubbleId, cv1)) {
+                if((not isInSuperbubble(superbubbleId, cv1)) or (averageOffset > maxOffset1)) {
                     superbubble.exits.push_back(cv0);
                     break;
                 }
@@ -4782,7 +4790,7 @@ bool AssemblyGraph::detangleShortSuperbubbles(
     bool changesWereMade = false;
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
         if(detangleShortSuperbubble(debug,
-            superbubbles, superbubbleId, detangleToleranceLow, detangleToleranceHigh,
+            superbubbles, superbubbleId, maxOffset1, detangleToleranceLow, detangleToleranceHigh,
             useBayesianModel, epsilon, minLogP)) {
             changesWereMade = true;
         }
@@ -4797,6 +4805,7 @@ bool AssemblyGraph::detangleShortSuperbubble(
     bool debug,
     const Superbubbles& superbubbles,
     uint64_t superbubbleId,
+    uint64_t maxOffset1,
     uint64_t detangleToleranceLow,
     uint64_t detangleToleranceHigh,
     bool useBayesianModel,
@@ -4822,14 +4831,22 @@ bool AssemblyGraph::detangleShortSuperbubble(
     vector<edge_descriptor> outEdges;
     for(const vertex_descriptor cv0: superbubble) {
         BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
+            uint64_t averageOffset;
+            uint64_t minOffset;
+            uint64_t maxOffset;
+            cGraph.bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
             const vertex_descriptor cv1 = source(ce, cGraph);
-            if(not superbubbles.isInSuperbubble(superbubbleId, cv1)) {
-                inEdges.push_back(ce);
+            if((not superbubbles.isInSuperbubble(superbubbleId, cv1)) or (averageOffset > maxOffset1)) {
+                 inEdges.push_back(ce);
             }
         }
         BGL_FORALL_OUTEDGES(cv0, ce, cGraph, AssemblyGraph) {
+            uint64_t averageOffset;
+            uint64_t minOffset;
+            uint64_t maxOffset;
+            cGraph.bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
             const vertex_descriptor cv1 = target(ce, cGraph);
-            if(not superbubbles.isInSuperbubble(superbubbleId, cv1)) {
+            if((not superbubbles.isInSuperbubble(superbubbleId, cv1)) or (averageOffset > maxOffset1)) {
                 outEdges.push_back(ce);
             }
         }
@@ -4948,6 +4965,13 @@ bool AssemblyGraph::detangleShortSuperbubble(
     }
 
 
+    // Find out if there are common edges between the inEdges and outEdges.
+    bool inOutEdgesExist = false;
+    for(const edge_descriptor e: inEdges) {
+        if(find(outEdges.begin(), outEdges.end(), e) != outEdges.end()) {
+            inOutEdgesExist = true;
+        }
+    }
 
     // Detangle based on the contents of the tangle matrix.
     if(useBayesianModel and inEdges.size() == 2 and outEdges.size() == 2) {
@@ -4978,29 +5002,147 @@ bool AssemblyGraph::detangleShortSuperbubble(
         if(isInPhase or isOutOfPhase) {
 
             // We can detangle.
+            if(inOutEdgesExist) {
 
-            // Create truncated versions of the inEdges and outEdges.
-            vector<vertex_descriptor> inVertices;
-            for(const edge_descriptor ce: inEdges) {
-                inVertices.push_back(cloneAndTruncateAtEnd(ce));
-            }
-            vector<vertex_descriptor> outVertices;
-            for(const edge_descriptor ce: outEdges) {
-                outVertices.push_back(cloneAndTruncateAtBeginning(ce));
-            }
+                // The special case where there are common edges between the inEdges and the outEdges.
+                if(debug) {
+                    cout << "Special case." << endl;
+                }
 
-            if(isInPhase) {
-                connect(inVertices[0], outVertices[0]);
-                connect(inVertices[1], outVertices[1]);
+                // If both inEdges are also outEdges, don't do anything.
+                if((inEdges[0] == outEdges[0]) and (inEdges[1] == outEdges[1])) {
+                    return false;
+                }
+                if((inEdges[0] == outEdges[1]) and (inEdges[1] == outEdges[0])) {
+                    return false;
+                }
+
+                // To reduce ourselves to the inPhase case, swap the outEdges if necessary.
+                if(isOutOfPhase) {
+                    std::swap(outEdges[0], outEdges[1]);
+                }
+
+
+
+                // So now we know that we are in phase and one of the inEdges is also an outEdge.
+                if(inEdges[0] == outEdges[0]) {
+
+                    // Just connect inEdges[1] to outEdges[1].
+                    const vertex_descriptor cv0 = source(inEdges[1], cGraph);
+                    const vertex_descriptor cv1 = target(outEdges[1], cGraph);
+                    edge_descriptor ceNew;
+                    tie(ceNew, ignore) = add_edge(cv0, cv1, cGraph);
+                    AssemblyGraphEdge& newEdge = cGraph[ceNew];
+                    newEdge.id = nextEdgeId++;
+                    BubbleChain& newBubbleChain = newEdge;
+                    newBubbleChain.resize(1);
+                    Bubble& newBubble = newBubbleChain.front();
+                    newBubble.resize(1);
+                    Chain& newChain = newBubble.front();
+                    const Chain& inChain = cGraph[inEdges[1]].front().front();
+                    const Chain& outChain = cGraph[outEdges[1]].front().front();
+                    copy(inChain.begin(), inChain.end()-1, back_inserter(newChain));
+                    copy(outChain.begin() + 1, outChain.end(), back_inserter(newChain));
+
+                } else if(inEdges[1] == outEdges[1]) {
+
+                    // Just connect inEdges[0] to outEdges[0].
+                    const vertex_descriptor cv0 = source(inEdges[0], cGraph);
+                    const vertex_descriptor cv1 = target(outEdges[0], cGraph);
+                    edge_descriptor ceNew;
+                    tie(ceNew, ignore) = add_edge(cv0, cv1, cGraph);
+                    AssemblyGraphEdge& newEdge = cGraph[ceNew];
+                    newEdge.id = nextEdgeId++;
+                    BubbleChain& newBubbleChain = newEdge;
+                    newBubbleChain.resize(1);
+                    Bubble& newBubble = newBubbleChain.front();
+                    newBubble.resize(1);
+                    Chain& newChain = newBubble.front();
+                    const Chain& inChain = cGraph[inEdges[0]].front().front();
+                    const Chain& outChain = cGraph[outEdges[0]].front().front();
+                    copy(inChain.begin(), inChain.end()-1, back_inserter(newChain));
+                    copy(outChain.begin() + 1, outChain.end(), back_inserter(newChain));
+
+                } else if(inEdges[1] == outEdges[0]) {
+
+                    // Connect inEdges[0] ... outEdges[0]==inEdges[1] ... outEdges[1].
+                    const vertex_descriptor cv0 = source(inEdges[0], cGraph);
+                    const vertex_descriptor cv1 = target(outEdges[1], cGraph);
+                    edge_descriptor ceNew;
+                    tie(ceNew, ignore) = add_edge(cv0, cv1, cGraph);
+                    AssemblyGraphEdge& newEdge = cGraph[ceNew];
+                    newEdge.id = nextEdgeId++;
+                    BubbleChain& newBubbleChain = newEdge;
+                    newBubbleChain.resize(1);
+                    Bubble& newBubble = newBubbleChain.front();
+                    newBubble.resize(1);
+                    Chain& newChain = newBubble.front();
+                    const Chain& inChain = cGraph[inEdges[0]].front().front();
+                    const Chain& middleChain = cGraph[outEdges[0]].front().front();
+                    const Chain& outChain = cGraph[outEdges[1]].front().front();
+                    copy(inChain.begin(), inChain.end()-1, back_inserter(newChain));
+                    copy(middleChain.begin()+1, middleChain.end()-1, back_inserter(newChain));
+                    copy(outChain.begin() + 1, outChain.end(), back_inserter(newChain));
+
+                } else if(inEdges[0] == outEdges[1]) {
+
+                    // Connect inEdges[1] ... outEdges[1]==inEdges[0] ... outEdges[0].
+                    const vertex_descriptor cv0 = source(inEdges[1], cGraph);
+                    const vertex_descriptor cv1 = target(outEdges[0], cGraph);
+                    edge_descriptor ceNew;
+                    tie(ceNew, ignore) = add_edge(cv0, cv1, cGraph);
+                    AssemblyGraphEdge& newEdge = cGraph[ceNew];
+                    newEdge.id = nextEdgeId++;
+                    BubbleChain& newBubbleChain = newEdge;
+                    newBubbleChain.resize(1);
+                    Bubble& newBubble = newBubbleChain.front();
+                    newBubble.resize(1);
+                    Chain& newChain = newBubble.front();
+                    const Chain& inChain = cGraph[inEdges[1]].front().front();
+                    const Chain& middleChain = cGraph[outEdges[1]].front().front();
+                    const Chain& outChain = cGraph[outEdges[0]].front().front();
+                    copy(inChain.begin(), inChain.end()-1, back_inserter(newChain));
+                    copy(middleChain.begin()+1, middleChain.end()-1, back_inserter(newChain));
+                    copy(outChain.begin() + 1, outChain.end(), back_inserter(newChain));
+
+                } else {
+                    SHASTA_ASSERT(0);
+                }
+
+                // Now we can remove all the vertices in the superbubble.
+                for(const vertex_descriptor cv: superbubble) {
+                    clear_vertex(cv, cGraph);
+                    remove_vertex(cv, cGraph);
+                }
+
+
             } else {
-                connect(inVertices[0], outVertices[1]);
-                connect(inVertices[1], outVertices[0]);
-            }
 
-            // Now we can remove all the vertices in the superbubble.
-            for(const vertex_descriptor cv: superbubble) {
-                clear_vertex(cv, cGraph);
-                remove_vertex(cv, cGraph);
+                // The common case where no inEdge is also an outEdge.
+
+                // Create truncated versions of the inEdges and outEdges.
+                vector<vertex_descriptor> inVertices;
+                for(const edge_descriptor ce: inEdges) {
+                    inVertices.push_back(cloneAndTruncateAtEnd(ce));
+                }
+                vector<vertex_descriptor> outVertices;
+                for(const edge_descriptor ce: outEdges) {
+                    outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+                }
+
+                if(isInPhase) {
+                    connect(inVertices[0], outVertices[0]);
+                    connect(inVertices[1], outVertices[1]);
+                } else {
+                    connect(inVertices[0], outVertices[1]);
+                    connect(inVertices[1], outVertices[0]);
+                }
+
+                // Now we can remove all the vertices in the superbubble.
+                for(const vertex_descriptor cv: superbubble) {
+                    clear_vertex(cv, cGraph);
+                    remove_vertex(cv, cGraph);
+                }
             }
 
             return true;
@@ -5018,6 +5160,14 @@ bool AssemblyGraph::detangleShortSuperbubble(
 
 
     // If getting here, we are not using the Bayesian model.
+
+    // If there are inEdges that are also outEdges, don't detangle.
+    if(inOutEdgesExist) {
+        if(debug) {
+            cout << "There are common edges between the inEdges and outEdges." << endl;
+        }
+        return false;
+    }
 
     // Count the number of significant, ambiguous, and negligible elements
     // in the tangle matrix.

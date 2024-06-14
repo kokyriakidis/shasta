@@ -572,6 +572,7 @@ private:
         bool debug,
         const Superbubbles&,
         uint64_t superbubbleId,
+        uint64_t maxOffset1,
         uint64_t detangleToleranceLow,
         uint64_t detangleToleranceHigh,
         bool useBayesianModel,
