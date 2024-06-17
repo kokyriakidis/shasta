@@ -220,6 +220,9 @@ void Assembler::fillServerFunctionTable()
 
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreSummary);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreRead);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreLookupRead);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreReadSequence);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreReadMarkers);
     SHASTA_ADD_TO_FUNCTION_TABLE(blastRead);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreAlignments);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreAlignmentCoverage);
@@ -421,9 +424,21 @@ void Assembler::writeNavigation(ostream& html) const
     writeNavigation(html, "Assembly information", {
         {"Summary", "exploreSummary"},
         });
-    writeNavigation(html, "Reads", {
-        {"Reads", "exploreRead"},
-        });
+
+    if(assemblerInfo->readRepresentation == 1) {
+        // RLE
+        writeNavigation(html, "Reads", {
+            {"Reads", "exploreRead"},
+            });
+    } else {
+        // No RLE.
+        writeNavigation(html, "Reads", {
+            {"Sequence", "exploreReadSequence"},
+            {"Markers", "exploreReadMarkers"},
+            {"Look up a read by name", "exploreLookupRead"},
+            });
+    }
+
     writeNavigation(html, "Alignments", {
         {"Candidate graph", "exploreAlignmentCandidateGraph"},
         {"Stored alignments", "exploreAlignments"},

@@ -283,3 +283,25 @@ uint64_t KmerCounter::getFrequency(KmerId kmerId) const
     SHASTA_ASSERT(0);
     return 0;
 }
+
+
+
+uint64_t KmerCounter::getFrequency(const Kmer& kmer) const
+{
+    const KmerId kmerId = kmer.id(k);
+    const Kmer rcKmer = kmer.reverseComplement(k);
+    const KmerId rcKmerId = rcKmer.id(k);
+    const KmerId canonicalKmerId = min(kmerId, rcKmerId);
+
+    const uint64_t hashValue = MurmurHash64A(&canonicalKmerId, sizeof(canonicalKmerId), hashSeed);
+    const uint64_t bucketId = hashValue & hashMask;
+
+    const auto bucket = kmerIdFrequencies[bucketId];
+
+    for(const auto& p: bucket) {
+        if(p.first == canonicalKmerId) {
+            return p.second;
+        }
+    }
+    return 0;
+}

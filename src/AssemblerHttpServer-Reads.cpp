@@ -1,6 +1,7 @@
 // Shasta.
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
+#include "KmerCounter.hpp"
 #include "orderPairs.hpp"
 #include "Reads.hpp"
 using namespace shasta;
@@ -1133,4 +1134,478 @@ void Assembler::exploreReadRaw(
     html << "</div>";
 
 }
+
+
+
+void Assembler::exploreReadSequence(const vector<string>& request, ostream& html)
+{
+    SHASTA_ASSERT(assemblerInfo->readRepresentation == 0);
+
+    // Get the request parameters.
+    ReadId readId = 0;
+    const bool readIdIsPresent = getParameterValue(request, "readId", readId);
+    Strand strand = 0;
+    const bool strandIsPresent = getParameterValue(request, "strand", strand);
+    uint32_t beginPosition = 0;
+    const bool beginPositionIsPresent = getParameterValue(request, "beginPosition", beginPosition);
+    uint32_t endPosition = 0;
+    const bool endPositionIsPresent = getParameterValue(request, "endPosition", endPosition);
+
+
+    // Write the form.
+    html <<
+        "<form>"
+        "<table>"
+
+        "<tr>"
+        "<th class=left>Numeric read id"
+        "<td><input type=text name=readId" <<
+        (readIdIsPresent ? (" value=" + to_string(readId)) : "") <<
+        " title='Enter a read id between 0 and " << reads->readCount()-1 << "'>"
+
+        "<tr>"
+        "<th class=left>Strand"
+        "<td>";
+    writeStrandSelection(html, "strand", strandIsPresent && strand==0, strandIsPresent && strand==1);
+
+    html <<
+        "<tr>"
+        "<th class=left>Begin position"
+        "<td><input type=text name=beginPosition"
+        " title='Leave blank to begin display at beginning of read.'";
+    if(beginPositionIsPresent) {
+        html << " value=" << beginPosition;
+    }
+    html << ">";
+
+    html <<
+        "<tr>"
+        "<th class=left>End position"
+        "<td><input type=text name=endPosition"
+        " title='Leave blank to end display at end of read.'";
+    if(endPositionIsPresent) {
+        html << " value=" << endPosition;
+    }
+    html << ">";
+
+
+    html <<
+        "</table>"
+        "<input type=submit value='Display'>"
+        "</form>";
+
+    if(not readIdIsPresent) {
+        html << "Specify a numeric read id.";
+        return;
+    }
+
+    // If the strand is missing, stop here.
+    if(not strandIsPresent) {
+        return;
+    }
+
+    // Sanity checks.
+    if(readId >= reads->readCount()) {
+        html << "<p>Invalid read id.";
+        return;
+    }
+    if(strand!=0 && strand!=1) {
+        html << "<p>Invalid strand.";
+        return;
+    }
+
+
+    // Access the read information we need.
+    const OrientedReadId orientedReadId(readId, strand);
+    const auto sequence = reads->getRead(readId);
+    const auto readName = reads->getReadName(readId);
+    const auto metaData = reads->getReadMetaData(readId);
+    const span<const CompressedMarker> orientedReadMarkers = markers[orientedReadId.getValue()];
+
+    // Adjust the position range, if necessary.
+    if(!beginPositionIsPresent) {
+        beginPosition = 0;
+    }
+    if(!endPositionIsPresent) {
+        endPosition = uint32_t(sequence.baseCount);
+    } else {
+        endPosition++; // To include the base at `endPosition`.
+    }
+    if(endPosition <= beginPosition) {
+        html << "<p>Invalid choice of begin and end position.";
+        return;
+    }
+
+
+
+    // Page title.
+    html << "<h2 title='Read " << readId << " on strand " << strand;
+    if(strand == 0) {
+        html << " (input read without reverse complementing)";
+    } else {
+        html << " (reverse complement of input read)";
+    }
+    html << "'>Oriented read " << orientedReadId << "</h2>";
+
+
+
+    // Read information.
+    html << "<table>";
+
+    html << "<tr><th class=left>Read id<td>" << readId;
+
+    html << "<tr><th class=left>Read name<td>";
+    copy(readName.begin(), readName.end(), ostream_iterator<char>(html));
+
+    html << "<tr><th class=left>Read meta data<td>";
+    copy(metaData.begin(), metaData.end(), ostream_iterator<char>(html));
+
+    html << "<tr><th class=left>Length<td>" << sequence.baseCount;
+
+    html << "<tr><th class=left>Length displayed<td>" << endPosition - beginPosition;
+
+    html << "</table>";
+
+
+    // Position scale labels.
+    html << "<p>For precise alignment of the following section, use Firefox to display this page.\n";
+    html << "<p><div style='font-family:Courier New;font-size:10pt;margin:0'>";
+    for(size_t position=beginPosition; position<endPosition; ) {
+        if((position%10)==0) {
+            const string label = to_string(position);
+            html << label;
+            for(size_t i=0; i<10-label.size(); i++) {
+                html << "&nbsp;";
+            }
+            position += 10;
+        } else {
+            html << "&nbsp;";
+            ++position;
+        }
+    }
+    html<< "<br>";
+
+    // Position scale
+    html << "<nobr>";
+    for(size_t position=beginPosition; position<endPosition; position++) {
+        if((position%10)==0) {
+            html << "|";
+        } else if((position%5)==0) {
+            html << "+";
+        } else {
+            html << ".";
+        }
+    }
+    html << "</nobr>";
+    html<< "<br>";
+
+    // Sequence.
+    for(uint64_t position=beginPosition; position!=endPosition; position++) {
+        html << sequence[position];
+    }
+    html<< "<br>";
+
+
+    // Display the markers.
+
+    // If here are no markers, there is nothing to do.
+    if(orientedReadMarkers.empty()) {
+        html << "</div><p>This read has no markers.";
+        return;
+    }
+
+    // Because markers can overlap, we have to display them on more than one row.
+    // This vector will contain, for each row, the list of marker ordinals
+    // to be displayed in this row.
+    vector< vector<uint64_t> > markersByRow;
+
+    const uint64_t k = assemblerInfo->k;
+    for(uint64_t ordinal=0; ordinal<orientedReadMarkers.size(); ordinal++) {
+        const uint64_t position = orientedReadMarkers[ordinal].position;
+
+        // If this marker begins before our beginPosition, it will not be displayed.
+        if(position < beginPosition) {
+            continue;
+        }
+
+        // If this marker ends after our endPosition, it will not be displayed.
+        if(position + k > endPosition) {
+            continue;
+        }
+
+        // Try all rows.
+        for(uint64_t row=0; ; row++) {
+            if(row >= markersByRow.size()) {
+                markersByRow.resize(row + 1);
+            }
+            vector<uint64_t>& markersOnThisRow = markersByRow[row];
+            if(markersOnThisRow.empty() or position > orientedReadMarkers[markersOnThisRow.back()].position + k) {
+                markersOnThisRow.push_back(ordinal);
+                break;
+            }
+        }
+    }
+
+    // Display the markers on each row.
+    for(const vector<uint64_t>&markersOnThisRow: markersByRow) {
+
+        // Loop over the markers on this row.
+        uint64_t oldPosition = 0;
+        for(const uint64_t ordinal: markersOnThisRow) {
+            const CompressedMarker& marker = orientedReadMarkers[ordinal];
+            const uint64_t position = marker.position - beginPosition;
+            const Kmer kmer = getOrientedReadMarkerKmer(orientedReadId, ordinal);
+
+            // Write the required number of spaces.
+            SHASTA_ASSERT((position==0) or (position > oldPosition));  // There must be at least a blank.
+            for(uint64_t i=oldPosition; i<position; i++) {
+                html << "&nbsp;";
+            }
+            oldPosition = position + k;
+
+            // See if this marker is contained in a vertex of the marker graph.
+            MarkerGraph::VertexId vertexId = invalid<MarkerGraph::VertexId>;
+            if(markerGraph.vertexTable.isOpen) {
+                vertexId = getGlobalMarkerGraphVertex(orientedReadId, uint32_t(ordinal));
+                if(vertexId == MarkerGraph::invalidCompressedVertexId) {
+                    vertexId = invalid<MarkerGraph::VertexId>;
+                }
+            }
+
+            if(vertexId != invalid<MarkerGraph::VertexId>) {
+
+                // There is a marker graph vertex.
+                // Write the marker as a link to that vertex.
+                const string url = "exploreMarkerGraph0?vertexId=" + to_string(vertexId) +
+                    "&maxDistance=6&detailed=on&sizePixels=600&timeout=30";
+                html << "<a href='" << url << "' title='Marker " << ordinal <<
+                    ", position " << marker.position <<
+                    ", coverage " << markerGraph.vertexCoverage(vertexId) <<
+                    "'>";
+
+                // Write the k-mer.
+                for(uint64_t i=0; i<k; i++) {
+                    html << kmer[i];
+                }
+                html << "</a>";
+
+            } else {
+
+                // There is no marker graph vertex.
+                // Write this marker as text.
+                html << "<span title='Marker " << ordinal <<
+                    ", position " << marker.position <<
+                    "'>";
+                for(uint64_t i=0; i<k; i++) {
+                    html << kmer[i];
+                }
+                html << "</span>";
+            }
+        }
+        html << "<br>";
+    }
+
+    html << "</div>";
+
+}
+
+
+
+void Assembler::exploreReadMarkers(const vector<string>& request, ostream& html)
+{
+    SHASTA_ASSERT(assemblerInfo->readRepresentation == 0);
+
+    // Get the request parameters.
+    ReadId readId = 0;
+    const bool readIdIsPresent = getParameterValue(request, "readId", readId);
+    Strand strand = 0;
+    const bool strandIsPresent = getParameterValue(request, "strand", strand);
+
+
+    // Write the form.
+    html <<
+        "<form>"
+        "<table>"
+
+        "<tr>"
+        "<th class=left>Numeric read id"
+        "<td><input type=text name=readId" <<
+        (readIdIsPresent ? (" value=" + to_string(readId)) : "") <<
+        " title='Enter a read id between 0 and " << reads->readCount()-1 << "'>"
+
+        "<tr>"
+        "<th class=left>Strand"
+        "<td>";
+    writeStrandSelection(html, "strand", strandIsPresent && strand==0, strandIsPresent && strand==1);
+
+    html <<
+        "</table>"
+        "<input type=submit value='Display'>"
+        "</form>";
+
+    if(not readIdIsPresent) {
+        html << "Specify a numeric read id.";
+        return;
+    }
+
+    // If the strand is missing, stop here.
+    if(not strandIsPresent) {
+        return;
+    }
+
+    // Sanity checks.
+    if(readId >= reads->readCount()) {
+        html << "<p>Invalid read id.";
+        return;
+    }
+    if(strand!=0 && strand!=1) {
+        html << "<p>Invalid strand.";
+        return;
+    }
+
+
+    // Access the read information we need.
+    const OrientedReadId orientedReadId(readId, strand);
+    const auto sequence = reads->getRead(readId);
+    const span<const CompressedMarker> orientedReadMarkers = markers[orientedReadId.getValue()];
+
+
+
+
+    // Page title.
+    html << "<h2 title='Markers of read " << readId << " on strand " << strand;
+    if(strand == 0) {
+        html << " (input read without reverse complementing)";
+    } else {
+        html << " (reverse complement of input read)";
+    }
+    html << "'>Markers of oriented read " << orientedReadId << "</h2>";
+
+    // Write a table with some summary information for the markers of this oriented read.
+    const double readMarkerDensity = double(orientedReadMarkers.size()) / double(sequence.baseCount);
+    const double assemblyMarkerDensity = double(markers.totalSize()) / double(2 * assemblerInfo->baseCount);
+    const uint64_t expectedMarkerCount = uint64_t(std::round(assemblyMarkerDensity * double(sequence.baseCount)));
+    html <<
+        "<table>"
+        "<tr><th class=left>Length in bases<td class=centered>" << sequence.baseCount <<
+        "<tr><th class=left>Number of markers<td class=centered>" << orientedReadMarkers.size() <<
+        "<tr><th class=left>Average marker density for this read<td class=centered>" <<
+        readMarkerDensity <<
+        "<tr><th class=left>Average marker density for this assembly<td class=centered>" <<
+        assemblyMarkerDensity <<
+        "<tr><th class=left width=400>"
+        "Expected number of markers based on average marker density for this assembly<td class=centered>" <<
+        expectedMarkerCount <<
+        "<tr><th class=left>"
+        "Deviation from expected number of markers<td class=centered>" <<
+        int64_t(orientedReadMarkers.size()) - int64_t(expectedMarkerCount) <<
+        "<tr><th class=left>"
+        "Deviation from expected number of markers, relative to "
+        "standard deviation of a Poisson distribution<td class=centered>" <<
+        double(int64_t(orientedReadMarkers.size()) - int64_t(expectedMarkerCount)) /
+        sqrt(double(expectedMarkerCount)) <<
+        "</table>";
+
+
+    // Count k-mers in this oriented read.
+    // Reverse complemented k-mers are considered equivalent.
+    const uint64_t k = assemblerInfo->k;
+    std::map<Kmer, uint64_t> kmerFrequencyMap;
+    for(uint64_t ordinal=0; ordinal<orientedReadMarkers.size(); ordinal++) {
+        const Kmer kmer = getOrientedReadMarkerKmer(orientedReadId, ordinal);
+        const KmerId kmerId = kmer.id(k);
+        const Kmer rcKmer = kmer.reverseComplement(k);
+        const KmerId rcKmerId = rcKmer.id(k);
+        const Kmer canonicalKmer = (kmerId <= rcKmerId) ? kmer : rcKmer;
+        const auto it = kmerFrequencyMap.find(canonicalKmer);
+        if(it == kmerFrequencyMap.end()) {
+            kmerFrequencyMap.insert({canonicalKmer, 1});
+        } else {
+            ++(it->second);
+        }
+    }
+
+
+
+    // Begin the main table containing one row for each marker.
+    html <<
+        "<p><table>"
+        "<tr>"
+        "<th>Marker<br>ordinal"
+        "<th>Begin<br>position"
+        "<th>End<br>position"
+        "<th>Kmer"
+        "<th>Frequency<br>in this read"
+        ;
+
+    if(kmerCounter and kmerCounter->isAvailable()) {
+        html << "<th>Frequency<br>in this assembly";
+    }
+
+
+
+    // Write one row for each marker.
+    for(uint64_t ordinal=0; ordinal<orientedReadMarkers.size(); ordinal++) {
+        const uint64_t position = orientedReadMarkers[ordinal].position;
+        const Kmer kmer = getOrientedReadMarkerKmer(orientedReadId, ordinal);
+        const KmerId kmerId = kmer.id(k);
+        const Kmer rcKmer = kmer.reverseComplement(k);
+        const KmerId rcKmerId = rcKmer.id(k);
+        const Kmer canonicalKmer = (kmerId <= rcKmerId) ? kmer : rcKmer;
+
+        html <<
+            "<tr>"
+            "<td class=centered>" << ordinal <<
+            "<td class=centered>" << position <<
+            "<td class=centered>" << position + k <<
+            "<td class=centered style='font-family:Courier New;'>";
+        kmer.write(html, k);
+
+        // Frequency of this Kmer in this read.
+        html << "<td class=centered>" << kmerFrequencyMap[canonicalKmer];
+
+        // Global frequency of this Kmer.
+        if(kmerCounter and kmerCounter->isAvailable()) {
+            html << "<td class=centered>" << kmerCounter->getFrequency(kmer);
+        }
+
+    }
+
+    html << "</table>";
+
+}
+
+
+
+void Assembler::exploreLookupRead(const vector<string>& request, ostream& html)
+{
+    SHASTA_ASSERT(assemblerInfo->readRepresentation == 0);
+
+    string requestReadName;
+    getParameterValue(request, "readName", requestReadName);
+
+    // Write the form.
+    html <<
+        "<form>"
+        "<table>"
+        "<tr>"
+        "<th class=left>Read name"
+        "<td><input type=text name=readName" <<
+        (requestReadName.empty() ? "" : " value='" + requestReadName + "'") << ">"
+        "</table>"
+        "<input type=submit value='Display'>"
+        "</form>";
+
+    if(not requestReadName.empty()) {
+        const ReadId readId = getReads().getReadId(requestReadName);
+        if(readId == invalidReadId) {
+            html << "A read with that name was not found. See ReadSummary.csv.";
+            return;
+        }
+
+        html << "<br>Read id for this assembly is " << readId;
+    }
+}
+
+
 

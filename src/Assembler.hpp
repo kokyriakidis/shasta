@@ -2172,6 +2172,9 @@ public:
     void exploreRead(const vector<string>&, ostream&);
     void exploreReadRaw(const vector<string>&, ostream&);
     void exploreReadRle(const vector<string>&, ostream&);
+    void exploreLookupRead(const vector<string>&, ostream&);
+    void exploreReadSequence(const vector<string>&, ostream&);
+    void exploreReadMarkers(const vector<string>&, ostream&);
     void blastRead(const vector<string>&, ostream&);
     void exploreAlignmentCandidateGraph(const vector<string>& request, ostream& html);
     void exploreAlignments(const vector<string>&, ostream&);

@@ -4,6 +4,7 @@
 // the number of time a marker KmerId appears in
 // the markers of this assembly.
 
+#include "Kmer.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "MemoryMappedVectorOfVectors.hpp"
 #include "MultithreadedObject.hpp"
@@ -46,6 +47,7 @@ public:
     }
 
     uint64_t getFrequency(KmerId) const;
+    uint64_t getFrequency(const Kmer&) const;
 
 private:
 
