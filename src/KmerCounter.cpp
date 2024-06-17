@@ -14,6 +14,7 @@ template class MultithreadedObject<KmerCounter>;
 
 
 
+// This constructor creates the KmerIdFrequencies hash table.
 KmerCounter::KmerCounter(
     uint64_t k,
     const Reads& reads,
@@ -89,6 +90,25 @@ KmerCounter::KmerCounter(
 
 }
 
+
+
+// This constructor accesses an existing KmerIdFrequencies hash table.
+KmerCounter::KmerCounter(
+    uint64_t k,
+    const Reads& reads,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+    const MappedMemoryOwner& mappedMemoryOwner
+    ) :
+    MultithreadedObject(*this),
+    MappedMemoryOwner(mappedMemoryOwner),
+    k(k),
+    reads(reads),
+    markers(markers)
+{
+    kmerIdFrequencies.accessExistingReadOnly(largeDataName("KmerFrequencies"));
+    const uint64_t bucketCount = kmerIdFrequencies.size();
+    hashMask = bucketCount - 1;
+}
 
 
 void KmerCounter::threadFunction1(uint64_t /* threadId */)
@@ -239,4 +259,27 @@ void KmerCounter::writeHistogram()
         }
     }
 
+}
+
+
+
+uint64_t KmerCounter::getFrequency(KmerId kmerId) const
+{
+    const Kmer kmer(kmerId, k);
+    const Kmer rcKmer = kmer.reverseComplement(k);
+    const KmerId rcKmerId = rcKmer.id(k);
+    const KmerId canonicalKmerId = min(kmerId, rcKmerId);
+
+    const uint64_t hashValue = MurmurHash64A(&canonicalKmerId, sizeof(canonicalKmerId), hashSeed);
+    const uint64_t bucketId = hashValue & hashMask;
+
+    const auto bucket = kmerIdFrequencies[bucketId];
+
+    for(const auto& p: bucket) {
+        if(p.first == canonicalKmerId) {
+            return p.second;
+        }
+    }
+    SHASTA_ASSERT(0);
+    return 0;
 }

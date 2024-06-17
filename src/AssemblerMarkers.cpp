@@ -625,3 +625,10 @@ void Assembler::countKmers(uint64_t threadCount)
     SHASTA_ASSERT(markers.isOpen());
     kmerCounter = make_shared<KmerCounter>(assemblerInfo->k, getReads(), markers, *this, threadCount);
 }
+
+void Assembler::accessKmerCounts()
+{
+    SHASTA_ASSERT(markers.isOpen());
+    kmerCounter = make_shared<KmerCounter>(assemblerInfo->k, getReads(), markers, *this);
+}
+

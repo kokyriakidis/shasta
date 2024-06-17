@@ -557,6 +557,7 @@ private:
     shared_ptr<KmerCounter> kmerCounter;
 public:
     void countKmers(uint64_t threadCount);
+    void accessKmerCounts();
 
 
     // Flag palindromic reads.

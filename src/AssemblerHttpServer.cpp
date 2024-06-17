@@ -611,6 +611,12 @@ void Assembler::accessAllSoft()
     }
 
     try {
+        accessKmerCounts();
+        cout << "Marker k-mer counts are available." << endl;
+    } catch(const exception& e) {
+    }
+
+    try {
         accessAlignmentCandidates();
     } catch(const exception& e) {
         cout << "Alignment candidates are not accessible." << endl;

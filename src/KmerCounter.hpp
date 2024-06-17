@@ -22,6 +22,8 @@ class shasta::KmerCounter :
     public MultithreadedObject<KmerCounter>,
     public MappedMemoryOwner {
 public:
+
+    // This constructor creates the KmerIdFrequencies hash table.
     KmerCounter(
         uint64_t k,
         const Reads&,
@@ -29,6 +31,21 @@ public:
         const MappedMemoryOwner& mappedMemoryOwner,
         uint64_t threadCount
         );
+
+    // This constructor accesses an existing KmerIdFrequencies hash table.
+    KmerCounter(
+        uint64_t k,
+        const Reads&,
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+        const MappedMemoryOwner& mappedMemoryOwner
+        );
+
+    bool isAvailable() const
+    {
+        return kmerIdFrequencies.isOpen();
+    }
+
+    uint64_t getFrequency(KmerId) const;
 
 private:
 
