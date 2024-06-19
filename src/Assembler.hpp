@@ -819,6 +819,17 @@ public:
         AlignmentInfo&,
         ostream& html);
 
+    // Alignment method 6.
+    void alignOrientedReads6(
+        OrientedReadId,
+        OrientedReadId,
+        int matchScore,
+        int mismatchScore,
+        int gapScore,
+        Alignment&,
+        AlignmentInfo&,
+        ostream& html);
+
 private:
 
 
