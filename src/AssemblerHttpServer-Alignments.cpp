@@ -5,6 +5,7 @@
 #include "Align4.hpp"
 #include "AssemblyGraph.hpp"
 #include "Histogram.hpp"
+#include "KmerCounter.hpp"
 #include "LocalAlignmentGraph.hpp"
 #include "LocalAlignmentCandidateGraph.hpp"
 #include "platformDependent.hpp"
@@ -1119,6 +1120,14 @@ void Assembler::exploreAlignment(
     getParameterValue(request, "markersPerPixel", markersPerPixel);
     uint64_t magnifyFactor = 1;
     getParameterValue(request, "magnifyFactor", magnifyFactor);
+
+    string displayMatrixByGlobalFrequencyString;
+    bool displayMatrixByGlobalFrequency = getParameterValue(request, "displayMatrixByGlobalFrequency", displayMatrixByGlobalFrequencyString);
+    uint64_t minGlobalFrequency = 0;
+    getParameterValue(request, "minGlobalFrequency", minGlobalFrequency);
+    uint64_t maxGlobalFrequency = 0;
+    getParameterValue(request, "maxGlobalFrequency", maxGlobalFrequency);
+
     string displayDetailsString;
     bool displayDetails = getParameterValue(request, "displayDetails", displayDetailsString);
     string displayDebugInfoString;
@@ -1171,9 +1180,23 @@ void Assembler::exploreAlignment(
         "<input type=text name=markersPerPixel size=6 value=" << markersPerPixel <<
         "> markers per pixel and with each pixel magnified "
         " <input type=text name=magnifyFactor size=6 value=" << magnifyFactor <<
-        "> times."
+        "> times.";
+
+    if(kmerCounter and kmerCounter->isAvailable()) {
+        html <<
+            "<br><input type=checkbox name=displayMatrixByGlobalFrequency" << (displayMatrixByGlobalFrequency ? " checked=checked" : "") <<
+            "> In the alignment matrix display, don't show the alignment and instead "
+            "only show markers with global frequency in this interval: "
+            "<input type=text name=minGlobalFrequency size=6 value=" << minGlobalFrequency <<
+            "> &le; global frequency &le; "
+            " <input type=text name=maxGlobalFrequency size=6 value=" << maxGlobalFrequency <<
+            ">.";
+    }
+
+    html <<
         "<br><input type=checkbox name=displayDetails" << (displayDetails ? " checked=checked" : "") <<
         "> Display alignment details"
+
         "<br><input type=checkbox name=displayDebugInfo" << (displayDebugInfo ? " checked=checked" : "") <<
         "> Display debug information"
         "</form>";
@@ -1290,6 +1313,10 @@ void Assembler::exploreAlignment(
             alignment,
             markersPerPixel,
             magnifyFactor,
+            displayMatrixByGlobalFrequency,
+            minGlobalFrequency,
+            maxGlobalFrequency,
+            kmerCounter,
             "Alignment.png");
 
         // Create a base64 version of the png file.

@@ -2,6 +2,7 @@
 #include "PngImage.hpp"
 #include "AlignmentGraph.hpp"
 #include "Alignment.hpp"
+#include "KmerCounter.hpp"
 using namespace shasta;
 
 
@@ -131,7 +132,7 @@ void AlignmentGraph::create(
     alignmentInfo.create(alignment, uint32_t(markers[0].size()), uint32_t(markers[1].size()));
 
     if(debug) {
-        writeImage(markers[0], markers[1], alignment, 1, 1, "Alignment.png");
+        writeImage(markers[0], markers[1], alignment, 1, 1, false, 0, 0, 0, "Alignment.png");
     }
 }
 
@@ -501,8 +502,16 @@ void AlignmentGraph::writeImage(
     const Alignment& alignment,
     uint64_t markersPerPixel,
     uint64_t magnifyFactor,
+    bool displayAlignmentMatrixByGlobalFrequency,
+    uint64_t minGlobalFrequency,
+    uint64_t maxGlobalFrequency,
+    const shared_ptr<const KmerCounter>& kmerCounter,
     const string& fileName)
 {
+    if(displayAlignmentMatrixByGlobalFrequency) {
+        SHASTA_ASSERT(kmerCounter);
+        SHASTA_ASSERT(kmerCounter->isAvailable());
+    }
 
     // Create the image, which gets initialized to black.
     const int n0 = int(markers0.size());
@@ -553,14 +562,27 @@ void AlignmentGraph::writeImage(
         for(int i1=0; i1<n1; i1++) {
             const MarkerWithOrdinal& marker1 = markers1[i1];
             if(marker0.kmerId == marker1.kmerId) {
+
+                if(displayAlignmentMatrixByGlobalFrequency) {
+                    const uint64_t globalFrequency = kmerCounter->getFrequency(marker0.kmerId);
+                    if(globalFrequency < minGlobalFrequency) {
+                        continue;
+                    }
+                    if(globalFrequency > maxGlobalFrequency) {
+                        continue;
+                    }
+                }
+
                 image.setPixel(marker0.ordinal/int(markersPerPixel), int(marker1.ordinal/markersPerPixel), 255, 0, 0);
             }
         }
     }
 
     // Write the alignment.
-    for(const auto& p: alignment.ordinals) {
-        image.setPixel(p[0]/int(markersPerPixel), p[1]/int(markersPerPixel), 0, 255, 0);
+    if(not displayAlignmentMatrixByGlobalFrequency) {
+        for(const auto& p: alignment.ordinals) {
+            image.setPixel(p[0]/int(markersPerPixel), p[1]/int(markersPerPixel), 0, 255, 0);
+        }
     }
 
     if(magnifyFactor != 1) {

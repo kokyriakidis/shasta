@@ -25,6 +25,7 @@ To find a good alignment, we find a shortest path in the graph.
 #include "shortestPath.hpp"
 
 // Standard library.
+#include "memory.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
 
@@ -38,6 +39,8 @@ namespace shasta {
         AlignmentGraphEdge>;
     class Alignment;
     class AlignmentInfo;
+
+    class KmerCounter;
 
     // Top level function to compute the marker alignment.
     void align(
@@ -170,6 +173,10 @@ public:
         const Alignment&,
         uint64_t markersPerPixel,
         uint64_t magnifyFactor,
+        bool displayAlignmentMatrixByGlobalFrequency,
+        uint64_t minGlobalFrequency,
+        uint64_t maxGlobalFrequency,
+        const shared_ptr<const KmerCounter>& kmerCounter,
         const string& fileName);
 private:
 
