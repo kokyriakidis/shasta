@@ -17,8 +17,9 @@ void Assembler::alignOrientedReads6(
     ostream& html)
 {
     // EXPOSE WHEN CODE STABILIZES
+    const uint64_t maxLocalFrequency = 1000000000;
     const uint64_t minGlobalFrequency = 10;
-    const uint64_t maxGlobalFrequency = 60;
+    const uint64_t maxGlobalFrequency = 50;
 
     SHASTA_ASSERT(kmerCounter and kmerCounter->isAvailable());
 
@@ -51,7 +52,7 @@ void Assembler::alignOrientedReads6(
 
 
 
-    // Align4 needs markers sorted by KmerId.
+    // Align6 needs markers sorted by KmerId.
     // Use the ones from sortedMarkers if available, or else compute them.
     array<span< pair<KmerId, uint32_t> >, 2> orientedReadSortedMarkersSpans;
     array<vector< pair<KmerId, uint32_t> >, 2> orientedReadSortedMarkers;
@@ -94,8 +95,44 @@ void Assembler::alignOrientedReads6(
         }
     }
 
+
+
+    // Find pairs of markers in the two oriented reads that have the same k-mer
+    // and satisfy the frequency requirements.
+    class MarkerPairInfo {
+    public:
+        uint32_t ordinal0;
+        uint32_t ordinal1;
+        KmerId kmerId;
+        uint64_t globalFrequency;
+        uint64_t localFrequency0;
+        uint64_t localFrequency1;
+        uint64_t ordinalSum() const
+        {
+            return ordinal0 + ordinal1;
+        }
+        int64_t ordinalOffset() const
+        {
+            return int64_t(ordinal0) - int64_t(ordinal1);
+        }
+    };
+    vector<MarkerPairInfo> markerPairInfos;
+
+
+
     if(html) {
-        html << "<table><tr><th>Ordinal0<th>Ordinal1<th>Kmer<th>KmerId<th>Global<br>frequency";
+        html <<
+            "<h3>Marker pairs</h2>"
+            "<table><tr>"
+            "<th>Ordinal0"
+            "<th>Ordinal1"
+            "<th>Ordinal<br>sum"
+            "<th>Ordinal<br>offset"
+            "<th>Kmer"
+            "<th>KmerId"
+            "<th>Local<br>frequency0"
+            "<th>Local<br>frequency1"
+            "<th>Global<br>frequency";
     }
 
 
@@ -133,25 +170,43 @@ void Assembler::alignOrientedReads6(
                 ++it1End;
             }
 
-            // If the global frequency of this k-mer is in the desired range,
+            // If the local global frequencies are in the desired range,
             // loop over pairs in the streaks.
+            const uint64_t localFrequency0 = it0End - it0Begin;
+            const uint64_t localFrequency1 = it1End - it1Begin;
             const uint64_t globalFrequency = kmerCounter->getFrequency(kmerId);
-            if((globalFrequency >= minGlobalFrequency) and (globalFrequency <= maxGlobalFrequency)) {
+            if(
+                (localFrequency0 <= maxLocalFrequency) and
+                (localFrequency1 <= maxLocalFrequency) and
+                (globalFrequency >= minGlobalFrequency) and
+                (globalFrequency <= maxGlobalFrequency)) {
+
+                MarkerPairInfo markerPairInfo;
+                markerPairInfo.kmerId = kmerId;
+                markerPairInfo. globalFrequency = globalFrequency;
+                markerPairInfo.localFrequency0 = localFrequency0;
+                markerPairInfo.localFrequency1 = localFrequency1;
 
                 for(auto jt0=it0Begin; jt0!=it0End; ++jt0) {
-                    const uint32_t ordinal0 = jt0->second;
+                    markerPairInfo. ordinal0 = jt0->second;
                     for(auto jt1=it1Begin; jt1!=it1End; ++jt1) {
-                        const uint32_t ordinal1 = jt1->second;
+                        markerPairInfo.ordinal1 = jt1->second;
+                        markerPairInfos.push_back(markerPairInfo);
+
                         if(html) {
                             html <<
                                 "<tr>"
-                                "<td class=centered>" << ordinal0 <<
-                                "<td class=centered>" << ordinal1 <<
+                                "<td class=centered>" << markerPairInfo.ordinal0 <<
+                                "<td class=centered>" << markerPairInfo.ordinal1 <<
+                                "<td class=centered>" << markerPairInfo.ordinalSum() <<
+                                "<td class=centered>" << markerPairInfo.ordinalOffset() <<
                                 "<td class=centered style='font-family:courier'>";
                             Kmer(kmerId, assemblerInfo->k).write(html, assemblerInfo->k);
 
                             html <<
                                 "<td class=centered>" << kmerId <<
+                                "<td class=centered>" << localFrequency0 <<
+                                "<td class=centered>" << localFrequency1 <<
                                 "<td class=centered>" << globalFrequency;
                         }
                     }
@@ -166,6 +221,40 @@ void Assembler::alignOrientedReads6(
     if(html) {
         html << "</table>";
     }
+
+
+
+    // Create a histogram of ordinal offsets for the active common markers.
+    std::map<int64_t, uint64_t> histogramMap;
+    for(const MarkerPairInfo& markerPairInfo: markerPairInfos) {
+        const int64_t offset = markerPairInfo.ordinalOffset();
+        auto it = histogramMap.find(offset);
+        if(it == histogramMap.end()) {
+            histogramMap.insert({offset, 1});
+        } else {
+            ++it->second;
+        }
+    }
+    vector< pair<int64_t, uint64_t> > histogram;
+    copy(histogramMap.begin(), histogramMap.end(), back_inserter(histogram));
+
+    if(html) {
+        html << "<h3>Histogram of ordinal offsets for the marker pairs</h3>"
+            "<table>"
+            "<tr><th>Ordinal<br>offset<th>Gap to<br>previous<th>Frequency";
+        int64_t previousOffset = invalid<int64_t>;
+        for(const auto& p: histogram) {
+            const int64_t offset = p.first;
+            html << "<tr><td class=centered>" << offset << "<td class=centered>";
+            if(previousOffset != invalid<int64_t>) {
+                html << offset - previousOffset - 1;
+            }
+            html << "<td class=centered>" << p.second;
+            previousOffset = offset;
+        }
+        html << "</table>";
+    }
+
 
     SHASTA_ASSERT(0);
 }
