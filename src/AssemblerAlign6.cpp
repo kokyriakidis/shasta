@@ -20,6 +20,7 @@ void Assembler::alignOrientedReads6(
     const uint64_t maxLocalFrequency = 1000000000;
     const uint64_t minGlobalFrequency = 10;
     const uint64_t maxGlobalFrequency = 50;
+    const double driftRateTolerance = 0.02;
 
     // Get the length of marker k-mers.
     const uint64_t k = assemblerInfo->k;
@@ -126,11 +127,11 @@ void Assembler::alignOrientedReads6(
     // marker pairs. That is, we want to find pairs (ordinal0, ordinal1)
     // such that KmerId(orientedReadId0, ordinal0) == KmerId(orientedReadId1, ordinal1).
     // Do a joint loop over the sorted markers, looking for common markers.
-    vector<MarkerPairInfo> markerPairInfos;
-    auto begin0 = orientedReadSortedMarkersSpans[0].begin();
-    auto begin1 = orientedReadSortedMarkersSpans[1].begin();
-    auto end0 = orientedReadSortedMarkersSpans[0].end();
-    auto end1 = orientedReadSortedMarkersSpans[1].end();
+    vector<MarkerPairInfo> lowFrequencyMarkerPairInfos;
+    const auto begin0 = orientedReadSortedMarkersSpans[0].begin();
+    const auto begin1 = orientedReadSortedMarkersSpans[1].begin();
+    const auto end0 = orientedReadSortedMarkersSpans[0].end();
+    const auto end1 = orientedReadSortedMarkersSpans[1].end();
 
     auto it0 = begin0;
     auto it1 = begin1;
@@ -178,7 +179,7 @@ void Assembler::alignOrientedReads6(
                     markerPairInfo. ordinal0 = jt0->second;
                     for(auto jt1=it1Begin; jt1!=it1End; ++jt1) {
                         markerPairInfo.ordinal1 = jt1->second;
-                        markerPairInfos.push_back(markerPairInfo);
+                        lowFrequencyMarkerPairInfos.push_back(markerPairInfo);
 
                     }
                 }
@@ -190,6 +191,14 @@ void Assembler::alignOrientedReads6(
         }
     }
 
+
+
+    if(lowFrequencyMarkerPairInfos.empty()) {
+        if(html) {
+            html << "<br>No low frequency marker pairs found.";
+        }
+        return;
+    }
 
 
     // Write out the low frequency marker pairs.
@@ -207,7 +216,7 @@ void Assembler::alignOrientedReads6(
             "<th>Local<br>frequency1"
             "<th>Global<br>frequency";
 
-        for(const MarkerPairInfo& markerPairInfo: markerPairInfos) {
+        for(const MarkerPairInfo& markerPairInfo: lowFrequencyMarkerPairInfos) {
             html <<
                 "<tr>"
                 "<td class=centered>" << markerPairInfo.ordinal0 <<
@@ -232,7 +241,7 @@ void Assembler::alignOrientedReads6(
 
     // Create a histogram of ordinal offsets for the low frequency marker pairs.
     std::map<int64_t, uint64_t> histogramMap;
-    for(const MarkerPairInfo& markerPairInfo: markerPairInfos) {
+    for(const MarkerPairInfo& markerPairInfo: lowFrequencyMarkerPairInfos) {
         const int64_t offset = markerPairInfo.ordinalOffset();
         auto it = histogramMap.find(offset);
         if(it == histogramMap.end()) {
@@ -258,6 +267,180 @@ void Assembler::alignOrientedReads6(
             html << "<tr><td class=centered>" << offset;
             html << "<td class=centered>" << frequency;
         }
+        html << "</table>";
+    }
+
+
+
+    // Create a convolution kernel that will be used to get a smoothed version
+    // of the histogram.
+    const uint64_t minLength = min(
+        orientedReadSortedMarkersSpans[0].size(),
+        orientedReadSortedMarkersSpans[1].size());
+    const int64_t kernelWidth = int64_t(std::round(driftRateTolerance * double(minLength)));
+    vector<double> kernel(2 * kernelWidth + 1);
+    for(uint64_t i=0; i<kernel.size(); i++) {
+        const double x = double(int64_t(i) - kernelWidth) / double(kernelWidth);
+        kernel[i] = 1. - fabs(x);
+    }
+
+
+
+    // Write the kernel.
+    if(html) {
+        html <<
+            "<h3>Convolution kernel</h3>"
+            "<table>"
+            "<tr><th>Delta<th>Kernel";
+        for(uint64_t i=0; i<kernel.size(); i++) {
+            html <<
+                "<tr><td class=centered>" << int64_t(i) - kernelWidth <<
+                "<td class=centered>" << kernel[i];
+        }
+        html << "</table>";
+    }
+
+
+
+    // Compute the convolution.
+    const int64_t minHistogramOffset = histogram.front().first;
+    const int64_t maxHistogramOffset = histogram.back().first;
+    const int64_t minDistributionOffset = minHistogramOffset - kernelWidth;
+    const int64_t maxDistributionOffset = maxHistogramOffset + kernelWidth;
+    vector<double> distribution(maxDistributionOffset - minDistributionOffset + 1, 0.);
+    for(const auto& p: histogram) {
+        const int64_t offset = p.first;
+        const uint64_t frequency = p.second;
+        const double weight = double(frequency);
+        for(uint64_t i=0; i<kernel.size(); i++) {
+            const int64_t j = offset + int64_t(i) - kernelWidth - minDistributionOffset;
+            SHASTA_ASSERT(j >= 0);
+            SHASTA_ASSERT(j < int64_t(distribution.size()));
+            distribution[j] += weight * kernel[i];
+        }
+    }
+
+
+
+    // Write the smoothed offset distribution.
+    if(html) {
+        html <<
+            "<h3>Smoothed offset distribution</h3>"
+            "<table>"
+            "<tr><th>Offset<th>Value";
+        for(uint64_t i=0; i<distribution.size(); i++) {
+            const int64_t offset = int64_t(i) + minDistributionOffset;
+            html << "<tr><td class=centered>" << offset <<
+                "<td class=centered>" << distribution[i];
+        }
+        html << "</table>";
+    }
+
+
+
+    // The tentative band is centered at the peak of the smoothed offset distribution.
+    const int64_t tentativeBandCenter =
+        int64_t(std::max_element(distribution.begin(), distribution.end()) - distribution.begin()) + minDistributionOffset;
+    const int64_t tentativeBandLow = tentativeBandCenter - kernelWidth;
+    const int64_t tentativeBandHigh = tentativeBandCenter + kernelWidth;
+    if(html) {
+        html << "<h3>Tentative band</h3>"
+            "Tentative band includes offset " << tentativeBandLow << " through " << tentativeBandHigh <<
+            "<br>Tentative band is centered at " << tentativeBandCenter;
+    }
+
+
+
+    // Gather all marker pairs within this tentative band.
+    vector<MarkerPairInfo> inBandMarkerPairInfos;
+    it0 = begin0;
+    it1 = begin1;
+    while(it0!=end0 && it1!=end1) {
+        if(it0->first < it1->first) {
+            ++it0;
+        } else if(it1->first < it0->first) {
+            ++it1;
+        } else {
+
+            // We found a common KmerId.
+            const KmerId kmerId = it0->first;
+
+            // This KmerId could appear more than once in each of the sequences,
+            // so we need to find the streak of this KmerId.
+            auto it0Begin = it0;
+            auto it1Begin = it1;
+            auto it0End = it0Begin;
+            auto it1End = it1Begin;
+            while(it0End!=end0 && it0End->first == kmerId) {
+                ++it0End;
+            }
+            while(it1End!=end1 && it1End->first == kmerId) {
+                ++it1End;
+            }
+
+            // Loop over pairs in the streaks.
+            const uint64_t localFrequency0 = it0End - it0Begin;
+            const uint64_t localFrequency1 = it1End - it1Begin;
+            const uint64_t globalFrequency = kmerCounter->getFrequency(kmerId);
+
+            MarkerPairInfo markerPairInfo;
+            markerPairInfo.kmerId = kmerId;
+            markerPairInfo. globalFrequency = globalFrequency;
+            markerPairInfo.localFrequency0 = localFrequency0;
+            markerPairInfo.localFrequency1 = localFrequency1;
+
+            for(auto jt0=it0Begin; jt0!=it0End; ++jt0) {
+                markerPairInfo. ordinal0 = jt0->second;
+                for(auto jt1=it1Begin; jt1!=it1End; ++jt1) {
+                    markerPairInfo.ordinal1 = jt1->second;
+                    const int64_t offset = markerPairInfo.ordinalOffset();
+                    if((offset >= tentativeBandLow) and (offset <= tentativeBandHigh)) {
+                        inBandMarkerPairInfos.push_back(markerPairInfo);
+                    }
+                }
+            }
+
+            // Continue the joint loop over KmerId's.
+            it0 = it0End;
+            it1 = it1End;
+        }
+    }
+
+
+
+    // Write out the marker pairs in the tentative band.
+    if(html) {
+        html <<
+            "<h3>Marker pairs in the tentative band</h2>"
+            "<table><tr>"
+            "<th>Ordinal0"
+            "<th>Ordinal1"
+            "<th>Ordinal<br>sum"
+            "<th>Ordinal<br>offset"
+            "<th>Kmer"
+            "<th>KmerId"
+            "<th>Local<br>frequency0"
+            "<th>Local<br>frequency1"
+            "<th>Global<br>frequency";
+
+        for(const MarkerPairInfo& markerPairInfo: inBandMarkerPairInfos) {
+            html <<
+                "<tr>"
+                "<td class=centered>" << markerPairInfo.ordinal0 <<
+                "<td class=centered>" << markerPairInfo.ordinal1 <<
+                "<td class=centered>" << markerPairInfo.ordinalSum() <<
+                "<td class=centered>" << markerPairInfo.ordinalOffset() <<
+                "<td class=centered style='font-family:courier'>";
+
+            Kmer(markerPairInfo.kmerId, k).write(html, k);
+
+            html <<
+                "<td class=centered>" << markerPairInfo.kmerId <<
+                "<td class=centered>" << markerPairInfo.localFrequency0 <<
+                "<td class=centered>" << markerPairInfo.localFrequency1 <<
+                "<td class=centered>" << markerPairInfo.globalFrequency;
+        }
+
         html << "</table>";
     }
 
