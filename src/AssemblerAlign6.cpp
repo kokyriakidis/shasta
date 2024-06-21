@@ -1,14 +1,24 @@
+// Shasta.
 #include "Assembler.hpp"
 #include "KmerCounter.hpp"
 #include "orderPairs.hpp"
 using namespace shasta;
 
+// Boost libraries.
+#include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/connected_components.hpp>
+#include <boost/graph/iteration_macros.hpp>
+
+// Standard library.
+#include "fstream.hpp"
 
 
 // Version that uses banded alignments.
 void Assembler::alignOrientedReads6(
     OrientedReadId orientedReadId0,
     OrientedReadId orientedReadId1,
+    uint64_t maxSkip,
+    uint64_t maxDrift,
     int matchScore,
     int mismatchScore,
     int gapScore,
@@ -118,6 +128,12 @@ void Assembler::alignOrientedReads6(
         int64_t ordinalOffset() const
         {
             return int64_t(ordinal0) - int64_t(ordinal1);
+        }
+
+        // Sort by ordinalSum.
+        bool operator<(const MarkerPairInfo& that) const
+        {
+            return ordinalSum() < that.ordinalSum();
         }
     };
 
@@ -406,13 +422,60 @@ void Assembler::alignOrientedReads6(
         }
     }
 
+    // Sort them by ordinalSum.
+    sort(inBandMarkerPairInfos.begin(), inBandMarkerPairInfos.end());
+
+
+
+    // Create a graph in which each vertex represents a MarkerPairInfo in
+    // the inBandMarkerPairInfos vector, and a directed edge is created
+    // if two MarkerPairInfo are compatible with maxSkip, maxDrift.
+    using Graph = boost::adjacency_list<>;
+    Graph graph(inBandMarkerPairInfos.size());
+    const uint64_t maxOffsetSumDelta = 2 * maxSkip;
+    for(uint64_t v0=0; v0<inBandMarkerPairInfos.size(); v0++) {
+        const MarkerPairInfo& markerPairInfo0 = inBandMarkerPairInfos[v0];
+        const uint64_t ordinalSum0 = markerPairInfo0.ordinalSum();
+        for(uint64_t v1=v0+1; v1<inBandMarkerPairInfos.size(); v1++) {
+            const MarkerPairInfo& markerPairInfo1 = inBandMarkerPairInfos[v1];
+            const uint64_t ordinalSum1 = markerPairInfo1.ordinalSum();
+            if(ordinalSum1 - ordinalSum0 > maxOffsetSumDelta) {
+                break;
+            }
+
+            // Check skip.
+            const uint64_t skip = max(
+                abs(int32_t(markerPairInfo0.ordinal0) - int32_t(markerPairInfo1.ordinal0)),
+                abs(int32_t(markerPairInfo0.ordinal1) - int32_t(markerPairInfo1.ordinal1)));
+            if(skip > maxSkip) {
+                continue;
+            }
+
+            // Check drift.
+            const int64_t offset0 =  markerPairInfo0.ordinalOffset();
+            const int64_t offset1 =  markerPairInfo1.ordinalOffset();
+            const uint64_t drift = labs(offset0 - offset1);
+            if(drift > maxDrift) {
+                continue;
+            }
+
+            // Add the edge.
+            add_edge(v0, v1, graph);
+        }
+    }
+
+    // Compute connected components.
+    vector<uint64_t> component(inBandMarkerPairInfos.size());
+    const uint64_t componentCount = boost::connected_components(graph, &component[0]);
+
 
 
     // Write out the marker pairs in the tentative band.
     if(html) {
         html <<
-            "<h3>Marker pairs in the tentative band</h2>"
+            "<h3>Marker pairs in the tentative band</h3>"
             "<table><tr>"
+            "<th>Id"
             "<th>Ordinal0"
             "<th>Ordinal1"
             "<th>Ordinal<br>sum"
@@ -421,11 +484,14 @@ void Assembler::alignOrientedReads6(
             "<th>KmerId"
             "<th>Local<br>frequency0"
             "<th>Local<br>frequency1"
-            "<th>Global<br>frequency";
+            "<th>Global<br>frequency"
+            "<th>Component";
 
-        for(const MarkerPairInfo& markerPairInfo: inBandMarkerPairInfos) {
+        for(uint64_t i=0; i<inBandMarkerPairInfos.size(); i++) {
+            const MarkerPairInfo& markerPairInfo = inBandMarkerPairInfos[i];
             html <<
                 "<tr>"
+                "<td class=centered>" << i <<
                 "<td class=centered>" << markerPairInfo.ordinal0 <<
                 "<td class=centered>" << markerPairInfo.ordinal1 <<
                 "<td class=centered>" << markerPairInfo.ordinalSum() <<
@@ -438,12 +504,62 @@ void Assembler::alignOrientedReads6(
                 "<td class=centered>" << markerPairInfo.kmerId <<
                 "<td class=centered>" << markerPairInfo.localFrequency0 <<
                 "<td class=centered>" << markerPairInfo.localFrequency1 <<
-                "<td class=centered>" << markerPairInfo.globalFrequency;
+                "<td class=centered>" << markerPairInfo.globalFrequency <<
+                "<td class=centered>" << component[i];
         }
 
         html << "</table>";
     }
 
+
+
+#if 0
+    // Write out the graph.
+    {
+        ofstream dot("Align6.dot");
+        dot << "digraph Align6 {\n";
+        BGL_FORALL_VERTICES(v, graph, Graph) {
+            dot << v << ";\n";
+        }
+        BGL_FORALL_EDGES(e, graph, Graph) {
+            const uint64_t v0 = source(e, graph);
+            const uint64_t v1 = target(e, graph);
+            dot << v0 << "->" << v1 << ";\n";
+        }
+        dot << "}\n";
+    }
+#endif
+
+
+
+    // Count low frequency marker pairs in each connected component.
+    vector<uint64_t> count(componentCount, 0);
+    for(uint64_t i=0; i<inBandMarkerPairInfos.size(); i++) {
+        const MarkerPairInfo& markerPairInfo = inBandMarkerPairInfos[i];
+        if(markerPairInfo.globalFrequency > maxGlobalFrequency) {
+            continue;
+        }
+        if(markerPairInfo.globalFrequency < minGlobalFrequency) {
+            continue;
+        }
+        if(markerPairInfo.localFrequency0 > maxLocalFrequency) {
+            continue;
+        }
+        if(markerPairInfo.localFrequency1 > maxLocalFrequency) {
+            continue;
+        }
+        const uint64_t c = component[i];
+        ++count[c];
+    }
+
+    if(html) {
+        html << "<h3>Number of low frequency marker pairs in each component</h3>"
+            "<table><tr><th>Component<th>Low<br>frequency<br>markers";
+        for(uint64_t c=0; c<componentCount; c++) {
+            html << "<tr><td class=centered>" << c << "<td class=centered>" << count[c];
+        }
+        html << "</table>";
+    }
 
 
     // Missing code.

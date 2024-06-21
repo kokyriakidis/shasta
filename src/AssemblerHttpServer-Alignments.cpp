@@ -1276,6 +1276,7 @@ void Assembler::exploreAlignment(
         ofstream nullStream;
         alignOrientedReads6(
             orientedReadId0, orientedReadId1,
+            maxSkip, maxDrift,
             matchScore, mismatchScore, gapScore,
             alignment, alignmentInfo, displayDebugInfo ? html : nullStream);
     } else {
