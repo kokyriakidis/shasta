@@ -21,6 +21,9 @@ void Assembler::alignOrientedReads6(
     const uint64_t minGlobalFrequency = 10;
     const uint64_t maxGlobalFrequency = 50;
 
+    // Get the length of marker k-mers.
+    const uint64_t k = assemblerInfo->k;
+
     SHASTA_ASSERT(kmerCounter and kmerCounter->isAvailable());
 
     // Get the marker KmerIds for the two oriented reads.
@@ -97,8 +100,8 @@ void Assembler::alignOrientedReads6(
 
 
 
-    // Find pairs of markers in the two oriented reads that have the same k-mer
-    // and satisfy the frequency requirements.
+    // Class to store information about a pair of markers in the
+    // two oriented reads that have the same KmerId.
     class MarkerPairInfo {
     public:
         uint32_t ordinal0;
@@ -116,30 +119,14 @@ void Assembler::alignOrientedReads6(
             return int64_t(ordinal0) - int64_t(ordinal1);
         }
     };
-    vector<MarkerPairInfo> markerPairInfos;
 
 
 
-    if(html) {
-        html <<
-            "<h3>Marker pairs</h2>"
-            "<table><tr>"
-            "<th>Ordinal0"
-            "<th>Ordinal1"
-            "<th>Ordinal<br>sum"
-            "<th>Ordinal<br>offset"
-            "<th>Kmer"
-            "<th>KmerId"
-            "<th>Local<br>frequency0"
-            "<th>Local<br>frequency1"
-            "<th>Global<br>frequency";
-    }
-
-
-    // Joint loop over markers sorted by KmerId to find the non-zero elements of
-    // the alignment matrix. That is, we want to find pairs (ordinal0, ordinal1)
+    // Joint loop over markers sorted by KmerId to find the low frequency
+    // marker pairs. That is, we want to find pairs (ordinal0, ordinal1)
     // such that KmerId(orientedReadId0, ordinal0) == KmerId(orientedReadId1, ordinal1).
-    // Joint loop over the sorted markers, looking for common markers.
+    // Do a joint loop over the sorted markers, looking for common markers.
+    vector<MarkerPairInfo> markerPairInfos;
     auto begin0 = orientedReadSortedMarkersSpans[0].begin();
     auto begin1 = orientedReadSortedMarkersSpans[1].begin();
     auto end0 = orientedReadSortedMarkersSpans[0].end();
@@ -193,22 +180,6 @@ void Assembler::alignOrientedReads6(
                         markerPairInfo.ordinal1 = jt1->second;
                         markerPairInfos.push_back(markerPairInfo);
 
-                        if(html) {
-                            html <<
-                                "<tr>"
-                                "<td class=centered>" << markerPairInfo.ordinal0 <<
-                                "<td class=centered>" << markerPairInfo.ordinal1 <<
-                                "<td class=centered>" << markerPairInfo.ordinalSum() <<
-                                "<td class=centered>" << markerPairInfo.ordinalOffset() <<
-                                "<td class=centered style='font-family:courier'>";
-                            Kmer(kmerId, assemblerInfo->k).write(html, assemblerInfo->k);
-
-                            html <<
-                                "<td class=centered>" << kmerId <<
-                                "<td class=centered>" << localFrequency0 <<
-                                "<td class=centered>" << localFrequency1 <<
-                                "<td class=centered>" << globalFrequency;
-                        }
                     }
                 }
             }
@@ -218,13 +189,48 @@ void Assembler::alignOrientedReads6(
             it1 = it1End;
         }
     }
+
+
+
+    // Write out the low frequency marker pairs.
     if(html) {
+        html <<
+            "<h3>Low frequency marker pairs</h2>"
+            "<table><tr>"
+            "<th>Ordinal0"
+            "<th>Ordinal1"
+            "<th>Ordinal<br>sum"
+            "<th>Ordinal<br>offset"
+            "<th>Kmer"
+            "<th>KmerId"
+            "<th>Local<br>frequency0"
+            "<th>Local<br>frequency1"
+            "<th>Global<br>frequency";
+
+        for(const MarkerPairInfo& markerPairInfo: markerPairInfos) {
+            html <<
+                "<tr>"
+                "<td class=centered>" << markerPairInfo.ordinal0 <<
+                "<td class=centered>" << markerPairInfo.ordinal1 <<
+                "<td class=centered>" << markerPairInfo.ordinalSum() <<
+                "<td class=centered>" << markerPairInfo.ordinalOffset() <<
+                "<td class=centered style='font-family:courier'>";
+
+            Kmer(markerPairInfo.kmerId, k).write(html, k);
+
+            html <<
+                "<td class=centered>" << markerPairInfo.kmerId <<
+                "<td class=centered>" << markerPairInfo.localFrequency0 <<
+                "<td class=centered>" << markerPairInfo.localFrequency1 <<
+                "<td class=centered>" << markerPairInfo.globalFrequency;
+        }
+
         html << "</table>";
     }
 
 
 
-    // Create a histogram of ordinal offsets for the active common markers.
+    // Create a histogram of ordinal offsets for the low frequency marker pairs.
     std::map<int64_t, uint64_t> histogramMap;
     for(const MarkerPairInfo& markerPairInfo: markerPairInfos) {
         const int64_t offset = markerPairInfo.ordinalOffset();
@@ -238,23 +244,26 @@ void Assembler::alignOrientedReads6(
     vector< pair<int64_t, uint64_t> > histogram;
     copy(histogramMap.begin(), histogramMap.end(), back_inserter(histogram));
 
+
+
+    // Write out the histogram.
     if(html) {
-        html << "<h3>Histogram of ordinal offsets for the marker pairs</h3>"
+        html << "<h3>Histogram of ordinal offsets for the low frequency marker pairs</h3>"
             "<table>"
-            "<tr><th>Ordinal<br>offset<th>Gap to<br>previous<th>Frequency";
-        int64_t previousOffset = invalid<int64_t>;
+            "<tr><th>Ordinal<br>offset<th>Frequency";
         for(const auto& p: histogram) {
             const int64_t offset = p.first;
-            html << "<tr><td class=centered>" << offset << "<td class=centered>";
-            if(previousOffset != invalid<int64_t>) {
-                html << offset - previousOffset - 1;
-            }
-            html << "<td class=centered>" << p.second;
-            previousOffset = offset;
+            const uint64_t frequency = p.second;
+
+            html << "<tr><td class=centered>" << offset;
+            html << "<td class=centered>" << frequency;
         }
         html << "</table>";
     }
 
 
-    SHASTA_ASSERT(0);
+
+    // Missing code.
+    const bool missingCode = true;
+    SHASTA_ASSERT(not missingCode);
 }
