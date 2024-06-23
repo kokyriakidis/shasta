@@ -8,6 +8,7 @@ using namespace shasta;
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/iteration_macros.hpp>
+#include <boost/pending/disjoint_sets.hpp>
 
 // Standard library.
 #include "fstream.hpp"
@@ -427,12 +428,16 @@ void Assembler::alignOrientedReads6(
 
 
 
-    // Create a graph in which each vertex represents a MarkerPairInfo in
+    // Create connected components of a graph in which each vertex represents a MarkerPairInfo in
     // the inBandMarkerPairInfos vector, and a directed edge is created
     // if two MarkerPairInfo are compatible with maxSkip, maxDrift.
-    using Graph = boost::adjacency_list<>;
-    Graph graph(inBandMarkerPairInfos.size());
     const uint64_t maxOffsetSumDelta = 2 * maxSkip;
+    vector<uint64_t> rank(inBandMarkerPairInfos.size());
+    vector<uint64_t> parent(inBandMarkerPairInfos.size());
+    boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
+    for(uint64_t v=0; v<inBandMarkerPairInfos.size(); v++) {
+        disjointSets.make_set(v);
+    }
     for(uint64_t v0=0; v0<inBandMarkerPairInfos.size(); v0++) {
         const MarkerPairInfo& markerPairInfo0 = inBandMarkerPairInfos[v0];
         const uint64_t ordinalSum0 = markerPairInfo0.ordinalSum();
@@ -459,14 +464,16 @@ void Assembler::alignOrientedReads6(
                 continue;
             }
 
-            // Add the edge.
-            add_edge(v0, v1, graph);
+            // Update the disjoint sets to take this edge into account.
+            disjointSets.union_set(v0, v1);
         }
     }
 
     // Compute connected components.
     vector<uint64_t> component(inBandMarkerPairInfos.size());
-    const uint64_t componentCount = boost::connected_components(graph, &component[0]);
+    for(uint64_t v=0; v<inBandMarkerPairInfos.size(); v++) {
+        component[v] = disjointSets.find_set(v);
+    }
 
 
 
@@ -513,27 +520,8 @@ void Assembler::alignOrientedReads6(
 
 
 
-#if 0
-    // Write out the graph.
-    {
-        ofstream dot("Align6.dot");
-        dot << "digraph Align6 {\n";
-        BGL_FORALL_VERTICES(v, graph, Graph) {
-            dot << v << ";\n";
-        }
-        BGL_FORALL_EDGES(e, graph, Graph) {
-            const uint64_t v0 = source(e, graph);
-            const uint64_t v1 = target(e, graph);
-            dot << v0 << "->" << v1 << ";\n";
-        }
-        dot << "}\n";
-    }
-#endif
-
-
-
     // Count low frequency marker pairs in each connected component.
-    vector<uint64_t> count(componentCount, 0);
+    vector<uint64_t> count(inBandMarkerPairInfos.size(), 0);
     for(uint64_t i=0; i<inBandMarkerPairInfos.size(); i++) {
         const MarkerPairInfo& markerPairInfo = inBandMarkerPairInfos[i];
         if(markerPairInfo.globalFrequency > maxGlobalFrequency) {
@@ -555,10 +543,19 @@ void Assembler::alignOrientedReads6(
     if(html) {
         html << "<h3>Number of low frequency marker pairs in each component</h3>"
             "<table><tr><th>Component<th>Low<br>frequency<br>markers";
-        for(uint64_t c=0; c<componentCount; c++) {
-            html << "<tr><td class=centered>" << c << "<td class=centered>" << count[c];
+        for(uint64_t c=0; c<inBandMarkerPairInfos.size(); c++) {
+            if(count[c] > 0) {
+                html << "<tr><td class=centered>" << c << "<td class=centered>" << count[c];
+            }
         }
         html << "</table>";
+    }
+
+
+    // Find the connected component with the most low frequency markers.
+    const uint64_t bestComponent = max_element(count.begin(), count.end()) - count.begin();
+    if(html) {
+        html << "<br>Will use marker pairs from component " << bestComponent;
     }
 
 
