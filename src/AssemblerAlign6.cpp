@@ -1,6 +1,7 @@
 // Shasta.
 #include "Assembler.hpp"
 #include "KmerCounter.hpp"
+#include "longestPath.hpp"
 #include "orderPairs.hpp"
 using namespace shasta;
 
@@ -31,7 +32,7 @@ void Assembler::alignOrientedReads6(
     const uint64_t maxLocalFrequency = 1000000000;
     const uint64_t minGlobalFrequency = 10;
     const uint64_t maxGlobalFrequency = 50;
-    const double driftRateTolerance = 0.02;
+    const double driftRateTolerance = 0.05;
 
     // Get the length of marker k-mers.
     const uint64_t k = assemblerInfo->k;
@@ -559,7 +560,115 @@ void Assembler::alignOrientedReads6(
     }
 
 
-    // Missing code.
-    const bool missingCode = true;
-    SHASTA_ASSERT(not missingCode);
+    // Gather the marker pairs in this component.
+    vector<MarkerPairInfo> activeMarkerPairs;
+    for(uint64_t v=0; v<inBandMarkerPairInfos.size(); v++) {
+        if(component[v] == bestComponent) {
+            activeMarkerPairs.push_back(inBandMarkerPairInfos[v]);
+        }
+    }
+
+
+
+    // Write out the active marker pairs.
+    if(html) {
+        html <<
+            "<h3>Active marker pairs</h3>"
+            "<table><tr>"
+            "<th>Id"
+            "<th>Ordinal0"
+            "<th>Ordinal1"
+            "<th>Ordinal<br>sum"
+            "<th>Ordinal<br>offset"
+            "<th>Kmer"
+            "<th>KmerId"
+            "<th>Local<br>frequency0"
+            "<th>Local<br>frequency1"
+            "<th>Global<br>frequency";
+
+        for(uint64_t i=0; i<activeMarkerPairs.size(); i++) {
+            const MarkerPairInfo& markerPairInfo = activeMarkerPairs[i];
+            html <<
+                "<tr>"
+                "<td class=centered>" << i <<
+                "<td class=centered>" << markerPairInfo.ordinal0 <<
+                "<td class=centered>" << markerPairInfo.ordinal1 <<
+                "<td class=centered>" << markerPairInfo.ordinalSum() <<
+                "<td class=centered>" << markerPairInfo.ordinalOffset() <<
+                "<td class=centered style='font-family:courier'>";
+
+            Kmer(markerPairInfo.kmerId, k).write(html, k);
+
+            html <<
+                "<td class=centered>" << markerPairInfo.kmerId <<
+                "<td class=centered>" << markerPairInfo.localFrequency0 <<
+                "<td class=centered>" << markerPairInfo.localFrequency1 <<
+                "<td class=centered>" << markerPairInfo.globalFrequency;
+        }
+
+        html << "</table>";
+    }
+
+
+
+    // Use the active marker pairs to create a directed graph
+    // whose edges correspond to MarkerPairInfos compatible with maxSkip, maxDrift.
+    using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS>;
+    Graph graph(activeMarkerPairs.size());
+    for(uint64_t v0=0; v0<activeMarkerPairs.size(); v0++) {
+        const MarkerPairInfo& markerPairInfo0 = activeMarkerPairs[v0];
+        const uint64_t ordinalSum0 = markerPairInfo0.ordinalSum();
+        for(uint64_t v1=v0+1; v1<activeMarkerPairs.size(); v1++) {
+            const MarkerPairInfo& markerPairInfo1 = activeMarkerPairs[v1];
+            const uint64_t ordinalSum1 = markerPairInfo1.ordinalSum();
+            if(ordinalSum1 - ordinalSum0 > maxOffsetSumDelta) {
+                break;
+            }
+
+            // Check skip.
+            const uint64_t skip = max(
+                abs(int32_t(markerPairInfo0.ordinal0) - int32_t(markerPairInfo1.ordinal0)),
+                abs(int32_t(markerPairInfo0.ordinal1) - int32_t(markerPairInfo1.ordinal1)));
+            if(skip > maxSkip) {
+                continue;
+            }
+
+            // Check drift.
+            const int64_t offset0 =  markerPairInfo0.ordinalOffset();
+            const int64_t offset1 =  markerPairInfo1.ordinalOffset();
+            const uint64_t drift = labs(offset0 - offset1);
+            if(drift > maxDrift) {
+                continue;
+            }
+
+            // Add an edge corresponding to these marker pairs.
+            add_edge(v0, v1, graph);
+        }
+    }
+
+
+    // Conpute the longest path. This gives us the alignment.
+    vector<uint64_t> longestPath;
+    shasta::longestPath(graph, longestPath);
+    if(html) {
+        html << "The longest path uses " << longestPath.size() <<
+            " vertices out of " << activeMarkerPairs.size() << endl;
+    }
+
+    // Create the alignment from the longest path.
+    alignment.clear();
+    for(const uint64_t v:longestPath) {
+        const MarkerPairInfo& markerPairInfo = activeMarkerPairs[v];
+        alignment.ordinals.push_back({markerPairInfo.ordinal0, markerPairInfo.ordinal1});
+    }
+
+
+    // Store the alignment info.
+    alignmentInfo.create(
+        alignment,
+        uint32_t(orientedReadSortedMarkersSpans[0].size()),
+        uint32_t(orientedReadSortedMarkersSpans[1].size()));
+    // alignmentInfo.uniquenessMetric = uniquenessMetric;
+
+
 }
