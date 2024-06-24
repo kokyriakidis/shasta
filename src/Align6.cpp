@@ -14,7 +14,6 @@ using namespace shasta;
 
 // Standard library.
 #include "fstream.hpp"
-#include "vector.hpp"
 
 
 
@@ -26,166 +25,36 @@ Align6::Align6(
     uint64_t maxDrift,
     Alignment& alignment,
     AlignmentInfo& alignmentInfo,
-    ostream& html)
-{
-    // EXPOSE WHEN CODE STABILIZES
-    const uint64_t maxLocalFrequency = 1000000000;
-    const uint64_t minGlobalFrequency = 10;
-    const uint64_t maxGlobalFrequency = 50;
-    const double driftRateTolerance = 0.05;
+    ostream& html) :
 
+    orientedReadSortedMarkersSpans(orientedReadSortedMarkersSpans),
+    k(k),
+    kmerCounter(kmerCounter),
+    maxSkip(maxSkip),
+    maxDrift(maxDrift),
+    alignment(alignment),
+    alignmentInfo(alignmentInfo),
+    html(html)
+{
     // Sanity check.
     SHASTA_ASSERT(kmerCounter.isAvailable());
 
-
-    // Class to store information about a pair of markers in the
-    // two oriented reads that have the same KmerId.
-    class MarkerPairInfo {
-    public:
-        uint32_t ordinal0;
-        uint32_t ordinal1;
-        KmerId kmerId;
-        uint64_t globalFrequency;
-        uint64_t localFrequency0;
-        uint64_t localFrequency1;
-        uint64_t ordinalSum() const
-        {
-            return ordinal0 + ordinal1;
-        }
-        int64_t ordinalOffset() const
-        {
-            return int64_t(ordinal0) - int64_t(ordinal1);
-        }
-
-        // Sort by ordinalSum.
-        bool operator<(const MarkerPairInfo& that) const
-        {
-            return ordinalSum() < that.ordinalSum();
-        }
-    };
-
-
-
-    // Joint loop over markers sorted by KmerId to find the low frequency
-    // marker pairs. That is, we want to find pairs (ordinal0, ordinal1)
-    // such that KmerId(orientedReadId0, ordinal0) == KmerId(orientedReadId1, ordinal1).
-    // Do a joint loop over the sorted markers, looking for common markers.
-    vector<MarkerPairInfo> lowFrequencyMarkerPairInfos;
-    const auto begin0 = orientedReadSortedMarkersSpans[0].begin();
-    const auto begin1 = orientedReadSortedMarkersSpans[1].begin();
-    const auto end0 = orientedReadSortedMarkersSpans[0].end();
-    const auto end1 = orientedReadSortedMarkersSpans[1].end();
-
-    auto it0 = begin0;
-    auto it1 = begin1;
-    while(it0!=end0 && it1!=end1) {
-        if(it0->first < it1->first) {
-            ++it0;
-        } else if(it1->first < it0->first) {
-            ++it1;
-        } else {
-
-            // We found a common KmerId.
-            const KmerId kmerId = it0->first;
-
-            // This KmerId could appear more than once in each of the sequences,
-            // so we need to find the streak of this KmerId.
-            auto it0Begin = it0;
-            auto it1Begin = it1;
-            auto it0End = it0Begin;
-            auto it1End = it1Begin;
-            while(it0End!=end0 && it0End->first == kmerId) {
-                ++it0End;
-            }
-            while(it1End!=end1 && it1End->first == kmerId) {
-                ++it1End;
-            }
-
-            // If the local global frequencies are in the desired range,
-            // loop over pairs in the streaks.
-            const uint64_t localFrequency0 = it0End - it0Begin;
-            const uint64_t localFrequency1 = it1End - it1Begin;
-            const uint64_t globalFrequency = kmerCounter.getFrequency(kmerId);
-            if(
-                (localFrequency0 <= maxLocalFrequency) and
-                (localFrequency1 <= maxLocalFrequency) and
-                (globalFrequency >= minGlobalFrequency) and
-                (globalFrequency <= maxGlobalFrequency)) {
-
-                MarkerPairInfo markerPairInfo;
-                markerPairInfo.kmerId = kmerId;
-                markerPairInfo. globalFrequency = globalFrequency;
-                markerPairInfo.localFrequency0 = localFrequency0;
-                markerPairInfo.localFrequency1 = localFrequency1;
-
-                for(auto jt0=it0Begin; jt0!=it0End; ++jt0) {
-                    markerPairInfo. ordinal0 = jt0->second;
-                    for(auto jt1=it1Begin; jt1!=it1End; ++jt1) {
-                        markerPairInfo.ordinal1 = jt1->second;
-                        lowFrequencyMarkerPairInfos.push_back(markerPairInfo);
-
-                    }
-                }
-            }
-
-            // Continue the joint loop over KmerId's.
-            it0 = it0End;
-            it1 = it1End;
-        }
-    }
-
-
-
-    if(lowFrequencyMarkerPairInfos.empty()) {
+    // Find offsets of the low frequency marker pairs.
+    // If there are two few of them, store an empty alignment and return.
+    computeLowFrequencyMarkerPairOffsets();
+    if(lowFrequencyMarkerPairOffsets.size() < minLowFrequencyCount) {
         if(html) {
-            html << "<br>No low frequency marker pairs found.";
+            html << "<br>Two few low frequency marker pairs found.";
         }
+        storeEmptyAlignment();
         return;
-    }
-
-
-    // Write out the low frequency marker pairs.
-    if(html) {
-        html <<
-            "<h3>Low frequency marker pairs</h2>"
-            "<table><tr>"
-            "<th>Ordinal0"
-            "<th>Ordinal1"
-            "<th>Ordinal<br>sum"
-            "<th>Ordinal<br>offset"
-            "<th>Kmer"
-            "<th>KmerId"
-            "<th>Local<br>frequency0"
-            "<th>Local<br>frequency1"
-            "<th>Global<br>frequency";
-
-        for(const MarkerPairInfo& markerPairInfo: lowFrequencyMarkerPairInfos) {
-            html <<
-                "<tr>"
-                "<td class=centered>" << markerPairInfo.ordinal0 <<
-                "<td class=centered>" << markerPairInfo.ordinal1 <<
-                "<td class=centered>" << markerPairInfo.ordinalSum() <<
-                "<td class=centered>" << markerPairInfo.ordinalOffset() <<
-                "<td class=centered style='font-family:courier'>";
-
-            Kmer(markerPairInfo.kmerId, k).write(html, k);
-
-            html <<
-                "<td class=centered>" << markerPairInfo.kmerId <<
-                "<td class=centered>" << markerPairInfo.localFrequency0 <<
-                "<td class=centered>" << markerPairInfo.localFrequency1 <<
-                "<td class=centered>" << markerPairInfo.globalFrequency;
-        }
-
-        html << "</table>";
     }
 
 
 
     // Create a histogram of ordinal offsets for the low frequency marker pairs.
     std::map<int64_t, uint64_t> histogramMap;
-    for(const MarkerPairInfo& markerPairInfo: lowFrequencyMarkerPairInfos) {
-        const int64_t offset = markerPairInfo.ordinalOffset();
+    for(const int64_t offset: lowFrequencyMarkerPairOffsets) {
         auto it = histogramMap.find(offset);
         if(it == histogramMap.end()) {
             histogramMap.insert({offset, 1});
@@ -281,23 +150,28 @@ Align6::Align6(
 
 
 
-    // The tentative band is centered at the peak of the smoothed offset distribution.
-    const int64_t tentativeBandCenter =
+    // The band is centered at the peak of the smoothed offset distribution.
+    const int64_t bandCenter =
         int64_t(std::max_element(distribution.begin(), distribution.end()) - distribution.begin()) + minDistributionOffset;
-    const int64_t tentativeBandLow = tentativeBandCenter - kernelWidth;
-    const int64_t tentativeBandHigh = tentativeBandCenter + kernelWidth;
+    const int64_t bandLow = bandCenter - kernelWidth;
+    const int64_t bandHigh = bandCenter + kernelWidth;
     if(html) {
-        html << "<h3>Tentative band</h3>"
-            "Tentative band includes offset " << tentativeBandLow << " through " << tentativeBandHigh <<
-            "<br>Tentative band is centered at " << tentativeBandCenter;
+        html << "<h3>Band</h3>"
+            "Band includes offset " << bandLow << " through " << bandHigh <<
+            " and is centered at " << bandCenter;
     }
 
 
 
     // Gather all marker pairs within this tentative band.
     vector<MarkerPairInfo> inBandMarkerPairInfos;
-    it0 = begin0;
-    it1 = begin1;
+    const auto begin0 = orientedReadSortedMarkersSpans[0].begin();
+    const auto begin1 = orientedReadSortedMarkersSpans[1].begin();
+    const auto end0 = orientedReadSortedMarkersSpans[0].end();
+    const auto end1 = orientedReadSortedMarkersSpans[1].end();
+
+    auto it0 = begin0;
+    auto it1 = begin1;
     while(it0!=end0 && it1!=end1) {
         if(it0->first < it1->first) {
             ++it0;
@@ -337,7 +211,7 @@ Align6::Align6(
                 for(auto jt1=it1Begin; jt1!=it1End; ++jt1) {
                     markerPairInfo.ordinal1 = jt1->second;
                     const int64_t offset = markerPairInfo.ordinalOffset();
-                    if((offset >= tentativeBandLow) and (offset <= tentativeBandHigh)) {
+                    if((offset >= bandLow) and (offset <= bandHigh)) {
                         inBandMarkerPairInfos.push_back(markerPairInfo);
                     }
                 }
@@ -596,4 +470,130 @@ Align6::Align6(
     // alignmentInfo.uniquenessMetric = uniquenessMetric;
 
 
+}
+
+
+
+// Find low frequency marker pairs and store their offsets.
+// The low frequency marker pairs consists of pairs (ordinal0, ordinal1)
+// such that KmerId(orientedReadId0, ordinal0) == KmerId(orientedReadId1, ordinal1),
+// and that satisfy the requirements on local and global frequency.
+void Align6::computeLowFrequencyMarkerPairOffsets()
+{
+    lowFrequencyMarkerPairOffsets.clear();
+
+    if(html) {
+        html <<
+            "<h3>Low frequency marker pairs</h2>"
+            "<table><tr>"
+            "<th>Ordinal0"
+            "<th>Ordinal1"
+            "<th>Ordinal<br>sum"
+            "<th>Ordinal<br>offset"
+            "<th>Kmer"
+            "<th>KmerId"
+            "<th>Local<br>frequency0"
+            "<th>Local<br>frequency1"
+            "<th>Global<br>frequency";
+    }
+
+    const auto begin0 = orientedReadSortedMarkersSpans[0].begin();
+    const auto begin1 = orientedReadSortedMarkersSpans[1].begin();
+    const auto end0 = orientedReadSortedMarkersSpans[0].end();
+    const auto end1 = orientedReadSortedMarkersSpans[1].end();
+
+    auto it0 = begin0;
+    auto it1 = begin1;
+    while(it0!=end0 && it1!=end1) {
+        if(it0->first < it1->first) {
+            ++it0;
+        } else if(it1->first < it0->first) {
+            ++it1;
+        } else {
+
+            // We found a common KmerId.
+            const KmerId kmerId = it0->first;
+
+            // This KmerId could appear more than once in each of the sequences,
+            // so we need to find the streak of this KmerId.
+            auto it0Begin = it0;
+            auto it1Begin = it1;
+            auto it0End = it0Begin;
+            auto it1End = it1Begin;
+            while(it0End!=end0 && it0End->first == kmerId) {
+                ++it0End;
+            }
+            while(it1End!=end1 && it1End->first == kmerId) {
+                ++it1End;
+            }
+
+            // If the local global frequencies are in the desired range,
+            // loop over pairs in the streaks.
+            const uint64_t localFrequency0 = it0End - it0Begin;
+            const uint64_t localFrequency1 = it1End - it1Begin;
+            const uint64_t globalFrequency = kmerCounter.getFrequency(kmerId);
+            if(
+                (localFrequency0 <= maxLocalFrequency) and
+                (localFrequency1 <= maxLocalFrequency) and
+                (globalFrequency >= minGlobalFrequency) and
+                (globalFrequency <= maxGlobalFrequency)) {
+
+                MarkerPairInfo markerPairInfo;
+                markerPairInfo.kmerId = kmerId;
+                markerPairInfo. globalFrequency = globalFrequency;
+                markerPairInfo.localFrequency0 = localFrequency0;
+                markerPairInfo.localFrequency1 = localFrequency1;
+
+                for(auto jt0=it0Begin; jt0!=it0End; ++jt0) {
+                    markerPairInfo. ordinal0 = jt0->second;
+                    for(auto jt1=it1Begin; jt1!=it1End; ++jt1) {
+                        markerPairInfo.ordinal1 = jt1->second;
+                        lowFrequencyMarkerPairOffsets.push_back(markerPairInfo.ordinalOffset());
+
+                        if(html) {
+                            html <<
+                                "<tr>"
+                                "<td class=centered>" << markerPairInfo.ordinal0 <<
+                                "<td class=centered>" << markerPairInfo.ordinal1 <<
+                                "<td class=centered>" << markerPairInfo.ordinalSum() <<
+                                "<td class=centered>" << markerPairInfo.ordinalOffset() <<
+                                "<td class=centered style='font-family:courier'>";
+
+                            Kmer(markerPairInfo.kmerId, k).write(html, k);
+
+                            html <<
+                                "<td class=centered>" << markerPairInfo.kmerId <<
+                                "<td class=centered>" << markerPairInfo.localFrequency0 <<
+                                "<td class=centered>" << markerPairInfo.localFrequency1 <<
+                                "<td class=centered>" << markerPairInfo.globalFrequency;
+                        }
+
+                    }
+                }
+            }
+
+            // Continue the joint loop over KmerId's.
+            it0 = it0End;
+            it1 = it1End;
+        }
+    }
+
+    if(html) {
+        html << "</table>";
+    }
+
+}
+
+
+
+// This is called when we give up.
+// Stores an empty alignment and the corresponding AlignmentInfo.
+void Align6::storeEmptyAlignment()
+{
+    alignment.clear();
+    alignmentInfo.create(
+        alignment,
+        uint32_t(orientedReadSortedMarkersSpans[0].size()),
+        uint32_t(orientedReadSortedMarkersSpans[1].size()));
+    alignmentInfo.uniquenessMetric = 0.;
 }
