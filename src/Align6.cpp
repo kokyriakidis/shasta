@@ -39,7 +39,7 @@ Align6::Align6(
     // Sanity check.
     SHASTA_ASSERT(kmerCounter.isAvailable());
 
-    // Find offsets of the low frequency marker pairs.
+    // Find ordinal offsets of the low frequency marker pairs.
     // If there are two few of them, store an empty alignment and return.
     computeLowFrequencyMarkerPairOffsets();
     if(lowFrequencyMarkerPairOffsets.size() < minLowFrequencyCount) {
@@ -50,111 +50,24 @@ Align6::Align6(
         return;
     }
 
-
-
-    // Create a histogram of ordinal offsets for the low frequency marker pairs.
-    std::map<int64_t, uint64_t> histogramMap;
-    for(const int64_t offset: lowFrequencyMarkerPairOffsets) {
-        auto it = histogramMap.find(offset);
-        if(it == histogramMap.end()) {
-            histogramMap.insert({offset, 1});
-        } else {
-            ++it->second;
-        }
-    }
-    vector< pair<int64_t, uint64_t> > histogram;
-    copy(histogramMap.begin(), histogramMap.end(), back_inserter(histogram));
-
-
-
-    // Write out the histogram.
-    if(html) {
-        html << "<h3>Histogram of ordinal offsets for the low frequency marker pairs</h3>"
-            "<table>"
-            "<tr><th>Ordinal<br>offset<th>Frequency";
-        for(const auto& p: histogram) {
-            const int64_t offset = p.first;
-            const uint64_t frequency = p.second;
-
-            html << "<tr><td class=centered>" << offset;
-            html << "<td class=centered>" << frequency;
-        }
-        html << "</table>";
-    }
-
-
+    // Compute a histogram of ordinal offsets of the low frequency marker pairs.
+    computeOffsetHistogram();
 
     // Create a convolution kernel that will be used to get a smoothed version
     // of the histogram.
-    const uint64_t minLength = min(
-        orientedReadSortedMarkersSpans[0].size(),
-        orientedReadSortedMarkersSpans[1].size());
-    const int64_t kernelWidth = int64_t(std::round(driftRateTolerance * double(minLength)));
-    vector<double> kernel(2 * kernelWidth + 1);
-    for(uint64_t i=0; i<kernel.size(); i++) {
-        const double x = double(int64_t(i) - kernelWidth) / double(kernelWidth);
-        kernel[i] = 1. - fabs(x);
-    }
+    createConvolutionKernel();
 
-
-
-    // Write the kernel.
-    if(html) {
-        html <<
-            "<h3>Convolution kernel</h3>"
-            "<table>"
-            "<tr><th>Delta<th>Kernel";
-        for(uint64_t i=0; i<kernel.size(); i++) {
-            html <<
-                "<tr><td class=centered>" << int64_t(i) - kernelWidth <<
-                "<td class=centered>" << kernel[i];
-        }
-        html << "</table>";
-    }
-
-
-
-    // Compute the convolution.
-    const int64_t minHistogramOffset = histogram.front().first;
-    const int64_t maxHistogramOffset = histogram.back().first;
-    const int64_t minDistributionOffset = minHistogramOffset - kernelWidth;
-    const int64_t maxDistributionOffset = maxHistogramOffset + kernelWidth;
-    vector<double> distribution(maxDistributionOffset - minDistributionOffset + 1, 0.);
-    for(const auto& p: histogram) {
-        const int64_t offset = p.first;
-        const uint64_t frequency = p.second;
-        const double weight = double(frequency);
-        for(uint64_t i=0; i<kernel.size(); i++) {
-            const int64_t j = offset + int64_t(i) - kernelWidth - minDistributionOffset;
-            SHASTA_ASSERT(j >= 0);
-            SHASTA_ASSERT(j < int64_t(distribution.size()));
-            distribution[j] += weight * kernel[i];
-        }
-    }
-
-
-
-    // Write the smoothed offset distribution.
-    if(html) {
-        html <<
-            "<h3>Smoothed offset distribution</h3>"
-            "<table>"
-            "<tr><th>Offset<th>Value";
-        for(uint64_t i=0; i<distribution.size(); i++) {
-            const int64_t offset = int64_t(i) + minDistributionOffset;
-            html << "<tr><td class=centered>" << offset <<
-                "<td class=centered>" << distribution[i];
-        }
-        html << "</table>";
-    }
+    // Compute the offset distribution, a smoothed version of the offset histogram.
+    computeOffsetDistribution();
 
 
 
     // The band is centered at the peak of the smoothed offset distribution.
     const int64_t bandCenter =
-        int64_t(std::max_element(distribution.begin(), distribution.end()) - distribution.begin()) + minDistributionOffset;
-    const int64_t bandLow = bandCenter - kernelWidth;
-    const int64_t bandHigh = bandCenter + kernelWidth;
+        int64_t(std::max_element(offsetDistribution.begin(), offsetDistribution.end()) -
+            offsetDistribution.begin()) + minDistributionOffset();
+    const int64_t bandLow = bandCenter - kernelHalfWidth();
+    const int64_t bandHigh = bandCenter + kernelHalfWidth();
     if(html) {
         html << "<h3>Band</h3>"
             "Band includes offset " << bandLow << " through " << bandHigh <<
@@ -596,4 +509,105 @@ void Align6::storeEmptyAlignment()
         uint32_t(orientedReadSortedMarkersSpans[0].size()),
         uint32_t(orientedReadSortedMarkersSpans[1].size()));
     alignmentInfo.uniquenessMetric = 0.;
+}
+
+
+
+// Compute a histogram of ordinal offsets for the low frequency marker pairs.
+void Align6::computeOffsetHistogram()
+{
+    std::map<int64_t, uint64_t> offsetHistogramMap;
+    for(const int64_t offset: lowFrequencyMarkerPairOffsets) {
+        auto it = offsetHistogramMap.find(offset);
+        if(it == offsetHistogramMap.end()) {
+            offsetHistogramMap.insert({offset, 1});
+        } else {
+            ++it->second;
+        }
+    }
+
+    // Copy it to the offsetHistogram vector.
+    offsetHistogram.clear();
+    copy(offsetHistogramMap.begin(), offsetHistogramMap.end(), back_inserter(offsetHistogram));
+
+    // Write out the histogram.
+    if(html) {
+        html << "<h3>Histogram of ordinal offsets for the low frequency marker pairs</h3>"
+            "<table>"
+            "<tr><th>Ordinal<br>offset<th>Frequency";
+        for(const auto& p: offsetHistogram) {
+            const int64_t offset = p.first;
+            const uint64_t frequency = p.second;
+
+            html << "<tr><td class=centered>" << offset;
+            html << "<td class=centered>" << frequency;
+        }
+        html << "</table>";
+    }
+}
+
+
+
+// Create a convolution kernel that will be used to get a smoothed version
+// of the offset histogram.
+void Align6::createConvolutionKernel()
+{
+    // Define the half width of the kernel.
+    const uint64_t minLength = min(
+        orientedReadSortedMarkersSpans[0].size(),
+        orientedReadSortedMarkersSpans[1].size());
+    const int64_t kernelHalfWidth = int64_t(std::round(driftRateTolerance * double(minLength)));
+
+    // Fill the kernel with a linear function that is 1 at 0 and goes to 0 at the edge of the kernel.
+    kernel.resize(2 * kernelHalfWidth + 1);
+    for(uint64_t i=0; i<kernel.size(); i++) {
+        const double x = double(int64_t(i) - kernelHalfWidth) / double(kernelHalfWidth);
+        kernel[i] = 1. - fabs(x);
+    }
+
+    // Write the kernel.
+    if(html) {
+        html <<
+            "<h3>Convolution kernel</h3>"
+            "<table>"
+            "<tr><th>Delta<th>Kernel";
+        for(uint64_t i=0; i<kernel.size(); i++) {
+            html <<
+                "<tr><td class=centered>" << int64_t(i) - kernelHalfWidth <<
+                "<td class=centered>" << kernel[i];
+        }
+        html << "</table>";
+    }
+}
+
+
+
+void Align6::computeOffsetDistribution()
+{
+    offsetDistribution.resize(maxDistributionOffset() - minDistributionOffset() + 1, 0.);
+    for(const auto& p: offsetHistogram) {
+        const int64_t offset = p.first;
+        const uint64_t frequency = p.second;
+        const double weight = double(frequency);
+        for(uint64_t i=0; i<kernel.size(); i++) {
+            const int64_t j = offset + int64_t(i) - kernelHalfWidth() - minDistributionOffset();
+            SHASTA_ASSERT(j >= 0);
+            SHASTA_ASSERT(j < int64_t(offsetDistribution.size()));
+            offsetDistribution[j] += weight * kernel[i];
+        }
+    }
+
+    // Write the smoothed offset distribution.
+    if(html) {
+        html <<
+            "<h3>Smoothed offset distribution</h3>"
+            "<table>"
+            "<tr><th>Offset<th>Value";
+        for(uint64_t i=0; i<offsetDistribution.size(); i++) {
+            const int64_t offset = int64_t(i) + minDistributionOffset();
+            html << "<tr><td class=centered>" << offset <<
+                "<td class=centered>" << offsetDistribution[i];
+        }
+        html << "</table>";
+    }
 }

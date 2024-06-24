@@ -81,12 +81,47 @@ private:
 
 
 
-    // The offsets of the low frequency marker pairs.
+    // The ordinal offsets of the low frequency marker pairs.
     // The low frequency marker pairs consists of pairs (ordinal0, ordinal1)
     // such that KmerId(orientedReadId0, ordinal0) == KmerId(orientedReadId1, ordinal1),
     // and that satisfy the requirements on local and global frequency.
     vector<int64_t> lowFrequencyMarkerPairOffsets;
     void computeLowFrequencyMarkerPairOffsets();
+
+    // Histogram of ordinal offsets for the low frequency marker pairs.
+    // Contains pairs(offset, frequency).
+    vector< pair<int64_t, uint64_t> > offsetHistogram;
+    int64_t minHistogramOffset() const
+    {
+        return offsetHistogram.front().first;
+    }
+    int64_t maxHistogramOffset() const
+    {
+        return offsetHistogram.back().first;
+    }
+    void computeOffsetHistogram();
+
+    // A convolution kernel that will be used to get a smoothed version
+    // of the offset histogram.
+    vector<double> kernel;
+    uint64_t kernelHalfWidth() const
+    {
+        return (kernel.size() - 1) / 2;
+    }
+    void createConvolutionKernel();
+
+    // The offset distribution is a smoothed version of the offset histogram.
+    vector<double> offsetDistribution;
+    int64_t minDistributionOffset() const
+    {
+        return minHistogramOffset() - kernelHalfWidth();
+    }
+    int64_t maxDistributionOffset() const
+    {
+        return maxHistogramOffset() + kernelHalfWidth();
+    }
+    void computeOffsetDistribution();
+
 
     // This is called when we give up.
     // Stores an empty alignment and the corresponding AlignmentInfo.
