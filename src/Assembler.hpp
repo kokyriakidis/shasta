@@ -825,9 +825,6 @@ public:
         OrientedReadId,
         uint64_t maxSkip,
         uint64_t maxDrift,
-        int matchScore,
-        int mismatchScore,
-        int gapScore,
         Alignment&,
         AlignmentInfo&,
         ostream& html);

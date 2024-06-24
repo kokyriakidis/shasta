@@ -21,9 +21,6 @@ void Assembler::alignOrientedReads6(
     OrientedReadId orientedReadId1,
     uint64_t maxSkip,
     uint64_t maxDrift,
-    int matchScore,
-    int mismatchScore,
-    int gapScore,
     Alignment& alignment,
     AlignmentInfo& alignmentInfo,
     ostream& html)
