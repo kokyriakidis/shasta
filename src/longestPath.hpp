@@ -23,7 +23,7 @@ namespace shasta {
 
 // Find the longest path in a directed graph without cycles.
 // Class Graph must be a boost::adjacency_list with
-// the first three template arguments set to <listS, vecS, bidirectionalS>.
+// the first three template arguments set to <does not matter, vecS, bidirectionalS>.
 // If the graph has cycles, this throws boost::not_a_dag.
 // This uses the algorithm described here:
 // https://en.wikipedia.org/wiki/Longest_path_problem#Acyclic_graphs
@@ -38,10 +38,12 @@ template<class Graph> void shasta::longestPath(
 
     // Check the Graph type.
     // Use C++20 concepts instead.
+#if 0
     static_assert(
         std::is_same<typename Graph::out_edge_list_selector, listS>::value,
         "shasta::transitiveReduction requires an adjacency_list "
         "with the first template argument set to boost::listS.");
+#endif
     static_assert(
         std::is_same<typename Graph::vertex_list_selector, vecS>::value,
         "shasta::transitiveReduction requires an adjacency_list "
