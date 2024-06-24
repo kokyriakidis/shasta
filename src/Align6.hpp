@@ -46,6 +46,8 @@ private:
     AlignmentInfo& alignmentInfo;
     ostream& html;
 
+    uint64_t maxOffsetSumDelta;
+
     // CONSTANTS TO BE EXPOSED WHEN CODE STABILIZES.
     const uint64_t maxLocalFrequency = 6;
     const uint64_t minGlobalFrequency = 10;
@@ -122,6 +124,35 @@ private:
     }
     void computeOffsetDistribution();
 
+    // The band computed using the offset distribution.
+    int64_t bandLow;
+    int64_t bandHigh;
+    int64_t bandCenter;
+    void computeBand();
+
+    // The marker pairs in contained in this band.
+    vector<MarkerPairInfo> inBandMarkerPairInfos;
+    void gatherMarkerPairsInBand();
+
+    // Find out if two MarkerPairInfos are compatible with maxSkip and maxDrift.
+    bool canBeConnected(const MarkerPairInfo&, const MarkerPairInfo&) const;
+
+    // Compute connected components of the marker pairs in the band.
+    // Two marker pairs belong to the same component if
+    // their ordinals are compatible with maxSkip and maxDrift.
+    // This vector has one entry for each entry in the
+    // inBandMarkerPairInfos vector.
+    vector<uint64_t> component;
+    void computeComponents();
+
+    // Write the marker pairs in the band and the component they belong to.
+    void writeMarkerPairsInBand();
+
+    // The best component is the one with the most low frequency markers.
+    // The call to findBestComponent() returns the number of low frequency
+    // markers in the best component.
+    uint64_t bestComponent;
+    uint64_t findBestComponent();   \
 
     // This is called when we give up.
     // Stores an empty alignment and the corresponding AlignmentInfo.
