@@ -106,28 +106,8 @@ private:
     }
     void computeOffsetHistogram();
 
-    // A convolution kernel that will be used to get a smoothed version
-    // of the offset histogram.
-    vector<double> kernel;
-    uint64_t kernelHalfWidth() const
-    {
-        return (kernel.size() - 1) / 2;
-    }
-    void createConvolutionKernel();
 
-    // The offset distribution is a smoothed version of the offset histogram.
-    vector<double> offsetDistribution;
-    int64_t minDistributionOffset() const
-    {
-        return minHistogramOffset() - kernelHalfWidth();
-    }
-    int64_t maxDistributionOffset() const
-    {
-        return maxHistogramOffset() + kernelHalfWidth();
-    }
-    void computeOffsetDistribution();
-
-    // The band computed using the offset distribution.
+    // The alignment matrix band that contains the most low frequency marker pairs.
     int64_t bandLow;
     int64_t bandHigh;
     int64_t bandCenter;

@@ -2,6 +2,7 @@
 #include "Align6.hpp"
 #include "Align6Marker.hpp"
 #include "Alignment.hpp"
+#include "invalid.hpp"
 #include "KmerCounter.hpp"
 #include "longestPath.hpp"
 #include "orderPairs.hpp"
@@ -51,14 +52,7 @@ Align6::Align6(
     // Compute a histogram of ordinal offsets of the low frequency marker pairs.
     computeOffsetHistogram();
 
-    // Create a convolution kernel that will be used to get a smoothed version
-    // of the histogram.
-    createConvolutionKernel();
-
-    // Compute the offset distribution, a smoothed version of the offset histogram.
-    computeOffsetDistribution();
-
-    // Use the offset distribution to compute a band.
+    // Band computation.
     computeBand();
 
     // Gather all marker pairs in the band, regardless of frequency.
@@ -249,92 +243,87 @@ void Align6::computeOffsetHistogram()
         }
         html << "</table>";
     }
+
+    lowFrequencyMarkerPairOffsets.clear();
+    lowFrequencyMarkerPairOffsets.shrink_to_fit();
 }
 
 
 
-// Create a convolution kernel that will be used to get a smoothed version
+// Compute a band by finding the maximum of a smoothed version
 // of the offset histogram.
-void Align6::createConvolutionKernel()
+// The smoothing is done implicitly using a triangular kernel.
+// Because we use a triangular kernel, the smoothed offset distribution
+// is piecewise linear.
+void Align6::computeBand()
 {
-    // Define the half width of the kernel.
     const uint64_t minLength = min(
         orientedReadMarkers[0].size(),
         orientedReadMarkers[1].size());
-    const int64_t kernelHalfWidth = int64_t(std::round(driftRateTolerance * double(minLength)));
+    const int64_t kernelHalfWidth =
+        int64_t(std::round(driftRateTolerance * double(minLength)));
 
-    // Fill the kernel with a linear function that is 1 at 0 and goes to 0 at the edge of the kernel.
-    kernel.resize(2 * kernelHalfWidth + 1);
-    for(uint64_t i=0; i<kernel.size(); i++) {
-        const double x = double(int64_t(i) - kernelHalfWidth) / double(kernelHalfWidth);
-        kernel[i] = 1. - fabs(x);
-    }
-
-    // Write the kernel.
-    if(html) {
-        html <<
-            "<h3>Convolution kernel</h3>"
-            "<table>"
-            "<tr><th>Delta<th>Kernel";
-        for(uint64_t i=0; i<kernel.size(); i++) {
-            html <<
-                "<tr><td class=centered>" << int64_t(i) - kernelHalfWidth <<
-                "<td class=centered>" << kernel[i];
-        }
-        html << "</table>";
-    }
-}
-
-
-
-void Align6::computeOffsetDistribution()
-{
-    offsetDistribution.resize(maxDistributionOffset() - minDistributionOffset() + 1, 0.);
+    // Pairs (offset, derivative change).
+    vector< pair<int64_t, int64_t> > derivativeChanges;
     for(const auto& p: offsetHistogram) {
         const int64_t offset = p.first;
-        const uint64_t frequency = p.second;
-        const double weight = double(frequency);
-        for(uint64_t i=0; i<kernel.size(); i++) {
-            const int64_t j = offset + int64_t(i) - kernelHalfWidth() - minDistributionOffset();
-            SHASTA_ASSERT(j >= 0);
-            SHASTA_ASSERT(j < int64_t(offsetDistribution.size()));
-            offsetDistribution[j] += weight * kernel[i];
-        }
+        const int64_t frequency = int64_t(p.second);
+        derivativeChanges.push_back({offset - kernelHalfWidth, frequency});
+        derivativeChanges.push_back({offset, -2 * frequency});
+        derivativeChanges.push_back({offset + kernelHalfWidth, frequency});
     }
+    sort(derivativeChanges.begin(), derivativeChanges.end(), OrderPairsByFirstOnly<int64_t, int64_t>());
 
-    // Write the smoothed offset distribution.
     if(html) {
         html <<
             "<h3>Smoothed offset distribution</h3>"
             "<table>"
             "<tr><th>Offset<th>Value";
-        for(uint64_t i=0; i<offsetDistribution.size(); i++) {
-            const int64_t offset = int64_t(i) + minDistributionOffset();
-            html << "<tr><td class=centered>" << offset <<
-                "<td class=centered>" << offsetDistribution[i];
+    }
+
+    int64_t value = 0;
+    int64_t derivative = 0;
+    int64_t previousOffset = invalid<int64_t>;
+    int64_t bestOffset = invalid<int64_t>;
+    int64_t bestValue = 0;
+    for(const auto& p: derivativeChanges) {
+        const int64_t offset = p.first;
+        const int64_t derivativeChange = p.second;
+        if(previousOffset != invalid<int64_t>) {
+            value += derivative * (offset - previousOffset);
         }
+        derivative += derivativeChange;
+        previousOffset = offset;
+
+        if(value > bestValue) {
+            bestOffset = offset;
+            bestValue = value;
+        }
+
+        if(html) {
+            html << "<tr><td class=centered>" << offset <<
+                "<td class=centered>" << value;
+        }
+
+    }
+
+    if(html) {
         html << "</table>";
     }
-}
 
-
-
-// Use the offset distribution to compute a band.
-void Align6::computeBand()
-{
-    bandCenter =
-        int64_t(std::max_element(offsetDistribution.begin(), offsetDistribution.end()) -
-            offsetDistribution.begin()) + minDistributionOffset();
-    bandLow = bandCenter - kernelHalfWidth();
-    bandHigh = bandCenter + kernelHalfWidth();
+    bandCenter = bestOffset;
+    bandLow = bandCenter - kernelHalfWidth;
+    bandHigh = bandCenter + kernelHalfWidth;
 
     if(html) {
         html << "<h3>Band</h3>"
             "Band includes offset " << bandLow << " through " << bandHigh <<
             " and is centered at " << bandCenter;
     }
-}
 
+    offsetHistogram.clear();
+    offsetHistogram.shrink_to_fit();
+}
 
 
 // Gather all marker pairs in the band, regardless of frequency.
@@ -621,6 +610,11 @@ void Align6::gatherActiveMarkerPairs()
 
         html << "</table>";
     }
+
+    inBandMarkerPairs.clear();
+    inBandMarkerPairs.shrink_to_fit();
+    component.clear();
+    component.shrink_to_fit();
 }
 
 
