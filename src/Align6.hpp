@@ -25,7 +25,7 @@ class shasta::Align6 {
 public:
 
     Align6(
-        const array<span< pair<KmerId, uint32_t> >, 2>& orientedReadSortedMarkersSpans,
+        const array<span< pair<KmerId, uint32_t> >, 2>& orientedReadMarkers,
         uint64_t k,
         const KmerCounter&,
         uint64_t maxSkip,
@@ -37,7 +37,7 @@ public:
 private:
 
     // References/copies for constructor arguments.
-    const array<span< pair<KmerId, uint32_t> >, 2>& orientedReadSortedMarkersSpans;
+    const array<span< pair<KmerId, uint32_t> >, 2>& orientedReadMarkers;
     uint64_t k;
     const KmerCounter& kmerCounter;
     uint64_t maxSkip;
@@ -57,7 +57,9 @@ private:
 
     // Class used to store information about a pair of markers in the
     // two oriented reads that have the same KmerId.
-    class MarkerPairInfo {
+    // This corresponds to an element of the alignment matrix
+    // that is set.
+    class MarkerPair {
     public:
         uint32_t ordinal0;
         uint32_t ordinal1;
@@ -75,7 +77,7 @@ private:
         }
 
         // Sort by ordinalSum.
-        bool operator<(const MarkerPairInfo& that) const
+        bool operator<(const MarkerPair& that) const
         {
             return ordinalSum() < that.ordinalSum();
         }
@@ -131,17 +133,17 @@ private:
     void computeBand();
 
     // The marker pairs in contained in this band.
-    vector<MarkerPairInfo> inBandMarkerPairInfos;
+    vector<MarkerPair> inBandMarkerPairs;
     void gatherMarkerPairsInBand();
 
-    // Find out if two MarkerPairInfos are compatible with maxSkip and maxDrift.
-    bool canBeConnected(const MarkerPairInfo&, const MarkerPairInfo&) const;
+    // Find out if two MarkerPairs can be connected compatibly with maxSkip and maxDrift.
+    bool canBeConnected(const MarkerPair&, const MarkerPair&) const;
 
     // Compute connected components of the marker pairs in the band.
     // Two marker pairs belong to the same component if
     // their ordinals are compatible with maxSkip and maxDrift.
     // This vector has one entry for each entry in the
-    // inBandMarkerPairInfos vector.
+    // inBandMarkerPairs vector.
     vector<uint64_t> component;
     void computeComponents();
 
@@ -152,7 +154,14 @@ private:
     // The call to findBestComponent() returns the number of low frequency
     // markers in the best component.
     uint64_t bestComponent;
-    uint64_t findBestComponent();   \
+    uint64_t findBestComponent();
+
+    // The active marker pairs are the ones  in the best component.
+    vector<MarkerPair> activeMarkerPairs;
+    void gatherActiveMarkerPairs();
+
+    // Use the active marker pairs to compute the alignment.
+    void computeAlignment();
 
     // This is called when we give up.
     // Stores an empty alignment and the corresponding AlignmentInfo.

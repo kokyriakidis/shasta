@@ -18,7 +18,7 @@ using namespace shasta;
 
 
 Align6::Align6(
-    const array<span< pair<KmerId, uint32_t> >, 2>& orientedReadSortedMarkersSpans,
+    const array<span< pair<KmerId, uint32_t> >, 2>& orientedReadMarkers,
     uint64_t k,
     const KmerCounter& kmerCounter,
     uint64_t maxSkip,
@@ -27,7 +27,7 @@ Align6::Align6(
     AlignmentInfo& alignmentInfo,
     ostream& html) :
 
-    orientedReadSortedMarkersSpans(orientedReadSortedMarkersSpans),
+    orientedReadMarkers(orientedReadMarkers),
     k(k),
     kmerCounter(kmerCounter),
     maxSkip(maxSkip),
@@ -85,119 +85,12 @@ Align6::Align6(
         return;
     }
 
+    // Gather the marker pairs in the best component.
+    // These are the ones that will be used to compute the alignment.
+    gatherActiveMarkerPairs();
 
-
-    // Gather the marker pairs in this component.
-    vector<MarkerPairInfo> activeMarkerPairs;
-    for(uint64_t v=0; v<inBandMarkerPairInfos.size(); v++) {
-        if(component[v] == bestComponent) {
-            activeMarkerPairs.push_back(inBandMarkerPairInfos[v]);
-        }
-    }
-
-
-
-    // Write out the active marker pairs.
-    if(html) {
-        html <<
-            "<h3>Active marker pairs</h3>"
-            "<table><tr>"
-            "<th>Id"
-            "<th>Ordinal0"
-            "<th>Ordinal1"
-            "<th>Ordinal<br>sum"
-            "<th>Ordinal<br>offset"
-            "<th>Kmer"
-            "<th>KmerId"
-            "<th>Local<br>frequency0"
-            "<th>Local<br>frequency1"
-            "<th>Global<br>frequency";
-
-        for(uint64_t i=0; i<activeMarkerPairs.size(); i++) {
-            const MarkerPairInfo& markerPairInfo = activeMarkerPairs[i];
-            html <<
-                "<tr>"
-                "<td class=centered>" << i <<
-                "<td class=centered>" << markerPairInfo.ordinal0 <<
-                "<td class=centered>" << markerPairInfo.ordinal1 <<
-                "<td class=centered>" << markerPairInfo.ordinalSum() <<
-                "<td class=centered>" << markerPairInfo.ordinalOffset() <<
-                "<td class=centered style='font-family:courier'>";
-
-            Kmer(markerPairInfo.kmerId, k).write(html, k);
-
-            html <<
-                "<td class=centered>" << markerPairInfo.kmerId <<
-                "<td class=centered>" << markerPairInfo.localFrequency0 <<
-                "<td class=centered>" << markerPairInfo.localFrequency1 <<
-                "<td class=centered>" << markerPairInfo.globalFrequency;
-        }
-
-        html << "</table>";
-    }
-
-
-
-    // Use the active marker pairs to create a directed graph
-    // whose edges correspond to MarkerPairInfos compatible with maxSkip, maxDrift.
-    using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS>;
-    Graph graph(activeMarkerPairs.size());
-    for(uint64_t v0=0; v0<activeMarkerPairs.size(); v0++) {
-        const MarkerPairInfo& markerPairInfo0 = activeMarkerPairs[v0];
-        const uint64_t ordinalSum0 = markerPairInfo0.ordinalSum();
-        for(uint64_t v1=v0+1; v1<activeMarkerPairs.size(); v1++) {
-            const MarkerPairInfo& markerPairInfo1 = activeMarkerPairs[v1];
-            const uint64_t ordinalSum1 = markerPairInfo1.ordinalSum();
-            if(ordinalSum1 - ordinalSum0 > maxOffsetSumDelta) {
-                break;
-            }
-
-            // Check skip.
-            const uint64_t skip = max(
-                abs(int32_t(markerPairInfo0.ordinal0) - int32_t(markerPairInfo1.ordinal0)),
-                abs(int32_t(markerPairInfo0.ordinal1) - int32_t(markerPairInfo1.ordinal1)));
-            if(skip > maxSkip) {
-                continue;
-            }
-
-            // Check drift.
-            const int64_t offset0 =  markerPairInfo0.ordinalOffset();
-            const int64_t offset1 =  markerPairInfo1.ordinalOffset();
-            const uint64_t drift = labs(offset0 - offset1);
-            if(drift > maxDrift) {
-                continue;
-            }
-
-            // Add an edge corresponding to these marker pairs.
-            add_edge(v0, v1, graph);
-        }
-    }
-
-
-    // Conpute the longest path. This gives us the alignment.
-    vector<uint64_t> longestPath;
-    shasta::longestPath(graph, longestPath);
-    if(html) {
-        html << "The longest path uses " << longestPath.size() <<
-            " vertices out of " << activeMarkerPairs.size() << endl;
-    }
-
-    // Create the alignment from the longest path.
-    alignment.clear();
-    for(const uint64_t v:longestPath) {
-        const MarkerPairInfo& markerPairInfo = activeMarkerPairs[v];
-        alignment.ordinals.push_back({markerPairInfo.ordinal0, markerPairInfo.ordinal1});
-    }
-
-
-    // Store the alignment info.
-    alignmentInfo.create(
-        alignment,
-        uint32_t(orientedReadSortedMarkersSpans[0].size()),
-        uint32_t(orientedReadSortedMarkersSpans[1].size()));
-    // alignmentInfo.uniquenessMetric = uniquenessMetric;
-
-
+    // Use the active marker pairs to compute the alignment.
+    computeAlignment();
 }
 
 
@@ -225,10 +118,10 @@ void Align6::computeLowFrequencyMarkerPairOffsets()
             "<th>Global<br>frequency";
     }
 
-    const auto begin0 = orientedReadSortedMarkersSpans[0].begin();
-    const auto begin1 = orientedReadSortedMarkersSpans[1].begin();
-    const auto end0 = orientedReadSortedMarkersSpans[0].end();
-    const auto end1 = orientedReadSortedMarkersSpans[1].end();
+    const auto begin0 = orientedReadMarkers[0].begin();
+    const auto begin1 = orientedReadMarkers[1].begin();
+    const auto end0 = orientedReadMarkers[0].end();
+    const auto end1 = orientedReadMarkers[1].end();
 
     auto it0 = begin0;
     auto it1 = begin1;
@@ -266,34 +159,34 @@ void Align6::computeLowFrequencyMarkerPairOffsets()
                 (globalFrequency >= minGlobalFrequency) and
                 (globalFrequency <= maxGlobalFrequency)) {
 
-                MarkerPairInfo markerPairInfo;
-                markerPairInfo.kmerId = kmerId;
-                markerPairInfo. globalFrequency = globalFrequency;
-                markerPairInfo.localFrequency0 = localFrequency0;
-                markerPairInfo.localFrequency1 = localFrequency1;
+                MarkerPair markerPair;
+                markerPair.kmerId = kmerId;
+                markerPair. globalFrequency = globalFrequency;
+                markerPair.localFrequency0 = localFrequency0;
+                markerPair.localFrequency1 = localFrequency1;
 
                 for(auto jt0=it0Begin; jt0!=it0End; ++jt0) {
-                    markerPairInfo. ordinal0 = jt0->second;
+                    markerPair. ordinal0 = jt0->second;
                     for(auto jt1=it1Begin; jt1!=it1End; ++jt1) {
-                        markerPairInfo.ordinal1 = jt1->second;
-                        lowFrequencyMarkerPairOffsets.push_back(markerPairInfo.ordinalOffset());
+                        markerPair.ordinal1 = jt1->second;
+                        lowFrequencyMarkerPairOffsets.push_back(markerPair.ordinalOffset());
 
                         if(html) {
                             html <<
                                 "<tr>"
-                                "<td class=centered>" << markerPairInfo.ordinal0 <<
-                                "<td class=centered>" << markerPairInfo.ordinal1 <<
-                                "<td class=centered>" << markerPairInfo.ordinalSum() <<
-                                "<td class=centered>" << markerPairInfo.ordinalOffset() <<
+                                "<td class=centered>" << markerPair.ordinal0 <<
+                                "<td class=centered>" << markerPair.ordinal1 <<
+                                "<td class=centered>" << markerPair.ordinalSum() <<
+                                "<td class=centered>" << markerPair.ordinalOffset() <<
                                 "<td class=centered style='font-family:courier'>";
 
-                            Kmer(markerPairInfo.kmerId, k).write(html, k);
+                            Kmer(markerPair.kmerId, k).write(html, k);
 
                             html <<
-                                "<td class=centered>" << markerPairInfo.kmerId <<
-                                "<td class=centered>" << markerPairInfo.localFrequency0 <<
-                                "<td class=centered>" << markerPairInfo.localFrequency1 <<
-                                "<td class=centered>" << markerPairInfo.globalFrequency;
+                                "<td class=centered>" << markerPair.kmerId <<
+                                "<td class=centered>" << markerPair.localFrequency0 <<
+                                "<td class=centered>" << markerPair.localFrequency1 <<
+                                "<td class=centered>" << markerPair.globalFrequency;
                         }
 
                     }
@@ -321,8 +214,8 @@ void Align6::storeEmptyAlignment()
     alignment.clear();
     alignmentInfo.create(
         alignment,
-        uint32_t(orientedReadSortedMarkersSpans[0].size()),
-        uint32_t(orientedReadSortedMarkersSpans[1].size()));
+        uint32_t(orientedReadMarkers[0].size()),
+        uint32_t(orientedReadMarkers[1].size()));
     alignmentInfo.uniquenessMetric = 0.;
 }
 
@@ -369,8 +262,8 @@ void Align6::createConvolutionKernel()
 {
     // Define the half width of the kernel.
     const uint64_t minLength = min(
-        orientedReadSortedMarkersSpans[0].size(),
-        orientedReadSortedMarkersSpans[1].size());
+        orientedReadMarkers[0].size(),
+        orientedReadMarkers[1].size());
     const int64_t kernelHalfWidth = int64_t(std::round(driftRateTolerance * double(minLength)));
 
     // Fill the kernel with a linear function that is 1 at 0 and goes to 0 at the edge of the kernel.
@@ -450,12 +343,12 @@ void Align6::computeBand()
 // Gather all marker pairs in the band, regardless of frequency.
 void Align6::gatherMarkerPairsInBand()
 {
-    inBandMarkerPairInfos.clear();
+    inBandMarkerPairs.clear();
 
-    const auto begin0 = orientedReadSortedMarkersSpans[0].begin();
-    const auto begin1 = orientedReadSortedMarkersSpans[1].begin();
-    const auto end0 = orientedReadSortedMarkersSpans[0].end();
-    const auto end1 = orientedReadSortedMarkersSpans[1].end();
+    const auto begin0 = orientedReadMarkers[0].begin();
+    const auto begin1 = orientedReadMarkers[1].begin();
+    const auto end0 = orientedReadMarkers[0].end();
+    const auto end1 = orientedReadMarkers[1].end();
 
     auto it0 = begin0;
     auto it1 = begin1;
@@ -487,19 +380,19 @@ void Align6::gatherMarkerPairsInBand()
             const uint64_t localFrequency1 = it1End - it1Begin;
             const uint64_t globalFrequency = kmerCounter.getFrequency(kmerId);
 
-            MarkerPairInfo markerPairInfo;
-            markerPairInfo.kmerId = kmerId;
-            markerPairInfo. globalFrequency = globalFrequency;
-            markerPairInfo.localFrequency0 = localFrequency0;
-            markerPairInfo.localFrequency1 = localFrequency1;
+            MarkerPair markerPair;
+            markerPair.kmerId = kmerId;
+            markerPair. globalFrequency = globalFrequency;
+            markerPair.localFrequency0 = localFrequency0;
+            markerPair.localFrequency1 = localFrequency1;
 
             for(auto jt0=it0Begin; jt0!=it0End; ++jt0) {
-                markerPairInfo. ordinal0 = jt0->second;
+                markerPair. ordinal0 = jt0->second;
                 for(auto jt1=it1Begin; jt1!=it1End; ++jt1) {
-                    markerPairInfo.ordinal1 = jt1->second;
-                    const int64_t offset = markerPairInfo.ordinalOffset();
+                    markerPair.ordinal1 = jt1->second;
+                    const int64_t offset = markerPair.ordinalOffset();
                     if((offset >= bandLow) and (offset <= bandHigh)) {
-                        inBandMarkerPairInfos.push_back(markerPairInfo);
+                        inBandMarkerPairs.push_back(markerPair);
                     }
                 }
             }
@@ -511,15 +404,15 @@ void Align6::gatherMarkerPairsInBand()
     }
 
     // Sort them by ordinalSum.
-    sort(inBandMarkerPairInfos.begin(), inBandMarkerPairInfos.end());
+    sort(inBandMarkerPairs.begin(), inBandMarkerPairs.end());
 }
 
 
 
 // Find out if two MarkerPairInfos are compatible with maxSkip and maxDrift.
 bool Align6::canBeConnected(
-    const MarkerPairInfo& markerPairInfo0,
-    const MarkerPairInfo& markerPairInfo1) const
+    const MarkerPair& markerPairInfo0,
+    const MarkerPair& markerPairInfo1) const
 {
 
     // Check skip.
@@ -550,19 +443,19 @@ void Align6::computeComponents()
 {
 
     // Initialize the disjoint sets data structure.
-    vector<uint64_t> rank(inBandMarkerPairInfos.size());
-    vector<uint64_t> parent(inBandMarkerPairInfos.size());
+    vector<uint64_t> rank(inBandMarkerPairs.size());
+    vector<uint64_t> parent(inBandMarkerPairs.size());
     boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
-    for(uint64_t v=0; v<inBandMarkerPairInfos.size(); v++) {
+    for(uint64_t v=0; v<inBandMarkerPairs.size(); v++) {
         disjointSets.make_set(v);
     }
 
     // Loop over pairs of MarkerPairInfos that are possibly compatible with maxSkip and maxDrift.
-    for(uint64_t v0=0; v0<inBandMarkerPairInfos.size(); v0++) {
-        const MarkerPairInfo& markerPairInfo0 = inBandMarkerPairInfos[v0];
+    for(uint64_t v0=0; v0<inBandMarkerPairs.size(); v0++) {
+        const MarkerPair& markerPairInfo0 = inBandMarkerPairs[v0];
         const uint64_t ordinalSum0 = markerPairInfo0.ordinalSum();
-        for(uint64_t v1=v0+1; v1<inBandMarkerPairInfos.size(); v1++) {
-            const MarkerPairInfo& markerPairInfo1 = inBandMarkerPairInfos[v1];
+        for(uint64_t v1=v0+1; v1<inBandMarkerPairs.size(); v1++) {
+            const MarkerPair& markerPairInfo1 = inBandMarkerPairs[v1];
             const uint64_t ordinalSum1 = markerPairInfo1.ordinalSum();
 
             if(ordinalSum1 - ordinalSum0 > maxOffsetSumDelta) {
@@ -578,8 +471,8 @@ void Align6::computeComponents()
     }
 
     // Compute connected components.
-    component.resize(inBandMarkerPairInfos.size());
-    for(uint64_t v=0; v<inBandMarkerPairInfos.size(); v++) {
+    component.resize(inBandMarkerPairs.size());
+    for(uint64_t v=0; v<inBandMarkerPairs.size(); v++) {
         component[v] = disjointSets.find_set(v);
     }
 }
@@ -606,24 +499,24 @@ void Align6::writeMarkerPairsInBand()
             "<th>Global<br>frequency"
             "<th>Component";
 
-        for(uint64_t i=0; i<inBandMarkerPairInfos.size(); i++) {
-            const MarkerPairInfo& markerPairInfo = inBandMarkerPairInfos[i];
+        for(uint64_t i=0; i<inBandMarkerPairs.size(); i++) {
+            const MarkerPair& markerPair = inBandMarkerPairs[i];
             html <<
                 "<tr>"
                 "<td class=centered>" << i <<
-                "<td class=centered>" << markerPairInfo.ordinal0 <<
-                "<td class=centered>" << markerPairInfo.ordinal1 <<
-                "<td class=centered>" << markerPairInfo.ordinalSum() <<
-                "<td class=centered>" << markerPairInfo.ordinalOffset() <<
+                "<td class=centered>" << markerPair.ordinal0 <<
+                "<td class=centered>" << markerPair.ordinal1 <<
+                "<td class=centered>" << markerPair.ordinalSum() <<
+                "<td class=centered>" << markerPair.ordinalOffset() <<
                 "<td class=centered style='font-family:courier'>";
 
-            Kmer(markerPairInfo.kmerId, k).write(html, k);
+            Kmer(markerPair.kmerId, k).write(html, k);
 
             html <<
-                "<td class=centered>" << markerPairInfo.kmerId <<
-                "<td class=centered>" << markerPairInfo.localFrequency0 <<
-                "<td class=centered>" << markerPairInfo.localFrequency1 <<
-                "<td class=centered>" << markerPairInfo.globalFrequency <<
+                "<td class=centered>" << markerPair.kmerId <<
+                "<td class=centered>" << markerPair.localFrequency0 <<
+                "<td class=centered>" << markerPair.localFrequency1 <<
+                "<td class=centered>" << markerPair.globalFrequency <<
                 "<td class=centered>" << component[i];
         }
 
@@ -639,19 +532,19 @@ uint64_t Align6::findBestComponent()
 {
 
     // Count low frequency marker pairs in each connected component.
-    vector<uint64_t> count(inBandMarkerPairInfos.size(), 0);
-    for(uint64_t i=0; i<inBandMarkerPairInfos.size(); i++) {
-        const MarkerPairInfo& markerPairInfo = inBandMarkerPairInfos[i];
-        if(markerPairInfo.globalFrequency > maxGlobalFrequency) {
+    vector<uint64_t> count(inBandMarkerPairs.size(), 0);
+    for(uint64_t i=0; i<inBandMarkerPairs.size(); i++) {
+        const MarkerPair& markerPair = inBandMarkerPairs[i];
+        if(markerPair.globalFrequency > maxGlobalFrequency) {
             continue;
         }
-        if(markerPairInfo.globalFrequency < minGlobalFrequency) {
+        if(markerPair.globalFrequency < minGlobalFrequency) {
             continue;
         }
-        if(markerPairInfo.localFrequency0 > maxLocalFrequency) {
+        if(markerPair.localFrequency0 > maxLocalFrequency) {
             continue;
         }
-        if(markerPairInfo.localFrequency1 > maxLocalFrequency) {
+        if(markerPair.localFrequency1 > maxLocalFrequency) {
             continue;
         }
         const uint64_t c = component[i];
@@ -661,7 +554,7 @@ uint64_t Align6::findBestComponent()
     if(html) {
         html << "<h3>Number of low frequency marker pairs in each component</h3>"
             "<table><tr><th>Component<th>Low<br>frequency<br>markers";
-        for(uint64_t c=0; c<inBandMarkerPairInfos.size(); c++) {
+        for(uint64_t c=0; c<inBandMarkerPairs.size(); c++) {
             if(count[c] > 0) {
                 html << "<tr><td class=centered>" << c << "<td class=centered>" << count[c];
             }
@@ -678,4 +571,113 @@ uint64_t Align6::findBestComponent()
     }
 
     return count[bestComponent];
+}
+
+
+
+// The active marker pairs are the ones  in the best component.
+void Align6::gatherActiveMarkerPairs()
+{
+    activeMarkerPairs.clear();
+
+    for(uint64_t v=0; v<inBandMarkerPairs.size(); v++) {
+        if(component[v] == bestComponent) {
+            activeMarkerPairs.push_back(inBandMarkerPairs[v]);
+        }
+    }
+
+    // Write out the active marker pairs.
+    if(html) {
+        html <<
+            "<h3>Active marker pairs</h3>"
+            "<table><tr>"
+            "<th>Id"
+            "<th>Ordinal0"
+            "<th>Ordinal1"
+            "<th>Ordinal<br>sum"
+            "<th>Ordinal<br>offset"
+            "<th>Kmer"
+            "<th>KmerId"
+            "<th>Local<br>frequency0"
+            "<th>Local<br>frequency1"
+            "<th>Global<br>frequency";
+
+        for(uint64_t i=0; i<activeMarkerPairs.size(); i++) {
+            const MarkerPair& markerPair = activeMarkerPairs[i];
+            html <<
+                "<tr>"
+                "<td class=centered>" << i <<
+                "<td class=centered>" << markerPair.ordinal0 <<
+                "<td class=centered>" << markerPair.ordinal1 <<
+                "<td class=centered>" << markerPair.ordinalSum() <<
+                "<td class=centered>" << markerPair.ordinalOffset() <<
+                "<td class=centered style='font-family:courier'>";
+
+            Kmer(markerPair.kmerId, k).write(html, k);
+
+            html <<
+                "<td class=centered>" << markerPair.kmerId <<
+                "<td class=centered>" << markerPair.localFrequency0 <<
+                "<td class=centered>" << markerPair.localFrequency1 <<
+                "<td class=centered>" << markerPair.globalFrequency;
+        }
+
+        html << "</table>";
+    }
+}
+
+
+
+// Use the active marker pairs to compute the alignment.
+void Align6::computeAlignment()
+{
+    // Use the active marker pairs to create a directed graph
+    // whose edges correspond to MarkerPairInfos compatible with maxSkip, maxDrift.
+    using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS>;
+    Graph graph(activeMarkerPairs.size());
+
+    for(uint64_t v0=0; v0<activeMarkerPairs.size(); v0++) {
+        const MarkerPair& markerPairInfo0 = activeMarkerPairs[v0];
+        const uint64_t ordinalSum0 = markerPairInfo0.ordinalSum();
+
+        for(uint64_t v1=v0+1; v1<activeMarkerPairs.size(); v1++) {
+            const MarkerPair& markerPairInfo1 = activeMarkerPairs[v1];
+
+            const uint64_t ordinalSum1 = markerPairInfo1.ordinalSum();
+            if(ordinalSum1 - ordinalSum0 > maxOffsetSumDelta) {
+                break;
+            }
+
+            // If these two MarkerPair are compatible with maxSkip, maxDrift,
+            // Add an edge corresponding to these marker pairs.
+            if(canBeConnected(markerPairInfo0, markerPairInfo1)) {
+                add_edge(v0, v1, graph);
+            }
+        }
+    }
+
+
+
+    // Compute the longest path. This gives us the alignment.
+    vector<uint64_t> longestPath;
+    shasta::longestPath(graph, longestPath);
+    if(html) {
+        html << "The longest path uses " << longestPath.size() <<
+            " vertices out of " << activeMarkerPairs.size() << endl;
+    }
+
+    // Create the alignment from the longest path.
+    alignment.clear();
+    for(const uint64_t v:longestPath) {
+        const MarkerPair& markerPair = activeMarkerPairs[v];
+        alignment.ordinals.push_back({markerPair.ordinal0, markerPair.ordinal1});
+    }
+
+
+    // Store the alignment info.
+    alignmentInfo.create(
+        alignment,
+        uint32_t(orientedReadMarkers[0].size()),
+        uint32_t(orientedReadMarkers[1].size()));
+    // alignmentInfo.uniquenessMetric = uniquenessMetric;
 }
