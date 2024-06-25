@@ -21,7 +21,6 @@ using namespace shasta;
 Align6::Align6(
     const array<span<Align6Marker>, 2>& orientedReadMarkers,
     uint64_t k,
-    const KmerCounter& kmerCounter,
     uint64_t maxSkip,
     uint64_t maxDrift,
     Alignment& alignment,
@@ -30,7 +29,6 @@ Align6::Align6(
 
     orientedReadMarkers(orientedReadMarkers),
     k(k),
-    kmerCounter(kmerCounter),
     maxSkip(maxSkip),
     maxDrift(maxDrift),
     alignment(alignment),
@@ -38,8 +36,6 @@ Align6::Align6(
     html(html),
     maxOffsetSumDelta(2 * maxSkip)
 {
-    // Sanity check.
-    SHASTA_ASSERT(kmerCounter.isAvailable());
 
     // Find ordinal offsets of the low frequency marker pairs.
     // If there are two few of them, store an empty alignment and return.
@@ -135,6 +131,7 @@ void Align6::computeLowFrequencyMarkerPairOffsets()
 
             // We found a common KmerId.
             const KmerId kmerId = it0->kmerId;
+            const uint64_t globalFrequency = it0->globalFrequency;
 
             // This KmerId could appear more than once in each of the sequences,
             // so we need to find the streak of this KmerId.
@@ -153,7 +150,6 @@ void Align6::computeLowFrequencyMarkerPairOffsets()
             // loop over pairs in the streaks.
             const uint64_t localFrequency0 = it0End - it0Begin;
             const uint64_t localFrequency1 = it1End - it1Begin;
-            const uint64_t globalFrequency = kmerCounter.getFrequency(kmerId);
             if(
                 (localFrequency0 <= maxLocalFrequency) and
                 (localFrequency1 <= maxLocalFrequency) and
@@ -362,6 +358,7 @@ void Align6::gatherMarkerPairsInBand()
 
             // We found a common KmerId.
             const KmerId kmerId = it0->kmerId;
+            const uint64_t globalFrequency = it0->globalFrequency;
 
             // This KmerId could appear more than once in each of the sequences,
             // so we need to find the streak of this KmerId.
@@ -379,7 +376,6 @@ void Align6::gatherMarkerPairsInBand()
             // Loop over pairs in the streaks.
             const uint64_t localFrequency0 = it0End - it0Begin;
             const uint64_t localFrequency1 = it1End - it1Begin;
-            const uint64_t globalFrequency = kmerCounter.getFrequency(kmerId);
 
             MarkerPair markerPair;
             markerPair.kmerId = kmerId;

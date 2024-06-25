@@ -17,7 +17,6 @@ namespace shasta {
     class Align6Marker;
     class Alignment;
     class AlignmentInfo;
-    class KmerCounter;
 }
 
 
@@ -31,7 +30,6 @@ public:
     Align6(
         const array<span<Align6Marker>, 2>& orientedReadMarkers,
         uint64_t k,
-        const KmerCounter&,
         uint64_t maxSkip,
         uint64_t maxDrift,
         Alignment& alignment,
@@ -43,7 +41,6 @@ private:
     // References/copies for constructor arguments.
     const array<span<Align6Marker>, 2>& orientedReadMarkers;
     uint64_t k;
-    const KmerCounter& kmerCounter;
     uint64_t maxSkip;
     uint64_t maxDrift;
     Alignment& alignment;

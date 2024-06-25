@@ -118,7 +118,7 @@ void Assembler::alignOrientedReads6(
 
     Align6(
         orientedReadAlign6MarkersSpans,
-        assemblerInfo->k, *kmerCounter,
+        assemblerInfo->k,
         maxSkip, maxDrift,
         alignment, alignmentInfo,
         html);
