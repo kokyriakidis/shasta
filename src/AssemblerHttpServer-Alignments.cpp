@@ -2905,6 +2905,12 @@ void Assembler::computeAllAlignmentsThreadFunction(size_t threadId)
                             align5DriftRateTolerance, align5MinBandExtend,
                             alignment, alignmentInfo,
                             nullStream);
+                    } else if(method == 6) {
+                        ofstream nullStream;
+                        alignOrientedReads6(orientedReadId0, orientedReadId1,
+                            maxSkip, maxDrift,
+                            alignment, alignmentInfo,
+                            nullStream);
                     } else {
                         SHASTA_ASSERT(0);
                     }
