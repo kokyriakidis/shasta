@@ -14,6 +14,7 @@
 namespace shasta {
     class Align6;
 
+    class Align6Marker;
     class Alignment;
     class AlignmentInfo;
     class KmerCounter;
@@ -24,8 +25,11 @@ namespace shasta {
 class shasta::Align6 {
 public:
 
+
+    // The orientedReadMarkers for the two reads must be sorted by KmerId.
+    // This is not checked.
     Align6(
-        const array<span< pair<KmerId, uint32_t> >, 2>& orientedReadMarkers,
+        const array<span<Align6Marker>, 2>& orientedReadMarkers,
         uint64_t k,
         const KmerCounter&,
         uint64_t maxSkip,
@@ -37,7 +41,7 @@ public:
 private:
 
     // References/copies for constructor arguments.
-    const array<span< pair<KmerId, uint32_t> >, 2>& orientedReadMarkers;
+    const array<span<Align6Marker>, 2>& orientedReadMarkers;
     uint64_t k;
     const KmerCounter& kmerCounter;
     uint64_t maxSkip;

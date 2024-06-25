@@ -1,6 +1,7 @@
 // Shasta.
 #include "Assembler.hpp"
 #include "Align6.hpp"
+#include "Align6Marker.hpp"
 #include "KmerCounter.hpp"
 #include "longestPath.hpp"
 #include "orderPairs.hpp"
@@ -26,19 +27,10 @@ void Assembler::alignOrientedReads6(
     AlignmentInfo& alignmentInfo,
     ostream& html)
 {
-#if 0
-    // EXPOSE WHEN CODE STABILIZES
-    const uint64_t maxLocalFrequency = 1000000000;
-    const uint64_t minGlobalFrequency = 10;
-    const uint64_t maxGlobalFrequency = 50;
-    const double driftRateTolerance = 0.05;
-
-    // Get the length of marker k-mers.
-    const uint64_t k = assemblerInfo->k;
-#endif
 
     SHASTA_ASSERT(kmerCounter and kmerCounter->isAvailable());
 
+#if 0
     // Get the marker KmerIds for the two oriented reads.
     array<span<KmerId>, 2> orientedReadKmerIds;
     array<vector<KmerId>, 2> orientedReadKmerIdsVectors;
@@ -110,11 +102,22 @@ void Assembler::alignOrientedReads6(
             orientedReadSortedMarkersSpans[i] = sm;
         }
     }
+#endif
 
+    // Construct vectors or Align6Markers for the two reads and the corresponding spans.
+    array<OrientedReadId, 2> orientedReadIds = {orientedReadId0, orientedReadId1};
+    array<vector<Align6Marker>, 2> orientedReadAlign6MarkersVectors;
+    array<span<Align6Marker>, 2> orientedReadAlign6MarkersSpans;
+    for(uint64_t i=0; i<2; i++) {
+        const uint64_t markerCount = markers[orientedReadIds[i].getValue()].size();
+        orientedReadAlign6MarkersVectors[i].resize(markerCount);
+        orientedReadAlign6MarkersSpans[i]  = span<Align6Marker>(orientedReadAlign6MarkersVectors[i].begin(), markerCount);
+        getOrientedReadAlign6Markers(orientedReadIds[i], orientedReadAlign6MarkersSpans[i]);
+    }
 
 
     Align6(
-        orientedReadSortedMarkersSpans,
+        orientedReadAlign6MarkersSpans,
         assemblerInfo->k, *kmerCounter,
         maxSkip, maxDrift,
         alignment, alignmentInfo,

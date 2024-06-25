@@ -1,5 +1,6 @@
 // Shasta.
 #include "Align6.hpp"
+#include "Align6Marker.hpp"
 #include "Alignment.hpp"
 #include "KmerCounter.hpp"
 #include "longestPath.hpp"
@@ -18,7 +19,7 @@ using namespace shasta;
 
 
 Align6::Align6(
-    const array<span< pair<KmerId, uint32_t> >, 2>& orientedReadMarkers,
+    const array<span<Align6Marker>, 2>& orientedReadMarkers,
     uint64_t k,
     const KmerCounter& kmerCounter,
     uint64_t maxSkip,
@@ -126,14 +127,14 @@ void Align6::computeLowFrequencyMarkerPairOffsets()
     auto it0 = begin0;
     auto it1 = begin1;
     while(it0!=end0 && it1!=end1) {
-        if(it0->first < it1->first) {
+        if(it0->kmerId < it1->kmerId) {
             ++it0;
-        } else if(it1->first < it0->first) {
+        } else if(it1->kmerId < it0->kmerId) {
             ++it1;
         } else {
 
             // We found a common KmerId.
-            const KmerId kmerId = it0->first;
+            const KmerId kmerId = it0->kmerId;
 
             // This KmerId could appear more than once in each of the sequences,
             // so we need to find the streak of this KmerId.
@@ -141,10 +142,10 @@ void Align6::computeLowFrequencyMarkerPairOffsets()
             auto it1Begin = it1;
             auto it0End = it0Begin;
             auto it1End = it1Begin;
-            while(it0End!=end0 && it0End->first == kmerId) {
+            while(it0End!=end0 && it0End->kmerId == kmerId) {
                 ++it0End;
             }
-            while(it1End!=end1 && it1End->first == kmerId) {
+            while(it1End!=end1 && it1End->kmerId == kmerId) {
                 ++it1End;
             }
 
@@ -166,9 +167,9 @@ void Align6::computeLowFrequencyMarkerPairOffsets()
                 markerPair.localFrequency1 = localFrequency1;
 
                 for(auto jt0=it0Begin; jt0!=it0End; ++jt0) {
-                    markerPair. ordinal0 = jt0->second;
+                    markerPair. ordinal0 = jt0->ordinal;
                     for(auto jt1=it1Begin; jt1!=it1End; ++jt1) {
-                        markerPair.ordinal1 = jt1->second;
+                        markerPair.ordinal1 = jt1->ordinal;
                         lowFrequencyMarkerPairOffsets.push_back(markerPair.ordinalOffset());
 
                         if(html) {
@@ -353,14 +354,14 @@ void Align6::gatherMarkerPairsInBand()
     auto it0 = begin0;
     auto it1 = begin1;
     while(it0!=end0 && it1!=end1) {
-        if(it0->first < it1->first) {
+        if(it0->kmerId < it1->kmerId) {
             ++it0;
-        } else if(it1->first < it0->first) {
+        } else if(it1->kmerId < it0->kmerId) {
             ++it1;
         } else {
 
             // We found a common KmerId.
-            const KmerId kmerId = it0->first;
+            const KmerId kmerId = it0->kmerId;
 
             // This KmerId could appear more than once in each of the sequences,
             // so we need to find the streak of this KmerId.
@@ -368,10 +369,10 @@ void Align6::gatherMarkerPairsInBand()
             auto it1Begin = it1;
             auto it0End = it0Begin;
             auto it1End = it1Begin;
-            while(it0End!=end0 && it0End->first == kmerId) {
+            while(it0End!=end0 && it0End->kmerId == kmerId) {
                 ++it0End;
             }
-            while(it1End!=end1 && it1End->first == kmerId) {
+            while(it1End!=end1 && it1End->kmerId == kmerId) {
                 ++it1End;
             }
 
@@ -387,9 +388,9 @@ void Align6::gatherMarkerPairsInBand()
             markerPair.localFrequency1 = localFrequency1;
 
             for(auto jt0=it0Begin; jt0!=it0End; ++jt0) {
-                markerPair. ordinal0 = jt0->second;
+                markerPair. ordinal0 = jt0->ordinal;
                 for(auto jt1=it1Begin; jt1!=it1End; ++jt1) {
-                    markerPair.ordinal1 = jt1->second;
+                    markerPair.ordinal1 = jt1->ordinal;
                     const int64_t offset = markerPair.ordinalOffset();
                     if((offset >= bandLow) and (offset <= bandHigh)) {
                         inBandMarkerPairs.push_back(markerPair);
@@ -680,4 +681,15 @@ void Align6::computeAlignment()
         uint32_t(orientedReadMarkers[0].size()),
         uint32_t(orientedReadMarkers[1].size()));
     // alignmentInfo.uniquenessMetric = uniquenessMetric;
+}
+
+
+
+void Align6Marker::setGlobalFrequency(uint64_t globalFrequencyLong)
+{
+    if(globalFrequencyLong > std::numeric_limits<uint32_t>::max()) {
+        globalFrequency = std::numeric_limits<uint32_t>::max();
+    } else {
+        globalFrequency = uint32_t(globalFrequencyLong);
+    }
 }

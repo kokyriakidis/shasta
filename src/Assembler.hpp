@@ -33,6 +33,7 @@ namespace shasta {
     class AlignmentGraph;
     class AlignmentInfo;
     class AlignOptions;
+    class Align6Marker;
     class AssemblerOptions;
     class AssembledSegment;
     class AssemblyGraph2;
@@ -532,6 +533,12 @@ private:
     void getOrientedReadMarkers(OrientedReadId, const span<MarkerWithOrdinal>&) const;
     void getOrientedReadMarkersStrand0(ReadId, const span<MarkerWithOrdinal>&) const;
     void getOrientedReadMarkersStrand1(ReadId, const span<MarkerWithOrdinal>&) const;
+
+    // Get all Align6::Markers for an oriented read (includes KmerId, and ordinal, and global frequency).
+    // Sorted by KmerId.
+    void getOrientedReadAlign6Markers(OrientedReadId, const span<Align6Marker>&) const;
+    void getOrientedReadAlign6MarkersStrand0(ReadId, const span<Align6Marker>&) const;
+    void getOrientedReadAlign6MarkersStrand1(ReadId, const span<Align6Marker>&) const;
 
     // Get all marker Kmers/KmerIds for a read in both orientations.
     void getReadMarkerKmers(

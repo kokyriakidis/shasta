@@ -1,5 +1,6 @@
 // Shasta.
 #include "Assembler.hpp"
+#include "Align6Marker.hpp"
 #include "extractKmer.hpp"
 #include "findMarkerId.hpp"
 #include "KmerCounter.hpp"
@@ -487,6 +488,84 @@ void Assembler::getOrientedReadMarkersStrand1(
         markers1[ordinal1] = MarkerWithOrdinal(KmerId(kmer1.id(k)), position1, uint32_t(ordinal1));
     }
 
+}
+
+
+
+void Assembler::getOrientedReadAlign6Markers(
+    OrientedReadId orientedReadId,
+    const span<Align6Marker>& align6Markers) const
+{
+    SHASTA_ASSERT(kmerCounter and kmerCounter->isAvailable());
+
+    const ReadId readId = orientedReadId.getReadId();
+    const Strand strand = orientedReadId.getStrand();
+
+    if(strand == 0) {
+        getOrientedReadAlign6MarkersStrand0(readId, align6Markers);
+    } else {
+        getOrientedReadAlign6MarkersStrand1(readId, align6Markers);
+    }
+
+    sort(align6Markers.begin(), align6Markers.end());
+}
+
+
+
+void Assembler::getOrientedReadAlign6MarkersStrand0(
+    ReadId readId,
+    const span<Align6Marker>& align6Markers) const
+{
+    const uint64_t k = assemblerInfo->k;
+
+    const auto read = reads->getRead(uint32_t(readId));
+    const OrientedReadId orientedReadId0(readId, 0);
+    const auto orientedReadMarkers0 = markers[orientedReadId0.getValue()];
+    const uint64_t readMarkerCount = orientedReadMarkers0.size();
+    SHASTA_ASSERT(align6Markers.size() == readMarkerCount);
+
+    // Loop over all markers.
+    for(uint64_t ordinal0=0; ordinal0<readMarkerCount; ordinal0++) {
+        const CompressedMarker& compressedMarker0 = orientedReadMarkers0[ordinal0];
+        const uint32_t position = compressedMarker0.position;
+        Kmer kmer0;
+        extractKmer(read, uint64_t(position), k, kmer0);
+
+        Align6Marker& align6Marker = align6Markers[ordinal0];
+        align6Marker.kmerId = KmerId(kmer0.id(k));
+        align6Marker.ordinal = uint32_t(ordinal0);
+        align6Marker.setGlobalFrequency(kmerCounter->getFrequency(align6Marker.kmerId));
+    }
+}
+
+
+
+void Assembler::getOrientedReadAlign6MarkersStrand1(
+    ReadId readId,
+    const span<Align6Marker>& align6Markers) const
+{
+    const uint64_t k = assemblerInfo->k;
+
+    const auto read = reads->getRead(uint32_t(readId));
+    const OrientedReadId orientedReadId0(readId, 0);
+    const OrientedReadId orientedReadId1(readId, 1);
+    const auto orientedReadMarkers0 = markers[orientedReadId0.getValue()];
+    const auto orientedReadMarkers1 = markers[orientedReadId1.getValue()];
+    const uint64_t readMarkerCount = orientedReadMarkers0.size();
+    SHASTA_ASSERT(align6Markers.size() == readMarkerCount);
+
+    // Loop over all markers.
+    for(uint64_t ordinal0=0; ordinal0<readMarkerCount; ordinal0++) {
+        const uint64_t ordinal1 = readMarkerCount - 1 - ordinal0;
+        Kmer kmer0;
+        extractKmer(read, uint64_t(orientedReadMarkers0[ordinal0].position), k, kmer0);
+        const Kmer kmer1 = kmer0.reverseComplement(k);
+
+        Align6Marker& align6Marker = align6Markers[ordinal1];
+        align6Marker.kmerId = KmerId(kmer1.id(k));
+        align6Marker.ordinal = uint32_t(ordinal1);
+        align6Marker.setGlobalFrequency(kmerCounter->getFrequency(align6Marker.kmerId));
+    }
 }
 
 
