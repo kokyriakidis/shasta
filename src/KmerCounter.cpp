@@ -53,8 +53,8 @@ KmerCounter::KmerCounter(
     const uint64_t bucketCount = std::bit_ceil(desiredBucketCount);
     hashMask = bucketCount - 1;
     cout << "Total number of marker k-mer on one strand " << kmerCount << endl;
-    cout << "Number of buckets for k-mer counting " << bucketCount << " " << hex << bucketCount << endl;
-    cout << "Hashing mask " << hex << hashMask << endl;
+    cout << "Number of buckets for k-mer counting " << bucketCount << " " << hex << bucketCount << dec << endl;
+    cout << "Hashing mask " << hex << hashMask << dec << endl;
     kmerIds.createNew(largeDataName("tmp-KmerCounterKmerIds"), largeDataPageSize);
 
     // Gather marker KmerIds of all the reads (one strand only).
