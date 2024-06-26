@@ -247,6 +247,13 @@ void Assembler::computeAlignments(
         computeLowFrequencyMarkers(1, threadCount);
     }
 
+    // For alignment method 6, compute Align6Markers.
+    if(alignOptions.alignMethod == 6) {
+        performanceLog << timestamp << "Computing Align6Markers." << endl;
+        computeAlign6Markers(threadCount);
+        performanceLog << timestamp << "Done computing Align6Markers." << endl;
+    }
+
     // Pick the batch size for computing alignments.
     size_t batchSize = 10;
     if(batchSize > alignmentCandidates.candidates.size()/threadCount) {
@@ -302,6 +309,9 @@ void Assembler::computeAlignments(
     }
     if(alignOptions.alignMethod == 5) {
         lowFrequencyMarkers.remove();
+    }
+    if(alignOptions.alignMethod == 6) {
+        align6Markers.remove();
     }
 
     cout << "Found and stored " << alignmentData.size() << " good alignments." << endl;

@@ -29,91 +29,33 @@ void Assembler::alignOrientedReads6(
 {
 
     SHASTA_ASSERT(kmerCounter and kmerCounter->isAvailable());
+    const array<OrientedReadId, 2> orientedReadIds = {orientedReadId0, orientedReadId1};
 
-#if 0
-    // Get the marker KmerIds for the two oriented reads.
-    array<span<KmerId>, 2> orientedReadKmerIds;
-    array<vector<KmerId>, 2> orientedReadKmerIdsVectors;
-    if(markerKmerIds.isOpen()) {
-        if(html) {
-            html << "<br>Using stored marker KmerIds." << endl;
-        }
-
-        orientedReadKmerIds[0] = markerKmerIds[orientedReadId0.getValue()];
-        orientedReadKmerIds[1] = markerKmerIds[orientedReadId1.getValue()];
-
-    } else {
-        if(html) {
-            html << "<br>Stored sorted marker KmerIds are not available - computing them." << endl;
-        }
-
-        // This is slower and will happen if markerKmerIds is not available.
-        // Resize the vectors and make the spans point to the vectors.
-        // Then call getOrientedReadMarkerKmerIds to fill them in.
-        orientedReadKmerIdsVectors[0].resize(markers.size(orientedReadId0.getValue()));
-        orientedReadKmerIdsVectors[1].resize(markers.size(orientedReadId1.getValue()));
-        orientedReadKmerIds[0] = span<KmerId>(orientedReadKmerIdsVectors[0]);
-        orientedReadKmerIds[1] = span<KmerId>(orientedReadKmerIdsVectors[1]);
-        getOrientedReadMarkerKmerIds(orientedReadId0, orientedReadKmerIds[0]);
-        getOrientedReadMarkerKmerIds(orientedReadId1, orientedReadKmerIds[1]);
-    }
-
-
-
-    // Align6 needs markers sorted by KmerId.
-    // Use the ones from sortedMarkers if available, or else compute them.
-    array<span< pair<KmerId, uint32_t> >, 2> orientedReadSortedMarkersSpans;
-    array<vector< pair<KmerId, uint32_t> >, 2> orientedReadSortedMarkers;
-    if(sortedMarkers.isOpen()) {
-        if(html) {
-            html << "<br>Using stored sorted markers." << endl;
-        }
-
-        // Make the spans point to the stored sorted markers.
-        orientedReadSortedMarkersSpans[0] = sortedMarkers[orientedReadId0.getValue()];
-        orientedReadSortedMarkersSpans[1] = sortedMarkers[orientedReadId1.getValue()];
-
-    } else {
-
-        // We don't have the sorted markers. we have to compute them here.
-        if(html) {
-            html << "<br>Stored sorted markers are not available - computing them." << endl;
-        }
-
-        for(uint64_t i=0; i<2; i++) {
-
-            // Unsorted markers for this oriented read.
-            const span<const KmerId>& km = orientedReadKmerIds[i];
-
-            // Sorted markers for this oriented read.
-            vector<pair<KmerId, uint32_t> >& sm = orientedReadSortedMarkers[i];
-
-            // Copy the unsorted markers.
-            const uint64_t n = km.size();
-            sm.resize(n);
-            for(uint64_t ordinal=0; ordinal<n; ordinal++) {
-                sm[ordinal] = make_pair(km[ordinal], uint32_t(ordinal));
-            }
-
-            // Sort them.
-            sort(sm.begin(), sm.end(), OrderPairsByFirstOnly<KmerId, uint32_t>());
-
-            // Make the span point to the data in the vector.
-            orientedReadSortedMarkersSpans[i] = sm;
-        }
-    }
-#endif
-
-    // Construct vectors or Align6Markers for the two reads and the corresponding spans.
-    array<OrientedReadId, 2> orientedReadIds = {orientedReadId0, orientedReadId1};
+    // Align6 needs spans of Align6Markers for the two oriented reads.
     array<vector<Align6Marker>, 2> orientedReadAlign6MarkersVectors;
     array<span<Align6Marker>, 2> orientedReadAlign6MarkersSpans;
-    for(uint64_t i=0; i<2; i++) {
-        const uint64_t markerCount = markers[orientedReadIds[i].getValue()].size();
-        orientedReadAlign6MarkersVectors[i].resize(markerCount);
-        orientedReadAlign6MarkersSpans[i]  = span<Align6Marker>(orientedReadAlign6MarkersVectors[i].begin(), markerCount);
-        getOrientedReadAlign6Markers(orientedReadIds[i], orientedReadAlign6MarkersSpans[i]);
+
+    if(align6Markers.isOpen()) {
+
+        // We precomputed the Align6Markers for all oriented reads.
+        // Make the spans point to them.
+        for(uint64_t i=0; i<2; i++) {
+            orientedReadAlign6MarkersSpans[i] = align6Markers[orientedReadIds[i].getValue()];
+        }
+
+    } else {
+
+        // We don't have precomputed Align6Markers.
+        // Conpute them here, storing in the two vectors,
+        // and making the spans point to the vectors.
+        for(uint64_t i=0; i<2; i++) {
+            const uint64_t markerCount = markers[orientedReadIds[i].getValue()].size();
+            orientedReadAlign6MarkersVectors[i].resize(markerCount);
+            orientedReadAlign6MarkersSpans[i]  = span<Align6Marker>(orientedReadAlign6MarkersVectors[i].begin(), markerCount);
+            getOrientedReadAlign6Markers(orientedReadIds[i], orientedReadAlign6MarkersSpans[i]);
+        }
     }
+
 
 
     Align6(
@@ -123,4 +65,54 @@ void Assembler::alignOrientedReads6(
         alignment, alignmentInfo,
         html);
 
+}
+
+
+
+void Assembler::computeAlign6Markers(uint64_t threadCount)
+{
+    // Check that we have what we need.
+    checkMarkersAreOpen();
+    const uint64_t orientedReadCount = markers.size();
+
+    // Adjust the numbers of threads, if necessary.
+    if(threadCount == 0) {
+        threadCount = std::thread::hardware_concurrency();
+    }
+
+    // Make space for the Align6Markers for each oriented read.
+    align6Markers.createNew(largeDataName("tmp-Align6Markers"), largeDataPageSize);
+    for(uint64_t i=0; i<orientedReadCount; i++) {
+        align6Markers.appendVector(markers[i].size());
+    }
+
+    // Compute them.
+    const uint64_t batchSize = 10;
+    setupLoadBalancing(orientedReadCount, batchSize);
+    runThreads(&Assembler::computeAlign6MarkersThreadFunction, threadCount);
+}
+
+
+
+void Assembler::accessAlign6Markers()
+{
+    align6Markers.accessExistingReadOnly(largeDataName("tmp-Align6Markers"));
+}
+
+
+
+void Assembler::computeAlign6MarkersThreadFunction(size_t threadId)
+{
+    // Loop over all batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over oriented reads in this batch.
+        for(uint64_t i=begin; i!=end; i++) {
+            const OrientedReadId orientedReadId = OrientedReadId::fromValue(ReadId(i));
+
+            // Compute the Align6Markers for this oriented read.
+            getOrientedReadAlign6Markers(orientedReadId, align6Markers[i]);
+        }
+    }
 }

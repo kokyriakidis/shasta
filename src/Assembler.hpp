@@ -4,6 +4,7 @@
 // Shasta.
 #include "Alignment.hpp"
 #include "AlignmentCandidates.hpp"
+#include "Align6Marker.hpp"
 #include "AssemblyGraph2Statistics.hpp"
 #include "HttpServer.hpp"
 #include "invalid.hpp"
@@ -33,7 +34,6 @@ namespace shasta {
     class AlignmentGraph;
     class AlignmentInfo;
     class AlignOptions;
-    class Align6Marker;
     class AssemblerOptions;
     class AssembledSegment;
     class AssemblyGraph2;
@@ -504,6 +504,18 @@ private:
         uint64_t maxMarkerFrequency;
     };
     ComputeLowFrequencyMarkersData computeLowFrequencyMarkersData;
+
+
+
+    // Align6Markers, sorted by KmerId, for each oriented read.
+    // Indexed by orientedReadId.getValue().
+    // Used by alignment method 6.
+public:
+    MemoryMapped::VectorOfVectors<Align6Marker, uint64_t> align6Markers;
+    void computeAlign6Markers(uint64_t threadCount);
+    void accessAlign6Markers();
+private:
+    void computeAlign6MarkersThreadFunction(size_t threadId);
 
 
 
