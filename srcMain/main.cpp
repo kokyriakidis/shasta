@@ -271,9 +271,9 @@ void shasta::main::assemble(
 
     if( assemblerOptions.alignOptions.alignMethod <  0 or
         assemblerOptions.alignOptions.alignMethod == 2 or
-        assemblerOptions.alignOptions.alignMethod >  5) {
+        assemblerOptions.alignOptions.alignMethod >  6) {
         throw runtime_error("Align method " + to_string(assemblerOptions.alignOptions.alignMethod) +
-            " is not valid. Valid options are 0, 1, 3, 4, and 5.");
+            " is not valid. Valid options are 0 through 6 except 2.");
     }
 
     if(assemblerOptions.readGraphOptions.creationMethod != 0 and
@@ -618,7 +618,12 @@ void shasta::main::assemble(
     assembler.createKmerChecker(assemblerOptions.kmersOptions, threadCount);
 
     // Find the markers in the reads.
-    assembler.findMarkers(0);
+    assembler.findMarkers(threadCount);
+
+    // If using alignment method 6, count marker k-mers.
+    if(assemblerOptions.alignOptions.alignMethod == 6) {
+        assembler.countKmers(threadCount);
+    }
 
     // Gather marker KmerIds for all markers.
     // They are used by LowHash and alignment computation.
