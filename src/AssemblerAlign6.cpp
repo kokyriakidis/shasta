@@ -21,11 +21,9 @@ using namespace shasta;
 void Assembler::alignOrientedReads6(
     OrientedReadId orientedReadId0,
     OrientedReadId orientedReadId1,
-    uint64_t maxSkip,
-    uint64_t maxDrift,
     Alignment& alignment,
     AlignmentInfo& alignmentInfo,
-    ostream& html)
+    Align6& align6)
 {
 
     SHASTA_ASSERT(kmerCounter and kmerCounter->isAvailable());
@@ -57,13 +55,15 @@ void Assembler::alignOrientedReads6(
     }
 
 
-
-    Align6(
-        orientedReadAlign6MarkersSpans,
+/*
+    Align6 align6(
         assemblerInfo->k,
-        maxSkip, maxDrift,
-        alignment, alignmentInfo,
+        maxSkip,
+        maxDrift,
         html);
+*/
+
+    align6.align(orientedReadAlign6MarkersSpans, alignment, alignmentInfo);
 
 }
 

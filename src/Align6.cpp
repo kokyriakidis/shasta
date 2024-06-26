@@ -9,7 +9,6 @@
 using namespace shasta;
 
 // Boost libraries.
-#include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/connected_components.hpp>
 #include <boost/graph/iteration_macros.hpp>
 #include <boost/pending/disjoint_sets.hpp>
@@ -18,34 +17,77 @@ using namespace shasta;
 #include "fstream.hpp"
 
 
-
 Align6::Align6(
-    const array<span<Align6Marker>, 2>& orientedReadMarkers,
     uint64_t k,
     uint64_t maxSkip,
     uint64_t maxDrift,
-    Alignment& alignment,
-    AlignmentInfo& alignmentInfo,
     ostream& html) :
-
-    orientedReadMarkers(orientedReadMarkers),
     k(k),
     maxSkip(maxSkip),
     maxDrift(maxDrift),
-    alignment(alignment),
-    alignmentInfo(alignmentInfo),
     html(html),
     maxOffsetSumDelta(2 * maxSkip)
+{}
+
+
+
+void Align6::clear()
 {
+    lowFrequencyMarkerPairOffsets.clear();
+    offsetHistogram.clear();
+    derivativeChanges.clear();
+    inBandMarkerPairs.clear();
+    rank.clear();
+    parent.clear();
+    component.clear();
+    count.clear();
+    activeMarkerPairs.clear();
+    longestPath.clear();
+
+    graph.m_vertices.clear();
+    graph.m_edges.clear();
+    graph.clear();
+}
+
+
+
+void Align6::free()
+{
+    clear();
+
+    lowFrequencyMarkerPairOffsets.shrink_to_fit();
+    offsetHistogram.shrink_to_fit();
+    derivativeChanges.shrink_to_fit();
+    inBandMarkerPairs.shrink_to_fit();
+    rank.shrink_to_fit();
+    parent.shrink_to_fit();
+    component.shrink_to_fit();
+    count.shrink_to_fit();
+    activeMarkerPairs.shrink_to_fit();
+    longestPath.shrink_to_fit();
+
+    graph.m_vertices.shrink_to_fit();
+    graph.m_edges.shrink_to_fit();
+    graph = Graph();
+}
+
+
+
+void Align6::align(
+    const array<span<Align6Marker>, 2>& orientedReadMarkers,
+    Alignment& alignment,
+    AlignmentInfo& alignmentInfo)
+{
+    clear();
 
     // Find ordinal offsets of the low frequency marker pairs.
     // If there are two few of them, store an empty alignment and return.
-    computeLowFrequencyMarkerPairOffsets();
+    computeLowFrequencyMarkerPairOffsets(orientedReadMarkers);
     if(lowFrequencyMarkerPairOffsets.size() < minLowFrequencyCount) {
         if(html) {
             html << "<br>Two few low frequency marker pairs found.";
         }
-        storeEmptyAlignment();
+        storeEmptyAlignment(orientedReadMarkers, alignment, alignmentInfo);
         return;
     }
 
@@ -53,10 +95,10 @@ Align6::Align6(
     computeOffsetHistogram();
 
     // Band computation.
-    computeBand();
+    computeBand(orientedReadMarkers);
 
     // Gather all marker pairs in the band, regardless of frequency.
-    gatherMarkerPairsInBand();
+    gatherMarkerPairsInBand(orientedReadMarkers);
 
     // Compute connected components of the marker pairs in the band.
     // Two marker pairs belong to the same component if
@@ -72,7 +114,7 @@ Align6::Align6(
         if(html) {
             html << "<br>Too few low frequency marker pairs found in the best component.";
         }
-        storeEmptyAlignment();
+        storeEmptyAlignment(orientedReadMarkers, alignment, alignmentInfo);
         return;
     }
 
@@ -81,7 +123,7 @@ Align6::Align6(
     gatherActiveMarkerPairs();
 
     // Use the active marker pairs to compute the alignment.
-    computeAlignment();
+    computeAlignment(orientedReadMarkers, alignment, alignmentInfo);
 }
 
 
@@ -90,7 +132,8 @@ Align6::Align6(
 // The low frequency marker pairs consists of pairs (ordinal0, ordinal1)
 // such that KmerId(orientedReadId0, ordinal0) == KmerId(orientedReadId1, ordinal1),
 // and that satisfy the requirements on local and global frequency.
-void Align6::computeLowFrequencyMarkerPairOffsets()
+void Align6::computeLowFrequencyMarkerPairOffsets(
+    const array<span<Align6Marker>, 2>& orientedReadMarkers)
 {
     lowFrequencyMarkerPairOffsets.clear();
 
@@ -200,7 +243,10 @@ void Align6::computeLowFrequencyMarkerPairOffsets()
 
 // This is called when we give up.
 // Stores an empty alignment and the corresponding AlignmentInfo.
-void Align6::storeEmptyAlignment()
+void Align6::storeEmptyAlignment(
+    const array<span<Align6Marker>, 2>& orientedReadMarkers,
+    Alignment& alignment,
+    AlignmentInfo& alignmentInfo)
 {
     alignment.clear();
     alignmentInfo.create(
@@ -245,7 +291,6 @@ void Align6::computeOffsetHistogram()
     }
 
     lowFrequencyMarkerPairOffsets.clear();
-    lowFrequencyMarkerPairOffsets.shrink_to_fit();
 }
 
 
@@ -255,7 +300,8 @@ void Align6::computeOffsetHistogram()
 // The smoothing is done implicitly using a triangular kernel.
 // Because we use a triangular kernel, the smoothed offset distribution
 // is piecewise linear.
-void Align6::computeBand()
+void Align6::computeBand(
+    const array<span<Align6Marker>, 2>& orientedReadMarkers)
 {
     const uint64_t minLength = min(
         orientedReadMarkers[0].size(),
@@ -264,7 +310,7 @@ void Align6::computeBand()
         int64_t(std::round(driftRateTolerance * double(minLength)));
 
     // Pairs (offset, derivative change).
-    vector< pair<int64_t, int64_t> > derivativeChanges;
+    derivativeChanges.clear();
     for(const auto& p: offsetHistogram) {
         const int64_t offset = p.first;
         const int64_t frequency = int64_t(p.second);
@@ -322,12 +368,11 @@ void Align6::computeBand()
     }
 
     offsetHistogram.clear();
-    offsetHistogram.shrink_to_fit();
 }
 
 
 // Gather all marker pairs in the band, regardless of frequency.
-void Align6::gatherMarkerPairsInBand()
+void Align6::gatherMarkerPairsInBand(const array<span<Align6Marker>, 2>& orientedReadMarkers)
 {
     inBandMarkerPairs.clear();
 
@@ -429,8 +474,8 @@ void Align6::computeComponents()
 {
 
     // Initialize the disjoint sets data structure.
-    vector<uint64_t> rank(inBandMarkerPairs.size());
-    vector<uint64_t> parent(inBandMarkerPairs.size());
+    rank.resize(inBandMarkerPairs.size());
+    parent.resize(inBandMarkerPairs.size());
     boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
     for(uint64_t v=0; v<inBandMarkerPairs.size(); v++) {
         disjointSets.make_set(v);
@@ -518,7 +563,7 @@ uint64_t Align6::findBestComponent()
 {
 
     // Count low frequency marker pairs in each connected component.
-    vector<uint64_t> count(inBandMarkerPairs.size(), 0);
+    count.resize(inBandMarkerPairs.size(), 0);
     for(uint64_t i=0; i<inBandMarkerPairs.size(); i++) {
         const MarkerPair& markerPair = inBandMarkerPairs[i];
         if(markerPair.globalFrequency > maxGlobalFrequency) {
@@ -612,20 +657,20 @@ void Align6::gatherActiveMarkerPairs()
     }
 
     inBandMarkerPairs.clear();
-    inBandMarkerPairs.shrink_to_fit();
     component.clear();
-    component.shrink_to_fit();
 }
 
 
 
 // Use the active marker pairs to compute the alignment.
-void Align6::computeAlignment()
+void Align6::computeAlignment(
+    const array<span<Align6Marker>, 2>& orientedReadMarkers,
+    Alignment& alignment,
+    AlignmentInfo& alignmentInfo)
 {
     // Use the active marker pairs to create a directed graph
     // whose edges correspond to MarkerPairInfos compatible with maxSkip, maxDrift.
-    using Graph = boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS>;
-    Graph graph(activeMarkerPairs.size());
+    graph.m_vertices.resize(activeMarkerPairs.size());
 
     for(uint64_t v0=0; v0<activeMarkerPairs.size(); v0++) {
         const MarkerPair& markerPairInfo0 = activeMarkerPairs[v0];
@@ -650,7 +695,6 @@ void Align6::computeAlignment()
 
 
     // Compute the longest path. This gives us the alignment.
-    vector<uint64_t> longestPath;
     shasta::longestPath(graph, longestPath);
     if(html) {
         html << "The longest path uses " << longestPath.size() <<

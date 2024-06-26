@@ -3,6 +3,7 @@
 #include "AssemblerOptions.hpp"
 #include "AlignmentGraph.hpp"
 #include "Align4.hpp"
+#include "Align6.hpp"
 #include "AssemblyGraph.hpp"
 #include "Histogram.hpp"
 #include "KmerCounter.hpp"
@@ -1219,7 +1220,12 @@ void Assembler::exploreAlignment(
         "<a href='exploreRead?readId=" << readId1 << "&strand=" << strand1 << "'>" << orientedReadId1 << "</a>" <<
         "</h1>";
 
-
+    ofstream nullStream;
+    Align6 align6(
+        assemblerInfo->k,
+        maxSkip,
+        maxDrift,
+        displayDebugInfo ? html : nullStream);
 
     // Compute the alignment.
     // This creates file Alignment.png.
@@ -1273,11 +1279,9 @@ void Assembler::exploreAlignment(
             align5DriftRateTolerance, align5MinBandExtend,
             alignment, alignmentInfo, displayDebugInfo ? html : nullStream);
     } else if(method == 6) {
-        ofstream nullStream;
         alignOrientedReads6(
             orientedReadId0, orientedReadId1,
-            maxSkip, maxDrift,
-            alignment, alignmentInfo, displayDebugInfo ? html : nullStream);
+            alignment, alignmentInfo, align6);
     } else {
         SHASTA_ASSERT(0);
     }
@@ -2845,6 +2849,13 @@ void Assembler::computeAllAlignmentsThreadFunction(size_t threadId)
             largeDataPageSize, 2ULL * 1024 * 1024 * 1024);
     }
 
+    ofstream nullStream;
+    Align6 align6(
+        assemblerInfo->k,
+        maxSkip,
+        maxDrift,
+        nullStream);
+
     // Vectors to contain markers sorted by kmerId.
     array<vector<MarkerWithOrdinal>, 2> markersSortedByKmerId;
     getMarkersSortedByKmerId(orientedReadId0, markersSortedByKmerId[0]);
@@ -2908,9 +2919,7 @@ void Assembler::computeAllAlignmentsThreadFunction(size_t threadId)
                     } else if(method == 6) {
                         ofstream nullStream;
                         alignOrientedReads6(orientedReadId0, orientedReadId1,
-                            maxSkip, maxDrift,
-                            alignment, alignmentInfo,
-                            nullStream);
+                            alignment, alignmentInfo, align6);
                     } else {
                         SHASTA_ASSERT(0);
                     }

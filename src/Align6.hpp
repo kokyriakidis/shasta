@@ -3,6 +3,9 @@
 // Shasta.
 #include "ReadId.hpp"
 
+// Boost libraries.
+#include <boost/graph/adjacency_list.hpp>
+
 // Standard library.
 #include "array.hpp"
 #include "cstdint.hpp"
@@ -24,27 +27,27 @@ namespace shasta {
 class shasta::Align6 {
 public:
 
-
-    // The orientedReadMarkers for the two reads must be sorted by KmerId.
-    // This is not checked.
+    // All work areas get allocated here so they can be reused.
+    // This reduces memory allocation activity.
     Align6(
-        const array<span<Align6Marker>, 2>& orientedReadMarkers,
         uint64_t k,
         uint64_t maxSkip,
         uint64_t maxDrift,
-        Alignment& alignment,
-        AlignmentInfo& alignmentInfo,
         ostream& html);
+
+
+    // The orientedReadMarkers for the two reads must be sorted by KmerId.
+    // This is not checked.
+    void align(
+        const array<span<Align6Marker>, 2>& orientedReadMarkers,
+        Alignment& alignment,
+        AlignmentInfo& alignmentInfo);
 
 private:
 
-    // References/copies for constructor arguments.
-    const array<span<Align6Marker>, 2>& orientedReadMarkers;
     uint64_t k;
     uint64_t maxSkip;
     uint64_t maxDrift;
-    Alignment& alignment;
-    AlignmentInfo& alignmentInfo;
     ostream& html;
 
     uint64_t maxOffsetSumDelta;
@@ -84,14 +87,16 @@ private:
         }
     };
 
-
+    void clear();
+    void free();
 
     // The ordinal offsets of the low frequency marker pairs.
     // The low frequency marker pairs consists of pairs (ordinal0, ordinal1)
     // such that KmerId(orientedReadId0, ordinal0) == KmerId(orientedReadId1, ordinal1),
     // and that satisfy the requirements on local and global frequency.
     vector<int64_t> lowFrequencyMarkerPairOffsets;
-    void computeLowFrequencyMarkerPairOffsets();
+    void computeLowFrequencyMarkerPairOffsets(
+        const array<span<Align6Marker>, 2>& orientedReadMarkers);
 
     // Histogram of ordinal offsets for the low frequency marker pairs.
     // Contains pairs(offset, frequency).
@@ -111,11 +116,12 @@ private:
     int64_t bandLow;
     int64_t bandHigh;
     int64_t bandCenter;
-    void computeBand();
+    void computeBand(const array<span<Align6Marker>, 2>& orientedReadMarkers);
+    vector< pair<int64_t, int64_t> > derivativeChanges;
 
     // The marker pairs in contained in this band.
     vector<MarkerPair> inBandMarkerPairs;
-    void gatherMarkerPairsInBand();
+    void gatherMarkerPairsInBand(const array<span<Align6Marker>, 2>& orientedReadMarkers);
 
     // Find out if two MarkerPairs can be connected compatibly with maxSkip and maxDrift.
     bool canBeConnected(const MarkerPair&, const MarkerPair&) const;
@@ -125,6 +131,8 @@ private:
     // their ordinals are compatible with maxSkip and maxDrift.
     // This vector has one entry for each entry in the
     // inBandMarkerPairs vector.
+    vector<uint64_t> rank;
+    vector<uint64_t> parent;
     vector<uint64_t> component;
     void computeComponents();
 
@@ -136,15 +144,28 @@ private:
     // markers in the best component.
     uint64_t bestComponent;
     uint64_t findBestComponent();
+    vector<uint64_t> count;
 
     // The active marker pairs are the ones  in the best component.
     vector<MarkerPair> activeMarkerPairs;
     void gatherActiveMarkerPairs();
 
     // Use the active marker pairs to compute the alignment.
-    void computeAlignment();
+    vector<uint64_t> longestPath;
+    void computeAlignment(
+        const array<span<Align6Marker>, 2>& orientedReadMarkers,
+        Alignment& alignment,
+        AlignmentInfo& alignmentInfo);
+    using Graph = boost::adjacency_list<
+        boost::vecS, boost::vecS, boost::bidirectionalS,
+        boost::no_property, boost::no_property, boost::no_property,
+        boost::vecS>;
+    Graph graph;
 
     // This is called when we give up.
     // Stores an empty alignment and the corresponding AlignmentInfo.
-    void storeEmptyAlignment();
+    void storeEmptyAlignment(
+        const array<span<Align6Marker>, 2>& orientedReadMarkers,
+        Alignment& alignment,
+        AlignmentInfo& alignmentInfo);
 };

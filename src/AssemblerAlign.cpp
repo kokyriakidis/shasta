@@ -6,6 +6,7 @@
 #include "Alignment.hpp"
 #include "AlignmentGraph.hpp"
 #include "Align4.hpp"
+#include "Align6.hpp"
 #include "AssemblerOptions.hpp"
 #include "compressAlignment.hpp"
 #include "performanceLog.hpp"
@@ -380,6 +381,13 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
             largeDataPageSize, 2ULL * 1024 * 1024 * 1024);
     }
 
+    ofstream nullStream;
+    Align6 align6(
+        assemblerInfo->k,
+        maxSkip,
+        maxDrift,
+        nullStream);
+
     vector<AlignmentData>& threadAlignmentData = data.threadAlignmentData[threadId];
     
     shared_ptr< MemoryMapped::VectorOfVectors<char, uint64_t> > thisThreadCompressedAlignmentsPointer =
@@ -389,6 +397,8 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
     thisThreadCompressedAlignments.createNew(
         largeDataName("tmp-ThreadGlobalCompressedAlignments-" + to_string(threadId)),
         largeDataPageSize);
+
+
 
     const uint64_t messageFrequency = min(1000000UL, alignmentCandidates.candidates.size()/20);
 
@@ -452,9 +462,7 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                 } else if(alignmentMethod == 6) {
                     ofstream nullStream;
                     alignOrientedReads6(orientedReadIds[0], orientedReadIds[1],
-                        maxSkip, maxDrift,
-                        alignment, alignmentInfo,
-                        nullStream);
+                        alignment, alignmentInfo, align6);
                 } else {
                     SHASTA_ASSERT(0);
                 }

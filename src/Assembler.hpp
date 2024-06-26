@@ -34,6 +34,7 @@ namespace shasta {
     class AlignmentGraph;
     class AlignmentInfo;
     class AlignOptions;
+    class Align6;
     class AssemblerOptions;
     class AssembledSegment;
     class AssemblyGraph2;
@@ -842,11 +843,9 @@ public:
     void alignOrientedReads6(
         OrientedReadId,
         OrientedReadId,
-        uint64_t maxSkip,
-        uint64_t maxDrift,
         Alignment&,
         AlignmentInfo&,
-        ostream& html);
+        Align6&);
 
 private:
 
