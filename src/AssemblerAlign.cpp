@@ -398,7 +398,10 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
         largeDataName("tmp-ThreadGlobalCompressedAlignments-" + to_string(threadId)),
         largeDataPageSize);
 
-
+#if 0
+    // A vector to store the time taken to compute each alignment.
+    vector< pair<uint64_t, double> > elapsedTime;
+#endif
 
     const uint64_t messageFrequency = min(1000000UL, alignmentCandidates.candidates.size()/20);
 
@@ -406,6 +409,10 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
     while(getNextBatch(begin, end)) {
 
         for(size_t i=begin; i!=end; i++) {
+#if 0
+            const auto steadyClock0 = std::chrono::steady_clock::now();
+#endif
+
             const OrientedReadPair& candidate = alignmentCandidates.candidates[i];
             SHASTA_ASSERT(candidate.readIds[0] < candidate.readIds[1]);
 
@@ -483,7 +490,11 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                 continue;
             }
 
-
+#if 0
+            const auto steadyClock1 = std::chrono::steady_clock::now();
+            const auto deltaT = 1.e-9 * double(std::chrono::duration_cast<std::chrono::nanoseconds>(steadyClock1 - steadyClock0).count());
+            elapsedTime.push_back({i, deltaT});
+#endif
 
             // If the alignment has too few markers, skip it.
             if(alignment.ordinals.size() < minAlignedMarkerCount) {
@@ -542,6 +553,23 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
     }
 
     thisThreadCompressedAlignments.unreserve();
+
+#if 0
+    // Write the elapsed time taken by each alignment.
+    ofstream csv("AlignTime-Thread" + to_string(threadId) + ".csv");
+    for(const auto& p: elapsedTime) {
+        const uint64_t i = p.first;
+        const OrientedReadPair& candidate = alignmentCandidates.candidates[i];
+        SHASTA_ASSERT(candidate.readIds[0] < candidate.readIds[1]);
+        const OrientedReadId orientedReadId0 = OrientedReadId(candidate.readIds[0], 0);
+        const OrientedReadId orientedReadId1 = OrientedReadId(candidate.readIds[1], candidate.isSameStrand ? 0 : 1);
+        const double t = p.second;
+        csv << i << ",";
+        csv << orientedReadId0 << ",";
+        csv << orientedReadId1 << ",";
+        csv << t << "\n";
+    }
+#endif
 }
 
 
