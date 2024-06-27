@@ -6,6 +6,7 @@
 #include "KmerCounter.hpp"
 #include "longestPath.hpp"
 #include "orderPairs.hpp"
+// #include "timestamp.hpp"
 using namespace shasta;
 
 // Boost libraries.
@@ -78,10 +79,12 @@ void Align6::align(
     Alignment& alignment,
     AlignmentInfo& alignmentInfo)
 {
+    // cout << timestamp << "***A" << endl;
     clear();
 
     // Find ordinal offsets of the low frequency marker pairs.
     // If there are two few of them, store an empty alignment and return.
+    // cout << timestamp << "***B" << endl;
     computeLowFrequencyMarkerPairOffsets(orientedReadMarkers);
     if(lowFrequencyMarkerPairOffsets.size() < minLowFrequencyCount) {
         if(html) {
@@ -92,23 +95,29 @@ void Align6::align(
     }
 
     // Compute a histogram of ordinal offsets of the low frequency marker pairs.
+    // cout << timestamp << "***C" << endl;
     computeOffsetHistogram();
 
     // Band computation.
+    // cout << timestamp << "***D" << endl;
     computeBand(orientedReadMarkers);
 
     // Gather all marker pairs in the band, regardless of frequency.
+    // cout << timestamp << "***E" << endl;
     gatherMarkerPairsInBand(orientedReadMarkers);
 
     // Compute connected components of the marker pairs in the band.
     // Two marker pairs belong to the same component if
     // their ordinals are compatible with maxSkip and maxDrift.
+    // cout << timestamp << "***F" << endl;
     computeComponents();
 
     // Write the marker pairs in the band and the component they belong to.
+    // cout << timestamp << "***G" << endl;
     writeMarkerPairsInBand();
 
     // Find the connected component with the most low frequency markers.
+    // cout << timestamp << "***H" << endl;
     const uint64_t bestLowFrequencyMarkerCount = findBestComponent();
     if(bestLowFrequencyMarkerCount < minLowFrequencyCount) {
         if(html) {
@@ -120,10 +129,13 @@ void Align6::align(
 
     // Gather the marker pairs in the best component.
     // These are the ones that will be used to compute the alignment.
+    // cout << timestamp << "***I" << endl;
     gatherActiveMarkerPairs();
 
     // Use the active marker pairs to compute the alignment.
+    // cout << timestamp << "***J" << endl;
     computeAlignment(orientedReadMarkers, alignment, alignmentInfo);
+    // cout << timestamp << "***K" << endl;
 }
 
 
@@ -417,6 +429,7 @@ void Align6::gatherMarkerPairsInBand(const array<span<Align6Marker>, 2>& oriente
             markerPair.localFrequency0 = localFrequency0;
             markerPair.localFrequency1 = localFrequency1;
 
+            const uint64_t previousInBandCount = inBandMarkerPairs.size();
             for(auto jt0=it0Begin; jt0!=it0End; ++jt0) {
                 markerPair. ordinal0 = jt0->ordinal;
                 for(auto jt1=it1Begin; jt1!=it1End; ++jt1) {
@@ -426,6 +439,12 @@ void Align6::gatherMarkerPairsInBand(const array<span<Align6Marker>, 2>& oriente
                         inBandMarkerPairs.push_back(markerPair);
                     }
                 }
+            }
+
+            // If this Kmer generated too many in-band marker pairs,
+            // get rid of them.
+            if(inBandMarkerPairs.size() - previousInBandCount > maxInBandCount) {
+                inBandMarkerPairs.resize(previousInBandCount);
             }
 
             // Continue the joint loop over KmerId's.
@@ -459,6 +478,14 @@ bool Align6::canBeConnected(
     const int64_t offset1 =  markerPairInfo1.ordinalOffset();
     const uint64_t drift = labs(offset0 - offset1);
     if(drift > maxDrift) {
+        return false;
+    }
+
+    // Check the ordinals.
+    if(markerPairInfo1.ordinal0 < markerPairInfo0.ordinal0) {
+        return false;
+    }
+    if(markerPairInfo1.ordinal1 < markerPairInfo0.ordinal1) {
         return false;
     }
 
