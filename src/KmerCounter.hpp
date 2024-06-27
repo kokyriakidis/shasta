@@ -80,6 +80,9 @@ private:
     void threadFunction4(uint64_t threadId);
     void threadFunction34(uint64_t pass);
 
-    // Write a histogram of k-mer frequencies.
-    void writeHistogram();
+    // The frequency histogram.
+    // Consists of pairs (coverage, frequency).
+    void createHistogram();
+public:
+    MemoryMapped::Vector< pair<uint64_t, uint64_t> > histogram;
 };

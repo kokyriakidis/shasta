@@ -80,8 +80,8 @@ KmerCounter::KmerCounter(
     // Remove the temporary hash table.
     kmerIds.remove();
 
-    // Write a histogram of k-mer frequencies.
-    writeHistogram();
+    // Create a histogram of k-mer frequencies.
+    createHistogram();
 
     // Final message.
     const auto tEnd = std::chrono::steady_clock::now();
@@ -108,6 +108,8 @@ KmerCounter::KmerCounter(
     kmerIdFrequencies.accessExistingReadOnly(largeDataName("KmerFrequencies"));
     const uint64_t bucketCount = kmerIdFrequencies.size();
     hashMask = bucketCount - 1;
+
+    histogram.accessExistingReadOnly(largeDataName("KmerCounterHistogram"));
 }
 
 
@@ -231,31 +233,34 @@ void KmerCounter::threadFunction34(uint64_t pass)
 }
 
 
-// Write a histogram of k-mer frequencies.
-void KmerCounter::writeHistogram()
+// Create a histogram of k-mer frequencies.
+void KmerCounter::createHistogram()
 {
 
-    vector<uint64_t> histogram;
+    vector<uint64_t> histogramVector;
     for(uint64_t bucketId=0; bucketId<kmerIdFrequencies.size(); bucketId++) {
         const auto bucket = kmerIdFrequencies[bucketId];
 
         for(const auto& p: bucket) {
             const uint64_t frequency = p.second;
 
-            if(frequency >= histogram.size()) {
-                histogram.resize(frequency + 1, 0);
+            if(frequency >= histogramVector.size()) {
+                histogramVector.resize(frequency + 1, 0);
             }
 
-            ++histogram[frequency];
+            ++histogramVector[frequency];
         }
     }
 
+    histogram.createNew(largeDataName("KmerCounterHistogram"), largeDataPageSize);
+
     ofstream csv("KmerFrequencyHistogram.csv");
     csv << "Coverage,Frequency\n";
-    for(uint64_t coverage=0; coverage<histogram.size(); coverage++) {
-        const uint64_t frequency = histogram[coverage];
+    for(uint64_t coverage=0; coverage<histogramVector.size(); coverage++) {
+        const uint64_t frequency = histogramVector[coverage];
         if(frequency) {
             csv << coverage << "," << frequency << "\n";
+            histogram.push_back(make_pair(coverage, frequency));
         }
     }
 
