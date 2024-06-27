@@ -1,6 +1,7 @@
 // Shasta.
 #include "Align6.hpp"
 #include "Align6Marker.hpp"
+#include "AssemblerOptions.hpp"
 #include "Alignment.hpp"
 #include "invalid.hpp"
 #include "KmerCounter.hpp"
@@ -22,10 +23,12 @@ Align6::Align6(
     uint64_t k,
     uint64_t maxSkip,
     uint64_t maxDrift,
+    const Align6Options& align6Options,
     ostream& html) :
     k(k),
     maxSkip(maxSkip),
     maxDrift(maxDrift),
+    align6Options(align6Options),
     html(html),
     maxOffsetSumDelta(2 * maxSkip)
 {}
@@ -86,7 +89,7 @@ void Align6::align(
     // If there are two few of them, store an empty alignment and return.
     // cout << timestamp << "***B" << endl;
     computeLowFrequencyMarkerPairOffsets(orientedReadMarkers);
-    if(lowFrequencyMarkerPairOffsets.size() < minLowFrequencyCount) {
+    if(lowFrequencyMarkerPairOffsets.size() < align6Options.minLowFrequencyCount) {
         if(html) {
             html << "<br>Two few low frequency marker pairs found.";
         }
@@ -119,7 +122,7 @@ void Align6::align(
     // Find the connected component with the most low frequency markers.
     // cout << timestamp << "***H" << endl;
     const uint64_t bestLowFrequencyMarkerCount = findBestComponent();
-    if(bestLowFrequencyMarkerCount < minLowFrequencyCount) {
+    if(bestLowFrequencyMarkerCount < align6Options.minLowFrequencyCount) {
         if(html) {
             html << "<br>Too few low frequency marker pairs found in the best component.";
         }
@@ -200,10 +203,10 @@ void Align6::computeLowFrequencyMarkerPairOffsets(
             const uint64_t localFrequency0 = it0End - it0Begin;
             const uint64_t localFrequency1 = it1End - it1Begin;
             if(
-                (localFrequency0 <= maxLocalFrequency) and
-                (localFrequency1 <= maxLocalFrequency) and
-                (globalFrequency >= minGlobalFrequency) and
-                (globalFrequency <= maxGlobalFrequency)) {
+                (localFrequency0 <= align6Options.maxLocalFrequency) and
+                (localFrequency1 <= align6Options.maxLocalFrequency) and
+                (globalFrequency >= align6Options.minGlobalFrequency) and
+                (globalFrequency <= align6Options.maxGlobalFrequency)) {
 
                 MarkerPair markerPair;
                 markerPair.kmerId = kmerId;
@@ -319,7 +322,7 @@ void Align6::computeBand(
         orientedReadMarkers[0].size(),
         orientedReadMarkers[1].size());
     const int64_t kernelHalfWidth =
-        int64_t(std::round(driftRateTolerance * double(minLength)));
+        int64_t(std::round(align6Options.driftRateTolerance * double(minLength)));
 
     // Pairs (offset, derivative change).
     derivativeChanges.clear();
@@ -443,7 +446,7 @@ void Align6::gatherMarkerPairsInBand(const array<span<Align6Marker>, 2>& oriente
 
             // If this Kmer generated too many in-band marker pairs,
             // get rid of them.
-            if(inBandMarkerPairs.size() - previousInBandCount > maxInBandCount) {
+            if(inBandMarkerPairs.size() - previousInBandCount > align6Options.maxInBandCount) {
                 inBandMarkerPairs.resize(previousInBandCount);
             }
 
@@ -593,16 +596,16 @@ uint64_t Align6::findBestComponent()
     count.resize(inBandMarkerPairs.size(), 0);
     for(uint64_t i=0; i<inBandMarkerPairs.size(); i++) {
         const MarkerPair& markerPair = inBandMarkerPairs[i];
-        if(markerPair.globalFrequency > maxGlobalFrequency) {
+        if(markerPair.globalFrequency > align6Options.maxGlobalFrequency) {
             continue;
         }
-        if(markerPair.globalFrequency < minGlobalFrequency) {
+        if(markerPair.globalFrequency < align6Options.minGlobalFrequency) {
             continue;
         }
-        if(markerPair.localFrequency0 > maxLocalFrequency) {
+        if(markerPair.localFrequency0 > align6Options.maxLocalFrequency) {
             continue;
         }
-        if(markerPair.localFrequency1 > maxLocalFrequency) {
+        if(markerPair.localFrequency1 > align6Options.maxLocalFrequency) {
             continue;
         }
         const uint64_t c = component[i];

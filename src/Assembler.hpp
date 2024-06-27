@@ -5,6 +5,7 @@
 #include "Alignment.hpp"
 #include "AlignmentCandidates.hpp"
 #include "Align6Marker.hpp"
+#include "AssemblerOptions.hpp"
 #include "AssemblyGraph2Statistics.hpp"
 #include "HttpServer.hpp"
 #include "invalid.hpp"
@@ -34,6 +35,7 @@ namespace shasta {
     class AlignmentGraph;
     class AlignmentInfo;
     class AlignOptions;
+    class Align6Options;
     class Align6;
     class AssemblerOptions;
     class AssembledSegment;
@@ -2287,6 +2289,7 @@ public:
         uint64_t align4MaxDistanceFromBoundary,
         double align5DriftRateTolerance,
         uint64_t align5MinBandExtend,
+        const Align6Options&,
         ostream& html
     );
     void writeColorPicker(ostream& html, string svgId);
@@ -2343,6 +2346,7 @@ public:
         uint64_t align4MaxDistanceFromBoundary;
         double align5DriftRateTolerance;
         uint64_t align5MinBandExtend;
+        Align6Options align6Options;
         // The alignments found by each thread.
         vector< vector< pair<OrientedReadId, AlignmentInfo> > > threadAlignments;
     };

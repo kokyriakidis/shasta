@@ -18,6 +18,7 @@ namespace shasta {
     class Align6;
 
     class Align6Marker;
+    class Align6Options;
     class Alignment;
     class AlignmentInfo;
 }
@@ -33,6 +34,7 @@ public:
         uint64_t k,
         uint64_t maxSkip,
         uint64_t maxDrift,
+        const Align6Options& align6Options,
         ostream& html);
 
 
@@ -48,17 +50,10 @@ private:
     uint64_t k;
     uint64_t maxSkip;
     uint64_t maxDrift;
+    const Align6Options& align6Options;
     ostream& html;
 
     uint64_t maxOffsetSumDelta;
-
-    // CONSTANTS TO BE EXPOSED WHEN CODE STABILIZES.
-    const uint64_t maxLocalFrequency = 1000000000;
-    const uint64_t minGlobalFrequency = 10;
-    const uint64_t maxGlobalFrequency = 100;
-    const uint64_t minLowFrequencyCount = 4;
-    const double driftRateTolerance = 0.05;
-    const uint64_t maxInBandCount = 1000;
 
     // Class used to store information about a pair of markers in the
     // two oriented reads that have the same KmerId.

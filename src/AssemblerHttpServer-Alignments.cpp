@@ -1114,6 +1114,14 @@ void Assembler::exploreAlignment(
     uint64_t align5MinBandExtend = httpServerData.assemblerOptions->alignOptions.align5MinBandExtend;
     getParameterValue(request, "align5MinBandExtend", align5MinBandExtend);
 
+    // Parameters for alignment method 6.
+    Align6Options align6Options = httpServerData.assemblerOptions->alignOptions.align6Options;
+    getParameterValue(request, "align6MaxLocalFrequency", align6Options.maxLocalFrequency);
+    getParameterValue(request, "align6MinGlobalFrequency", align6Options.minGlobalFrequency);
+    getParameterValue(request, "align6MaxGlobalFrequency", align6Options.maxGlobalFrequency);
+    getParameterValue(request, "align6MinLowFrequencyCount", align6Options.minLowFrequencyCount);
+    getParameterValue(request, "align6DriftRateTolerance", align6Options.driftRateTolerance);
+    getParameterValue(request, "align6MaxInBandCount", align6Options.maxInBandCount);
 
     string displayMatrixString;
     bool displayMatrix = getParameterValue(request, "displayMatrix", displayMatrixString);
@@ -1172,6 +1180,7 @@ void Assembler::exploreAlignment(
         align4MaxDistanceFromBoundary,
         align5DriftRateTolerance,
         align5MinBandExtend,
+        align6Options,
         html
     );
 
@@ -1225,6 +1234,7 @@ void Assembler::exploreAlignment(
         assemblerInfo->k,
         maxSkip,
         maxDrift,
+        align6Options,
         displayDebugInfo ? html : nullStream);
 
     // Compute the alignment.
@@ -1806,6 +1816,7 @@ void Assembler::renderEditableAlignmentConfig(
     uint64_t align4MaxDistanceFromBoundary,
     double align5DriftRateTolerance,
     uint64_t align5MinBandExtend,
+    const Align6Options& align6Options,
     ostream& html
 ) {
     const auto& descriptions = httpServerData.assemblerOptions->allOptionsDescription;
@@ -1936,8 +1947,52 @@ void Assembler::renderEditableAlignmentConfig(
             "<input type=text style='text-align:center;border:none' name=align5MinBandExtend size=16 value=" << align5MinBandExtend << ">"
         "<td class=smaller>" << descriptions.find("Align.align5.minBandExtend", false).description();
 
+    html << "<tr>"
+        "<th class=left>align6.maxLocalFrequency"
+        "<td class=centered>"
+            "<input type=text style='text-align:center;border:none' name=align6MaxLocalFrequency size=16 value=" <<
+            align6Options.maxLocalFrequency << ">"
+        "<td class=smaller>" << descriptions.find("Align.align6.maxLocalFrequency", false).description();
+
+    html << "<tr>"
+        "<th class=left>align6.minGlobalFrequency"
+        "<td class=centered>"
+            "<input type=text style='text-align:center;border:none' name=align6MinGlobalFrequency size=16 value=" <<
+            align6Options.minGlobalFrequency << ">"
+        "<td class=smaller>" << descriptions.find("Align.align6.minGlobalFrequency", false).description();
+
+    html << "<tr>"
+        "<th class=left>align6.maxGlobalFrequency"
+        "<td class=centered>"
+            "<input type=text style='text-align:center;border:none' name=align6MaxGlobalFrequency size=16 value=" <<
+            align6Options.maxGlobalFrequency << ">"
+        "<td class=smaller>" << descriptions.find("Align.align6.maxGlobalFrequency", false).description();
+
+    html << "<tr>"
+        "<th class=left>align6.minLowFrequencyCount"
+        "<td class=centered>"
+            "<input type=text style='text-align:center;border:none' name=align6MinLowFrequencyCount size=16 value=" <<
+            align6Options.minLowFrequencyCount << ">"
+        "<td class=smaller>" << descriptions.find("Align.align6.minLowFrequencyCount", false).description();
+
+    html << "<tr>"
+        "<th class=left>align6.driftRateTolerance"
+        "<td class=centered>"
+            "<input type=text style='text-align:center;border:none' name=align6DriftRateTolerance size=16 value=" <<
+            align6Options.driftRateTolerance << ">"
+        "<td class=smaller>" << descriptions.find("Align.align6.driftRateTolerance", false).description();
+
+    html << "<tr>"
+        "<th class=left>align6.maxInBandCount"
+        "<td class=centered>"
+            "<input type=text style='text-align:center;border:none' name=align6MaxInBandCount size=16 value=" <<
+            align6Options.maxInBandCount << ">"
+        "<td class=smaller>" << descriptions.find("Align.align6.maxInBandCount", false).description();
+
     html << "</table>";
 }
+
+
 
 // Compute alignments on an oriented read against
 // all other oriented reads.
@@ -1997,6 +2052,15 @@ void Assembler::computeAllAlignments(
     computeAllAlignmentsData.align5MinBandExtend = httpServerData.assemblerOptions->alignOptions.align5MinBandExtend;
     getParameterValue(request, "align5MinBandExtend", computeAllAlignmentsData.align5MinBandExtend);
 
+    // Parameters for alignment method 6.
+    Align6Options& align6Options = computeAllAlignmentsData.align6Options;
+    getParameterValue(request, "align6MaxLocalFrequency", align6Options.maxLocalFrequency);
+    getParameterValue(request, "align6MinGlobalFrequency", align6Options.minGlobalFrequency);
+    getParameterValue(request, "align6MaxGlobalFrequency", align6Options.maxGlobalFrequency);
+    getParameterValue(request, "align6MinLowFrequencyCount", align6Options.minLowFrequencyCount);
+    getParameterValue(request, "align6DriftRateTolerance", align6Options.driftRateTolerance);
+    getParameterValue(request, "align6MaxInBandCount", align6Options.maxInBandCount);
+
 
     // Write the form.
     html <<
@@ -2029,6 +2093,7 @@ void Assembler::computeAllAlignments(
         computeAllAlignmentsData.align4MaxDistanceFromBoundary,
         computeAllAlignmentsData.align5DriftRateTolerance,
         computeAllAlignmentsData.align5MinBandExtend,
+        computeAllAlignmentsData.align6Options,
         html
     );
 
@@ -2463,6 +2528,15 @@ void Assembler::assessAlignments(
     computeAllAlignmentsData.align5MinBandExtend = httpServerData.assemblerOptions->alignOptions.align5MinBandExtend;
     getParameterValue(request, "align5MinBandExtend", computeAllAlignmentsData.align5MinBandExtend);
 
+    // Parameters for alignment method 6.
+    Align6Options align6Options = httpServerData.assemblerOptions->alignOptions.align6Options;
+    getParameterValue(request, "align6MaxLocalFrequency", align6Options.maxLocalFrequency);
+    getParameterValue(request, "align6MinGlobalFrequency", align6Options.minGlobalFrequency);
+    getParameterValue(request, "align6MaxGlobalFrequency", align6Options.maxGlobalFrequency);
+    getParameterValue(request, "align6MinLowFrequencyCount", align6Options.minLowFrequencyCount);
+    getParameterValue(request, "align6DriftRateTolerance", align6Options.driftRateTolerance);
+    getParameterValue(request, "align6MaxInBandCount", align6Options.maxInBandCount);
+
 
     html << "<h1>Alignment statistics</h1>";
     html << "<p>This page enables sampling from the pool of reads and computing alignments for each read in the sample "
@@ -2523,6 +2597,7 @@ void Assembler::assessAlignments(
             computeAllAlignmentsData.align4MaxDistanceFromBoundary,
             computeAllAlignmentsData.align5DriftRateTolerance,
             computeAllAlignmentsData.align5MinBandExtend,
+            computeAllAlignmentsData.align6Options,
             html
     );
 
@@ -2854,6 +2929,7 @@ void Assembler::computeAllAlignmentsThreadFunction(size_t threadId)
         assemblerInfo->k,
         maxSkip,
         maxDrift,
+        computeAllAlignmentsData.align6Options,
         nullStream);
 
     // Vectors to contain markers sorted by kmerId.

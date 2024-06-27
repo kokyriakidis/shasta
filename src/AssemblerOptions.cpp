@@ -546,6 +546,36 @@ void AssemblerOptions::addConfigurableOptions()
         default_value(10),
         "Minimum band extension for alignment method 5.")
 
+        ("Align.align6.maxLocalFrequency",
+        value<uint64_t>(&alignOptions.align6Options.maxLocalFrequency)->
+        default_value(100),
+        "Only used for alignment method 6.")
+
+        ("Align.align6.minGlobalFrequency",
+        value<uint64_t>(&alignOptions.align6Options.minGlobalFrequency)->
+        default_value(10),
+        "Only used for alignment method 6.")
+
+        ("Align.align6.maxGlobalFrequency",
+        value<uint64_t>(&alignOptions.align6Options.maxGlobalFrequency)->
+        default_value(100),
+        "Only used for alignment method 6.")
+
+        ("Align.align6.minLowFrequencyCount",
+        value<uint64_t>(&alignOptions.align6Options.minLowFrequencyCount)->
+        default_value(4),
+        "Only used for alignment method 6.")
+
+        ("Align.align6.driftRateTolerance",
+        value<double>(&alignOptions.align6Options.driftRateTolerance)->
+        default_value(0.05),
+        "Only used for alignment method 6.")
+
+        ("Align.align6.maxInBandCount",
+        value<uint64_t>(&alignOptions.align6Options.maxInBandCount)->
+        default_value(1000),
+        "Only used for alignment method 6.")
+
         ("ReadGraph.creationMethod",
         value<int>(&readGraphOptions.creationMethod)->
         default_value(0),
@@ -1237,6 +1267,21 @@ void AlignOptions::write(ostream& s) const
     s << "align4.maxDistanceFromBoundary = " << align4MaxDistanceFromBoundary << "\n";
     s << "align5.driftRateTolerance = " << align5DriftRateTolerance << "\n";
     s << "align5.minBandExtend = " << align5MinBandExtend << "\n";
+
+    align6Options.write(s);
+
+}
+
+
+
+void Align6Options::write(ostream& s) const
+{
+    s << "align6.maxLocalFrequency = " <<  maxLocalFrequency;
+    s << "align6.minGlobalFrequency = " << minGlobalFrequency;
+    s << "align6.maxGlobalFrequency = " << maxGlobalFrequency;
+    s << "align6.minLowFrequencyCount = " << minLowFrequencyCount;
+    s << "align6.driftRateTolerance = " << driftRateTolerance;
+    s << "align6.maxInBandCount = " << maxInBandCount;
 }
 
 

@@ -69,6 +69,7 @@ or something to that effect.
 
 namespace shasta {
     class AlignOptions;
+    class Align6Options;
     class AssemblerOptions;
     class AssemblyOptions;
     class CommandLineOnlyOptions;
@@ -182,6 +183,20 @@ public:
 
 
 
+class shasta::Align6Options {
+public:
+    uint64_t maxLocalFrequency;
+    uint64_t minGlobalFrequency;
+    uint64_t maxGlobalFrequency;
+    uint64_t minLowFrequencyCount;
+    double driftRateTolerance;
+    uint64_t maxInBandCount;
+
+    void write(ostream&) const;
+};
+
+
+
 // Options in the [Align] section of the configuration file.
 // Can also be entered on the command line with option names
 // beginning with "Align.".
@@ -202,12 +217,20 @@ public:
     int maxBand;
     int sameChannelReadAlignmentSuppressDeltaThreshold;
     bool suppressContainments;
+
+    // Align4.
     uint64_t align4DeltaX;
     uint64_t align4DeltaY;
     uint64_t align4MinEntryCountPerCell;
     uint64_t align4MaxDistanceFromBoundary;
+
+    // Align5.
     double align5DriftRateTolerance;
     uint64_t align5MinBandExtend;
+
+    // Align6.
+    Align6Options align6Options;
+
     void write(ostream&) const;
 };
 

@@ -54,15 +54,6 @@ void Assembler::alignOrientedReads6(
         }
     }
 
-
-/*
-    Align6 align6(
-        assemblerInfo->k,
-        maxSkip,
-        maxDrift,
-        html);
-*/
-
     align6.align(orientedReadAlign6MarkersSpans, alignment, alignmentInfo);
 
 }
