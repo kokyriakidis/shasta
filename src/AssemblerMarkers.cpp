@@ -4,6 +4,7 @@
 #include "extractKmer.hpp"
 #include "findMarkerId.hpp"
 #include "KmerCounter.hpp"
+#include "KmerDistributionInfo.hpp"
 #include "MarkerFinder.hpp"
 #include "performanceLog.hpp"
 #include "timestamp.hpp"
@@ -702,8 +703,16 @@ KmerId Assembler::getOrientedReadMarkerKmerId(OrientedReadId orientedReadId, uin
 void Assembler::countKmers(uint64_t threadCount)
 {
     SHASTA_ASSERT(markers.isOpen());
-    kmerCounter = make_shared<KmerCounter>(assemblerInfo->k, getReads(), markers, *this, threadCount);
+    kmerCounter = make_shared<KmerCounter>(
+        assemblerInfo->k, getReads(), markers, *this, assemblerInfo->kmerDistributionInfo, threadCount);
+
+    cout << "Marker k-mer coverage distribution:"
+        " low "   << assemblerInfo->kmerDistributionInfo.coverageLow <<
+        ", peak " << assemblerInfo->kmerDistributionInfo.coveragePeak <<
+        ", high " << assemblerInfo->kmerDistributionInfo.coverageHigh << endl;
 }
+
+
 
 void Assembler::accessKmerCounts()
 {

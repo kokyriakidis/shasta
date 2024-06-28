@@ -10,6 +10,7 @@
 #include "HttpServer.hpp"
 #include "invalid.hpp"
 #include "Kmer.hpp"
+#include "KmerDistributionInfo.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "Marker.hpp"
 #include "MarkerGraph.hpp"
@@ -158,6 +159,10 @@ public:
     size_t chimericReadCount = 0;
     uint64_t isolatedReadCount = 0;
     uint64_t isolatedReadBaseCount = 0;
+
+    // The coverage distribution of marker k-mers.
+    // Only filled in for --Align.alignMethod 6.
+    KmerDistributionInfo kmerDistributionInfo;
 
     // Alignment criteria actually used.
     // For readGraph creation method 0, they are the values specified

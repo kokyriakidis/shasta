@@ -1,6 +1,7 @@
 #include "KmerCounter.hpp"
 #include "deduplicate.hpp"
 #include "extractKmer.hpp"
+#include "KmerDistributionInfo.hpp"
 #include "Marker.hpp"
 #include "MurmurHash2.hpp"
 #include "performanceLog.hpp"
@@ -20,6 +21,7 @@ KmerCounter::KmerCounter(
     const Reads& reads,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     const MappedMemoryOwner& mappedMemoryOwner,
+    KmerDistributionInfo& kmerDistributionInfo,
     uint64_t threadCount
     ) :
     MultithreadedObject(*this),
@@ -52,9 +54,9 @@ KmerCounter::KmerCounter(
     const uint64_t desiredBucketCount = kmerCount / averageBucketSize;
     const uint64_t bucketCount = std::bit_ceil(desiredBucketCount);
     hashMask = bucketCount - 1;
-    cout << "Total number of marker k-mer on one strand " << kmerCount << endl;
-    cout << "Number of buckets for k-mer counting " << bucketCount << " " << hex << bucketCount << dec << endl;
-    cout << "Hashing mask " << hex << hashMask << dec << endl;
+    // cout << "Total number of marker k-mer on one strand " << kmerCount << endl;
+    // cout << "Number of buckets for k-mer counting " << bucketCount << " " << hex << bucketCount << dec << endl;
+    // cout << "Hashing mask " << hex << hashMask << dec << endl;
     kmerIds.createNew(largeDataName("tmp-KmerCounterKmerIds"), largeDataPageSize);
 
     // Gather marker KmerIds of all the reads (one strand only).
@@ -82,6 +84,7 @@ KmerCounter::KmerCounter(
 
     // Create a histogram of k-mer frequencies.
     createHistogram();
+    getHistogramInfo(kmerDistributionInfo);
 
     // Final message.
     const auto tEnd = std::chrono::steady_clock::now();
@@ -309,4 +312,58 @@ uint64_t KmerCounter::getFrequency(const Kmer& kmer) const
         }
     }
     return 0;
+}
+
+
+
+void KmerCounter::getHistogramInfo(KmerDistributionInfo& info) const
+{
+    // Set coverageLow to the first value where the histogram starts increasing.
+
+    info.coverageLow = invalid<uint64_t>;
+    uint64_t frequencyAtCoverageLow = invalid<uint64_t>;
+    uint64_t previousFrequency = std::numeric_limits<uint64_t>::max();
+
+    auto it = histogram.begin();
+    for(; it!=histogram.end(); ++it) {
+        const uint64_t coverage = it->first;
+        const uint64_t frequency = it->second;
+
+        if(frequency > previousFrequency) {
+            info.coverageLow = coverage;
+            frequencyAtCoverageLow = frequency;
+            break;
+        } else {
+            previousFrequency = frequency;
+        }
+    }
+    SHASTA_ASSERT(info.coverageLow != invalid<uint64_t>);
+
+
+
+    // Set coveragePeak to the value grater than coverageLow at which the histogram
+    // reaches its maximum.
+    info.coveragePeak = info.coverageLow;
+    uint64_t maxFrequency = frequencyAtCoverageLow;
+    for(; it!=histogram.end(); ++it) {
+        const uint64_t coverage = it->first;
+        const uint64_t frequency = it->second;
+        if(frequency > maxFrequency) {
+            info.coveragePeak = coverage;
+            maxFrequency = frequency;
+        }
+    }
+
+    // Set coverageHigh to the last coverage with frequency
+    // at least equal to frequencyAtCoverageLow.
+    info.coverageHigh = invalid<uint64_t>;
+    for(uint64_t i=histogram.size()-1; i>0; i--) {
+        const uint64_t coverage = histogram[i].first;
+        const uint64_t frequency = histogram[i].second;
+        if(frequency >= frequencyAtCoverageLow) {
+            info.coverageHigh = coverage;
+            break;
+        }
+    }
+    SHASTA_ASSERT(info.coverageHigh != invalid<uint64_t>);
 }

@@ -15,6 +15,7 @@ namespace shasta {
     class KmerCounter;
 
     class CompressedMarker;
+    class KmerDistributionInfo;
     class Reads;
 }
 
@@ -30,6 +31,7 @@ public:
         const Reads&,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         const MappedMemoryOwner& mappedMemoryOwner,
+        KmerDistributionInfo&,
         uint64_t threadCount
         );
 
@@ -85,4 +87,6 @@ private:
     void createHistogram();
 public:
     MemoryMapped::Vector< pair<uint64_t, uint64_t> > histogram;
+
+    void getHistogramInfo(KmerDistributionInfo&) const;
 };
