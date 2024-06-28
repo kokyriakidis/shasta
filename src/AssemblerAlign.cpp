@@ -387,6 +387,7 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
         maxSkip,
         maxDrift,
         data.alignOptions->align6Options,
+        assemblerInfo->kmerDistributionInfo,
         nullStream);
 
     vector<AlignmentData>& threadAlignmentData = data.threadAlignmentData[threadId];

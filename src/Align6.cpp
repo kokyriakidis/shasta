@@ -5,6 +5,7 @@
 #include "Alignment.hpp"
 #include "invalid.hpp"
 #include "KmerCounter.hpp"
+#include "KmerDistributionInfo.hpp"
 #include "longestPath.hpp"
 #include "orderPairs.hpp"
 // #include "timestamp.hpp"
@@ -24,6 +25,7 @@ Align6::Align6(
     uint64_t maxSkip,
     uint64_t maxDrift,
     const Align6Options& align6Options,
+    const KmerDistributionInfo& kmerDistributionInfo,
     ostream& html) :
     k(k),
     maxSkip(maxSkip),
@@ -31,7 +33,20 @@ Align6::Align6(
     align6Options(align6Options),
     html(html),
     maxOffsetSumDelta(2 * maxSkip)
-{}
+{
+
+    // Set minGlobalFrequency and maxGlobalFrequency.
+    // If align6Options.minGlobalFrequency and align6Options.maxGlobalFrequency
+    // are both 0 (the default), these are obtained from the
+    // KmerDistributionInfo. Otherwise, they are taken from the Align6Options.
+    if((align6Options.minGlobalFrequency == 0) and (align6Options.maxGlobalFrequency == 0)) {
+        minGlobalFrequency = kmerDistributionInfo.coverageLow;
+        maxGlobalFrequency = kmerDistributionInfo.coverageHigh;
+    } else {
+        minGlobalFrequency = align6Options.minGlobalFrequency;
+        maxGlobalFrequency = align6Options.maxGlobalFrequency;
+    }
+}
 
 
 
@@ -205,8 +220,8 @@ void Align6::computeLowFrequencyMarkerPairOffsets(
             if(
                 (localFrequency0 <= align6Options.maxLocalFrequency) and
                 (localFrequency1 <= align6Options.maxLocalFrequency) and
-                (globalFrequency >= align6Options.minGlobalFrequency) and
-                (globalFrequency <= align6Options.maxGlobalFrequency)) {
+                (globalFrequency >= minGlobalFrequency) and
+                (globalFrequency <= maxGlobalFrequency)) {
 
                 MarkerPair markerPair;
                 markerPair.kmerId = kmerId;
@@ -596,10 +611,10 @@ uint64_t Align6::findBestComponent()
     count.resize(inBandMarkerPairs.size(), 0);
     for(uint64_t i=0; i<inBandMarkerPairs.size(); i++) {
         const MarkerPair& markerPair = inBandMarkerPairs[i];
-        if(markerPair.globalFrequency > align6Options.maxGlobalFrequency) {
+        if(markerPair.globalFrequency > maxGlobalFrequency) {
             continue;
         }
-        if(markerPair.globalFrequency < align6Options.minGlobalFrequency) {
+        if(markerPair.globalFrequency < minGlobalFrequency) {
             continue;
         }
         if(markerPair.localFrequency0 > align6Options.maxLocalFrequency) {

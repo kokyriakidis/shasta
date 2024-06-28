@@ -1235,6 +1235,7 @@ void Assembler::exploreAlignment(
         maxSkip,
         maxDrift,
         align6Options,
+        assemblerInfo->kmerDistributionInfo,
         displayDebugInfo ? html : nullStream);
 
     // Compute the alignment.
@@ -2930,6 +2931,7 @@ void Assembler::computeAllAlignmentsThreadFunction(size_t threadId)
         maxSkip,
         maxDrift,
         computeAllAlignmentsData.align6Options,
+        assemblerInfo->kmerDistributionInfo,
         nullStream);
 
     // Vectors to contain markers sorted by kmerId.

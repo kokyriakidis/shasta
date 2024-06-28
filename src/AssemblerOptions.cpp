@@ -553,12 +553,12 @@ void AssemblerOptions::addConfigurableOptions()
 
         ("Align.align6.minGlobalFrequency",
         value<uint64_t>(&alignOptions.align6Options.minGlobalFrequency)->
-        default_value(10),
+        default_value(0),
         "Only used for alignment method 6.")
 
         ("Align.align6.maxGlobalFrequency",
         value<uint64_t>(&alignOptions.align6Options.maxGlobalFrequency)->
-        default_value(100),
+        default_value(0),
         "Only used for alignment method 6.")
 
         ("Align.align6.minLowFrequencyCount",
@@ -1276,12 +1276,12 @@ void AlignOptions::write(ostream& s) const
 
 void Align6Options::write(ostream& s) const
 {
-    s << "align6.maxLocalFrequency = " <<  maxLocalFrequency;
-    s << "align6.minGlobalFrequency = " << minGlobalFrequency;
-    s << "align6.maxGlobalFrequency = " << maxGlobalFrequency;
-    s << "align6.minLowFrequencyCount = " << minLowFrequencyCount;
-    s << "align6.driftRateTolerance = " << driftRateTolerance;
-    s << "align6.maxInBandCount = " << maxInBandCount;
+    s << "align6.maxLocalFrequency = " <<  maxLocalFrequency << "\n";
+    s << "align6.minGlobalFrequency = " << minGlobalFrequency << "\n";
+    s << "align6.maxGlobalFrequency = " << maxGlobalFrequency << "\n";
+    s << "align6.minLowFrequencyCount = " << minLowFrequencyCount << "\n";
+    s << "align6.driftRateTolerance = " << driftRateTolerance << "\n";
+    s << "align6.maxInBandCount = " << maxInBandCount << "\n";
 }
 
 

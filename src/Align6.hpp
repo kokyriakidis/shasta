@@ -21,6 +21,7 @@ namespace shasta {
     class Align6Options;
     class Alignment;
     class AlignmentInfo;
+    class KmerDistributionInfo;
 }
 
 
@@ -35,6 +36,7 @@ public:
         uint64_t maxSkip,
         uint64_t maxDrift,
         const Align6Options& align6Options,
+        const KmerDistributionInfo&,
         ostream& html);
 
 
@@ -52,6 +54,13 @@ private:
     uint64_t maxDrift;
     const Align6Options& align6Options;
     ostream& html;
+
+    // The minGlobalFrequency and maxLocalFrequency actually used.
+    // If align6Options.minGlobalFrequency and align6Options.maxGlobalFrequency
+    // are both 0 (the default), these are obtained from the
+    // KmerDistributionInfo. Otherwise, they are taken from the Align6Options.
+    uint64_t minGlobalFrequency;
+    uint64_t maxGlobalFrequency;
 
     uint64_t maxOffsetSumDelta;
 
