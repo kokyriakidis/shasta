@@ -561,6 +561,11 @@ void AssemblerOptions::addConfigurableOptions()
         default_value(0),
         "Only used for alignment method 6.")
 
+        ("Align.align6.maxGlobalFrequencyMultiplier",
+        value<double>(&alignOptions.align6Options.maxGlobalFrequencyMultiplier)->
+        default_value(2.),
+        "Only used for alignment method 6.")
+
         ("Align.align6.minLowFrequencyCount",
         value<uint64_t>(&alignOptions.align6Options.minLowFrequencyCount)->
         default_value(4),
@@ -1279,6 +1284,7 @@ void Align6Options::write(ostream& s) const
     s << "align6.maxLocalFrequency = " <<  maxLocalFrequency << "\n";
     s << "align6.minGlobalFrequency = " << minGlobalFrequency << "\n";
     s << "align6.maxGlobalFrequency = " << maxGlobalFrequency << "\n";
+    s << "align6.maxGlobalFrequencyMultiplier = " << maxGlobalFrequencyMultiplier << "\n";
     s << "align6.minLowFrequencyCount = " << minLowFrequencyCount << "\n";
     s << "align6.driftRateTolerance = " << driftRateTolerance << "\n";
     s << "align6.maxInBandCount = " << maxInBandCount << "\n";

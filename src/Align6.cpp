@@ -41,11 +41,21 @@ Align6::Align6(
     // KmerDistributionInfo. Otherwise, they are taken from the Align6Options.
     if((align6Options.minGlobalFrequency == 0) and (align6Options.maxGlobalFrequency == 0)) {
         minGlobalFrequency = kmerDistributionInfo.coverageLow;
-        maxGlobalFrequency = kmerDistributionInfo.coverageHigh;
+        maxGlobalFrequency = uint64_t(std::round(
+            align6Options.maxGlobalFrequencyMultiplier * double(kmerDistributionInfo.coverageHigh)));
     } else {
         minGlobalFrequency = align6Options.minGlobalFrequency;
         maxGlobalFrequency = align6Options.maxGlobalFrequency;
     }
+}
+
+
+
+void Align6::writeGlobalFrequencyCriteria(ostream& s) const
+{
+    s << "K-mer global frequency criteria for alignment computations are set as follows:" << endl;
+    s << "Minimum global frequency " << minGlobalFrequency << endl;
+    s << "Maximum global frequency " << maxGlobalFrequency << endl;
 }
 
 

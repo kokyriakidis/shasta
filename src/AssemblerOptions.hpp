@@ -188,6 +188,7 @@ public:
     uint64_t maxLocalFrequency;
     uint64_t minGlobalFrequency;
     uint64_t maxGlobalFrequency;
+    double maxGlobalFrequencyMultiplier;
     uint64_t minLowFrequencyCount;
     double driftRateTolerance;
     uint64_t maxInBandCount;

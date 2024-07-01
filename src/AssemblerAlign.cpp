@@ -389,6 +389,10 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
         data.alignOptions->align6Options,
         assemblerInfo->kmerDistributionInfo,
         nullStream);
+    if((threadId == 0) and (alignmentMethod == 6)) {
+        std::lock_guard<std::mutex> lock(mutex);
+        align6.writeGlobalFrequencyCriteria(cout);
+    }
 
     vector<AlignmentData>& threadAlignmentData = data.threadAlignmentData[threadId];
     

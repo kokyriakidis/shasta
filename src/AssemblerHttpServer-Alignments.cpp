@@ -1119,6 +1119,7 @@ void Assembler::exploreAlignment(
     getParameterValue(request, "align6MaxLocalFrequency", align6Options.maxLocalFrequency);
     getParameterValue(request, "align6MinGlobalFrequency", align6Options.minGlobalFrequency);
     getParameterValue(request, "align6MaxGlobalFrequency", align6Options.maxGlobalFrequency);
+    getParameterValue(request, "align6MaxGlobalFrequencyMultiplier", align6Options.maxGlobalFrequency);
     getParameterValue(request, "align6MinLowFrequencyCount", align6Options.minLowFrequencyCount);
     getParameterValue(request, "align6DriftRateTolerance", align6Options.driftRateTolerance);
     getParameterValue(request, "align6MaxInBandCount", align6Options.maxInBandCount);
@@ -1136,6 +1137,8 @@ void Assembler::exploreAlignment(
     getParameterValue(request, "minGlobalFrequency", minGlobalFrequency);
     uint64_t maxGlobalFrequency = 0;
     getParameterValue(request, "maxGlobalFrequency", maxGlobalFrequency);
+    double maxGlobalFrequencyMultiplier = 0.;
+    getParameterValue(request, "maxGlobalFrequencyMultiplier", maxGlobalFrequencyMultiplier);
 
     string displayDetailsString;
     bool displayDetails = getParameterValue(request, "displayDetails", displayDetailsString);
@@ -1970,6 +1973,13 @@ void Assembler::renderEditableAlignmentConfig(
         "<td class=smaller>" << descriptions.find("Align.align6.maxGlobalFrequency", false).description();
 
     html << "<tr>"
+        "<th class=left>align6.maxGlobalFrequencyMultiplier"
+        "<td class=centered>"
+            "<input type=text style='text-align:center;border:none' name=align6MaxGlobalFrequencyMultiplier size=16 value=" <<
+            align6Options.maxGlobalFrequencyMultiplier << ">"
+        "<td class=smaller>" << descriptions.find("Align.align6.maxGlobalFrequencyMultiplier", false).description();
+
+    html << "<tr>"
         "<th class=left>align6.minLowFrequencyCount"
         "<td class=centered>"
             "<input type=text style='text-align:center;border:none' name=align6MinLowFrequencyCount size=16 value=" <<
@@ -2058,6 +2068,7 @@ void Assembler::computeAllAlignments(
     getParameterValue(request, "align6MaxLocalFrequency", align6Options.maxLocalFrequency);
     getParameterValue(request, "align6MinGlobalFrequency", align6Options.minGlobalFrequency);
     getParameterValue(request, "align6MaxGlobalFrequency", align6Options.maxGlobalFrequency);
+    getParameterValue(request, "align6MaxGlobalFrequencyMultiplier", align6Options.maxGlobalFrequencyMultiplier);
     getParameterValue(request, "align6MinLowFrequencyCount", align6Options.minLowFrequencyCount);
     getParameterValue(request, "align6DriftRateTolerance", align6Options.driftRateTolerance);
     getParameterValue(request, "align6MaxInBandCount", align6Options.maxInBandCount);
@@ -2534,6 +2545,7 @@ void Assembler::assessAlignments(
     getParameterValue(request, "align6MaxLocalFrequency", align6Options.maxLocalFrequency);
     getParameterValue(request, "align6MinGlobalFrequency", align6Options.minGlobalFrequency);
     getParameterValue(request, "align6MaxGlobalFrequency", align6Options.maxGlobalFrequency);
+    getParameterValue(request, "align6MaxGlobalFrequencyMultiplier", align6Options.maxGlobalFrequencyMultiplier);
     getParameterValue(request, "align6MinLowFrequencyCount", align6Options.minLowFrequencyCount);
     getParameterValue(request, "align6DriftRateTolerance", align6Options.driftRateTolerance);
     getParameterValue(request, "align6MaxInBandCount", align6Options.maxInBandCount);

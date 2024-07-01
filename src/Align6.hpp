@@ -47,6 +47,8 @@ public:
         Alignment& alignment,
         AlignmentInfo& alignmentInfo);
 
+    void writeGlobalFrequencyCriteria(ostream&) const;
+
 private:
 
     uint64_t k;
