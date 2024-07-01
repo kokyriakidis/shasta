@@ -168,6 +168,12 @@ private:
         boost::no_property, boost::no_property, boost::no_property,
         boost::vecS>;
     Graph graph;
+    void computeAlignment1(
+        const array<span<Align6Marker>, 2>& orientedReadMarkers,
+        Alignment& alignment,
+        AlignmentInfo& alignmentInfo);
+    vector<uint64_t> length;
+    vector<uint64_t> predecessor;
 
     // This is called when we give up.
     // Stores an empty alignment and the corresponding AlignmentInfo.

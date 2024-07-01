@@ -1119,7 +1119,7 @@ void Assembler::exploreAlignment(
     getParameterValue(request, "align6MaxLocalFrequency", align6Options.maxLocalFrequency);
     getParameterValue(request, "align6MinGlobalFrequency", align6Options.minGlobalFrequency);
     getParameterValue(request, "align6MaxGlobalFrequency", align6Options.maxGlobalFrequency);
-    getParameterValue(request, "align6MaxGlobalFrequencyMultiplier", align6Options.maxGlobalFrequency);
+    getParameterValue(request, "align6MaxGlobalFrequencyMultiplier", align6Options.maxGlobalFrequencyMultiplier);
     getParameterValue(request, "align6MinLowFrequencyCount", align6Options.minLowFrequencyCount);
     getParameterValue(request, "align6DriftRateTolerance", align6Options.driftRateTolerance);
     getParameterValue(request, "align6MaxInBandCount", align6Options.maxInBandCount);
@@ -1240,6 +1240,11 @@ void Assembler::exploreAlignment(
         align6Options,
         assemblerInfo->kmerDistributionInfo,
         displayDebugInfo ? html : nullStream);
+    if(method == 6 and displayDebugInfo) {
+        html << "<pre>";
+        align6.writeGlobalFrequencyCriteria(html);
+        html << "</pre>";
+    }
 
     // Compute the alignment.
     // This creates file Alignment.png.

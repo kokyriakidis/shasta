@@ -111,12 +111,12 @@ void Align6::align(
     clear();
 
     // Find ordinal offsets of the low frequency marker pairs.
-    // If there are two few of them, store an empty alignment and return.
+    // If there are too few of them, store an empty alignment and return.
     // cout << timestamp << "***B" << endl;
     computeLowFrequencyMarkerPairOffsets(orientedReadMarkers);
     if(lowFrequencyMarkerPairOffsets.size() < align6Options.minLowFrequencyCount) {
         if(html) {
-            html << "<br>Two few low frequency marker pairs found.";
+            html << "<br>Too few low frequency marker pairs found.";
         }
         storeEmptyAlignment(orientedReadMarkers, alignment, alignmentInfo);
         return;
@@ -162,7 +162,7 @@ void Align6::align(
 
     // Use the active marker pairs to compute the alignment.
     // cout << timestamp << "***J" << endl;
-    computeAlignment(orientedReadMarkers, alignment, alignmentInfo);
+    computeAlignment1(orientedReadMarkers, alignment, alignmentInfo);
     // cout << timestamp << "***K" << endl;
 }
 
@@ -762,6 +762,75 @@ void Align6::computeAlignment(
         const MarkerPair& markerPair = activeMarkerPairs[v];
         alignment.ordinals.push_back({markerPair.ordinal0, markerPair.ordinal1});
     }
+
+
+    // Store the alignment info.
+    alignmentInfo.create(
+        alignment,
+        uint32_t(orientedReadMarkers[0].size()),
+        uint32_t(orientedReadMarkers[1].size()));
+    // alignmentInfo.uniquenessMetric = uniquenessMetric;
+}
+
+
+
+// More efficient version in which the directed graph is constructed implicitly.
+// Use the active marker pairs to compute the alignment.
+void Align6::computeAlignment1(
+    const array<span<Align6Marker>, 2>& orientedReadMarkers,
+    Alignment& alignment,
+    AlignmentInfo& alignmentInfo)
+{
+    // The maximum length of a path ending at each active marker pair.
+    length.resize(activeMarkerPairs.size());
+    fill(length.begin(), length.end(), 0);
+    predecessor.resize(activeMarkerPairs.size());
+    fill(predecessor.begin(), predecessor.end(), invalid<uint64_t>);
+
+    for(uint64_t v0=0; v0<activeMarkerPairs.size(); v0++) {
+        const MarkerPair& markerPairInfo0 = activeMarkerPairs[v0];
+        const uint64_t ordinalSum0 = markerPairInfo0.ordinalSum();
+        const uint64_t length0 = length[v0];
+        const uint64_t length0plus1 = length0 + 1;
+
+        for(uint64_t v1=v0+1; v1<activeMarkerPairs.size(); v1++) {
+            const MarkerPair& markerPairInfo1 = activeMarkerPairs[v1];
+
+            const uint64_t ordinalSum1 = markerPairInfo1.ordinalSum();
+            if(ordinalSum1 - ordinalSum0 > maxOffsetSumDelta) {
+                break;
+            }
+
+            // If these two MarkerPair are compatible with maxSkip, maxDrift,
+            // Add an edge corresponding to these marker pairs.
+            if(canBeConnected(markerPairInfo0, markerPairInfo1)) {
+                uint64_t& length1 = length[v1];
+                if(length0plus1 > length1) {
+                    length1 = length0plus1;
+                    predecessor[v1] = v0;
+                }
+            }
+        }
+    }
+
+    // Find the vertex with the maximum path length.
+    uint64_t v = max_element(length.begin(), length.end()) - length.begin();
+
+
+
+    // Walk back from here.
+    alignment.clear();
+    while(true) {
+        const MarkerPair& markerPair = activeMarkerPairs[v];
+        alignment.ordinals.push_back({markerPair.ordinal0, markerPair.ordinal1});
+
+        v = predecessor[v];
+        if(v == invalid<uint64_t>) {
+            break;
+        }
+    }
+    reverse(alignment.ordinals.begin(), alignment.ordinals.end());
+
 
 
     // Store the alignment info.
