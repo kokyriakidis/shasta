@@ -750,7 +750,7 @@ void Align6::computeAlignment(
 
 
     // Compute the longest path. This gives us the alignment.
-    shasta::longestPath(graph, longestPath);
+    shasta::longestPath1(graph, longestPath);
     if(html) {
         html << "The longest path uses " << longestPath.size() <<
             " vertices out of " << activeMarkerPairs.size() << endl;
