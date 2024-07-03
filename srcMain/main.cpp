@@ -660,6 +660,11 @@ void shasta::main::assemble(
             threadCount);
     }
 
+    // For align method 6, marker KmerIds are freed here.
+    // For other align methods this is done later./
+    if(assemblerOptions.alignOptions.alignMethod == 6) {
+        assembler.cleanupMarkerKmerIds();
+    }
 
 
     // Suppress alignment candidates where reads are close on the same channel.
@@ -680,8 +685,10 @@ void shasta::main::assemble(
         threadCount);
 
     // Marker KmerIds are freed here.
-    // They can always be recomputed from the reads when needed.
-    assembler.cleanupMarkerKmerIds();
+    // For align method 6 this is done earlier.
+    if(assemblerOptions.alignOptions.alignMethod != 6) {
+        assembler.cleanupMarkerKmerIds();
+    }
 
 
     // Create the read graph.
