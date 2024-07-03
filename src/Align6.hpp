@@ -97,6 +97,9 @@ private:
     void clear();
     void free();
 
+    // The number of times align was called.
+    uint64_t alignCount = 0;
+
     // The ordinal offsets of the low frequency marker pairs.
     // The low frequency marker pairs consists of pairs (ordinal0, ordinal1)
     // such that KmerId(orientedReadId0, ordinal0) == KmerId(orientedReadId1, ordinal1),

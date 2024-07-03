@@ -76,6 +76,9 @@ void Align6::clear()
     graph.m_vertices.clear();
     graph.m_edges.clear();
     graph.clear();
+
+    length.clear();
+    predecessor.clear();
 }
 
 
@@ -98,6 +101,9 @@ void Align6::free()
     graph.m_vertices.shrink_to_fit();
     graph.m_edges.shrink_to_fit();
     graph = Graph();
+
+    length.shrink_to_fit();
+    predecessor.shrink_to_fit();
 }
 
 
@@ -107,8 +113,7 @@ void Align6::align(
     Alignment& alignment,
     AlignmentInfo& alignmentInfo)
 {
-    // cout << timestamp << "***A" << endl;
-    clear();
+    ++alignCount;
 
     // Find ordinal offsets of the low frequency marker pairs.
     // If there are too few of them, store an empty alignment and return.
@@ -164,6 +169,13 @@ void Align6::align(
     // cout << timestamp << "***J" << endl;
     computeAlignment1(orientedReadMarkers, alignment, alignmentInfo);
     // cout << timestamp << "***K" << endl;
+
+    // Free the memory every now and then to avoid long term growth.
+    if((alignCount % 10) == 0) {
+        free();
+    } else {
+        clear();
+    }
 }
 
 
