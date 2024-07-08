@@ -132,7 +132,9 @@ private:
 
     // The marker pairs in contained in this band.
     vector<MarkerPair> inBandMarkerPairs;
-    void gatherMarkerPairsInBand(const array<span<Align6Marker>, 2>& orientedReadMarkers);
+    bool gatherMarkerPairsInBand(
+        const array<span<Align6Marker>, 2>& orientedReadMarkers,
+        uint64_t maxInBandCount);
 
     // Find out if two MarkerPairs can be connected compatibly with maxSkip and maxDrift.
     bool canBeConnected(const MarkerPair&, const MarkerPair&) const;

@@ -138,7 +138,16 @@ void Align6::align(
 
     // Gather all marker pairs in the band, regardless of frequency.
     // cout << timestamp << "***E" << endl;
-    gatherMarkerPairsInBand(orientedReadMarkers);
+    const double maxBandRatio = 20.;
+    const uint64_t maxInBandCount = uint64_t(maxBandRatio * double(bandHigh - bandLow));
+    if(not gatherMarkerPairsInBand(orientedReadMarkers, maxInBandCount)) {
+        if(html) {
+            html << "<br>Too many marker pairs in band.";
+        }
+        storeEmptyAlignment(orientedReadMarkers, alignment, alignmentInfo);
+        freeOrClear();
+        return;
+    }
 
     // Compute connected components of the marker pairs in the band.
     // Two marker pairs belong to the same component if
@@ -433,8 +442,11 @@ void Align6::computeBand(
 }
 
 
+
 // Gather all marker pairs in the band, regardless of frequency.
-void Align6::gatherMarkerPairsInBand(const array<span<Align6Marker>, 2>& orientedReadMarkers)
+bool Align6::gatherMarkerPairsInBand(
+    const array<span<Align6Marker>, 2>& orientedReadMarkers,
+    uint64_t maxInBandCount)
 {
     inBandMarkerPairs.clear();
 
@@ -487,6 +499,9 @@ void Align6::gatherMarkerPairsInBand(const array<span<Align6Marker>, 2>& oriente
                     const int64_t offset = markerPair.ordinalOffset();
                     if((offset >= bandLow) and (offset <= bandHigh)) {
                         inBandMarkerPairs.push_back(markerPair);
+                        if(inBandMarkerPairs.size() > maxInBandCount) {
+                            return false;
+                        }
                     }
                 }
             }
@@ -505,6 +520,8 @@ void Align6::gatherMarkerPairsInBand(const array<span<Align6Marker>, 2>& oriente
 
     // Sort them by ordinalSum.
     sort(inBandMarkerPairs.begin(), inBandMarkerPairs.end());
+
+    return true;
 }
 
 
