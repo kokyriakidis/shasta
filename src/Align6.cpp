@@ -138,8 +138,9 @@ void Align6::align(
 
     // Gather all marker pairs in the band, regardless of frequency.
     // cout << timestamp << "***E" << endl;
-    const double maxBandRatio = 20.;
-    const uint64_t maxInBandCount = uint64_t(maxBandRatio * double(bandHigh - bandLow));
+    const double maxBandRatio = 100.;
+    const uint64_t maxInBandCount = uint64_t(maxBandRatio *
+        double(min(orientedReadMarkers[0].size(), orientedReadMarkers[1].size())));
     if(not gatherMarkerPairsInBand(orientedReadMarkers, maxInBandCount)) {
         if(html) {
             html << "<br>Too many marker pairs in band.";
