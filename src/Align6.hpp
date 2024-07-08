@@ -99,6 +99,7 @@ private:
 
     // The number of times align was called.
     uint64_t alignCount = 0;
+    void freeOrClear();
 
     // The ordinal offsets of the low frequency marker pairs.
     // The low frequency marker pairs consists of pairs (ordinal0, ordinal1)

@@ -124,6 +124,7 @@ void Align6::align(
             html << "<br>Too few low frequency marker pairs found.";
         }
         storeEmptyAlignment(orientedReadMarkers, alignment, alignmentInfo);
+        freeOrClear();
         return;
     }
 
@@ -157,6 +158,7 @@ void Align6::align(
             html << "<br>Too few low frequency marker pairs found in the best component.";
         }
         storeEmptyAlignment(orientedReadMarkers, alignment, alignmentInfo);
+        freeOrClear();
         return;
     }
 
@@ -171,6 +173,14 @@ void Align6::align(
     // cout << timestamp << "***K" << endl;
 
     // Free the memory every now and then to avoid long term growth.
+    freeOrClear();
+}
+
+
+
+// Free the memory every now and then to avoid long term growth.
+void Align6::freeOrClear()
+{
     if((alignCount % 10) == 0) {
         free();
     } else {
