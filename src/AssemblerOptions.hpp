@@ -192,6 +192,7 @@ public:
     uint64_t minLowFrequencyCount;
     double driftRateTolerance;
     uint64_t maxInBandCount;
+    double maxInBandRatio;
 
     void write(ostream&) const;
 };

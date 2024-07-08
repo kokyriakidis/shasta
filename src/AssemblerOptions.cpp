@@ -581,6 +581,11 @@ void AssemblerOptions::addConfigurableOptions()
         default_value(1000),
         "Only used for alignment method 6.")
 
+        ("Align.align6.maxInBandRatio",
+        value<double>(&alignOptions.align6Options.maxInBandRatio)->
+        default_value(100.),
+        "Only used for alignment method 6.")
+
         ("ReadGraph.creationMethod",
         value<int>(&readGraphOptions.creationMethod)->
         default_value(0),
@@ -1288,6 +1293,7 @@ void Align6Options::write(ostream& s) const
     s << "align6.minLowFrequencyCount = " << minLowFrequencyCount << "\n";
     s << "align6.driftRateTolerance = " << driftRateTolerance << "\n";
     s << "align6.maxInBandCount = " << maxInBandCount << "\n";
+    s << "align6.maxInBandRatio = " << maxInBandRatio << "\n";
 }
 
 

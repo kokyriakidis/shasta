@@ -138,15 +138,14 @@ void Align6::align(
 
     // Gather all marker pairs in the band, regardless of frequency.
     // cout << timestamp << "***E" << endl;
-    const double maxBandRatio = 100.;
-    const uint64_t maxInBandCount = uint64_t(maxBandRatio *
+    const uint64_t maxTotalInBandCount = uint64_t(align6Options.maxInBandRatio *
         double(min(orientedReadMarkers[0].size(), orientedReadMarkers[1].size())));
-    if(not gatherMarkerPairsInBand(orientedReadMarkers, maxInBandCount)) {
+    if(not gatherMarkerPairsInBand(orientedReadMarkers, maxTotalInBandCount)) {
         if(html) {
             html << "<br>Too many marker pairs in band.";
         }
         storeEmptyAlignment(orientedReadMarkers, alignment, alignmentInfo);
-        freeOrClear();
+        free();
         return;
     }
 
@@ -447,7 +446,7 @@ void Align6::computeBand(
 // Gather all marker pairs in the band, regardless of frequency.
 bool Align6::gatherMarkerPairsInBand(
     const array<span<Align6Marker>, 2>& orientedReadMarkers,
-    uint64_t maxInBandCount)
+    uint64_t maxTotalInBandCount)
 {
     inBandMarkerPairs.clear();
 
@@ -500,7 +499,7 @@ bool Align6::gatherMarkerPairsInBand(
                     const int64_t offset = markerPair.ordinalOffset();
                     if((offset >= bandLow) and (offset <= bandHigh)) {
                         inBandMarkerPairs.push_back(markerPair);
-                        if(inBandMarkerPairs.size() > maxInBandCount) {
+                        if(inBandMarkerPairs.size() > maxTotalInBandCount) {
                             return false;
                         }
                     }
