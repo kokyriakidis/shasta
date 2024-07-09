@@ -21,7 +21,6 @@ KmerCounter::KmerCounter(
     const Reads& reads,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     const MappedMemoryOwner& mappedMemoryOwner,
-    KmerDistributionInfo& kmerDistributionInfo,
     uint64_t threadCount
     ) :
     MultithreadedObject(*this),
@@ -81,10 +80,6 @@ KmerCounter::KmerCounter(
 
     // Remove the temporary hash table.
     kmerIds.remove();
-
-    // Create a histogram of k-mer frequencies.
-    createHistogram();
-    getHistogramInfo(kmerDistributionInfo);
 
     // Final message.
     const auto tEnd = std::chrono::steady_clock::now();
@@ -256,17 +251,25 @@ void KmerCounter::createHistogram()
     }
 
     histogram.createNew(largeDataName("KmerCounterHistogram"), largeDataPageSize);
-
-    ofstream csv("KmerFrequencyHistogram.csv");
-    csv << "Coverage,Frequency\n";
     for(uint64_t coverage=0; coverage<histogramVector.size(); coverage++) {
         const uint64_t frequency = histogramVector[coverage];
         if(frequency) {
-            csv << coverage << "," << frequency << "\n";
             histogram.push_back(make_pair(coverage, frequency));
         }
     }
 
+}
+
+
+
+void KmerCounter::writeHistogram(ostream& csv) const
+{
+    csv << "Coverage,Frequency\n";
+    for(const auto& p: histogram) {
+        const uint64_t coverage = p.first;
+        const uint64_t frequency = p.second;
+        csv << coverage << "," << frequency << "\n";
+    }
 }
 
 
@@ -288,7 +291,8 @@ uint64_t KmerCounter::getFrequency(KmerId kmerId) const
             return p.second;
         }
     }
-    SHASTA_ASSERT(0);
+
+    // We did not find this k-mer, so we return 0 frequency.
     return 0;
 }
 
@@ -311,6 +315,8 @@ uint64_t KmerCounter::getFrequency(const Kmer& kmer) const
             return p.second;
         }
     }
+
+    // We did not find this k-mer, so we return 0 frequency.
     return 0;
 }
 

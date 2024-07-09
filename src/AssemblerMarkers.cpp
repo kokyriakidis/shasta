@@ -704,7 +704,14 @@ void Assembler::countKmers(uint64_t threadCount)
 {
     SHASTA_ASSERT(markers.isOpen());
     kmerCounter = make_shared<KmerCounter>(
-        assemblerInfo->k, getReads(), markers, *this, assemblerInfo->kmerDistributionInfo, threadCount);
+        assemblerInfo->k, getReads(), markers, *this, threadCount);
+
+    // Create a k-mer frequency histogram, write it out, and get low/peak/high
+    // values for the histogram.
+    kmerCounter->createHistogram();
+    ofstream csv("KmerFrequencyHistogram.csv");
+    kmerCounter->writeHistogram(csv);
+    kmerCounter->getHistogramInfo(assemblerInfo->kmerDistributionInfo);
 
     cout << "Marker k-mer coverage distribution:"
         " low "   << assemblerInfo->kmerDistributionInfo.coverageLow <<

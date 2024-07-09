@@ -31,7 +31,6 @@ public:
         const Reads&,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         const MappedMemoryOwner& mappedMemoryOwner,
-        KmerDistributionInfo&,
         uint64_t threadCount
         );
 
@@ -82,10 +81,12 @@ private:
     void threadFunction4(uint64_t threadId);
     void threadFunction34(uint64_t pass);
 
-    // The frequency histogram.
-    // Consists of pairs (coverage, frequency).
-    void createHistogram();
 public:
+
+    // The frequency histogram.
+    // It consists of pairs (coverage, frequency).
+    void createHistogram();
+    void writeHistogram(ostream&) const;
     MemoryMapped::Vector< pair<uint64_t, uint64_t> > histogram;
 
     void getHistogramInfo(KmerDistributionInfo&) const;
