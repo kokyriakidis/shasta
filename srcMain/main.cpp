@@ -622,7 +622,7 @@ void shasta::main::assemble(
 
     // If using alignment method 6, count marker k-mers.
     if(assemblerOptions.alignOptions.alignMethod == 6) {
-        assembler.countKmers(threadCount);
+        assembler.countKmers(threadCount, assemblerOptions.kmersOptions.globalFrequencyOverrideDirectory);
     }
 
     // Gather marker KmerIds for all markers.

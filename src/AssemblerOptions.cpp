@@ -369,6 +369,11 @@ void AssemblerOptions::addConfigurableOptions()
         "A relative path is not accepted. "
         "Only used if Kmers.generationMethod is 3.")
 
+        ("Kmers.globalFrequencyOverrideDirectory",
+        value<string>(&kmersOptions.globalFrequencyOverrideDirectory),
+        "The directory containing the hash table with marker k-mer global frequencies. "
+        "Only used for Shasta development.")
+
         ("MinHash.version",
         value<int>(&minHashOptions.version)->
         default_value(0),
@@ -1230,6 +1235,7 @@ void KmersOptions::write(ostream& s) const
     s << "enrichmentThreshold = " << enrichmentThreshold << "\n";
     s << "distanceThreshold = " << distanceThreshold << "\n";
     s << "file = " << file << "\n";
+    s << "globalFrequencyOverrideDirectory = " << globalFrequencyOverrideDirectory << "\n";
 }
 
 

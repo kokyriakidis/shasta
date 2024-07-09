@@ -26,8 +26,8 @@ KmerCounter::KmerCounter(
     MultithreadedObject(*this),
     MappedMemoryOwner(mappedMemoryOwner),
     k(k),
-    reads(reads),
-    markers(markers)
+    readsPointer(&reads),
+    markersPointer(&markers)
 {
     // Initial message.
     performanceLog << timestamp << "Markers counting begins." << endl;
@@ -93,15 +93,11 @@ KmerCounter::KmerCounter(
 // This constructor accesses an existing KmerIdFrequencies hash table.
 KmerCounter::KmerCounter(
     uint64_t k,
-    const Reads& reads,
-    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     const MappedMemoryOwner& mappedMemoryOwner
     ) :
     MultithreadedObject(*this),
     MappedMemoryOwner(mappedMemoryOwner),
-    k(k),
-    reads(reads),
-    markers(markers)
+    k(k)
 {
     kmerIdFrequencies.accessExistingReadOnly(largeDataName("KmerFrequencies"));
     const uint64_t bucketCount = kmerIdFrequencies.size();
@@ -132,6 +128,9 @@ void KmerCounter::threadFunction12(uint64_t pass)
     KmerId kmerId;
     KmerId rcKmerId;
     KmerId canonicalKmerId;
+
+    const Reads& reads = *readsPointer;
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers = *markersPointer;
 
     // Loop over all batches of reads assigned to this thread.
     uint64_t begin, end;
@@ -372,4 +371,20 @@ void KmerCounter::getHistogramInfo(KmerDistributionInfo& info) const
         }
     }
     SHASTA_ASSERT(info.coverageHigh != invalid<uint64_t>);
+}
+
+
+
+// Override the frequencies stored in this KmerCounter
+// with the ones obtained from another KmerCounter.
+void KmerCounter::overrideFrequencies(const KmerCounter& that)
+{
+    for(uint64_t bucketId=0; bucketId<kmerIdFrequencies.size(); bucketId++) {
+        const auto bucket = kmerIdFrequencies[bucketId];
+
+        for(auto& p: bucket) {
+            const KmerId kmerId = p.first;
+            p.second = that.getFrequency(kmerId);
+        }
+    }
 }

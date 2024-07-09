@@ -583,7 +583,9 @@ private:
     // Counting of marker Kmers.
     shared_ptr<KmerCounter> kmerCounter;
 public:
-    void countKmers(uint64_t threadCount);
+    void countKmers(
+        uint64_t threadCount,
+        const string& globalFrequencyOverrideDirectory);
     void accessKmerCounts();
 
 

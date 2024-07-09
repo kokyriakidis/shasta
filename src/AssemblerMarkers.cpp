@@ -700,15 +700,39 @@ KmerId Assembler::getOrientedReadMarkerKmerId(OrientedReadId orientedReadId, uin
 
 
 
-void Assembler::countKmers(uint64_t threadCount)
+void Assembler::countKmers(
+    uint64_t threadCount,
+    const string& globalFrequencyOverrideDirectory)
 {
     SHASTA_ASSERT(markers.isOpen());
     kmerCounter = make_shared<KmerCounter>(
         assemblerInfo->k, getReads(), markers, *this, threadCount);
 
-    // Create a k-mer frequency histogram, write it out, and get low/peak/high
-    // values for the histogram.
-    kmerCounter->createHistogram();
+
+
+    if(globalFrequencyOverrideDirectory.empty()) {
+        // No override, just create the histogram.
+        kmerCounter->createHistogram();
+    } else {
+
+        // Override the frequencies.
+        MappedMemoryOwner mappedMemoryOwner;
+        mappedMemoryOwner.largeDataFileNamePrefix = globalFrequencyOverrideDirectory + "/";
+        mappedMemoryOwner.largeDataPageSize = 4096;
+
+        KmerCounter otherKmerCounter(assemblerInfo->k, mappedMemoryOwner);
+
+        cout << timestamp << "Overriding k-mer global frequencies." << endl;
+        kmerCounter->overrideFrequencies(otherKmerCounter);
+        cout << timestamp << "Done overriding k-mer global frequencies." << endl;
+
+        // Copy the histogram.
+        kmerCounter->histogram.createNew(largeDataName("KmerCounterHistogram"), largeDataPageSize);
+        kmerCounter->histogram.resize(otherKmerCounter.histogram.size());
+        copy(otherKmerCounter.histogram.begin(), otherKmerCounter.histogram.end(), kmerCounter->histogram.begin());
+    }
+
+
     ofstream csv("KmerFrequencyHistogram.csv");
     kmerCounter->writeHistogram(csv);
     kmerCounter->getHistogramInfo(assemblerInfo->kmerDistributionInfo);
@@ -724,6 +748,6 @@ void Assembler::countKmers(uint64_t threadCount)
 void Assembler::accessKmerCounts()
 {
     SHASTA_ASSERT(markers.isOpen());
-    kmerCounter = make_shared<KmerCounter>(assemblerInfo->k, getReads(), markers, *this);
+    kmerCounter = make_shared<KmerCounter>(assemblerInfo->k, *this);
 }
 

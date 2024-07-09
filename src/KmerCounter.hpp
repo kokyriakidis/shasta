@@ -4,11 +4,13 @@
 // the number of time a marker KmerId appears in
 // the markers of this assembly.
 
+// Shasta.
 #include "Kmer.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "MemoryMappedVectorOfVectors.hpp"
 #include "MultithreadedObject.hpp"
 #include "shastaTypes.hpp"
+
 
 
 namespace shasta {
@@ -37,8 +39,6 @@ public:
     // This constructor accesses an existing KmerIdFrequencies hash table.
     KmerCounter(
         uint64_t k,
-        const Reads&,
-        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         const MappedMemoryOwner& mappedMemoryOwner
         );
 
@@ -50,12 +50,16 @@ public:
     uint64_t getFrequency(KmerId) const;
     uint64_t getFrequency(const Kmer&) const;
 
+    // Override the frequencies stored in this KmerCounter
+    // with the ones obtained from another KmerCounter.
+    void overrideFrequencies(const KmerCounter&);
+
 private:
 
     // Data passed in to the constructor.
     uint64_t k;
-    const Reads& reads;
-    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
+    Reads const* readsPointer = 0;
+    MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t> const* markersPointer = 0;
 
     // Hashing.
     const uint32_t hashSeed = 12771;

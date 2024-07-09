@@ -159,6 +159,7 @@ public:
     double enrichmentThreshold;
     uint64_t distanceThreshold;
     string file;
+    string globalFrequencyOverrideDirectory;
     void write(ostream&) const;
 };
 
