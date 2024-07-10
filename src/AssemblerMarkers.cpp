@@ -715,6 +715,12 @@ void Assembler::countKmers(
         kmerCounter->createHistogram();
     } else {
 
+        // The globalFrequencyOverrideDirectory must specify an absolute path.
+        if(globalFrequencyOverrideDirectory[0] != '/') {
+            throw runtime_error("Option --Kmers.globalFrequencyOverrideDirectory must specify an absolute path. "
+                "A relative path is not accepted.");
+        }
+
         // Override the frequencies.
         MappedMemoryOwner mappedMemoryOwner;
         mappedMemoryOwner.largeDataFileNamePrefix = globalFrequencyOverrideDirectory + "/";
