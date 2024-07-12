@@ -243,13 +243,13 @@ void Assembler::fillMode3AssemblyPathStep(const vector<string>& request, ostream
     }
 
     // Sanity checks on the edge ids.
-    if(edgeIdA >= markerGraph.edges.size()) {
+    if(edgeIdA >= markerGraph.edgeMarkerIntervals.size()) {
         throw runtime_error("Marker graph edge " + to_string(edgeIdA) +
-            " is not valid. Maximum valid edge id is " + to_string(markerGraph.edges.size()));
+            " is not valid. Maximum valid edge id is " + to_string(markerGraph.edgeMarkerIntervals.size()));
     }
-    if(edgeIdB >= markerGraph.edges.size()) {
+    if(edgeIdB >= markerGraph.edgeMarkerIntervals.size()) {
         throw runtime_error("Marker graph edge " + to_string(edgeIdB) +
-            " is not valid. Maximum valid edge id is " + to_string(markerGraph.edges.size()));
+            " is not valid. Maximum valid edge id is " + to_string(markerGraph.edgeMarkerIntervals.size()));
     }
 
     // Sanity check that the two edges are distinct.
