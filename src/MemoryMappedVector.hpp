@@ -96,6 +96,9 @@ public:
     // Close and remove the supporting file.
     void remove();
 
+    // Save it to disk.
+    bool save(const string& fileName) const;
+
     // Resize works as for std::vector;
     void resize(size_t);
     void clear()
@@ -748,6 +751,41 @@ template<class T> inline void shasta::MemoryMapped::Vector<T>::remove()
         close();    // This forgets the fileName.
         std::filesystem::remove(savedFileName);
     }
+}
+
+
+
+// Save it to disk.
+template<class T> inline bool shasta::MemoryMapped::Vector<T>::save(const string& fileName) const
+{
+    // Try to open it with O_DIRECT to avoid polluting the cache.
+    int fileDescriptor = ::open(fileName.c_str(), O_CREAT | O_RDWR | O_DIRECT, S_IRWXU);
+
+    // If that did not work, try without O_DIRECT.
+    if(fileDescriptor == -1) {
+        fileDescriptor = ::open(fileName.c_str(), O_CREAT | O_RDWR, S_IRWXU);
+    }
+
+    // If that also did not work, give up.
+    if(fileDescriptor == -1) {
+        return false;
+    }
+
+    // Write it out.
+    char const* pointer = reinterpret_cast<char const *>(header);
+    size_t bytesToWrite = header->fileSize;
+    while(bytesToWrite > 0) {
+        const ssize_t bytesWritten = ::write(fileDescriptor, pointer, bytesToWrite);
+        if(bytesWritten == -1) {
+            ::close(fileDescriptor);
+            return false;
+        }
+        pointer += bytesWritten;
+        bytesToWrite -= bytesWritten;
+    }
+
+    ::close(fileDescriptor);
+    return true;
 }
 
 

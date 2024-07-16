@@ -91,6 +91,11 @@ public:
             count.remove();
         }
     }
+    // Save it to disk.
+    bool save(const string& baseName) const
+    {
+        return toc.save(baseName + ".toc") and data.save(baseName + ".data");
+    }
 
     size_t size() const
     {
