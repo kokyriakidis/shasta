@@ -1093,8 +1093,10 @@ void Assembler::exploreReadRaw(
             oldPosition = position + k;
 
             // See if this marker is contained in a vertex of the marker graph.
-            const MarkerGraph::VertexId vertexId =
-                getGlobalMarkerGraphVertex(orientedReadId, uint32_t(ordinal));
+            MarkerGraph::VertexId vertexId = MarkerGraph::invalidCompressedVertexId;
+            if(markerGraph.vertexTable.isOpen) {
+                vertexId = getGlobalMarkerGraphVertex(orientedReadId, uint32_t(ordinal));
+            }
             const bool hasMarkerGraphVertex =
                 (vertexId != MarkerGraph::invalidCompressedVertexId);
 
