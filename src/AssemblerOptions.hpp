@@ -46,11 +46,10 @@ or something to that effect.
 ADDING A NEW NON-CONFIGURABLE OPTION
 
 1. Add the option to class CommandLineOnlyOptions.
-2. Modify the write function to that class to also write the newly added option
-3. Modify AssemblerOptions::addConfigurableOptions to reflect the new option,
+2. Modify AssemblerOptions::addConfigurableOptions to reflect the new option,
    making sure to include a default value and at least a minimal help message.
-4. Document the option in shasta/docs/CommandLineOptions.html.
-5. If the option requires validation add it at tha appropriate place in
+3. Document the option in shasta/docs/CommandLineOptions.html.
+4. If the option requires validation add it at the appropriate place in
    shasta/srcMain/main.cpp.
 
 For options not ready for end users, it is fine in steps 3 4 5 to use a
@@ -103,6 +102,7 @@ public:
     string exploreAccess;
     uint16_t port;
     string alignmentsPafFile;
+    bool saveBinaryData;
 };
 
 

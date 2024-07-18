@@ -2399,7 +2399,27 @@ private:
     void exploreAssemblyGraphEdgesSupport(const vector<string>&, ostream&);
 
 
+public:
+    // Functions and data to save binary data.
+    // This happens under control of --saveBinaryData
+    // and is only implemented for Mode 3 assembly.
 
+    // Binary data will be saved to this directory,
+    // stored including the final slash:
+    // Data/ if memoryMode is anonymous.
+    // DataOnDisk if memoryMode is filesystem.
+    string saveBinaryDataDirectory;
+    void createSaveBinaryDataDirectory(const string& memoryMode);
+
+    using SaveBinaryDataFunction = void (Assembler::*)() const;
+    void initiateSaveBinaryData(SaveBinaryDataFunction);
+    vector<std::thread> saveBinaryDataThreads;
+    void waitForSaveBinaryDataThreads();
+
+    void saveMarkers() const;
+
+
+private:
     // Set up the ConsensusCaller used to compute the "best"
     // base and repeat count at each assembly position.
     // The argument to setupConsensusCaller specifies

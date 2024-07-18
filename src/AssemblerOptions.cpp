@@ -245,6 +245,11 @@ void AssemblerOptions::addCommandLineOnlyOptions()
         "a reference. Only used for --command explore, for display of the alignment "
         "candidate graph. Experimental."
         )
+
+        ("saveBinaryData",
+        bool_switch(&commandLineOnlyOptions.saveBinaryData)->
+        default_value(false),
+        "Save binary data (Mode 3 assembly only).")
         ;
 
 }

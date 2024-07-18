@@ -229,6 +229,43 @@ uint32_t Assembler::hashKmerId(KmerId kmerId) const
 
 
 
+void Assembler::createSaveBinaryDataDirectory(const string& memoryMode)
+{
+    if(memoryMode == "anonymous") {
+        saveBinaryDataDirectory = "Data/";
+    } else if(memoryMode == "filesystem") {
+        saveBinaryDataDirectory = "DataOnDisk/";
+    } else {
+        SHASTA_ASSERT(0);
+    }
+
+    std::filesystem::create_directory(saveBinaryDataDirectory);
+
+    // initiateSaveBinaryData(&Assembler::saveMarkers);
+    // SHASTA_ASSERT(0);
+}
+
+
+
+void Assembler::initiateSaveBinaryData(SaveBinaryDataFunction function)
+{
+    if(not saveBinaryDataDirectory.empty()) {
+        saveBinaryDataThreads.push_back(std::thread(function, this));
+    }
+}
+
+void Assembler::waitForSaveBinaryDataThreads()
+{
+    for(std::thread& t: saveBinaryDataThreads) {
+        t.join();
+    }
+}
+
+void Assembler::saveMarkers() const
+{
+    markers.save(saveBinaryDataDirectory + "Markers");
+}
+
 
 
 

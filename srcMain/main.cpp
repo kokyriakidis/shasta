@@ -380,8 +380,6 @@ void shasta::main::assemble(
     }
     cout << "For options in use for this assembly, see shasta.conf in the assembly directory." << endl;
 
-
-
     // Initial disclaimer message.
     if(assemblerOptions.commandLineOnlyOptions.memoryBacking != "2M" &&
         assemblerOptions.commandLineOnlyOptions.memoryMode != "filesystem") {
@@ -555,6 +553,12 @@ void shasta::main::assemble(
     }
     assembler.setupConsensusCaller(assemblerOptions.assemblyOptions.consensusCaller);
 
+    // If --saveBinaryData was requested and Mode assembly is 3,
+    // create the directory where binary data will be saved.
+    if( assemblerOptions.commandLineOnlyOptions.saveBinaryData and
+        assemblerOptions.assemblyOptions.mode == 3) {
+        assembler.createSaveBinaryDataDirectory(assemblerOptions.commandLineOnlyOptions.memoryMode);
+    }
 
 
     // Add reads from the specified input files.
@@ -619,6 +623,7 @@ void shasta::main::assemble(
 
     // Find the markers in the reads.
     assembler.findMarkers(threadCount);
+    assembler.initiateSaveBinaryData(&Assembler::saveMarkers);
 
     // If using alignment method 6, count marker k-mers.
     if(assemblerOptions.alignOptions.alignMethod == 6) {
@@ -805,6 +810,12 @@ void shasta::main::assemble(
     assembler.writeAssemblySummaryJson(json);
     ofstream htmlIndex("index.html");
     assembler.writeAssemblyIndex(htmlIndex);
+
+    // If --saveBinaryData was requested and Mode assembly is 3,
+    // wait for save binary data threads to finish.
+    if(not assembler.saveBinaryDataDirectory.empty()) {
+        assembler.waitForSaveBinaryDataThreads();
+    }
 
     performanceLog << timestamp << endl;
     performanceLog << "Assembly time statistics:\n"
