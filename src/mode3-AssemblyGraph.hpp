@@ -901,5 +901,10 @@ private:
         uint64_t& minOffset,
         uint64_t& maxOffset
         ) const;
+
+
+
+    // Code in mode3-AssemblyGraph-test.cpp.
+    void test();
 };
 

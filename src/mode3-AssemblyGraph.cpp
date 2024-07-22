@@ -228,6 +228,13 @@ void AssemblyGraph::run(
     renumberEdges();
     if(debug) write("F");
 
+#if 1
+    // Final cleanup.
+    write("Before");
+    test();
+    write("After");
+#endif
+
     if(assembleSequence) {
 
         // Assemble sequence.
