@@ -228,7 +228,7 @@ void AssemblyGraph::run(
     renumberEdges();
     if(debug) write("F");
 
-#if 1
+#if 0
     // Final cleanup.
     write("Before");
     test();
