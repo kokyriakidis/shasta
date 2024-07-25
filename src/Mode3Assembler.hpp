@@ -34,11 +34,9 @@ private:
     const Assembler& assembler;
     bool debug;
 
-    // The MarkerGraphEdgeIds of the primary marker graph edges.
-    // These are sorted.
-    // An index in this vector is called PrimaryId.
-    vector<MarkerGraphEdgeId> primaryMarkerGraphEdgeIds;
-    void gatherPrimaryMarkerGraphEdgeIds();
+    // For Mode 3 assembly we only generate primary marker graph edges,
+    // so all marker graph edges participate in Mode 3 assembly.
+    // Each marker graph edge becomes an "anchor" for Mode 3 assembly.
 
     // The oriented reads present in each primary marker graph edge
     // define a bipartite graph. We want to compute connected components

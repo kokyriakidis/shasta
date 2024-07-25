@@ -33,7 +33,6 @@ Mode3Assembler::Mode3Assembler(
 {
     performanceLog << timestamp << "Mode 3 assembly begins." << endl;
 
-    gatherPrimaryMarkerGraphEdgeIds();
     computeConnectedComponents();
     if(debug) {
         writeConnectedComponents();
@@ -41,20 +40,6 @@ Mode3Assembler::Mode3Assembler(
     assembleConnectedComponents(threadCount, options, debug);
 
     performanceLog << timestamp << "Mode 3 assembly ends." << endl;
-}
-
-
-
-void Mode3Assembler::gatherPrimaryMarkerGraphEdgeIds()
-{
-
-    primaryMarkerGraphEdgeIds.clear();
-    for(MarkerGraphEdgeId edgeId=0; edgeId<assembler.markerGraph.edgeMarkerIntervals.size(); edgeId++) {
-        // All marker graph edges are now primary!
-        primaryMarkerGraphEdgeIds.push_back(edgeId);
-    }
-    cout << "Of " << assembler.markerGraph.edgeMarkerIntervals.size() << " marker graph edges, " <<
-        primaryMarkerGraphEdgeIds.size() << " are primary." << endl;
 }
 
 
@@ -73,9 +58,9 @@ void Mode3Assembler::computeConnectedComponents()
     vector<DisjointSets::Aint> disjointSetsData(orientedReadCount);
     DisjointSets disjointSets(&disjointSetsData[0], orientedReadCount);
 
-    // Loop over all primary marker graph edges.
+    // Loop over all marker graph edges (that is, over all anchors).
     // This could be multithreaded but runs at decent speed as is.
-    for(const MarkerGraphEdgeId edgeId: primaryMarkerGraphEdgeIds) {
+    for(MarkerGraphEdgeId edgeId=0; edgeId<assembler.markerGraph.edgeMarkerIntervals.size(); edgeId++) {
         const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
         SHASTA_ASSERT(not markerIntervals.empty());
         const OrientedReadId orientedReadId0 = markerIntervals.front().orientedReadId;
@@ -95,8 +80,7 @@ void Mode3Assembler::computeConnectedComponents()
     // Gather the primary marker graph edges in each connected component.
     // This stores PrimaryIds, not MarkerGraphEdgeIds.
     vector< vector<uint64_t> > componentsPrimaryIds(orientedReadCount);
-    for(uint64_t primaryId=0; primaryId<primaryMarkerGraphEdgeIds.size(); primaryId++) {
-        const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
+    for(MarkerGraphEdgeId edgeId=0; edgeId<assembler.markerGraph.edgeMarkerIntervals.size(); edgeId++) {
         const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
         SHASTA_ASSERT(not markerIntervals.empty());
         const OrientedReadId orientedReadId0 = markerIntervals.front().orientedReadId;
@@ -108,7 +92,7 @@ void Mode3Assembler::computeConnectedComponents()
             const OrientedReadId orientedReadId1 = markerInterval.orientedReadId;
             SHASTA_ASSERT(disjointSets.find(orientedReadId1.getValue()) == componentId);
         }
-        componentsPrimaryIds[componentId].push_back(primaryId);
+        componentsPrimaryIds[componentId].push_back(edgeId);
     }
 
 
@@ -352,7 +336,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     performanceLog << timestamp << "Journey computation begins." << endl;
     for(uint64_t localPrimaryId=0; localPrimaryId<primaryIds.size(); localPrimaryId++) {
         const uint64_t primaryId = primaryIds[localPrimaryId];
-        const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
+        const MarkerGraphEdgeId edgeId = primaryId;
         const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
         for(const MarkerInterval& markerInterval: markerIntervals) {
             const OrientedReadId orientedReadId = markerInterval.orientedReadId;
@@ -378,35 +362,13 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
             for(const auto& p: journey) {
                 const uint64_t localPrimaryId = p.second;
                 const uint64_t primaryId = primaryIds[localPrimaryId];
-                const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
-                SHASTA_ASSERT(edgeId == primaryId);
+                const MarkerGraphEdgeId edgeId = primaryId;
                 csv << edgeId << ",";
             }
             csv << "\n";
         }
     }
 
-
-
-#if 0
-    // Check that the journeys computed in this way are identical to the ones stored in the MarkerGraph.
-    // The ones stored in the MarkerGraph will eventually go away.
-    for(uint64_t i=0; i<orientedReadIds.size(); i++) {
-        const OrientedReadId orientedReadId = orientedReadIds[i];
-        const auto journey = journeys[i];
-        const auto storedJourney = assembler.markerGraph.primaryJourneys[orientedReadId.getValue()];
-        SHASTA_ASSERT(journey.size() == storedJourney.size());
-
-        for(uint64_t j=0; j<journey.size(); j++) {
-            const auto& p = journey[j];
-            const uint64_t localPrimaryId = p.second;
-            const uint64_t primaryId = primaryIds[localPrimaryId];
-            const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
-            // cout << orientedReadId << " " << storedJourney[j].edgeId << " " << edgeId << endl;
-            SHASTA_ASSERT(edgeId == storedJourney[j].edgeId);
-        }
-    }
-#endif
 
 
     // Now we can create the PrimaryGraph for this connected component.
@@ -416,7 +378,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     vector<PrimaryGraph::vertex_descriptor> vertexDescriptors;
     for(uint64_t localPrimaryId=0; localPrimaryId<primaryIds.size(); localPrimaryId++) {
         const uint64_t primaryId = primaryIds[localPrimaryId];
-        const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
+        const MarkerGraphEdgeId edgeId = primaryId;
         vertexDescriptors.push_back(primaryGraph.addVertex(edgeId));
     }
 
@@ -535,7 +497,7 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
 
         for(uint64_t localPrimaryId=0; localPrimaryId<component.primaryIds.size(); localPrimaryId++) {
             const uint64_t primaryId = primaryIds[localPrimaryId];
-            const MarkerGraphEdgeId edgeId = primaryMarkerGraphEdgeIds[primaryId];
+            const MarkerGraphEdgeId edgeId = primaryId;
             const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
             for(const MarkerInterval& markerInterval: markerIntervals) {
                 csv << edgeId << ",";
