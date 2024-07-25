@@ -13,10 +13,17 @@
 
 namespace shasta {
     class Mode3Assembler;
+
     class Assembler;
+    class MarkerInterval;
     class Mode3AssemblyOptions;
+
     namespace mode3 {
         class AssemblyGraph;
+    }
+
+    namespace MemoryMapped {
+        template<class T, class Int> class VectorOfVectors;
     }
 }
 
@@ -34,23 +41,28 @@ private:
     const Assembler& assembler;
     bool debug;
 
-    // For Mode 3 assembly we only generate primary marker graph edges,
-    // so all marker graph edges participate in Mode 3 assembly.
-    // Each marker graph edge becomes an "anchor" for Mode 3 assembly.
+    // The main input to MOde3Assembler is a set of anchors.
+    // Each anchor consists of a group of MarkerIntervals, with the following requirements:
+    // - All MarkerIntervals correspond to exactly the same sequence.
+    // - There are no duplicate oriented reads in an anchor.
+    // - The anchor coverage (number of oriented reads) in is [minPrimaryCoverage, maxPrimaryCoverage].
+    // For now the anchors are simply a reference to assembler.markerGraph.edgeMarkerIntervals,
+    // but we it would be possible to construct the anchors by other means.
+    using AnchorId = MarkerGraphEdgeId;
+    const MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t>& anchors;
 
-    // The oriented reads present in each primary marker graph edge
+    // The oriented reads present in each anchor
     // define a bipartite graph. We want to compute connected components
     // of this bipartite graph and process them one at a time.
     // These are also connected components of the global primary graph
-    // (with one vertex for each primary marker graph edge,
-    // and edges created by following the reads).
+    // (with one vertex for each anchor, and edges created by following the reads).
     class ConnectedComponent {
     public:
         // The oriented reads in this connected component.
         vector<OrientedReadId> orientedReadIds;
 
         // The anchors (marker graph edges) in this connected component.
-        vector<MarkerGraphEdgeId> markerGraphEdgeIds;
+        vector<AnchorId> markerGraphEdgeIds;
     };
     vector<ConnectedComponent> connectedComponents;
     void computeConnectedComponents();

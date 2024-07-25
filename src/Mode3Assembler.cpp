@@ -29,7 +29,8 @@ Mode3Assembler::Mode3Assembler(
     MultithreadedObject<Mode3Assembler>(*this),
     MappedMemoryOwner(assembler),
     assembler(assembler),
-    debug(debug)
+    debug(debug),
+    anchors(assembler.markerGraph.edgeMarkerIntervals)
 {
     performanceLog << timestamp << "Mode 3 assembly begins." << endl;
 
@@ -60,8 +61,8 @@ void Mode3Assembler::computeConnectedComponents()
 
     // Loop over all marker graph edges (that is, over all anchors).
     // This could be multithreaded but runs at decent speed as is.
-    for(MarkerGraphEdgeId edgeId=0; edgeId<assembler.markerGraph.edgeMarkerIntervals.size(); edgeId++) {
-        const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
+    for(MarkerGraphEdgeId edgeId=0; edgeId<anchors.size(); edgeId++) {
+        const auto markerIntervals = anchors[edgeId];
         SHASTA_ASSERT(not markerIntervals.empty());
         const OrientedReadId orientedReadId0 = markerIntervals.front().orientedReadId;
         for(const MarkerInterval& markerInterval: markerIntervals) {
@@ -79,8 +80,8 @@ void Mode3Assembler::computeConnectedComponents()
 
     // Gather the anchors (marker graph edges) in each connected component.
     vector< vector<uint64_t> > componentsMarkerGraphEdgeIds(orientedReadCount);
-    for(MarkerGraphEdgeId edgeId=0; edgeId<assembler.markerGraph.edgeMarkerIntervals.size(); edgeId++) {
-        const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
+    for(MarkerGraphEdgeId edgeId=0; edgeId<anchors.size(); edgeId++) {
+        const auto markerIntervals = anchors[edgeId];
         SHASTA_ASSERT(not markerIntervals.empty());
         const OrientedReadId orientedReadId0 = markerIntervals.front().orientedReadId;
         const uint64_t componentId = disjointSets.find(orientedReadId0.getValue());
@@ -325,8 +326,8 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
 
 
-    // We need to compute the primary journey of each oriented read,
-    // that is, the sequence of anchors (marker graph edges) encountered by each read.
+    // We need to compute the anchor journey of each oriented read,
+    // that is, the sequence of anchors encountered by each read.
     // We store each journey as a vector of pairs of
     // (ordinal0, localAnchorId), where localAnchorId is an index into anchorIds (markerGraphEdgeIds)
     // for this connected component.
@@ -335,8 +336,8 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     performanceLog << timestamp << "Journey computation begins." << endl;
     for(uint64_t localAnchorId=0; localAnchorId<markerGraphEdgeIds.size(); localAnchorId++) {
         const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localAnchorId];
-        const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
-        for(const MarkerInterval& markerInterval: markerIntervals) {
+        const auto anchor = anchors[edgeId];
+        for(const MarkerInterval& markerInterval: anchor) {
             const OrientedReadId orientedReadId = markerInterval.orientedReadId;
             const uint32_t ordinal0 = markerInterval.ordinals[0];
             const auto& p = orientedReadIdTable[orientedReadId.getValue()];
@@ -489,12 +490,12 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
     // Write the marker intervals.
     {
         ofstream csv("MarkerIntervals-" + to_string(componentId) + ".csv");
-        csv << "MarkerGraphEdgeId,OrientedReadId,Ordinal0,Ordinal1\n";
+        csv << "AnchorId,OrientedReadId,Ordinal0,Ordinal1\n";
 
         for(uint64_t localPrimaryId=0; localPrimaryId<component.markerGraphEdgeIds.size(); localPrimaryId++) {
             const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localPrimaryId];
-            const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
-            for(const MarkerInterval& markerInterval: markerIntervals) {
+            const auto anchor = anchors[edgeId];
+            for(const MarkerInterval& markerInterval: anchor) {
                 csv << edgeId << ",";
                 csv << markerInterval.orientedReadId << ",";
                 csv << markerInterval.ordinals[0] << ",";
