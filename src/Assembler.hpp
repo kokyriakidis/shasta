@@ -1012,6 +1012,9 @@ public:
     void readGraphClustering();
     void writeReadGraphEdges(bool useReadName=false) const;
 
+    void createReadGraph3(uint64_t maxAlignmentCount);
+
+
 
 
     // Triangle and least square analysis of the read graph
