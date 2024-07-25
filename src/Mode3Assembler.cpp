@@ -326,22 +326,22 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
 
     // We need to compute the primary journey of each oriented read,
-    // that is, the sequence of primary edges encountered by each read.
+    // that is, the sequence of anchors (marker graph edges) encountered by each read.
     // We store each journey as a vector of pairs of
-    // (ordinal0, localPrimaryId), where localPrimaryId is an index into primaryIds
+    // (ordinal0, localAnchorId), where localAnchorId is an index into anchorIds (markerGraphEdgeIds)
     // for this connected component.
     vector< vector< pair<uint32_t, uint64_t> > > journeys(orientedReadIds.size());
 
     performanceLog << timestamp << "Journey computation begins." << endl;
-    for(uint64_t localPrimaryId=0; localPrimaryId<markerGraphEdgeIds.size(); localPrimaryId++) {
-        const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localPrimaryId];
+    for(uint64_t localAnchorId=0; localAnchorId<markerGraphEdgeIds.size(); localAnchorId++) {
+        const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localAnchorId];
         const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
         for(const MarkerInterval& markerInterval: markerIntervals) {
             const OrientedReadId orientedReadId = markerInterval.orientedReadId;
             const uint32_t ordinal0 = markerInterval.ordinals[0];
             const auto& p = orientedReadIdTable[orientedReadId.getValue()];
             SHASTA_ASSERT(p.first == componentId);
-            journeys[p.second].push_back({ordinal0, localPrimaryId});
+            journeys[p.second].push_back({ordinal0, localAnchorId});
         }
     }
     for(vector< pair<uint32_t, uint64_t> >& journey: journeys) {
@@ -358,8 +358,8 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
             csv << orientedReadIds[i] << ",";
             const auto& journey = journeys[i];
             for(const auto& p: journey) {
-                const uint64_t localPrimaryId = p.second;
-                const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localPrimaryId];
+                const uint64_t localAnchorId = p.second;
+                const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localAnchorId];
                 csv << edgeId << ",";
             }
             csv << "\n";
