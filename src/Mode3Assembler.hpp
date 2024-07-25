@@ -49,9 +49,8 @@ private:
         // The oriented reads in this connected component.
         vector<OrientedReadId> orientedReadIds;
 
-        // The PrimaryIds of the marker graph edges in this connected component.
-        // These are indices into primaryMarkerGraphEdgeIds.
-        vector<uint64_t> primaryIds;
+        // The anchors (marker graph edges) in this connected component.
+        vector<MarkerGraphEdgeId> markerGraphEdgeIds;
     };
     vector<ConnectedComponent> connectedComponents;
     void computeConnectedComponents();

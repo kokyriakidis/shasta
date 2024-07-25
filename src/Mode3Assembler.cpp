@@ -138,7 +138,7 @@ void Mode3Assembler::computeConnectedComponents()
     for(uint64_t i=0; i<connectedComponents.size(); i++) {
         const uint64_t componentId = componentTable[i].first;
         connectedComponents[i].orientedReadIds.swap(componentsOrientedReads[componentId]);
-        connectedComponents[i].primaryIds.swap(componentsPrimaryIds[componentId]);
+        connectedComponents[i].markerGraphEdgeIds.swap(componentsPrimaryIds[componentId]);
     }
 
     // Fill in the orientedReadIdTable.
@@ -319,10 +319,10 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
     const ConnectedComponent& connectedComponent = connectedComponents[componentId];
     const vector<OrientedReadId>& orientedReadIds = connectedComponent.orientedReadIds;
-    const vector<uint64_t>& primaryIds = connectedComponent.primaryIds;
+    const vector<uint64_t>& markerGraphEdgeIds = connectedComponent.markerGraphEdgeIds;
 
     cout << "This connected component has " << orientedReadIds.size() <<
-        " reads and " << primaryIds.size() << " primary marker graph edges." << endl;
+        " oriented reads and " << markerGraphEdgeIds.size() << " anchors." << endl;
 
 
 
@@ -334,9 +334,8 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     vector< vector< pair<uint32_t, uint64_t> > > journeys(orientedReadIds.size());
 
     performanceLog << timestamp << "Journey computation begins." << endl;
-    for(uint64_t localPrimaryId=0; localPrimaryId<primaryIds.size(); localPrimaryId++) {
-        const uint64_t primaryId = primaryIds[localPrimaryId];
-        const MarkerGraphEdgeId edgeId = primaryId;
+    for(uint64_t localPrimaryId=0; localPrimaryId<markerGraphEdgeIds.size(); localPrimaryId++) {
+        const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localPrimaryId];
         const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
         for(const MarkerInterval& markerInterval: markerIntervals) {
             const OrientedReadId orientedReadId = markerInterval.orientedReadId;
@@ -361,8 +360,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
             const auto& journey = journeys[i];
             for(const auto& p: journey) {
                 const uint64_t localPrimaryId = p.second;
-                const uint64_t primaryId = primaryIds[localPrimaryId];
-                const MarkerGraphEdgeId edgeId = primaryId;
+                const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localPrimaryId];
                 csv << edgeId << ",";
             }
             csv << "\n";
@@ -376,9 +374,8 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
     // Create the vertices first.
     vector<PrimaryGraph::vertex_descriptor> vertexDescriptors;
-    for(uint64_t localPrimaryId=0; localPrimaryId<primaryIds.size(); localPrimaryId++) {
-        const uint64_t primaryId = primaryIds[localPrimaryId];
-        const MarkerGraphEdgeId edgeId = primaryId;
+    for(uint64_t localPrimaryId=0; localPrimaryId<markerGraphEdgeIds.size(); localPrimaryId++) {
+        const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localPrimaryId];
         vertexDescriptors.push_back(primaryGraph.addVertex(edgeId));
     }
 
@@ -389,7 +386,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     // as a localPrimaryId1 in journeyPairs[localPrimaryId0].
     // For now use a simple vector of vector and sequential code, but later
     // switch to MemoryMapped::VectorOfVectors<uint64_t, uint64_t> and multithreaded code.
-    vector< vector<uint64_t> > journeyPairs(primaryIds.size());
+    vector< vector<uint64_t> > journeyPairs(markerGraphEdgeIds.size());
     performanceLog << timestamp << "PrimaryGraph edge creation begins." << endl;
     for(const auto& journey: journeys) {
         for(uint64_t i1=1; i1<journey.size(); i1++) {
@@ -400,7 +397,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
         }
      }
      vector<uint64_t> count;
-     for(uint64_t localPrimaryId0=0; localPrimaryId0<primaryIds.size(); localPrimaryId0++) {
+     for(uint64_t localPrimaryId0=0; localPrimaryId0<markerGraphEdgeIds.size(); localPrimaryId0++) {
          const PrimaryGraph::vertex_descriptor v0 = vertexDescriptors[localPrimaryId0];
          const MarkerGraphEdgeId edgeId0 = primaryGraph[v0].edgeId;
          auto journeyPairs0 = journeyPairs[localPrimaryId0];
@@ -457,7 +454,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
      // Create the assembly graph for this connected component.
      return make_shared<AssemblyGraph>(
-         primaryGraph, componentId, assembler, orientedReadIds, primaryIds, threadCount,
+         primaryGraph, componentId, assembler, orientedReadIds, markerGraphEdgeIds, threadCount,
          options, assembleSequence, debug);
 }
 
@@ -478,7 +475,7 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
 {
     const ConnectedComponent& component = connectedComponents[componentId];
     const vector<OrientedReadId>& orientedReadIds = component.orientedReadIds;
-    const vector<uint64_t>& primaryIds = component.primaryIds;
+    const vector<uint64_t>& markerGraphEdgeIds = component.markerGraphEdgeIds;
 
     // Write the oriented reads.
     {
@@ -495,9 +492,8 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
         ofstream csv("MarkerIntervals-" + to_string(componentId) + ".csv");
         csv << "MarkerGraphEdgeId,OrientedReadId,Ordinal0,Ordinal1\n";
 
-        for(uint64_t localPrimaryId=0; localPrimaryId<component.primaryIds.size(); localPrimaryId++) {
-            const uint64_t primaryId = primaryIds[localPrimaryId];
-            const MarkerGraphEdgeId edgeId = primaryId;
+        for(uint64_t localPrimaryId=0; localPrimaryId<component.markerGraphEdgeIds.size(); localPrimaryId++) {
+            const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localPrimaryId];
             const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
             for(const MarkerInterval& markerInterval: markerIntervals) {
                 csv << edgeId << ",";
