@@ -44,7 +44,7 @@ Mode3Assembler::Mode3Assembler(
 
 
 
-// The oriented reads present in each primary marker graph edge
+// The oriented reads present in each anchor (primary marker graph edge)
 // define a bipartite graph. We want to compute connected components
 // of this bipartite graph and process them one at a time.
 void Mode3Assembler::computeConnectedComponents()
@@ -77,9 +77,8 @@ void Mode3Assembler::computeConnectedComponents()
         componentsOrientedReads[componentId].push_back(OrientedReadId::fromValue(ReadId(i)));
     }
 
-    // Gather the primary marker graph edges in each connected component.
-    // This stores PrimaryIds, not MarkerGraphEdgeIds.
-    vector< vector<uint64_t> > componentsPrimaryIds(orientedReadCount);
+    // Gather the anchors (marker graph edges) in each connected component.
+    vector< vector<uint64_t> > componentsMarkerGraphEdgeIds(orientedReadCount);
     for(MarkerGraphEdgeId edgeId=0; edgeId<assembler.markerGraph.edgeMarkerIntervals.size(); edgeId++) {
         const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
         SHASTA_ASSERT(not markerIntervals.empty());
@@ -92,7 +91,7 @@ void Mode3Assembler::computeConnectedComponents()
             const OrientedReadId orientedReadId1 = markerInterval.orientedReadId;
             SHASTA_ASSERT(disjointSets.find(orientedReadId1.getValue()) == componentId);
         }
-        componentsPrimaryIds[componentId].push_back(edgeId);
+        componentsMarkerGraphEdgeIds[componentId].push_back(edgeId);
     }
 
 
@@ -138,7 +137,7 @@ void Mode3Assembler::computeConnectedComponents()
     for(uint64_t i=0; i<connectedComponents.size(); i++) {
         const uint64_t componentId = componentTable[i].first;
         connectedComponents[i].orientedReadIds.swap(componentsOrientedReads[componentId]);
-        connectedComponents[i].markerGraphEdgeIds.swap(componentsPrimaryIds[componentId]);
+        connectedComponents[i].markerGraphEdgeIds.swap(componentsMarkerGraphEdgeIds[componentId]);
     }
 
     // Fill in the orientedReadIdTable.
