@@ -8,6 +8,7 @@
 
 // Standard library.
 #include "memory.hpp"
+#include "span.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
 
@@ -41,13 +42,14 @@ private:
     const Assembler& assembler;
     bool debug;
 
-    // The main input to MOde3Assembler is a set of anchors.
-    // Each anchor consists of a group of MarkerIntervals, with the following requirements:
-    // - All MarkerIntervals correspond to exactly the same sequence.
+    // The main input to Mode3Assembler is a set of anchors.
+    // Each anchor consists of a span of MarkerIntervals, with the following requirements:
+    // - All MarkerIntervals correspond to exactly the same sequence in the corresponding reads.
     // - There are no duplicate oriented reads in an anchor.
-    // - The anchor coverage (number of oriented reads) in is [minPrimaryCoverage, maxPrimaryCoverage].
+    // - The anchor coverage (number of oriented reads) is isn [minPrimaryCoverage, maxPrimaryCoverage].
     // For now the anchors are simply a reference to assembler.markerGraph.edgeMarkerIntervals,
-    // but we it would be possible to construct the anchors by other means.
+    // butit might be possible to construct the anchors by other means.
+    using Anchor = span<const MarkerInterval>;
     using AnchorId = MarkerGraphEdgeId;
     const MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t>& anchors;
 

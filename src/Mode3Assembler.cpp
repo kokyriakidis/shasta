@@ -54,18 +54,19 @@ void Mode3Assembler::computeConnectedComponents()
 
     // Compute connected components of the oriented reads portion
     // of the bipartite graph.
-    // Here oriented reads are indexed by OrientedReadId::getValue().
+    // OrientedReadIds are indexed by OrientedReadId::getValue().
     const uint64_t orientedReadCount = assembler.markers.size();
     vector<DisjointSets::Aint> disjointSetsData(orientedReadCount);
     DisjointSets disjointSets(&disjointSetsData[0], orientedReadCount);
 
-    // Loop over all marker graph edges (that is, over all anchors).
+    // Loop over all Anchors.
+    // All oriented reads in an Anchor belong to the same connected component.
     // This could be multithreaded but runs at decent speed as is.
-    for(MarkerGraphEdgeId edgeId=0; edgeId<anchors.size(); edgeId++) {
-        const auto markerIntervals = anchors[edgeId];
-        SHASTA_ASSERT(not markerIntervals.empty());
-        const OrientedReadId orientedReadId0 = markerIntervals.front().orientedReadId;
-        for(const MarkerInterval& markerInterval: markerIntervals) {
+    for(AnchorId anchorId=0; anchorId<anchors.size(); anchorId++) {
+        const Anchor anchor = anchors[anchorId];
+        SHASTA_ASSERT(not anchor.empty());
+        const OrientedReadId orientedReadId0 = anchor.front().orientedReadId;
+        for(const MarkerInterval& markerInterval: anchor) {
             const OrientedReadId orientedReadId1 = markerInterval.orientedReadId;
             disjointSets.unite(orientedReadId0.getValue(), orientedReadId1.getValue());
         }
@@ -335,8 +336,8 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
     performanceLog << timestamp << "Journey computation begins." << endl;
     for(uint64_t localAnchorId=0; localAnchorId<markerGraphEdgeIds.size(); localAnchorId++) {
-        const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localAnchorId];
-        const auto anchor = anchors[edgeId];
+        const MarkerGraphEdgeId anchorId = markerGraphEdgeIds[localAnchorId];
+        const Anchor anchor = anchors[anchorId];
         for(const MarkerInterval& markerInterval: anchor) {
             const OrientedReadId orientedReadId = markerInterval.orientedReadId;
             const uint32_t ordinal0 = markerInterval.ordinals[0];
@@ -492,11 +493,11 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
         ofstream csv("MarkerIntervals-" + to_string(componentId) + ".csv");
         csv << "AnchorId,OrientedReadId,Ordinal0,Ordinal1\n";
 
-        for(uint64_t localPrimaryId=0; localPrimaryId<component.markerGraphEdgeIds.size(); localPrimaryId++) {
-            const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localPrimaryId];
-            const auto anchor = anchors[edgeId];
+        for(uint64_t localAnchorId=0; localAnchorId<component.markerGraphEdgeIds.size(); localAnchorId++) {
+            const AnchorId anchorId = markerGraphEdgeIds[localAnchorId];
+            const Anchor anchor = anchors[anchorId];
             for(const MarkerInterval& markerInterval: anchor) {
-                csv << edgeId << ",";
+                csv << anchorId << ",";
                 csv << markerInterval.orientedReadId << ",";
                 csv << markerInterval.ordinals[0] << ",";
                 csv << markerInterval.ordinals[1] << "\n";
