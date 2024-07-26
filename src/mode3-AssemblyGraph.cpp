@@ -1,7 +1,7 @@
 // Shasta.
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-LocalAssembly.hpp"
-#include "mode3-PrimaryGraph.hpp"
+#include "mode3-AnchorGraph.hpp"
 #include "mode3-PhasingTable.hpp"
 #include "mode3-TangleGraph.hpp"
 #include "Assembler.hpp"

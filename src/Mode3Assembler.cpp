@@ -5,7 +5,7 @@
 #include "deduplicate.hpp"
 #include "dset64-gccAtomic.hpp"
 #include "mode3-AssemblyGraph.hpp"
-#include "mode3-PrimaryGraph.hpp"
+#include "mode3-AnchorGraph.hpp"
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"
 #include "timestamp.hpp"

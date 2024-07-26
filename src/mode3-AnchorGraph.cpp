@@ -1,5 +1,5 @@
 // Shasta.
-#include "mode3-PrimaryGraph.hpp"
+#include "mode3-AnchorGraph.hpp"
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
 #include "longestPath.hpp"
