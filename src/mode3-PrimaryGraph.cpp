@@ -24,7 +24,7 @@ using namespace mode3;
 
 
 
-PrimaryGraph::vertex_descriptor PrimaryGraph::addVertex(MarkerGraphEdgeId edgeId)
+AnchorGraph::vertex_descriptor AnchorGraph::addVertex(MarkerGraphEdgeId edgeId)
 {
     SHASTA_ASSERT(not vertexMap.contains(edgeId));
     const vertex_descriptor v = add_vertex({edgeId}, *this);
@@ -34,7 +34,7 @@ PrimaryGraph::vertex_descriptor PrimaryGraph::addVertex(MarkerGraphEdgeId edgeId
 
 
 
-void PrimaryGraph::addEdgeFromVertexDescriptors(
+void AnchorGraph::addEdgeFromVertexDescriptors(
     vertex_descriptor v0,
     vertex_descriptor v1,
     const MarkerGraphEdgePairInfo& info,
@@ -45,7 +45,7 @@ void PrimaryGraph::addEdgeFromVertexDescriptors(
 
 
 
-void PrimaryGraph::addEdge(
+void AnchorGraph::addEdge(
     MarkerGraphEdgeId edgeId0,
     MarkerGraphEdgeId edgeId1,
     const MarkerGraphEdgePairInfo& info,
@@ -63,19 +63,19 @@ void PrimaryGraph::addEdge(
 
 
 
-// Write a PrimaryGraph in graphviz format.
-void PrimaryGraph::writeGraphviz(
+// Write a AnchorGraph in graphviz format.
+void AnchorGraph::writeGraphviz(
     const string& name,
-    const PrimaryGraphDisplayOptions& options,
+    const AnchorGraphDisplayOptions& options,
     const MarkerGraph& markerGraph) const
 {
     ofstream out(name + ".dot");
 
-    const PrimaryGraph& graph = *this;
+    const AnchorGraph& graph = *this;
     out << "digraph " << name << " {\n";
 
-    BGL_FORALL_VERTICES(v, graph, PrimaryGraph) {
-        const PrimaryGraphVertex& vertex = graph[v];
+    BGL_FORALL_VERTICES(v, graph, AnchorGraph) {
+        const AnchorGraphVertex& vertex = graph[v];
         out << vertex.edgeId;
 
         if(options.labels or options.tooltips or options.colorVertices) {
@@ -102,8 +102,8 @@ void PrimaryGraph::writeGraphviz(
 
 
 
-    BGL_FORALL_EDGES(e, graph, PrimaryGraph) {
-        const PrimaryGraphEdge& edge = graph[e];
+    BGL_FORALL_EDGES(e, graph, AnchorGraph) {
+        const AnchorGraphEdge& edge = graph[e];
         if(not options.showNonTransitiveReductionEdges and edge.isNonTransitiveReductionEdge) {
             continue;
         }
@@ -173,16 +173,16 @@ void PrimaryGraph::writeGraphviz(
 
 
 
-void PrimaryGraph::writeEdgeCoverageHistogram(const string& fileName) const
+void AnchorGraph::writeEdgeCoverageHistogram(const string& fileName) const
 {
-    const PrimaryGraph& primaryGraph = *this;
+    const AnchorGraph& primaryGraph = *this;
 
     // Create a histogram indexed by histogram[coverage][commonCount].
     vector< vector<uint64_t> > histogram;
 
     // Loop over all edges.
-    BGL_FORALL_EDGES(e, primaryGraph, PrimaryGraph) {
-        const PrimaryGraphEdge& edge = primaryGraph[e];
+    BGL_FORALL_EDGES(e, primaryGraph, AnchorGraph) {
+        const AnchorGraphEdge& edge = primaryGraph[e];
         const uint64_t coverage = edge.coverage;
         const uint64_t commonCount = edge.info.common;
         SHASTA_ASSERT(coverage <= commonCount);
@@ -219,12 +219,12 @@ void PrimaryGraph::writeEdgeCoverageHistogram(const string& fileName) const
 
 
 
-// Create the connected components of this PrimaryGraph,
-// without changing the PrimaryGraph itself.
-vector< shared_ptr<PrimaryGraph> > PrimaryGraph::createConnectedComponents(
+// Create the connected components of this AnchorGraph,
+// without changing the AnchorGraph itself.
+vector< shared_ptr<AnchorGraph> > AnchorGraph::createConnectedComponents(
     uint64_t minComponentSize) const
 {
-    const PrimaryGraph& graph = *this;
+    const AnchorGraph& graph = *this;
 
     // Compute connected components.
     // We can't use boost::connected_components because it only works
@@ -236,38 +236,38 @@ vector< shared_ptr<PrimaryGraph> > PrimaryGraph::createConnectedComponents(
     for(uint64_t vertexId=0; vertexId<n; vertexId++) {
         disjointSets.make_set(vertexId);
     }
-    BGL_FORALL_EDGES(e, graph, PrimaryGraph) {
-        const PrimaryGraph::vertex_descriptor v0 = source(e, graph);
-        const PrimaryGraph::vertex_descriptor v1 = target(e, graph);
+    BGL_FORALL_EDGES(e, graph, AnchorGraph) {
+        const AnchorGraph::vertex_descriptor v0 = source(e, graph);
+        const AnchorGraph::vertex_descriptor v1 = target(e, graph);
         disjointSets.union_set(v0, v1);
     }
 
 
     // Gather the vertices in each connected component.
-    vector< shared_ptr<PrimaryGraph> > allComponentPointers(num_vertices(graph));
-    BGL_FORALL_VERTICES(v, graph, PrimaryGraph) {
-        const PrimaryGraphVertex& vertex = graph[v];
+    vector< shared_ptr<AnchorGraph> > allComponentPointers(num_vertices(graph));
+    BGL_FORALL_VERTICES(v, graph, AnchorGraph) {
+        const AnchorGraphVertex& vertex = graph[v];
         const uint64_t componentId = disjointSets.find_set(v);
-        shared_ptr<PrimaryGraph>& componentPointer = allComponentPointers[componentId];
+        shared_ptr<AnchorGraph>& componentPointer = allComponentPointers[componentId];
         if(not componentPointer) {
-            componentPointer = make_shared<PrimaryGraph>();
+            componentPointer = make_shared<AnchorGraph>();
         }
-        PrimaryGraph& component = *componentPointer;
+        AnchorGraph& component = *componentPointer;
         component.addVertex(vertex.edgeId);
     }
 
 
     // Gather the edges in each connected component.
-    BGL_FORALL_EDGES(e, graph, PrimaryGraph) {
-        const PrimaryGraph::vertex_descriptor v0 = source(e, graph);
-        const PrimaryGraph::vertex_descriptor v1 = target(e, graph);
+    BGL_FORALL_EDGES(e, graph, AnchorGraph) {
+        const AnchorGraph::vertex_descriptor v0 = source(e, graph);
+        const AnchorGraph::vertex_descriptor v1 = target(e, graph);
         const uint64_t edgeId0 = graph[v0].edgeId;
         const uint64_t edgeId1 = graph[v1].edgeId;
         const uint64_t componentId = disjointSets.find_set(v0);
         SHASTA_ASSERT(componentId == disjointSets.find_set(v1));
-        shared_ptr<PrimaryGraph>& componentPointer = allComponentPointers[componentId];
+        shared_ptr<AnchorGraph>& componentPointer = allComponentPointers[componentId];
         SHASTA_ASSERT(componentPointer);
-        PrimaryGraph& component = *componentPointer;
+        AnchorGraph& component = *componentPointer;
         component.addEdge(
             edgeId0,
             edgeId1,
@@ -279,8 +279,8 @@ vector< shared_ptr<PrimaryGraph> > PrimaryGraph::createConnectedComponents(
 
     // Keep only the components with at least minComponentSize vertices
     // and sort them by size.
-    vector< pair<shared_ptr<PrimaryGraph>, uint64_t> > componentPointersWithSizes;
-    for(const shared_ptr<PrimaryGraph>& p: allComponentPointers) {
+    vector< pair<shared_ptr<AnchorGraph>, uint64_t> > componentPointersWithSizes;
+    for(const shared_ptr<AnchorGraph>& p: allComponentPointers) {
         if(p) {
             const uint64_t componentSize = num_vertices(*p);
             if(componentSize >= minComponentSize) {
@@ -289,12 +289,12 @@ vector< shared_ptr<PrimaryGraph> > PrimaryGraph::createConnectedComponents(
         }
     }
     sort(componentPointersWithSizes.begin(), componentPointersWithSizes.end(),
-        OrderPairsBySecondOnlyGreater<shared_ptr<PrimaryGraph>, uint64_t>());
+        OrderPairsBySecondOnlyGreater<shared_ptr<AnchorGraph>, uint64_t>());
 
 
     // For now return all components, including the empty ones.
     // But we want to remove the small ones and sort them by size.
-    vector< shared_ptr<PrimaryGraph> > componentPointers;
+    vector< shared_ptr<AnchorGraph> > componentPointers;
     for(const auto& p: componentPointersWithSizes) {
         componentPointers.push_back(p.first);
     }
@@ -312,18 +312,18 @@ vector< shared_ptr<PrimaryGraph> > PrimaryGraph::createConnectedComponents(
 //   (ignoring edges marked as removed by transitive reduction).
 // - v1 has at least one in-edge with coverage at least highCoverageThreshold.
 //   (ignoring edges marked as removed by transitive reduction).
-void PrimaryGraph::removeCrossEdges(
+void AnchorGraph::removeCrossEdges(
     uint64_t lowCoverageThreshold,
     uint64_t highCoverageThreshold,
     uint64_t minOffset,
     bool debug)
 {
-    PrimaryGraph& graph = *this;
+    AnchorGraph& graph = *this;
 
     // Find the edges we are going to remove.
     vector<edge_descriptor> edgesToBeRemoved;
-    BGL_FORALL_EDGES(e, graph, PrimaryGraph) {
-        const PrimaryGraphEdge& edge = graph[e];
+    BGL_FORALL_EDGES(e, graph, AnchorGraph) {
+        const AnchorGraphEdge& edge = graph[e];
 
         // If it is marked as removed by transitive reduction, skip it.
         if(edge.isNonTransitiveReductionEdge) {
@@ -343,7 +343,7 @@ void PrimaryGraph::removeCrossEdges(
         // Check out-edges of v0.
         const vertex_descriptor v0 = source(e, graph);
         bool v0HasStrongOutEdge = false;
-        BGL_FORALL_OUTEDGES(v0, e0, graph, PrimaryGraph) {
+        BGL_FORALL_OUTEDGES(v0, e0, graph, AnchorGraph) {
             // If it is marked as removed by transitive reduction, ignore it.
             if(graph[e0].isNonTransitiveReductionEdge) {
                 continue;
@@ -360,7 +360,7 @@ void PrimaryGraph::removeCrossEdges(
         // Check in-edges of v1.
         const vertex_descriptor v1 = target(e, graph);
         bool v1HasStrongOutEdge = false;
-        BGL_FORALL_INEDGES(v1, e1, graph, PrimaryGraph) {
+        BGL_FORALL_INEDGES(v1, e1, graph, AnchorGraph) {
             // If it is marked as removed by transitive reduction, ignore it.
             if(graph[e1].isNonTransitiveReductionEdge) {
                 continue;
@@ -394,14 +394,14 @@ void PrimaryGraph::removeCrossEdges(
 
 
 // Remove edges for which loss = (commonCount - coverage) / commonCount > maxLoss
-void PrimaryGraph::removeWeakEdges(double maxLoss, bool debug)
+void AnchorGraph::removeWeakEdges(double maxLoss, bool debug)
 {
-    PrimaryGraph& graph = *this;
+    AnchorGraph& graph = *this;
 
     // Find the edges we are going to remove.
     vector<edge_descriptor> edgesToBeRemoved;
-    BGL_FORALL_EDGES(e, graph, PrimaryGraph) {
-        const PrimaryGraphEdge& edge = graph[e];
+    BGL_FORALL_EDGES(e, graph, AnchorGraph) {
+        const AnchorGraphEdge& edge = graph[e];
         const double loss = double(edge.info.common - edge.coverage) / double(edge.info.common);
         if(loss > maxLoss) {
             edgesToBeRemoved.push_back(e);

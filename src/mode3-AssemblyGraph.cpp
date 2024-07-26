@@ -40,7 +40,7 @@ template class MultithreadedObject<AssemblyGraph>;
 
 // Create from a connected component of the PrimaryGraph, then call run.
 AssemblyGraph::AssemblyGraph(
-    const PrimaryGraph& graph,
+    const AnchorGraph& graph,
     uint64_t componentId,
     const Assembler& assembler,
     const vector<OrientedReadId> orientedReadIds,
@@ -256,10 +256,10 @@ void AssemblyGraph::run(
 
 
 
-// Initial creation from the PrimaryGraph.
-// Each linear chain of edges in the PrimaryGraph after transitive reduction generates
+// Initial creation from the AnchorGraph.
+// Each linear chain of edges in the AnchorGraph after transitive reduction generates
 // an AssemblyGraphEdge (BubbleChain) consisting of a single haploid bubble.
-void AssemblyGraph::create(const PrimaryGraph& graph, bool /* debug */)
+void AssemblyGraph::create(const AnchorGraph& graph, bool /* debug */)
 {
     AssemblyGraph& cGraph = *this;
 
@@ -267,28 +267,28 @@ void AssemblyGraph::create(const PrimaryGraph& graph, bool /* debug */)
     // transitive reduction edges.
     class EdgePredicate {
     public:
-        bool operator()(const PrimaryGraph::edge_descriptor e) const
+        bool operator()(const AnchorGraph::edge_descriptor e) const
         {
             return not (*graph)[e].isNonTransitiveReductionEdge;
         }
-        EdgePredicate(const PrimaryGraph& graph) : graph(&graph) {}
+        EdgePredicate(const AnchorGraph& graph) : graph(&graph) {}
         EdgePredicate() : graph(0) {}
     private:
-        const PrimaryGraph* graph;
+        const AnchorGraph* graph;
     };
-    using FilteredPrimaryGraph = boost::filtered_graph<PrimaryGraph, EdgePredicate>;
-    FilteredPrimaryGraph filteredGraph(graph, EdgePredicate(graph));
+    using FilteredAnchorGraph = boost::filtered_graph<AnchorGraph, EdgePredicate>;
+    FilteredAnchorGraph filteredGraph(graph, EdgePredicate(graph));
 
     // Find linear chains in the PathGraph after transitive reduction.
-    vector< vector<PrimaryGraph::edge_descriptor> > inputChains;
+    vector< vector<AnchorGraph::edge_descriptor> > inputChains;
     findLinearChains(filteredGraph, 0, inputChains);
 
     // Each chain generates an edge.
     // Vertices are added as needed.
     std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
-    for(const vector<PrimaryGraph::edge_descriptor>& inputChain: inputChains) {
-        const PrimaryGraph::vertex_descriptor v0 = source(inputChain.front(), graph);
-        const PrimaryGraph::vertex_descriptor v1 = target(inputChain.back(), graph);
+    for(const vector<AnchorGraph::edge_descriptor>& inputChain: inputChains) {
+        const AnchorGraph::vertex_descriptor v0 = source(inputChain.front(), graph);
+        const AnchorGraph::vertex_descriptor v1 = target(inputChain.back(), graph);
         const MarkerGraphEdgeId markerGraphEdgeId0 = graph[v0].edgeId;
         const MarkerGraphEdgeId markerGraphEdgeId1 = graph[v1].edgeId;
         const vertex_descriptor cv0 = getVertex(markerGraphEdgeId0, vertexMap);
@@ -307,12 +307,12 @@ void AssemblyGraph::create(const PrimaryGraph& graph, bool /* debug */)
 
         // Store the chain.
         Chain& chain = bubble.front();
-        for(const PrimaryGraph::edge_descriptor e: inputChain) {
-            const PrimaryGraph::vertex_descriptor v = source(e, graph);
+        for(const AnchorGraph::edge_descriptor e: inputChain) {
+            const AnchorGraph::vertex_descriptor v = source(e, graph);
             chain.push_back(graph[v].edgeId);
         }
-        const PrimaryGraph::edge_descriptor eLast = inputChain.back();
-        const PrimaryGraph::vertex_descriptor vLast = target(eLast, graph);
+        const AnchorGraph::edge_descriptor eLast = inputChain.back();
+        const AnchorGraph::vertex_descriptor vLast = target(eLast, graph);
         chain.push_back(graph[vLast].edgeId);
     }
 }

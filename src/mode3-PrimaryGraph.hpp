@@ -29,29 +29,28 @@ namespace shasta {
     class MarkerGraph;
     namespace mode3 {
 
-        // A connected component of the primary graph,
-        // in which each vertex represents a primary edge of the marker graph.
-        // Edges are created by following the reads on their journeys
-        // over primary marker graph edges.
-        class PrimaryGraphVertex;
-        class PrimaryGraphEdge;
-        class PrimaryGraph;
-        using PrimaryGraphBaseClass = boost::adjacency_list<
+        // A connected component of the Anchor graph,
+        // in which each vertex represents an Anchor.
+        // Edges are created by following the reads on their journeys over Anchors.
+        class AnchorGraphVertex;
+        class AnchorGraphEdge;
+        class AnchorGraph;
+        using AnchorGraphBaseClass = boost::adjacency_list<
             boost::listS,
             boost::vecS,
             boost::bidirectionalS,
-            PrimaryGraphVertex,
-            PrimaryGraphEdge>;
+            AnchorGraphVertex,
+            AnchorGraphEdge>;
 
-        class PrimaryGraphDisplayOptions;
+        class AnchorGraphDisplayOptions;
 
     }
 }
 
 
 
-// Class to control Graphviz output of PrimaryGraph.
-class shasta::mode3::PrimaryGraphDisplayOptions {
+// Class to control Graphviz output of AnchorGraph.
+class shasta::mode3::AnchorGraphDisplayOptions {
 public:
     bool labels = true;
     bool tooltips = true;
@@ -66,7 +65,7 @@ public:
     double redJ;
     double greenJ;
 
-    PrimaryGraphDisplayOptions(double redJ = 0., double greenJ = 1.) :
+    AnchorGraphDisplayOptions(double redJ = 0., double greenJ = 1.) :
         redJ(redJ), greenJ(greenJ) {}
 
     void makeCompact()
@@ -80,7 +79,7 @@ public:
 
 
 
-class shasta::mode3::PrimaryGraphVertex {
+class shasta::mode3::AnchorGraphVertex {
 public:
 
     // The corresponding marker graph edgeId.
@@ -89,7 +88,7 @@ public:
 
 
 
-class shasta::mode3::PrimaryGraphEdge {
+class shasta::mode3::AnchorGraphEdge {
 public:
     MarkerGraphEdgePairInfo info;
     uint64_t coverage;
@@ -98,7 +97,7 @@ public:
 
 
 
-class shasta::mode3::PrimaryGraph : public PrimaryGraphBaseClass {
+class shasta::mode3::AnchorGraph : public AnchorGraphBaseClass {
 public:
 
     std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
@@ -117,14 +116,14 @@ public:
 
     void writeGraphviz(
         const string& name,
-        const PrimaryGraphDisplayOptions&,
+        const AnchorGraphDisplayOptions&,
         const MarkerGraph&) const;
 
     void writeEdgeCoverageHistogram(const string& fileName) const;
 
-    // Create the connected components of this PrimaryGraph,
-    // without changing the PrimaryGraph itself.
-    vector< shared_ptr<PrimaryGraph> > createConnectedComponents(uint64_t minComponentSize) const;
+    // Create the connected components of this AnchorGraph,
+    // without changing the AnchorGraph itself.
+    vector< shared_ptr<AnchorGraph> > createConnectedComponents(uint64_t minComponentSize) const;
 
     void localTransitiveReduction(
         uint64_t distance,

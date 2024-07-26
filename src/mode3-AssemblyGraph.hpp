@@ -50,7 +50,7 @@ namespace shasta {
             AssemblyGraphVertex,
             AssemblyGraphEdge>;
 
-        class PrimaryGraph;
+        class AnchorGraph;
     }
     class Assembler;
     class Mode3AssemblyOptions;
@@ -253,7 +253,7 @@ public:
 
     // Create from a connected component of the PrimaryGraph, then call run.
     AssemblyGraph(
-        const PrimaryGraph&,
+        const AnchorGraph&,
         uint64_t componentId,
         const Assembler&,
         const vector<OrientedReadId> orientedReadIds,
@@ -329,10 +329,10 @@ private:
 
 
 
-    // Initial creation from the PrimaryGraph.
-    // Each linear chain of edges in the PrimaryGraph after transitive reduction generates
+    // Initial creation from the AnchorGraph.
+    // Each linear chain of edges in the AnchorGraph after transitive reduction generates
     // an AssemblyGraphEdge (BubbleChain) consisting of a single haploid bubble.
-    void create(const PrimaryGraph&, bool debug);
+    void create(const AnchorGraph&, bool debug);
     uint64_t nextEdgeId = 0;
     void renumberEdges();
 

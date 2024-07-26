@@ -449,73 +449,73 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
 
 
-    // Now we can create the PrimaryGraph for this connected component.
-    PrimaryGraph primaryGraph;
+    // Now we can create the AnchorGraph for this connected component.
+    AnchorGraph anchorGraph;
 
     // Create the vertices first.
-    vector<PrimaryGraph::vertex_descriptor> vertexDescriptors;
-    for(uint64_t localPrimaryId=0; localPrimaryId<markerGraphEdgeIds.size(); localPrimaryId++) {
-        const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localPrimaryId];
-        vertexDescriptors.push_back(primaryGraph.addVertex(edgeId));
+    vector<AnchorGraph::vertex_descriptor> vertexDescriptors;
+    for(uint64_t localAnchorId=0; localAnchorId<markerGraphEdgeIds.size(); localAnchorId++) {
+        const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localAnchorId];
+        vertexDescriptors.push_back(anchorGraph.addVertex(edgeId));
     }
 
 
 
-    // To generate edges of the PrimaryGraph, we need to gather pairs of consecutive
-    // journey entries. Each pair (localPrimaryId0, localPrimaryId1) is stored
-    // as a localPrimaryId1 in journeyPairs[localPrimaryId0].
+    // To generate edges of the AnchorGraph, we need to gather pairs of consecutive
+    // journey entries. Each pair (localAnchorId0, localAnchorId1) is stored
+    // as a localAnchorId1 in journeyPairs[localAnchorId0].
     // For now use a simple vector of vector and sequential code, but later
     // switch to MemoryMapped::VectorOfVectors<uint64_t, uint64_t> and multithreaded code.
     vector< vector<uint64_t> > journeyPairs(markerGraphEdgeIds.size());
-    performanceLog << timestamp << "PrimaryGraph edge creation begins." << endl;
+    performanceLog << timestamp << "AnchorGraph edge creation begins." << endl;
     for(const auto& journey: journeys) {
         for(uint64_t i1=1; i1<journey.size(); i1++) {
             const uint64_t i0 = i1 - 1;
-            const uint64_t localPrimaryId0 = journey[i0].second;
-            const uint64_t localPrimaryId1 = journey[i1].second;
-            journeyPairs[localPrimaryId0].push_back(localPrimaryId1);
+            const uint64_t localAnchorId0 = journey[i0].second;
+            const uint64_t localAnchorId1 = journey[i1].second;
+            journeyPairs[localAnchorId0].push_back(localAnchorId1);
         }
      }
      vector<uint64_t> count;
-     for(uint64_t localPrimaryId0=0; localPrimaryId0<markerGraphEdgeIds.size(); localPrimaryId0++) {
-         const PrimaryGraph::vertex_descriptor v0 = vertexDescriptors[localPrimaryId0];
-         const MarkerGraphEdgeId edgeId0 = primaryGraph[v0].edgeId;
-         auto journeyPairs0 = journeyPairs[localPrimaryId0];
+     for(uint64_t localAnchorId0=0; localAnchorId0<markerGraphEdgeIds.size(); localAnchorId0++) {
+         const AnchorGraph::vertex_descriptor v0 = vertexDescriptors[localAnchorId0];
+         const MarkerGraphEdgeId edgeId0 = anchorGraph[v0].edgeId;
+         auto journeyPairs0 = journeyPairs[localAnchorId0];
          deduplicateAndCount(journeyPairs0, count);
          SHASTA_ASSERT(journeyPairs0.size() == count.size());
          for(uint64_t j=0; j<journeyPairs0.size(); j++) {
-             const uint64_t localPrimaryId1 = journeyPairs0[j];
+             const uint64_t localAnchorId1 = journeyPairs0[j];
              const uint64_t coverage = count[j];
-             const PrimaryGraph::vertex_descriptor v1 = vertexDescriptors[localPrimaryId1];
-             const MarkerGraphEdgeId edgeId1 = primaryGraph[v1].edgeId;
+             const AnchorGraph::vertex_descriptor v1 = vertexDescriptors[localAnchorId1];
+             const MarkerGraphEdgeId edgeId1 = anchorGraph[v1].edgeId;
              MarkerGraphEdgePairInfo info;
              SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
-             primaryGraph.addEdgeFromVertexDescriptors(v0, v1, info, coverage);
+             anchorGraph.addEdgeFromVertexDescriptors(v0, v1, info, coverage);
          }
      }
-     performanceLog << timestamp << "PrimaryGraph edge creation ends." << endl;
+     performanceLog << timestamp << "AnchorGraph edge creation ends." << endl;
 
-     cout << "The PrimaryGraph for this connected component has " <<
-         num_vertices(primaryGraph) << " vertices and " << num_edges(primaryGraph) << " edges." << endl;
+     cout << "The AnchorGraph for this connected component has " <<
+         num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
 
 
      // Graphviz output.
      if(debug) {
-         PrimaryGraphDisplayOptions options;
+         AnchorGraphDisplayOptions options;
          options.showNonTransitiveReductionEdges = true;
-         primaryGraph.writeGraphviz(
-             "PrimaryGraphInitial" + to_string(componentId), options, assembler.markerGraph);
+         anchorGraph.writeGraphviz(
+             "AnchorGraphInitial" + to_string(componentId), options, assembler.markerGraph);
          options.makeCompact();
-         primaryGraph.writeGraphviz(
-             "PrimaryGraphCompactInitial" + to_string(componentId), options, assembler.markerGraph);
-         primaryGraph.writeEdgeCoverageHistogram("PrimaryGraphInitial" + to_string(componentId) + "-EdgeCoverageHistogram.csv");
+         anchorGraph.writeGraphviz(
+             "AnchorGraphCompactInitial" + to_string(componentId), options, assembler.markerGraph);
+         anchorGraph.writeEdgeCoverageHistogram("AnchorGraphInitial" + to_string(componentId) + "-EdgeCoverageHistogram.csv");
      }
 
      // Remove weak edges..
-     primaryGraph.removeWeakEdges(options.primaryGraphOptions.maxLoss, debug);
+     anchorGraph.removeWeakEdges(options.primaryGraphOptions.maxLoss, debug);
 
      // Remove cross-edges.
-     primaryGraph.removeCrossEdges(
+     anchorGraph.removeCrossEdges(
          options.primaryGraphOptions.crossEdgesLowCoverageThreshold,
          options.primaryGraphOptions.crossEdgesHighCoverageThreshold,
          0,
@@ -523,18 +523,18 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
      // Graphviz output.
      if(debug) {
-         PrimaryGraphDisplayOptions options;
+         AnchorGraphDisplayOptions options;
          options.showNonTransitiveReductionEdges = false;
-         primaryGraph.writeGraphviz(
-             "PrimaryGraph" + to_string(componentId), options, assembler.markerGraph);
+         anchorGraph.writeGraphviz(
+             "AnchorGraph" + to_string(componentId), options, assembler.markerGraph);
          options.makeCompact();
-         primaryGraph.writeGraphviz(
-             "PrimaryGraphCompact" + to_string(componentId), options, assembler.markerGraph);
+         anchorGraph.writeGraphviz(
+             "AnchorGraphCompact" + to_string(componentId), options, assembler.markerGraph);
      }
 
      // Create the assembly graph for this connected component.
      return make_shared<AssemblyGraph>(
-         primaryGraph, componentId, assembler, orientedReadIds, markerGraphEdgeIds, threadCount,
+         anchorGraph, componentId, assembler, orientedReadIds, markerGraphEdgeIds, threadCount,
          options, assembleSequence, debug);
 }
 
