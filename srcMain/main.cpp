@@ -297,10 +297,6 @@ void shasta::main::assemble(
         assemblerOptions.readGraphOptions.strandSeparationMethod != 2) {
         throw runtime_error("--Assembly.mode 2 requires --ReadGraph.strandSeparationMethod 2.");
     }
-    if(assemblerOptions.assemblyOptions.mode == 3 and
-        assemblerOptions.readGraphOptions.strandSeparationMethod != 2) {
-        throw runtime_error("--Assembly.mode 3 requires --ReadGraph.strandSeparationMethod 2.");
-    }
 
     // Find absolute paths of the input files.
     // We will use them below after changing directory to the output directory.

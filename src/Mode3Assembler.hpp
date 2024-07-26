@@ -65,6 +65,9 @@ private:
 
         // The anchors (marker graph edges) in this connected component.
         vector<AnchorId> markerGraphEdgeIds;
+
+        bool isSelfComplementary() const;
+        void checkIsValid() const;  // SHASTA_ASSERT if not valid.
     };
     vector<ConnectedComponent> connectedComponents;
     void computeConnectedComponents();

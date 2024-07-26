@@ -103,9 +103,9 @@ void Mode3Assembler::computeConnectedComponents()
 
 
     // Gather the components with more than one read and their sizes.
-    // The connected components cannot be self-complementary because
-    // we are using read strand separation method 2.
-    // This means that the ReadIds must be all distinct (and increasing).
+    // Each component can be self-complementary (contains both strands)
+    // or part of a pairs of reverse complementary component.
+    // We keep all self-complementary components.
     // For each complementary pair, only keep the one
     // that has the first oriented read on strand 0.
     vector< pair<uint64_t, uint64_t> > componentTable;
@@ -115,19 +115,44 @@ void Mode3Assembler::computeConnectedComponents()
         if(componentSize < 2) {
             continue;
         }
-        if(component.front().getStrand() != 0) {
-            continue;
+
+        // Figure out if this is a self-complementary component (contains both strands).
+        const bool isSelfComplementary =  component[0].getReadId() == component[1].getReadId();
+
+
+
+        // Sanity checks.
+        if(isSelfComplementary) {
+
+            // For a self-complementary component, all oriented reads come in reverse complemented pairs.
+            SHASTA_ASSERT((componentSize %2) == 0);
+            for(uint64_t i=0; i<componentSize; i+=2) {
+                const OrientedReadId orientedReadId0 = component[i];
+                const OrientedReadId orientedReadId1 = component[i+1];
+                SHASTA_ASSERT(orientedReadId0.getReadId() == orientedReadId1.getReadId());
+                SHASTA_ASSERT(orientedReadId0.getStrand() == 0);
+                SHASTA_ASSERT(orientedReadId1.getStrand() == 1);
+            }
+
+        } else {
+
+            // For a non-self-complementary component, all ReadIds must be distinct.
+            for(uint64_t i1=1; i1<componentSize; i1++) {
+                const uint64_t i0 = i1 - 1;
+                SHASTA_ASSERT(component[i0].getReadId() < component[i1].getReadId());
+            }
+
         }
 
-        // Verify that the ReadIds are all distinct.
-        // THIS CHECK CAN BE REMOVED FOR PERFORMANCE.
-        for(uint64_t i1=1; i1<component.size(); i1++) {
-            const uint64_t i0 = i1 - 1;
-            SHASTA_ASSERT(component[i0].getReadId() < component[i1].getReadId());
-        }
+        // Decide if we keep this component.
+        // We keep all self-complementary components and one component of
+        // each pair of reverse complemented components.
+        const bool keep = isSelfComplementary or (component.front().getStrand() == 0);
 
         // Store this component in the componentTable.
-        componentTable.push_back({componentId, componentSize});
+        if(keep) {
+            componentTable.push_back({componentId, componentSize});
+        }
     }
 
     // Sort the component table by decreasing size.
@@ -306,6 +331,53 @@ void Mode3Assembler::assembleConnectedComponents(
 
 
 
+
+bool Mode3Assembler::ConnectedComponent::isSelfComplementary() const
+{
+    // A self-complementary component must have at least two oriented reads.
+    if(orientedReadIds.size() < 2) {
+        return false;
+    }
+
+    // In a self-complementary component, the number of oriented reads must be even.
+    if((orientedReadIds.size() % 2) == 1) {
+        return false;
+    }
+
+    // Otherwise, check the first two OrientedReadId.
+    return orientedReadIds[0].getReadId() == orientedReadIds[1].getReadId();
+}
+
+
+
+void Mode3Assembler::ConnectedComponent::checkIsValid() const
+{
+    if(isSelfComplementary()) {
+
+        // For a self-complementary component, all oriented reads come in reverse complemented pairs.
+        SHASTA_ASSERT((orientedReadIds.size() %2) == 0);
+        for(uint64_t i=0; i<orientedReadIds.size(); i+=2) {
+            const OrientedReadId orientedReadId0 = orientedReadIds[i];
+            const OrientedReadId orientedReadId1 = orientedReadIds[i+1];
+            SHASTA_ASSERT(orientedReadId0.getReadId() == orientedReadId1.getReadId());
+            SHASTA_ASSERT(orientedReadId0.getStrand() == 0);
+            SHASTA_ASSERT(orientedReadId1.getStrand() == 1);
+        }
+
+    } else {
+
+        // For a non-self-complementary component, all ReadIds must be distinct.
+        for(uint64_t i1=1; i1<orientedReadIds.size(); i1++) {
+            const uint64_t i0 = i1 - 1;
+            SHASTA_ASSERT(orientedReadIds[i0].getReadId() < orientedReadIds[i1].getReadId());
+        }
+
+    }
+
+}
+
+
+
 shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     uint64_t componentId,
     uint64_t threadCount,
@@ -322,8 +394,15 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     const vector<OrientedReadId>& orientedReadIds = connectedComponent.orientedReadIds;
     const vector<uint64_t>& markerGraphEdgeIds = connectedComponent.markerGraphEdgeIds;
 
+    const bool isSelfComplementary = connectedComponent.isSelfComplementary();
+    connectedComponent.checkIsValid();
+
     cout << "This connected component has " << orientedReadIds.size() <<
         " oriented reads and " << markerGraphEdgeIds.size() << " anchors." << endl;
+    if(isSelfComplementary) {
+        cout << "This connected component is self-complementary "
+            "and its assembly will contain both strands." << endl;
+    }
 
 
 
