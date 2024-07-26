@@ -1,6 +1,7 @@
 #pragma once
 
 // Shasta.
+#include "mode3-Anchor.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "MultithreadedObject.hpp"
 #include "ReadId.hpp"
@@ -44,14 +45,14 @@ private:
 
     // The main input to Mode3Assembler is a set of anchors.
     // Each anchor consists of a span of MarkerIntervals, with the following requirements:
-    // - All MarkerIntervals correspond to exactly the same sequence in the corresponding reads.
+    // - All MarkerIntervals correspond to exactly the same sequence in the corresponding oriented reads, and:
+    //      * Those portions of the oriented reads are believed to be aligned.
+    //      * They apear in a low number of copies in the genome being sequenced.
     // - There are no duplicate oriented reads in an anchor.
     // - The anchor coverage (number of oriented reads) is isn [minPrimaryCoverage, maxPrimaryCoverage].
     // For now the anchors are simply a reference to assembler.markerGraph.edgeMarkerIntervals,
     // butit might be possible to construct the anchors by other means.
-    using Anchor = span<const MarkerInterval>;
-    using AnchorId = MarkerGraphEdgeId;
-    const MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t>& anchors;
+    const mode3::Anchors& anchors;
 
     // The oriented reads present in each anchor
     // define a bipartite graph. We want to compute connected components
@@ -64,7 +65,7 @@ private:
         vector<OrientedReadId> orientedReadIds;
 
         // The anchors (marker graph edges) in this connected component.
-        vector<AnchorId> markerGraphEdgeIds;
+        vector<mode3::AnchorId> markerGraphEdgeIds;
 
         bool isSelfComplementary() const;
         void checkIsValid() const;  // SHASTA_ASSERT if not valid.
