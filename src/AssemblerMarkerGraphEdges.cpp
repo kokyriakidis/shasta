@@ -1489,8 +1489,8 @@ uint64_t Assembler::countCommonOrientedReadsUnsafe(
 //   is present, the edge is split into two parallel edges.
 // - This only generates primary marker graph edges, defined as follows:
 //   * Edge coverage is >= minPrimaryCoverage and <= maxPrimaryCoverage.
-//   * Both its vertices have no duplicate oriented read.
-//   * The edge marker interval has no duplicate oriented read.
+//   * Both its vertices have no duplicate ReadId.
+//   * The edge marker interval has no duplicate ReadId.
 // - This will only create the MarkerGraph::edgeMarkerIntervals
 //   and nothing else.
 void Assembler::createPrimaryMarkerGraphEdges(
@@ -1628,6 +1628,7 @@ void Assembler::createPrimaryMarkerGraphEdgesThreadFunction(uint64_t threadId)
 
         // Loop over source vertex ids assigned to this batch.
         for(MarkerGraphVertexId vertexId0=begin; vertexId0!=end; vertexId0++) {
+
             infos.clear();
 
             // Access the markers of this vertex.
@@ -1639,19 +1640,16 @@ void Assembler::createPrimaryMarkerGraphEdgesThreadFunction(uint64_t threadId)
                 continue;
             }
 
+            // If this vertex has duplicate ReadIds, no primary edge can begin here.
+            if(markerGraph.vertexHasDuplicateReadIds(vertexId0, markers)) {
+                continue;
+            }
+
             // Loop over the markers of this vertex.
-            OrientedReadId previousOrientedReadId(invalid<ReadId>, 0);
-            bool hasDuplicates = false;
             for(const MarkerId markerId0: vertexMarkerIds) {
                 OrientedReadId orientedReadId;
                 uint32_t ordinal0;
                 tie(orientedReadId, ordinal0) = findMarkerId(markerId0);
-
-                if(orientedReadId == previousOrientedReadId) {
-                    hasDuplicates = true;
-                    break;
-                }
-                previousOrientedReadId = orientedReadId;
 
                 // Find the next marker graph vertex visited by this OrientedReadId.
                 const uint32_t ordinal1 = ordinal0 + 1;
@@ -1700,14 +1698,9 @@ void Assembler::createPrimaryMarkerGraphEdgesThreadFunction(uint64_t threadId)
                 }
             }
 
-            if(hasDuplicates) {
-                // No primary marker graph edges have this vertex as a source.
-                continue;
-            }
-
             // Each of our Infos object can generate a primary edge, but we have to check that:
-            // - Coverage if in the primary coverage range.
-            // - vertexId1 does not have duplicate orientedReadId.
+            // - Coverage is in the primary coverage range.
+            // - vertexId1 does not have duplicate ReadIds.
             for(const Info& info: infos) {
                 if(info.markerIntervals.size() < minPrimaryCoverage) {
                     continue;
@@ -1715,7 +1708,7 @@ void Assembler::createPrimaryMarkerGraphEdgesThreadFunction(uint64_t threadId)
                 if(info.markerIntervals.size() > maxPrimaryCoverage) {
                     continue;
                 }
-                if(markerGraph.vertexHasDuplicateOrientedReadIds(info.vertexId1, markers)) {
+                if(markerGraph.vertexHasDuplicateReadIds(info.vertexId1, markers)) {
                     continue;
                 }
 
