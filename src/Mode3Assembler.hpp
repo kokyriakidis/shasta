@@ -54,6 +54,15 @@ private:
     // butit might be possible to construct the anchors by other means.
     const mode3::Anchors& anchors;
 
+    // Keep track of the reverse complement of each anchor:
+    // the reverse complement of anchorId is reverseComplementAnchor[anchorId],
+    // and therefore for any anchorId:
+    // reverseComplementAnchor[reverseComplementAnchor[anchorId]] == anchorId.
+    // Anchors are not allowed to be self-complementary, and therefore for any anchorId:
+    // reverseComplementAnchor[anchorId] != anchorId.
+    vector<mode3::AnchorId> reverseComplementAnchor;
+    void findReverseComplementAnchors();
+
     // The oriented reads present in each anchor
     // define a bipartite graph. We want to compute connected components
     // of this bipartite graph and process them one at a time.
