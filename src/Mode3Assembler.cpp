@@ -6,6 +6,7 @@
 #include "dset64-gccAtomic.hpp"
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-AnchorGraph.hpp"
+#include "mode3-StrandSplitter.hpp"
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"
 #include "timestamp.hpp"
@@ -199,8 +200,7 @@ void Mode3Assembler::computeConnectedComponents()
     vector< pair<uint64_t, uint64_t> > componentTable;
     for(uint64_t componentId=0; componentId<orientedReadCount; componentId++) {
         const vector<OrientedReadId>& component = componentsOrientedReads[componentId];
-        const uint64_t componentSize = component.size();
-        if(componentSize < 2) {
+        if(component.size() < 2) {
             continue;
         }
 
@@ -209,12 +209,12 @@ void Mode3Assembler::computeConnectedComponents()
 
 
 
-        // Sanity checks.
+        // If it is self complementary, split the strands.
         if(isSelfComplementary) {
 
             // For a self-complementary component, all oriented reads come in reverse complemented pairs.
-            SHASTA_ASSERT((componentSize %2) == 0);
-            for(uint64_t i=0; i<componentSize; i+=2) {
+            SHASTA_ASSERT((component.size() %2) == 0);
+            for(uint64_t i=0; i<component.size(); i+=2) {
                 const OrientedReadId orientedReadId0 = component[i];
                 const OrientedReadId orientedReadId1 = component[i+1];
                 SHASTA_ASSERT(orientedReadId0.getReadId() == orientedReadId1.getReadId());
@@ -222,24 +222,22 @@ void Mode3Assembler::computeConnectedComponents()
                 SHASTA_ASSERT(orientedReadId1.getStrand() == 1);
             }
 
+            StrandSplitter strandSplitter(
+                componentsOrientedReads[componentId],
+                componentsMarkerGraphEdgeIds[componentId],
+                anchors,
+                reverseComplementAnchor);
+
+            // The StrandSplitter only kept one side, and so we will keep it.
+            componentTable.push_back({componentId, component.size()});
+
         } else {
 
-            // For a non-self-complementary component, all ReadIds must be distinct.
-            for(uint64_t i1=1; i1<componentSize; i1++) {
-                const uint64_t i0 = i1 - 1;
-                SHASTA_ASSERT(component[i0].getReadId() < component[i1].getReadId());
+            // This is one of a pair of complementary connected components.
+            // Keep it if its first OrientedReadId is on strand 0.
+            if(component.front().getStrand() == 0) {
+                componentTable.push_back({componentId, component.size()});
             }
-
-        }
-
-        // Decide if we keep this component.
-        // We keep all self-complementary components and one component of
-        // each pair of reverse complemented components.
-        const bool keep = isSelfComplementary or (component.front().getStrand() == 0);
-
-        // Store this component in the componentTable.
-        if(keep) {
-            componentTable.push_back({componentId, componentSize});
         }
     }
 
@@ -488,8 +486,8 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     cout << "This connected component has " << orientedReadIds.size() <<
         " oriented reads and " << markerGraphEdgeIds.size() << " anchors." << endl;
     if(isSelfComplementary) {
-        cout << "This connected component is self-complementary "
-            "and its assembly will contain both strands." << endl;
+        cout << "This connected component is self-complementary. This is unexpected." << endl;
+        SHASTA_ASSERT(0);
     }
 
 
@@ -509,8 +507,9 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
             const OrientedReadId orientedReadId = markerInterval.orientedReadId;
             const uint32_t ordinal0 = markerInterval.ordinals[0];
             const auto& p = orientedReadIdTable[orientedReadId.getValue()];
-            SHASTA_ASSERT(p.first == componentId);
-            journeys[p.second].push_back({ordinal0, localAnchorId});
+            if(p.first == componentId) { // Due to StrandSplitter this is not always the case.
+                journeys[p.second].push_back({ordinal0, localAnchorId});
+            }
         }
     }
     for(vector< pair<uint32_t, uint64_t> >& journey: journeys) {
