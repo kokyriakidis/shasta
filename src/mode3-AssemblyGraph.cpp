@@ -5412,9 +5412,15 @@ void AssemblyGraph::phaseBubbleChainsUsingPhasingTable(
     }
 
     for(const edge_descriptor ce: allEdges) {
-        phaseBubbleChainUsingPhasingTable(
-            debug ? (directoryName + "/" + bubbleChainStringId(ce)) : "",
-            ce, phaseErrorThreshold, bubbleErrorThreshold, longBubbleThreshold);
+        try {
+            phaseBubbleChainUsingPhasingTable(
+                debug ? (directoryName + "/" + bubbleChainStringId(ce)) : "",
+                ce, phaseErrorThreshold, bubbleErrorThreshold, longBubbleThreshold);
+        } catch(std::exception&) {
+            // If an exception occurred, skip phasing for this bubble chain.
+            cout << "Error during phasing for bubble chain " << bubbleChainStringId(ce) <<
+                ": skipping phasing for this bubble chain." << endl;
+        }
     }
 
     if(debug) {
