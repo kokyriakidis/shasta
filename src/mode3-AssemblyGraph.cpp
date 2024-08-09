@@ -2950,6 +2950,16 @@ bool AssemblyGraph::detangleVertex(
     }
 
 
+    // If there are common edges between the in-edges and out-edges, skip.
+    // The code below does not work for this case.
+    for(const edge_descriptor e0: inEdges) {
+        if(find(outEdges.begin(), outEdges.end(), e0) != outEdges.end()) {
+            if(debug) {
+                cout << "Not detangling due to cycle." << endl;
+            }
+            return false;
+        }
+    }
 
     // If a MarkerGraphEdgeId appears both in the inEdges and in the outEdges,
     // detangling could generate a chain with two consecutive copies of the same
@@ -3462,6 +3472,16 @@ bool AssemblyGraph::detangleEdge(
         return false;
     }
 
+    // If there are common edges between the in-edges and out-edges, skip.
+    // The code below does not work for this case.
+    for(const edge_descriptor e0: inEdges) {
+        if(find(outEdges.begin(), outEdges.end(), e0) != outEdges.end()) {
+            if(debug) {
+                cout << "Not detangling due to cycle." << endl;
+            }
+            return false;
+        }
+    }
 
 
     // If a MarkerGraphEdgeId appears both in the inEdges and in the outEdges,
@@ -3802,6 +3822,16 @@ bool AssemblyGraph::detangleEdge(
         return false;
     }
 
+    // If there are common edges between the in-edges and out-edges, skip.
+    // The code below does not work for this case.
+    for(const edge_descriptor e0: inEdges) {
+        if(find(outEdges.begin(), outEdges.end(), e0) != outEdges.end()) {
+            if(debug) {
+                cout << "Not detangling due to cycle." << endl;
+            }
+            return false;
+        }
+    }
 
 
     // Compute the tangle matrix using up to n MarkerGraphEdgeIds
