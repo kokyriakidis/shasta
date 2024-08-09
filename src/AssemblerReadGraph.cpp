@@ -30,9 +30,14 @@ using namespace shasta;
 
 
 // For each read, keep only the best maxAlignmentCount alignments.
+// "Best" means:
+// - More aligned markers if preferAlignedFraction is false.
+// - A higher aligned fraction if preferAlignedFraction is true.
 // Note that the connectivity of the resulting read graph can
 // be more than maxAlignmentCount.
-void Assembler::createReadGraph(uint32_t maxAlignmentCount)
+void Assembler::createReadGraph(
+    uint32_t maxAlignmentCount,
+    bool preferAlignedFraction)
 {
     // Find the number of reads and oriented reads.
     const ReadId orientedReadCount = uint32_t(markers.size());
@@ -42,57 +47,119 @@ void Assembler::createReadGraph(uint32_t maxAlignmentCount)
     // Mark all alignments as not to be kept.
     vector<bool> keepAlignment(alignmentData.size(), false);
 
-    // Vector to keep the alignments for each read,
-    // with their number of markers.
-    // Contains pairs(marker count, alignment id).
-    vector< pair<uint32_t, uint32_t> > readAlignments;
-
     const bool debug = false;
     if(debug) {
         cout << "createReadGraph begins, maxAlignmentCount " << maxAlignmentCount << endl;
     }
 
 
-    // Loop over reads.
-    for(ReadId readId=0; readId<readCount; readId++) {
-        if(debug) {
-            cout << "Working on read " << readId << endl;
-        }
+    if(preferAlignedFraction) {
 
-        // Gather the alignments for this read, each with its number of markers.
-        readAlignments.clear();
-        for(const uint32_t alignmentId: alignmentTable[OrientedReadId(readId, 0).getValue()]) {
-            const AlignmentData& alignment = alignmentData[alignmentId];
-            readAlignments.push_back(make_pair(alignment.info.markerCount, alignmentId));
-        }
-        if(debug) {
-            cout << "Found " << readAlignments.size() << " alignments." << endl;
-        }
+        // Vector to keep the alignments for each read,
+        // with their aligned fraction
+        // Contains pairs(aligned fraction, alignment id).
+        vector< pair<double, uint32_t> > readAlignments;
 
-        // Keep the best maxAlignmentCount.
-        if(readAlignments.size() > maxAlignmentCount) {
-            std::nth_element(
-                readAlignments.begin(),
-                readAlignments.begin() + maxAlignmentCount,
-                readAlignments.end(),
-                std::greater< pair<uint32_t, uint32_t> >());
-            readAlignments.resize(maxAlignmentCount);
-        }
-        if(debug) {
-            cout << "Kept " << readAlignments.size() << " alignments." << endl;
-        }
 
-        // Mark the surviving alignments as to be kept.
-        for(const auto& p: readAlignments) {
-            const uint32_t alignmentId = p.second;
-            keepAlignment[alignmentId] = true;
+
+        // Loop over reads.
+        for(ReadId readId=0; readId<readCount; readId++) {
             if(debug) {
+                cout << "Working on read " << readId << endl;
+            }
+
+            // Gather the alignments for this read, each with its number of markers.
+            readAlignments.clear();
+            for(const uint32_t alignmentId: alignmentTable[OrientedReadId(readId, 0).getValue()]) {
                 const AlignmentData& alignment = alignmentData[alignmentId];
-                cout << "Marked alignment " << alignment.readIds[0] << " " <<
-                    alignment.readIds[1] << (alignment.isSameStrand ? " same strand" : " opposite strand") << endl;
+                readAlignments.push_back(make_pair(alignment.info.minAlignedFraction(), alignmentId));
+            }
+            if(debug) {
+                cout << "Found " << readAlignments.size() << " alignments." << endl;
+            }
+
+            // Keep the best maxAlignmentCount.
+            if(readAlignments.size() > maxAlignmentCount) {
+                std::nth_element(
+                    readAlignments.begin(),
+                    readAlignments.begin() + maxAlignmentCount,
+                    readAlignments.end(),
+                    std::greater< pair<uint32_t, uint32_t> >());
+                readAlignments.resize(maxAlignmentCount);
+            }
+            if(debug) {
+                cout << "Kept " << readAlignments.size() << " alignments." << endl;
+            }
+
+            // Mark the surviving alignments as to be kept.
+            for(const auto& p: readAlignments) {
+                const uint32_t alignmentId = p.second;
+                keepAlignment[alignmentId] = true;
+                if(debug) {
+                    const AlignmentData& alignment = alignmentData[alignmentId];
+                    cout << "Marked alignment " << alignment.readIds[0] << " " <<
+                        alignment.readIds[1] << (alignment.isSameStrand ? " same strand" : " opposite strand") << endl;
+                }
+            }
+        }
+
+    } else {
+
+        // Vector to keep the alignments for each read,
+        // with their number of markers.
+        // Contains pairs(marker count, alignment id).
+        vector< pair<uint32_t, uint32_t> > readAlignments;
+
+        const bool debug = false;
+        if(debug) {
+            cout << "createReadGraph begins, maxAlignmentCount " << maxAlignmentCount << endl;
+        }
+
+
+        // Loop over reads.
+        for(ReadId readId=0; readId<readCount; readId++) {
+            if(debug) {
+                cout << "Working on read " << readId << endl;
+            }
+
+            // Gather the alignments for this read, each with its number of markers.
+            readAlignments.clear();
+            for(const uint32_t alignmentId: alignmentTable[OrientedReadId(readId, 0).getValue()]) {
+                const AlignmentData& alignment = alignmentData[alignmentId];
+                readAlignments.push_back(make_pair(alignment.info.markerCount, alignmentId));
+            }
+            if(debug) {
+                cout << "Found " << readAlignments.size() << " alignments." << endl;
+            }
+
+            // Keep the best maxAlignmentCount.
+            if(readAlignments.size() > maxAlignmentCount) {
+                std::nth_element(
+                    readAlignments.begin(),
+                    readAlignments.begin() + maxAlignmentCount,
+                    readAlignments.end(),
+                    std::greater< pair<uint32_t, uint32_t> >());
+                readAlignments.resize(maxAlignmentCount);
+            }
+            if(debug) {
+                cout << "Kept " << readAlignments.size() << " alignments." << endl;
+            }
+
+            // Mark the surviving alignments as to be kept.
+            for(const auto& p: readAlignments) {
+                const uint32_t alignmentId = p.second;
+                keepAlignment[alignmentId] = true;
+                if(debug) {
+                    const AlignmentData& alignment = alignmentData[alignmentId];
+                    cout << "Marked alignment " << alignment.readIds[0] << " " <<
+                        alignment.readIds[1] << (alignment.isSameStrand ? " same strand" : " opposite strand") << endl;
+                }
             }
         }
     }
+
+
+
     const size_t keepCount = count(keepAlignment.begin(), keepAlignment.end(), true);
     cout << "Keeping " << keepCount << " alignments of " << keepAlignment.size() << endl;
 

@@ -246,6 +246,7 @@ class shasta::ReadGraphOptions {
 public:
     int creationMethod;
     int maxAlignmentCount;
+    bool preferAlignedFraction;
     int maxChimericReadDistance;
     uint64_t strandSeparationMethod;
     int crossStrandMaxDistance;

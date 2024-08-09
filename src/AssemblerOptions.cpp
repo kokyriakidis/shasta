@@ -606,6 +606,11 @@ void AssemblerOptions::addConfigurableOptions()
         default_value(6),
         "The maximum number of alignments to be kept for each read.")
 
+        ("ReadGraph.preferAlignedFraction",
+        bool_switch(&readGraphOptions.preferAlignedFraction)->
+        default_value(false),
+        "Prefer alignments with a higher aligned fraction, rather than higher number of aligned markers.")
+
         ("ReadGraph.maxChimericReadDistance",
         value<int>(&readGraphOptions.maxChimericReadDistance)->
         default_value(2),
@@ -1314,6 +1319,7 @@ void ReadGraphOptions::write(ostream& s) const
     s << "[ReadGraph]\n";
     s << "creationMethod = " << creationMethod << "\n";
     s << "maxAlignmentCount = " << maxAlignmentCount << "\n";
+    s << "preferAlignedFraction = " << convertBoolToPythonString(preferAlignedFraction) << "\n";
     s << "maxChimericReadDistance = " << maxChimericReadDistance << "\n";
     s << "strandSeparationMethod = " << strandSeparationMethod << "\n";
     s << "crossStrandMaxDistance = " << crossStrandMaxDistance << "\n";

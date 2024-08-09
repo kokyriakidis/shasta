@@ -986,7 +986,9 @@ private:
     // For more information, see comments in ReadGraph.hpp.
 public:
     ReadGraph readGraph;
-    void createReadGraph(uint32_t maxAlignmentCount);
+    void createReadGraph(
+        uint32_t maxAlignmentCount,
+        bool preferAlignedFraction);
 
     void createReadGraph2(
         uint32_t maxAlignmentCount,
