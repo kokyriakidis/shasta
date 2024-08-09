@@ -6,7 +6,6 @@
 #include "dset64-gccAtomic.hpp"
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-AnchorGraph.hpp"
-#include "mode3-StrandSplitter.hpp"
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"
 #include "timestamp.hpp"
@@ -208,7 +207,7 @@ void Mode3Assembler::computeConnectedComponents()
         const bool isSelfComplementary =  component[0].getReadId() == component[1].getReadId();
 
 
-
+#if 0
         // If it is self complementary, split the strands.
         if(isSelfComplementary) {
 
@@ -238,6 +237,11 @@ void Mode3Assembler::computeConnectedComponents()
             if(component.front().getStrand() == 0) {
                 componentTable.push_back({componentId, component.size()});
             }
+        }
+#endif
+
+        if(isSelfComplementary or (component.front().getStrand() == 0)) {
+            componentTable.push_back({componentId, component.size()});
         }
     }
 
@@ -486,8 +490,8 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     cout << "This connected component has " << orientedReadIds.size() <<
         " oriented reads and " << markerGraphEdgeIds.size() << " anchors." << endl;
     if(isSelfComplementary) {
-        cout << "This connected component is self-complementary. This is unexpected." << endl;
-        SHASTA_ASSERT(0);
+        cout << "This connected component is self-complementary. Both strands will be assembled." << endl;
+        // SHASTA_ASSERT(0);
     }
 
 
