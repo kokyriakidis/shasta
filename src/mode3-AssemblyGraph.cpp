@@ -5898,7 +5898,7 @@ void AssemblyGraph::phaseBubbleChainUsingPhasingTable(
     for(const auto& phasedComponentPointer: phasingTable.phasedComponents) {
         const PhasedComponent& phasedComponent = *phasedComponentPointer;
         if(phasedComponent.size() < 2) {
-            break;
+            continue;
         }
         if(debug) {
             cout << "Checking for splitting a PhasedComponent of size " << phasedComponent.size() << endl;
