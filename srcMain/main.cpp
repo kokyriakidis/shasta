@@ -277,10 +277,11 @@ void shasta::main::assemble(
     }
 
     if(assemblerOptions.readGraphOptions.creationMethod != 0 and
-        assemblerOptions.readGraphOptions.creationMethod != 2) {
+        assemblerOptions.readGraphOptions.creationMethod != 2 and
+        assemblerOptions.readGraphOptions.creationMethod != 3) {
         throw runtime_error("--ReadGraph.creationMethod " +
             to_string(assemblerOptions.readGraphOptions.creationMethod) +
-            " is not valid. Valid values are 0 and 2.");
+            " is not valid. Valid values are 0, 2, and 3.");
     }
 
     // Check assemblerOptions.assemblyOptions.detangleMethod.
@@ -693,10 +694,15 @@ void shasta::main::assemble(
 
 
     // Create the read graph.
-    if(assemblerOptions.readGraphOptions.creationMethod == 0) {
-        assembler.createReadGraph(
-            assemblerOptions.readGraphOptions.maxAlignmentCount,
-            assemblerOptions.readGraphOptions.preferAlignedFraction);
+    if(assemblerOptions.readGraphOptions.creationMethod != 2 ) {
+        if(assemblerOptions.readGraphOptions.creationMethod == 0) {
+            assembler.createReadGraph(
+                assemblerOptions.readGraphOptions.maxAlignmentCount,
+                assemblerOptions.readGraphOptions.preferAlignedFraction);
+        } else if(assemblerOptions.readGraphOptions.creationMethod == 3) {
+            assembler.createReadGraph3(
+                assemblerOptions.readGraphOptions.maxAlignmentCount);
+        }
 
         // Actual alignment criteria are as specified in the command line options
         // and/or configuration.
