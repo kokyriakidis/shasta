@@ -30,7 +30,7 @@ Mode3Assembler::Mode3Assembler(
     MappedMemoryOwner(assembler),
     assembler(assembler),
     debug(debug),
-    anchors(assembler.markerGraph.edgeMarkerIntervals)
+    anchors(assembler.markerGraph)
 {
     performanceLog << timestamp << "Mode 3 assembly begins." << endl;
     findReverseComplementAnchors();

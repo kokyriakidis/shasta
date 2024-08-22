@@ -5,6 +5,7 @@
 
 namespace shasta {
 
+    class MarkerGraph;
     class MarkerInterval;
 
     namespace MemoryMapped {
@@ -23,9 +24,22 @@ namespace shasta {
 
     namespace mode3 {
 
-        using Anchors = MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t>;
-        using Anchor = span<const MarkerInterval>;
         using AnchorId = uint64_t;
+        using Anchor = span<const MarkerInterval>;
+        class Anchors;
 
     }
 }
+
+
+
+class shasta::mode3::Anchors {
+public:
+
+    Anchors(const MarkerGraph&);
+    Anchor operator[](AnchorId anchorId) const;
+    uint64_t size() const;
+
+private:
+    const MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t>& anchorMarkerIntervals;
+};
