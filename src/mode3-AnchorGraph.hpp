@@ -37,7 +37,7 @@ namespace shasta {
         class AnchorGraph;
         using AnchorGraphBaseClass = boost::adjacency_list<
             boost::listS,
-            boost::vecS,
+            boost::listS,
             boost::bidirectionalS,
             AnchorGraphVertex,
             AnchorGraphEdge>;
@@ -120,10 +120,6 @@ public:
         const MarkerGraph&) const;
 
     void writeEdgeCoverageHistogram(const string& fileName) const;
-
-    // Create the connected components of this AnchorGraph,
-    // without changing the AnchorGraph itself.
-    vector< shared_ptr<AnchorGraph> > createConnectedComponents(uint64_t minComponentSize) const;
 
     void localTransitiveReduction(
         uint64_t distance,
