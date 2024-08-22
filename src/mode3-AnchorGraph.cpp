@@ -24,12 +24,22 @@ using namespace mode3;
 
 
 
-AnchorGraph::vertex_descriptor AnchorGraph::addVertex(MarkerGraphEdgeId edgeId)
+// Create the AnchorGraph and its vertices given a vector of AnchorIds.
+AnchorGraph::AnchorGraph(const vector<AnchorId>& anchorIds) :
+    anchorIds(anchorIds)
 {
-    SHASTA_ASSERT(not vertexMap.contains(edgeId));
-    const vertex_descriptor v = add_vertex({edgeId}, *this);
-    vertexMap.insert({edgeId, v});
-    return v;
+
+    // Check that the AnchorIds are sorted and distinct.
+    for(uint64_t i=1; i<anchorIds.size(); i++) {
+        SHASTA_ASSERT(anchorIds[i-1] < anchorIds[i]);
+    }
+
+    // Create the vertices.
+    for(const AnchorId anchorId: anchorIds) {
+        const vertex_descriptor v = add_vertex(AnchorGraphVertex{anchorId}, *this);
+        vertexMap.insert({anchorId, v});
+        vertexDescriptors.push_back(v);
+    }
 }
 
 
@@ -45,14 +55,14 @@ void AnchorGraph::addEdgeFromVertexDescriptors(
 
 
 
-void AnchorGraph::addEdge(
-    MarkerGraphEdgeId edgeId0,
-    MarkerGraphEdgeId edgeId1,
+void AnchorGraph::addEdgeFromAnchorIds(
+    AnchorId anchorId0,
+    AnchorId anchorId1,
     const MarkerGraphEdgePairInfo& info,
     uint64_t coverage)
 {
-    auto it0 = vertexMap.find(edgeId0);
-    auto it1 = vertexMap.find(edgeId1);
+    auto it0 = vertexMap.find(anchorId0);
+    auto it1 = vertexMap.find(anchorId1);
     SHASTA_ASSERT(it0 != vertexMap.end());
     SHASTA_ASSERT(it1 != vertexMap.end());
     const vertex_descriptor v0 = it0->second;
@@ -76,7 +86,7 @@ void AnchorGraph::writeGraphviz(
 
     BGL_FORALL_VERTICES(v, graph, AnchorGraph) {
         const AnchorGraphVertex& vertex = graph[v];
-        out << vertex.edgeId;
+        out << vertex.anchorId;
 
         if(options.labels or options.tooltips or options.colorVertices) {
             out << "[";
@@ -84,13 +94,13 @@ void AnchorGraph::writeGraphviz(
 
         if(options.labels) {
             out << "label=\"";
-            out << vertex.edgeId << "\\n" << markerGraph.edgeCoverage(vertex.edgeId);
+            out << vertex.anchorId << "\\n" << markerGraph.edgeCoverage(vertex.anchorId);
             out << "\" ";
         }
 
         if(options.tooltips) {
             out << "tooltip=\"";
-            out << vertex.edgeId;
+            out << vertex.anchorId;
             out << "\" ";
         }
 
@@ -111,8 +121,8 @@ void AnchorGraph::writeGraphviz(
         const vertex_descriptor v1 = target(e, graph);
 
         out <<
-            graph[v0].edgeId << "->" <<
-            graph[v1].edgeId;
+            graph[v0].anchorId << "->" <<
+            graph[v1].anchorId;
 
         if(edge.isNonTransitiveReductionEdge or options.labels or options.tooltips or options.colorEdges) {
             out << " [";
@@ -125,8 +135,8 @@ void AnchorGraph::writeGraphviz(
         if(options.tooltips) {
             out <<
                 "tooltip=\"" <<
-                graph[v0].edgeId << "->" <<
-                graph[v1].edgeId << " ";
+                graph[v0].anchorId << "->" <<
+                graph[v1].anchorId << " ";
             if(edge.coverage != invalid<uint64_t>) {
                 out << edge.coverage << "/";
             }
@@ -296,8 +306,8 @@ void AnchorGraph::removeCrossEdges(
             const vertex_descriptor v0 = source(e, graph);
             const vertex_descriptor v1 = target(e, graph);
             cout << "Removing cross edge " <<
-                graph[v0].edgeId << "->" <<
-                graph[v1].edgeId << endl;
+                graph[v0].anchorId << "->" <<
+                graph[v1].anchorId << endl;
         }
     }
 
@@ -326,8 +336,8 @@ void AnchorGraph::removeWeakEdges(double maxLoss, bool debug)
                 const vertex_descriptor v0 = source(e, graph);
                 const vertex_descriptor v1 = target(e, graph);
                 cout << "Removing weak edge " <<
-                    graph[v0].edgeId << "->" <<
-                    graph[v1].edgeId << ", loss " << loss << endl;
+                    graph[v0].anchorId << "->" <<
+                    graph[v1].anchorId << ", loss " << loss << endl;
             }
         }
     }

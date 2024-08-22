@@ -290,10 +290,10 @@ void AssemblyGraph::create(const AnchorGraph& graph, bool /* debug */)
     for(const vector<AnchorGraph::edge_descriptor>& inputChain: inputChains) {
         const AnchorGraph::vertex_descriptor v0 = source(inputChain.front(), graph);
         const AnchorGraph::vertex_descriptor v1 = target(inputChain.back(), graph);
-        const MarkerGraphEdgeId markerGraphEdgeId0 = graph[v0].edgeId;
-        const MarkerGraphEdgeId markerGraphEdgeId1 = graph[v1].edgeId;
-        const vertex_descriptor cv0 = getVertex(markerGraphEdgeId0, vertexMap);
-        const vertex_descriptor cv1 = getVertex(markerGraphEdgeId1, vertexMap);
+        const AnchorId anchorId0 = graph[v0].anchorId;
+        const AnchorId anchorId1 = graph[v1].anchorId;
+        const vertex_descriptor cv0 = getVertex(anchorId0, vertexMap);
+        const vertex_descriptor cv1 = getVertex(anchorId1, vertexMap);
 
         // Create an edge for this input chain.
         edge_descriptor ce;
@@ -310,11 +310,11 @@ void AssemblyGraph::create(const AnchorGraph& graph, bool /* debug */)
         Chain& chain = bubble.front();
         for(const AnchorGraph::edge_descriptor e: inputChain) {
             const AnchorGraph::vertex_descriptor v = source(e, graph);
-            chain.push_back(graph[v].edgeId);
+            chain.push_back(graph[v].anchorId);
         }
         const AnchorGraph::edge_descriptor eLast = inputChain.back();
         const AnchorGraph::vertex_descriptor vLast = target(eLast, graph);
-        chain.push_back(graph[vLast].edgeId);
+        chain.push_back(graph[vLast].anchorId);
     }
 }
 

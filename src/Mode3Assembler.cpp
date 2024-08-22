@@ -538,19 +538,9 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
         }
     }
 
-
-
     // Now we can create the AnchorGraph for this connected component.
-    AnchorGraph anchorGraph;
-
-    // Create the vertices first.
-    vector<AnchorGraph::vertex_descriptor> vertexDescriptors;
-    for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
-        const AnchorId anchorId = anchorIds[localAnchorId];
-        vertexDescriptors.push_back(anchorGraph.addVertex(anchorId));
-    }
-
-
+    // The constructor generates the vertices.
+    AnchorGraph anchorGraph(anchorIds);
 
     // To generate edges of the AnchorGraph, we need to gather pairs of consecutive
     // journey entries. Each pair (localAnchorId0, localAnchorId1) is stored
@@ -569,18 +559,18 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      }
      vector<uint64_t> count;
      for(uint64_t localAnchorId0=0; localAnchorId0<anchorIds.size(); localAnchorId0++) {
-         const AnchorGraph::vertex_descriptor v0 = vertexDescriptors[localAnchorId0];
-         const MarkerGraphEdgeId edgeId0 = anchorGraph[v0].edgeId;
+         const AnchorGraph::vertex_descriptor v0 = anchorGraph.vertexDescriptors[localAnchorId0];
+         const AnchorId anchorId0 = anchorGraph[v0].anchorId;
          auto journeyPairs0 = journeyPairs[localAnchorId0];
          deduplicateAndCount(journeyPairs0, count);
          SHASTA_ASSERT(journeyPairs0.size() == count.size());
          for(uint64_t j=0; j<journeyPairs0.size(); j++) {
              const uint64_t localAnchorId1 = journeyPairs0[j];
              const uint64_t coverage = count[j];
-             const AnchorGraph::vertex_descriptor v1 = vertexDescriptors[localAnchorId1];
-             const MarkerGraphEdgeId edgeId1 = anchorGraph[v1].edgeId;
+             const AnchorGraph::vertex_descriptor v1 = anchorGraph.vertexDescriptors[localAnchorId1];
+             const AnchorId anchorId1 = anchorGraph[v1].anchorId;
              MarkerGraphEdgePairInfo info;
-             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(anchorId0, anchorId1, info));
              anchorGraph.addEdgeFromVertexDescriptors(v0, v1, info, coverage);
          }
      }
