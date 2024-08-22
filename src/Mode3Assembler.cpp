@@ -559,19 +559,17 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      }
      vector<uint64_t> count;
      for(uint64_t localAnchorId0=0; localAnchorId0<anchorIds.size(); localAnchorId0++) {
-         const AnchorGraph::vertex_descriptor v0 = anchorGraph.vertexDescriptors[localAnchorId0];
-         const AnchorId anchorId0 = anchorGraph[v0].anchorId;
+         const AnchorId anchorId0 = anchorIds[localAnchorId0];
          auto journeyPairs0 = journeyPairs[localAnchorId0];
          deduplicateAndCount(journeyPairs0, count);
          SHASTA_ASSERT(journeyPairs0.size() == count.size());
          for(uint64_t j=0; j<journeyPairs0.size(); j++) {
              const uint64_t localAnchorId1 = journeyPairs0[j];
              const uint64_t coverage = count[j];
-             const AnchorGraph::vertex_descriptor v1 = anchorGraph.vertexDescriptors[localAnchorId1];
-             const AnchorId anchorId1 = anchorGraph[v1].anchorId;
+             const AnchorId anchorId1 = anchorIds[localAnchorId1];
              MarkerGraphEdgePairInfo info;
              SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(anchorId0, anchorId1, info));
-             anchorGraph.addEdgeFromVertexDescriptors(v0, v1, info, coverage);
+             anchorGraph.addEdgeFromLocalAnchorIds(localAnchorId0, localAnchorId1, info, coverage);
          }
      }
      performanceLog << timestamp << "AnchorGraph edge creation ends." << endl;

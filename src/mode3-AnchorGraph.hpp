@@ -94,6 +94,8 @@ public:
     MarkerGraphEdgePairInfo info;
     uint64_t coverage;
     bool isNonTransitiveReductionEdge = false;
+    AnchorGraphEdge(const MarkerGraphEdgePairInfo& info, uint64_t coverage) :
+        info(info), coverage(coverage) {}
 };
 
 
@@ -112,17 +114,10 @@ public:
     // Index by the local anchor id.
     vector<vertex_descriptor> vertexDescriptors;
 
-    // The vertex descriptor corresponding to each AnchorId.
-    std::map<AnchorId, vertex_descriptor> vertexMap;
-
-    void addEdgeFromAnchorIds(
-        AnchorId,
-        AnchorId,
-        const MarkerGraphEdgePairInfo&,
-        uint64_t coverage);
-    void addEdgeFromVertexDescriptors(
-        vertex_descriptor,
-        vertex_descriptor,
+    // Add an edge between the vertices corresponding to given local anchor ids.
+    void addEdgeFromLocalAnchorIds(
+        uint64_t,
+        uint64_t,
         const MarkerGraphEdgePairInfo&,
         uint64_t coverage);
 

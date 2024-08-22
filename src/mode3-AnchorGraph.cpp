@@ -37,38 +37,23 @@ AnchorGraph::AnchorGraph(const vector<AnchorId>& anchorIds) :
     // Create the vertices.
     for(const AnchorId anchorId: anchorIds) {
         const vertex_descriptor v = add_vertex(AnchorGraphVertex{anchorId}, *this);
-        vertexMap.insert({anchorId, v});
+        // vertexMap.insert({anchorId, v});
         vertexDescriptors.push_back(v);
     }
 }
 
 
 
-void AnchorGraph::addEdgeFromVertexDescriptors(
-    vertex_descriptor v0,
-    vertex_descriptor v1,
+void AnchorGraph::addEdgeFromLocalAnchorIds(
+    uint64_t localAnchorId0,
+    uint64_t localAnchorId1,
     const MarkerGraphEdgePairInfo& info,
     uint64_t coverage)
 {
-    add_edge(v0, v1, {info, coverage}, *this);
-}
-
-
-
-void AnchorGraph::addEdgeFromAnchorIds(
-    AnchorId anchorId0,
-    AnchorId anchorId1,
-    const MarkerGraphEdgePairInfo& info,
-    uint64_t coverage)
-{
-    auto it0 = vertexMap.find(anchorId0);
-    auto it1 = vertexMap.find(anchorId1);
-    SHASTA_ASSERT(it0 != vertexMap.end());
-    SHASTA_ASSERT(it1 != vertexMap.end());
-    const vertex_descriptor v0 = it0->second;
-    const vertex_descriptor v1 = it1->second;
-
-    addEdgeFromVertexDescriptors(v0, v1, info, coverage);
+    boost::add_edge(
+        vertexDescriptors[localAnchorId0],
+        vertexDescriptors[localAnchorId1],
+        AnchorGraphEdge(info, coverage), *this);
 }
 
 
