@@ -577,6 +577,12 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      cout << "The AnchorGraph for this connected component has " <<
          num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
 
+     if(isSelfComplementary) {
+         anchorGraph.separateStrands();
+         cout << "After strand separation, the AnchorGraph for this connected component has " <<
+             num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
+     }
+
 
      // Graphviz output.
      if(debug) {

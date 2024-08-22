@@ -337,6 +337,14 @@ void AnchorGraph::removeWeakEdges(double maxLoss, bool debug)
 }
 
 
+
+void AnchorGraph::separateStrands()
+{
+    // Do nothing for now.
+}
+
+
+
 #if 0
 // Given sets of two primary in-edges and two primary out-edges,
 // find primary mid-edges in-between that can be used for detangling.
@@ -472,4 +480,5 @@ void GlobalPathGraph::searchForDetangling(
     }
 }
 #endif
+
 

@@ -121,6 +121,8 @@ public:
         const MarkerGraphEdgePairInfo&,
         uint64_t coverage);
 
+    void separateStrands();
+
     void writeGraphviz(
         const string& name,
         const AnchorGraphDisplayOptions&,
