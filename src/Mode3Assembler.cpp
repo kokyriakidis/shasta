@@ -254,7 +254,7 @@ void Mode3Assembler::computeConnectedComponents()
     for(uint64_t i=0; i<connectedComponents.size(); i++) {
         const uint64_t componentId = componentTable[i].first;
         connectedComponents[i].orientedReadIds.swap(componentsOrientedReads[componentId]);
-        connectedComponents[i].markerGraphEdgeIds.swap(componentsMarkerGraphEdgeIds[componentId]);
+        connectedComponents[i].anchorIds.swap(componentsMarkerGraphEdgeIds[componentId]);
     }
 
     // Fill in the orientedReadIdTable.
@@ -482,13 +482,13 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
     const ConnectedComponent& connectedComponent = connectedComponents[componentId];
     const vector<OrientedReadId>& orientedReadIds = connectedComponent.orientedReadIds;
-    const vector<uint64_t>& markerGraphEdgeIds = connectedComponent.markerGraphEdgeIds;
+    const vector<uint64_t>& anchorIds = connectedComponent.anchorIds;
 
     const bool isSelfComplementary = connectedComponent.isSelfComplementary();
     connectedComponent.checkIsValid();
 
     cout << "This connected component has " << orientedReadIds.size() <<
-        " oriented reads and " << markerGraphEdgeIds.size() << " anchors." << endl;
+        " oriented reads and " << anchorIds.size() << " anchors." << endl;
     if(isSelfComplementary) {
         cout << "This connected component is self-complementary. Both strands will be assembled." << endl;
         // SHASTA_ASSERT(0);
@@ -504,8 +504,8 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     vector< vector< pair<uint32_t, uint64_t> > > journeys(orientedReadIds.size());
 
     performanceLog << timestamp << "Journey computation begins." << endl;
-    for(uint64_t localAnchorId=0; localAnchorId<markerGraphEdgeIds.size(); localAnchorId++) {
-        const MarkerGraphEdgeId anchorId = markerGraphEdgeIds[localAnchorId];
+    for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
+        const AnchorId anchorId = anchorIds[localAnchorId];
         const Anchor anchor = anchors[anchorId];
         for(const MarkerInterval& markerInterval: anchor) {
             const OrientedReadId orientedReadId = markerInterval.orientedReadId;
@@ -531,8 +531,8 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
             const auto& journey = journeys[i];
             for(const auto& p: journey) {
                 const uint64_t localAnchorId = p.second;
-                const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localAnchorId];
-                csv << edgeId << ",";
+                const AnchorId anchorId = anchorIds[localAnchorId];
+                csv << anchorId << ",";
             }
             csv << "\n";
         }
@@ -545,9 +545,9 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
     // Create the vertices first.
     vector<AnchorGraph::vertex_descriptor> vertexDescriptors;
-    for(uint64_t localAnchorId=0; localAnchorId<markerGraphEdgeIds.size(); localAnchorId++) {
-        const MarkerGraphEdgeId edgeId = markerGraphEdgeIds[localAnchorId];
-        vertexDescriptors.push_back(anchorGraph.addVertex(edgeId));
+    for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
+        const AnchorId anchorId = anchorIds[localAnchorId];
+        vertexDescriptors.push_back(anchorGraph.addVertex(anchorId));
     }
 
 
@@ -557,7 +557,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     // as a localAnchorId1 in journeyPairs[localAnchorId0].
     // For now use a simple vector of vector and sequential code, but later
     // switch to MemoryMapped::VectorOfVectors<uint64_t, uint64_t> and multithreaded code.
-    vector< vector<uint64_t> > journeyPairs(markerGraphEdgeIds.size());
+    vector< vector<uint64_t> > journeyPairs(anchorIds.size());
     performanceLog << timestamp << "AnchorGraph edge creation begins." << endl;
     for(const auto& journey: journeys) {
         for(uint64_t i1=1; i1<journey.size(); i1++) {
@@ -568,7 +568,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
         }
      }
      vector<uint64_t> count;
-     for(uint64_t localAnchorId0=0; localAnchorId0<markerGraphEdgeIds.size(); localAnchorId0++) {
+     for(uint64_t localAnchorId0=0; localAnchorId0<anchorIds.size(); localAnchorId0++) {
          const AnchorGraph::vertex_descriptor v0 = vertexDescriptors[localAnchorId0];
          const MarkerGraphEdgeId edgeId0 = anchorGraph[v0].edgeId;
          auto journeyPairs0 = journeyPairs[localAnchorId0];
@@ -625,7 +625,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
      // Create the assembly graph for this connected component.
      return make_shared<AssemblyGraph>(
-         anchorGraph, componentId, assembler, orientedReadIds, markerGraphEdgeIds, threadCount,
+         anchorGraph, componentId, assembler, orientedReadIds, anchorIds, threadCount,
          options, assembleSequence, debug);
 }
 
@@ -646,7 +646,7 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
 {
     const ConnectedComponent& component = connectedComponents[componentId];
     const vector<OrientedReadId>& orientedReadIds = component.orientedReadIds;
-    const vector<uint64_t>& markerGraphEdgeIds = component.markerGraphEdgeIds;
+    const vector<uint64_t>& anchorIds = component.anchorIds;
 
     // Write the oriented reads.
     {
@@ -663,8 +663,8 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
         ofstream csv("MarkerIntervals-" + to_string(componentId) + ".csv");
         csv << "AnchorId,OrientedReadId,Ordinal0,Ordinal1\n";
 
-        for(uint64_t localAnchorId=0; localAnchorId<component.markerGraphEdgeIds.size(); localAnchorId++) {
-            const AnchorId anchorId = markerGraphEdgeIds[localAnchorId];
+        for(uint64_t localAnchorId=0; localAnchorId<component.anchorIds.size(); localAnchorId++) {
+            const AnchorId anchorId = anchorIds[localAnchorId];
             const Anchor anchor = anchors[anchorId];
             for(const MarkerInterval& markerInterval: anchor) {
                 csv << anchorId << ",";

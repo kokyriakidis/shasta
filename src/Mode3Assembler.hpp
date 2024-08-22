@@ -73,8 +73,8 @@ private:
         // The oriented reads in this connected component.
         vector<OrientedReadId> orientedReadIds;
 
-        // The anchors (marker graph edges) in this connected component.
-        vector<mode3::AnchorId> markerGraphEdgeIds;
+        // The anchors (marker graph edge ids) in this connected component.
+        vector<mode3::AnchorId> anchorIds;
 
         bool isSelfComplementary() const;
         void checkIsValid() const;  // SHASTA_ASSERT if not valid.
