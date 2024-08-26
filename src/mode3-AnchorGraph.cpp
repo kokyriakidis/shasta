@@ -35,9 +35,10 @@ AnchorGraph::AnchorGraph(const vector<AnchorId>& anchorIds) :
     }
 
     // Create the vertices.
-    for(const AnchorId anchorId: anchorIds) {
-        const vertex_descriptor v = add_vertex(AnchorGraphVertex{anchorId}, *this);
-        // vertexMap.insert({anchorId, v});
+    for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
+        AnchorGraphVertex vertex;
+        vertex.localAnchorId = localAnchorId;
+        const vertex_descriptor v = add_vertex(vertex, *this);
         vertexDescriptors.push_back(v);
     }
 }
@@ -70,8 +71,7 @@ void AnchorGraph::writeGraphviz(
     out << "digraph " << name << " {\n";
 
     BGL_FORALL_VERTICES(v, graph, AnchorGraph) {
-        const AnchorGraphVertex& vertex = graph[v];
-        out << vertex.anchorId;
+        out << getAnchorId(v);
 
         if(options.labels or options.tooltips or options.colorVertices) {
             out << "[";
@@ -79,13 +79,13 @@ void AnchorGraph::writeGraphviz(
 
         if(options.labels) {
             out << "label=\"";
-            out << vertex.anchorId << "\\n" << markerGraph.edgeCoverage(vertex.anchorId);
+            out << getAnchorId(v) << "\\n" << markerGraph.edgeCoverage(getAnchorId(v));
             out << "\" ";
         }
 
         if(options.tooltips) {
             out << "tooltip=\"";
-            out << vertex.anchorId;
+            out << getAnchorId(v);
             out << "\" ";
         }
 
@@ -106,8 +106,8 @@ void AnchorGraph::writeGraphviz(
         const vertex_descriptor v1 = target(e, graph);
 
         out <<
-            graph[v0].anchorId << "->" <<
-            graph[v1].anchorId;
+            getAnchorId(v0) << "->" <<
+            getAnchorId(v1);
 
         if(edge.isNonTransitiveReductionEdge or options.labels or options.tooltips or options.colorEdges) {
             out << " [";
@@ -120,8 +120,8 @@ void AnchorGraph::writeGraphviz(
         if(options.tooltips) {
             out <<
                 "tooltip=\"" <<
-                graph[v0].anchorId << "->" <<
-                graph[v1].anchorId << " ";
+                getAnchorId(v0) << "->" <<
+                getAnchorId(v1) << " ";
             if(edge.coverage != invalid<uint64_t>) {
                 out << edge.coverage << "/";
             }
@@ -291,8 +291,8 @@ void AnchorGraph::removeCrossEdges(
             const vertex_descriptor v0 = source(e, graph);
             const vertex_descriptor v1 = target(e, graph);
             cout << "Removing cross edge " <<
-                graph[v0].anchorId << "->" <<
-                graph[v1].anchorId << endl;
+                getAnchorId(v0) << "->" <<
+                getAnchorId(v1) << endl;
         }
     }
 
@@ -321,8 +321,8 @@ void AnchorGraph::removeWeakEdges(double maxLoss, bool debug)
                 const vertex_descriptor v0 = source(e, graph);
                 const vertex_descriptor v1 = target(e, graph);
                 cout << "Removing weak edge " <<
-                    graph[v0].anchorId << "->" <<
-                    graph[v1].anchorId << ", loss " << loss << endl;
+                    getAnchorId(v0) << "->" <<
+                    getAnchorId(v1) << ", loss " << loss << endl;
             }
         }
     }
@@ -338,9 +338,178 @@ void AnchorGraph::removeWeakEdges(double maxLoss, bool debug)
 
 
 
-void AnchorGraph::separateStrands()
+void AnchorGraph::separateStrands(
+    const Anchors& anchors,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers)
 {
-    // Do nothing for now.
+    AnchorGraph& anchorGraph = *this;
+
+    findReverseComplementAnchors(anchors, markers);
+    findReverseComplementVertices();
+    findReverseComplementEdges();
+
+    // Gather pairs of reverse complemented edges, by coverage.
+    vector< vector< pair<edge_descriptor, edge_descriptor> > > edgePairs;
+    BGL_FORALL_EDGES(e, anchorGraph, AnchorGraph) {
+        const edge_descriptor eRc = anchorGraph[e].eRc;
+        if(e < eRc) {
+            const uint64_t coverage = anchorGraph[e].coverage;
+            SHASTA_ASSERT(coverage == anchorGraph[eRc].coverage);
+            if(coverage >= edgePairs.size()) {
+                edgePairs.resize(coverage + 1);
+            }
+            edgePairs[coverage].push_back({e, eRc});
+        }
+    }
+
+    /*
+    cout << "Number of edge pairs by coverage:" << endl;
+    uint64_t edgePairCount = 0;
+    for(uint64_t coverage=0; coverage<edgePairs.size(); coverage++) {
+        const uint64_t n = edgePairs[coverage].size();
+        if(n > 0) {
+            edgePairCount += n;
+            cout << coverage << "," << n << endl;
+        }
+    }
+    SHASTA_ASSERT(2 * edgePairCount == num_edges(anchorGraph));
+    */
+
+
+    // The main strand separation code begins here.
+    // We create a disjoint sets data structure and add edges
+    // in order of decreasing coverage.
+    // Edges that would cause two reverse complemented vertices to end up
+    // in the same connected component are skipped.
+    // In the end, we are left with two connected components, one per strand.
+
+    SHASTA_ASSERT(0);
+}
+
+
+
+void AnchorGraph::findReverseComplementAnchors(
+    const Anchors& anchors,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers)
+{
+
+    // Index the AnchorIds by their first MarkerInterval.
+    class AnchorInfo {
+    public:
+        uint64_t localAnchorId;
+        MarkerInterval firstMarkerInterval;
+        AnchorInfo(
+            uint64_t localAnchorId,
+            MarkerInterval firstMarkerInterval) :
+            localAnchorId(localAnchorId), firstMarkerInterval(firstMarkerInterval) {}
+        bool operator<(const AnchorInfo& that) const
+        {
+            return firstMarkerInterval < that.firstMarkerInterval;
+        }
+    };
+    vector<AnchorInfo> anchorInfos;
+    for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
+        const AnchorId anchorId = anchorIds[localAnchorId];
+        const Anchor anchor = anchors[anchorId];
+        anchorInfos.push_back(AnchorInfo(localAnchorId, anchor[0]));
+    }
+    sort(anchorInfos.begin(), anchorInfos.end());
+
+
+
+    // Find the local anchor id corresponding to the reverse complement
+    // of a given local anchor id.
+    reverseComplementAnchor.resize(anchorIds.size());
+    for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
+        const AnchorId anchorId = anchorIds[localAnchorId];
+        const Anchor anchor = anchors[anchorId];
+        const MarkerInterval& firstMarkerInterval = anchor[0];
+
+        // Get the reverse complemented OrientedReadId.
+        const OrientedReadId orientedReadId = firstMarkerInterval.orientedReadId;
+        OrientedReadId orientedReadIdRc = orientedReadId;
+        orientedReadIdRc.flipStrand();
+
+
+        // Get the reverse complemented MarkerInterval.
+        const uint32_t markerCount = uint32_t(markers[orientedReadId.getValue()].size());
+        MarkerInterval firstMarkerIntervalRc;
+        firstMarkerIntervalRc.orientedReadId = orientedReadIdRc;
+        firstMarkerIntervalRc.ordinals[0] = markerCount - 1 - firstMarkerInterval.ordinals[1];
+        firstMarkerIntervalRc.ordinals[1] = markerCount - 1 - firstMarkerInterval.ordinals[0];
+
+        // Look it up in our AnchorInfo vector.
+        const AnchorInfo anchorInfoRc(invalid<uint64_t>, firstMarkerIntervalRc);
+        const auto it = lower_bound(anchorInfos.begin(), anchorInfos.end(), anchorInfoRc);
+        SHASTA_ASSERT(it != anchorInfos.end());
+        SHASTA_ASSERT(it->firstMarkerInterval == firstMarkerIntervalRc);
+
+        // Store the local anchor id of the reverse complement anchor.
+        reverseComplementAnchor[localAnchorId] = it->localAnchorId;
+    }
+
+    // Sanity check.
+    for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
+        const uint64_t localAnchorIdRc = reverseComplementAnchor[localAnchorId];
+        SHASTA_ASSERT(localAnchorIdRc != localAnchorId);
+        SHASTA_ASSERT(reverseComplementAnchor[localAnchorIdRc] == localAnchorId);
+    }
+}
+
+
+
+void AnchorGraph::findReverseComplementVertices()
+{
+    AnchorGraph& anchorGraph = *this;
+
+    for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
+        const vertex_descriptor v = vertexDescriptors[localAnchorId];
+        const uint64_t localAnchorIdRc = reverseComplementAnchor[localAnchorId];
+        const vertex_descriptor vRc = vertexDescriptors[localAnchorIdRc];
+        anchorGraph[v].vRc = vRc;
+    }
+
+    // Sanity check.
+    BGL_FORALL_VERTICES(v, anchorGraph, AnchorGraph) {
+        const AnchorGraphVertex& vertex = anchorGraph[v];
+        const vertex_descriptor vRc = vertex.vRc;
+        SHASTA_ASSERT(vRc != v);
+        const AnchorGraphVertex& vertexRc = anchorGraph[vRc];
+        SHASTA_ASSERT(vertexRc.vRc == v);
+    }
+
+}
+
+
+
+void AnchorGraph::findReverseComplementEdges()
+{
+    AnchorGraph& anchorGraph = *this;
+
+    BGL_FORALL_EDGES(e, anchorGraph, AnchorGraph) {
+        const vertex_descriptor v0 = source(e, anchorGraph);
+        const vertex_descriptor v1 = target(e, anchorGraph);
+        const vertex_descriptor v0Rc = anchorGraph[v0].vRc;
+        const vertex_descriptor v1Rc = anchorGraph[v1].vRc;
+
+        // The reverse complement edge is v1Rc->v0Rc.
+        edge_descriptor eRc;
+        bool edgeWasFound = false;
+        tie(eRc, edgeWasFound) = boost::edge(v1Rc, v0Rc, anchorGraph);
+        SHASTA_ASSERT(edgeWasFound);
+
+        // Store it.
+        anchorGraph[e].eRc = eRc;
+    }
+
+    // Sanity check.
+    BGL_FORALL_EDGES(e, anchorGraph, AnchorGraph) {
+        const AnchorGraphEdge& edge = anchorGraph[e];
+        const edge_descriptor eRc = edge.eRc;
+        SHASTA_ASSERT(eRc != e);
+        const AnchorGraphEdge& edgeRc = anchorGraph[eRc];
+        SHASTA_ASSERT(edgeRc.eRc == e);
+    }
 }
 
 

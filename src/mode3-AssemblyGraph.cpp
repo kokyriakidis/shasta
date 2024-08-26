@@ -290,8 +290,8 @@ void AssemblyGraph::create(const AnchorGraph& graph, bool /* debug */)
     for(const vector<AnchorGraph::edge_descriptor>& inputChain: inputChains) {
         const AnchorGraph::vertex_descriptor v0 = source(inputChain.front(), graph);
         const AnchorGraph::vertex_descriptor v1 = target(inputChain.back(), graph);
-        const AnchorId anchorId0 = graph[v0].anchorId;
-        const AnchorId anchorId1 = graph[v1].anchorId;
+        const AnchorId anchorId0 = graph.getAnchorId(v0);
+        const AnchorId anchorId1 = graph.getAnchorId(v1);
         const vertex_descriptor cv0 = getVertex(anchorId0, vertexMap);
         const vertex_descriptor cv1 = getVertex(anchorId1, vertexMap);
 
@@ -310,11 +310,11 @@ void AssemblyGraph::create(const AnchorGraph& graph, bool /* debug */)
         Chain& chain = bubble.front();
         for(const AnchorGraph::edge_descriptor e: inputChain) {
             const AnchorGraph::vertex_descriptor v = source(e, graph);
-            chain.push_back(graph[v].anchorId);
+            chain.push_back(graph.getAnchorId(v));
         }
         const AnchorGraph::edge_descriptor eLast = inputChain.back();
         const AnchorGraph::vertex_descriptor vLast = target(eLast, graph);
-        chain.push_back(graph[vLast].anchorId);
+        chain.push_back(graph.getAnchorId(vLast));
     }
 }
 
