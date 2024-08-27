@@ -8,6 +8,7 @@
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"
 #include "timestamp.hpp"
+#include "weightedShuffle.hpp"
 using namespace shasta;
 using namespace mode3;
 
@@ -349,41 +350,165 @@ void AnchorGraph::separateStrands(
     findReverseComplementEdges();
 
     // Gather pairs of reverse complemented edges, by coverage.
-    vector< vector< pair<edge_descriptor, edge_descriptor> > > edgePairs;
+    using EdgePair = WeightedShuffleItem< pair<edge_descriptor, edge_descriptor> >;
+    vector<EdgePair> edgePairs;
     BGL_FORALL_EDGES(e, anchorGraph, AnchorGraph) {
+        SHASTA_ASSERT(reinterpret_cast<uint64_t>(e.m_eproperty) != 1);
         const edge_descriptor eRc = anchorGraph[e].eRc;
+        SHASTA_ASSERT(reinterpret_cast<uint64_t>(eRc.m_eproperty) != 1);
         if(e < eRc) {
             const uint64_t coverage = anchorGraph[e].coverage;
             SHASTA_ASSERT(coverage == anchorGraph[eRc].coverage);
-            if(coverage >= edgePairs.size()) {
-                edgePairs.resize(coverage + 1);
+            edgePairs.push_back(EdgePair(make_pair(e, eRc), double(coverage)));
+        }
+    }
+
+    // Random source for the weightd random shuffles below.
+    const uint32_t seed = 231;
+    std::mt19937 randomSource(seed);
+
+
+    // At each iteration, reshuffle the edge pairs, using coVerage as weight.
+    // Edge pairs with large coverage are more likely to end up at the beginning
+    // of the edgePairs vewctor.
+    const uint64_t iterationCount = 100;
+    uint64_t bestSkippedCount = std::numeric_limits<uint64_t>::max();
+    vector<EdgePair> bestSkippedEdgePairs;
+    double bestSkippedWeight = std::numeric_limits<double>::max();
+    double bestMaximumSkippedCoverage = std::numeric_limits<double>::max();
+    vector<vertex_descriptor> verticesToBeRemoved;
+    vector<uint64_t> rank(anchorIds.size());
+    vector<uint64_t> parent(anchorIds.size());
+    for(uint64_t iteration=0; iteration<iterationCount; iteration++) {
+        weightedShuffle(edgePairs, randomSource);
+
+        // Create a disjoint sets data structure and add edges
+        // in the shuffled order, in which high coverage edges are more
+        // likely to be near the beginning.
+        // Edges that would cause two reverse complemented vertices to end up
+        // in the same connected component are skipped.
+        // In the end, we are left with two connected components, one per strand.
+
+        // Initialize the disjoint sets data structure for this iteration.
+        boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
+        for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
+            disjointSets.make_set(localAnchorId);
+        }
+
+        // Loop over edges in shuffled order.
+        uint64_t skippedCount = 0;
+        double skippedWeight = 0.;
+        double maxSkippedCoverage = 0.;
+        vector<EdgePair> skippedEdgePairs;
+        for(const EdgePair& edgePair: edgePairs) {
+
+            const pair<edge_descriptor, edge_descriptor>& p = edgePair.t;
+            const edge_descriptor eA = p.first;
+            const edge_descriptor eB = p.second;
+
+            // Get the vertices of these two edges.
+            const vertex_descriptor vA0 = source(eA, anchorGraph);
+            const vertex_descriptor vA1 = target(eA, anchorGraph);
+            const vertex_descriptor vB0 = source(eB, anchorGraph);
+            const vertex_descriptor vB1 = target(eB, anchorGraph);
+
+            // Get the corresponding local anchor ids.
+            const uint64_t localAnchorIdA0 = anchorGraph[vA0].localAnchorId;
+            const uint64_t localAnchorIdA1 = anchorGraph[vA1].localAnchorId;
+            const uint64_t localAnchorIdB0 = anchorGraph[vB0].localAnchorId;
+            const uint64_t localAnchorIdB1 = anchorGraph[vB1].localAnchorId;
+
+            // Because this is a pair of reverse complemented edges,
+            // the vertices must also be reverse complemented
+            // when taken in the opposite order.
+            SHASTA_ASSERT(anchorGraph[vA0].vRc == vB1);
+            SHASTA_ASSERT(anchorGraph[vA1].vRc == vB0);
+            SHASTA_ASSERT(anchorGraph[vB0].vRc == vA1);
+            SHASTA_ASSERT(anchorGraph[vB1].vRc == vA0);
+
+            // Get the corresponding disjoint sets;
+            const uint64_t cA0 = disjointSets.find_set(localAnchorIdA0);
+            const uint64_t cA1 = disjointSets.find_set(localAnchorIdA1);
+            const uint64_t cB0 = disjointSets.find_set(localAnchorIdB0);
+            const uint64_t cB1 = disjointSets.find_set(localAnchorIdB1);
+
+            if(cA1 == cB1) {
+                SHASTA_ASSERT(cA0 == cB0);
+                skippedEdgePairs.push_back(edgePair);
+                ++skippedCount;
+                skippedWeight += edgePair.w;
+                maxSkippedCoverage = max(maxSkippedCoverage, edgePair.w);
+            } else {
+                SHASTA_ASSERT(cA0 != cB0);
+                disjointSets.union_set(localAnchorIdA0, localAnchorIdA1);
+                disjointSets.union_set(localAnchorIdB0, localAnchorIdB1);
             }
-            edgePairs[coverage].push_back({e, eRc});
+        }
+        cout << "Strand separation iteration " << iteration << " discarded " << skippedCount <<
+            " edge pairs with total coverage " << skippedWeight <<
+            ", maximum coverage " << maxSkippedCoverage << endl;
+
+        // If this is the best we achieved so far, store some information about it.
+        // if(tie(skippedWeight, skippedCount) < tie(bestSkippedWeight, bestSkippedCount)) {
+        if(maxSkippedCoverage < bestMaximumSkippedCoverage) {
+            cout << "This is the best so far." << endl;
+            bestSkippedCount = skippedCount;
+            bestSkippedWeight = skippedWeight;
+            bestMaximumSkippedCoverage = maxSkippedCoverage;
+            bestSkippedEdgePairs = skippedEdgePairs;
+
+            // We should have two connected components.
+            vector<uint64_t> componentIds;
+            for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
+                const uint64_t componentId = disjointSets.find_set(localAnchorId);
+                if(find(componentIds.begin(), componentIds.end(), componentId) == componentIds.end()) {
+                    componentIds.push_back(componentId);
+                }
+            }
+            SHASTA_ASSERT(componentIds.size() == 2);
+
+            // Only keep the vertices in the first component.
+            verticesToBeRemoved.clear();
+            for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
+                const uint64_t componentId = disjointSets.find_set(localAnchorId);
+                if(componentId != componentIds.front()) {
+                    verticesToBeRemoved.push_back(vertexDescriptors[localAnchorId]);
+                }
+            }
         }
     }
 
-    /*
-    cout << "Number of edge pairs by coverage:" << endl;
-    uint64_t edgePairCount = 0;
-    for(uint64_t coverage=0; coverage<edgePairs.size(); coverage++) {
-        const uint64_t n = edgePairs[coverage].size();
-        if(n > 0) {
-            edgePairCount += n;
-            cout << coverage << "," << n << endl;
-        }
+
+    cout << "Best strand separation discarded " << bestSkippedCount <<
+        " edge pairs with total weight " << bestSkippedWeight << ":" << endl;
+
+    for(const EdgePair& edgePair: bestSkippedEdgePairs) {
+        const pair<edge_descriptor, edge_descriptor>& p = edgePair.t;
+        const edge_descriptor eA = p.first;
+        const edge_descriptor eB = p.second;
+
+        const vertex_descriptor vA0 = source(eA, anchorGraph);
+        const vertex_descriptor vA1 = target(eA, anchorGraph);
+        const vertex_descriptor vB0 = source(eB, anchorGraph);
+        const vertex_descriptor vB1 = target(eB, anchorGraph);
+
+        cout << getAnchorId(vA0) << "->" << getAnchorId(vA1) << " " <<
+            getAnchorId(vB0) << "->" << getAnchorId(vB1) << " " << uint64_t(edgePair.w) << endl;
     }
-    SHASTA_ASSERT(2 * edgePairCount == num_edges(anchorGraph));
-    */
 
+    // Remove the vertices.
+    const uint64_t oldVertexCount = num_vertices(anchorGraph);
+    const uint64_t oldEdgeCount = num_edges(anchorGraph);
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        vertexDescriptors[anchorGraph[v].localAnchorId] = null_vertex();
+        boost::clear_vertex(v, anchorGraph);
+        boost::remove_vertex(v, anchorGraph);
+    }
+    const uint64_t newVertexCount = num_vertices(anchorGraph);
+    const uint64_t newEdgeCount = num_edges(anchorGraph);
+    SHASTA_ASSERT(newVertexCount == oldVertexCount / 2);
+    SHASTA_ASSERT(newEdgeCount == oldEdgeCount / 2 - bestSkippedCount);
 
-    // The main strand separation code begins here.
-    // We create a disjoint sets data structure and add edges
-    // in order of decreasing coverage.
-    // Edges that would cause two reverse complemented vertices to end up
-    // in the same connected component are skipped.
-    // In the end, we are left with two connected components, one per strand.
-
-    SHASTA_ASSERT(0);
 }
 
 

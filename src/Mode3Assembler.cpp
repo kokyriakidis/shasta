@@ -490,8 +490,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     cout << "This connected component has " << orientedReadIds.size() <<
         " oriented reads and " << anchorIds.size() << " anchors." << endl;
     if(isSelfComplementary) {
-        cout << "This connected component is self-complementary. Both strands will be assembled." << endl;
-        // SHASTA_ASSERT(0);
+        cout << "This connected component is self-complementary." << endl;
     }
 
 
@@ -577,13 +576,11 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      cout << "The AnchorGraph for this connected component has " <<
          num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
 
-#if 0
      if(isSelfComplementary) {
          anchorGraph.separateStrands(anchors, assembler.markers);
          cout << "After strand separation, the AnchorGraph for this connected component has " <<
              num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
      }
-#endif
 
      // Graphviz output.
      if(debug) {
