@@ -203,10 +203,12 @@ void AssemblyGraph::run(
         options.assemblyGraphOptions.minLogP);
     while(compressSequentialEdges());
     compressBubbleChains();
+    write("Y");
     detangleEdges(false,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP,
         6);
+    write("Z");
 
     // See if we can do more with a TangleGraph.
     // const TangleGraph tangleGraph(*this);
@@ -3670,7 +3672,7 @@ bool AssemblyGraph::detangleEdge(
     // The code below does not work for this case.
     for(const edge_descriptor e0: inEdges) {
         if(find(outEdges.begin(), outEdges.end(), e0) != outEdges.end()) {
-            if(debug) {
+            if(true) {
                 cout << "Not detangling due to cycle." << endl;
             }
             return false;
@@ -4020,7 +4022,7 @@ bool AssemblyGraph::detangleEdge(
     // The code below does not work for this case.
     for(const edge_descriptor e0: inEdges) {
         if(find(outEdges.begin(), outEdges.end(), e0) != outEdges.end()) {
-            if(debug) {
+            if(true) {
                 cout << "Not detangling due to cycle." << endl;
             }
             return false;
