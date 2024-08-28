@@ -345,10 +345,6 @@ void AnchorGraph::separateStrands(
 {
     AnchorGraph& anchorGraph = *this;
 
-    findReverseComplementAnchors(anchors, markers);
-    findReverseComplementVertices();
-    findReverseComplementEdges();
-
     // Gather pairs of reverse complemented edges, by coverage.
     using EdgePair = WeightedShuffleItem< pair<edge_descriptor, edge_descriptor> >;
     vector<EdgePair> edgePairs;

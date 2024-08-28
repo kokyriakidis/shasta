@@ -576,12 +576,6 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      cout << "The AnchorGraph for this connected component has " <<
          num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
 
-     if(isSelfComplementary) {
-         anchorGraph.separateStrands(anchors, assembler.markers);
-         cout << "After strand separation, the AnchorGraph for this connected component has " <<
-             num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
-     }
-
      // Graphviz output.
      if(debug) {
          AnchorGraphDisplayOptions options;
@@ -594,8 +588,10 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
          anchorGraph.writeEdgeCoverageHistogram("AnchorGraphInitial" + to_string(componentId) + "-EdgeCoverageHistogram.csv");
      }
 
-     // Remove weak edges..
+     // Remove weak edges.
      anchorGraph.removeWeakEdges(options.primaryGraphOptions.maxLoss, debug);
+     cout << "After removing weak edges, the AnchorGraph for this connected component has " <<
+         num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
 
      // Remove cross-edges.
      anchorGraph.removeCrossEdges(
@@ -603,6 +599,18 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
          options.primaryGraphOptions.crossEdgesHighCoverageThreshold,
          0,
          debug);
+     cout << "After removing cross-edges, the AnchorGraph for this connected component has " <<
+         num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
+
+     // Strand separation.
+     if(isSelfComplementary) {
+         anchorGraph.findReverseComplementAnchors(anchors, assembler.markers);
+         anchorGraph.findReverseComplementVertices();
+         anchorGraph.findReverseComplementEdges();
+         anchorGraph.separateStrands(anchors, assembler.markers);
+         cout << "After strand separation, the AnchorGraph for this connected component has " <<
+             num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
+     }
 
      // Graphviz output.
      if(debug) {
