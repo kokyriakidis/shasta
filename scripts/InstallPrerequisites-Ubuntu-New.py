@@ -1,0 +1,97 @@
+#!/usr/bin/python3
+
+import os
+import tempfile
+
+def runCommand(command):
+    if(os.system(command)):
+        raise Exception("Error running command: " + command)
+        
+def installPackage(package):
+    runCommand("sudo apt-get install " + package)
+
+def installAptPackages():
+    packages = [
+    "git",
+    "g++",
+    "make",
+    "cmake",
+    "libboost-system-dev", 
+    "libboost-program-options-dev",
+    "libboost-graph-dev",
+    "libboost-chrono-dev",
+    "libpng-dev", 
+    "libblas-dev", 
+    "liblapack-dev",
+    "gfortran",
+    "libseqan2-dev",
+    "ncbi-blast+",
+    "graphviz",
+    "gnuplot",
+    "python3-dev", 
+    ]
+    for package in packages:
+        installPackage(package)
+    
+
+
+def installPybind11():
+    installPackage("python3-pip")
+    runCommand("sudo pip3 install pybind11==2.8.1")
+
+
+        
+def installSpoa():
+    # The spoa library is available in the stable Ubuntu repository, but
+    # without the static version.
+    # So we have to build it from source.
+    
+    with tempfile.TemporaryDirectory() as temporaryDirectory:
+        print("Building spoa library using temporary directory", temporaryDirectory)
+        
+        # Change to the temporary directory.
+        oldDirectory = os.getcwd()
+        os.chdir(temporaryDirectory)
+                
+        # Get the code.
+        runCommand("sudo apt-get install curl")
+        runCommand("curl -L https://github.com/rvaser/spoa/archive/refs/tags/4.0.8.tar.gz -o 4.0.8.tar.gz")
+        runCommand("tar -xvf 4.0.8.tar.gz")
+    
+
+        # The spoa dispatcher feature selects code at run time based on available hardware features,
+        # which can improve performance.
+        # However, in spoa v4.0.8 it introduces two additional dependencies:
+        # - USCiLab/cereal
+        # - google/cpu_features
+        # To avoid these additional dependencies, we turn off the dispatcher feature for now.
+        # We could turn it back on if we see significant performance degradation in this area.
+        spoaBuildFlags = "-DCMAKE_BUILD_TYPE=Release -Dspoa_optimize_for_portability=ON -Dspoa_build_tests=OFF"
+
+        # Build the shared library.
+        print("******** Building spoa shared library")
+        os.mkdir("build")
+        os.chdir("build")
+        runCommand("cmake ../spoa-4.0.8 -DBUILD_SHARED_LIBS=ON " + spoaBuildFlags)
+        runCommand("make -j all")
+        runCommand("make install")
+        
+        # Build the static library.
+        os.chdir("..")
+        print("******** Buildimg spoa static library")
+        os.mkdir("build-static")
+        os.chdir("build-static")
+        runCommand("cmake ../spoa-4.0.8 -DBUILD_SHARED_LIBS=OFF " + spoaBuildFlags)
+        runCommand("make -j all")
+        runCommand("make install")
+        
+        # Change back to the original directory.
+        os.chdir(oldDirectory)
+
+
+    
+installAptPackages() 
+installPybind11() 
+installSpoa()  
+
+print("Installation of Shasta prerequisies completed successfully.")
