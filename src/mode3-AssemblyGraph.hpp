@@ -417,6 +417,14 @@ private:
         double epsilon,
         double minLogP);
 
+    // This handles the case of a vertex with one in-edge, one out-edge.
+    // and one in-out-edge (cycle).
+    bool detangleVertexWithCycle(
+        vertex_descriptor,
+        bool debug,
+        double epsilon,
+        double minLogP);
+
     // Edge detangling using only
     // the second-to-last MarkerGraphEdgeId of incoming chains and
     // the second MarkerGraphEdgeId of outgoing chains.

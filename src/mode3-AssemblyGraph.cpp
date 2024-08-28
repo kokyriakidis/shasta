@@ -2955,10 +2955,11 @@ bool AssemblyGraph::detangleVertex(
     // The code below does not work for this case.
     for(const edge_descriptor e0: inEdges) {
         if(find(outEdges.begin(), outEdges.end(), e0) != outEdges.end()) {
-            if(debug) {
-                cout << "Not detangling due to cycle." << endl;
+            if(inEdges.size() == 2 and outEdges.size() == 2) {
+                return detangleVertexWithCycle(cv, debug, epsilon, minLogP);
+            } else {
+                return false;
             }
-            return false;
         }
     }
 
@@ -3244,6 +3245,198 @@ bool AssemblyGraph::detangleVertex(
 
 
     SHASTA_ASSERT(0);
+}
+
+
+
+// This handles the case of a vertex with one in-edge, one out-edge.
+// and one in-out-edge (cycle).
+bool AssemblyGraph::detangleVertexWithCycle(
+    vertex_descriptor cv,
+    bool debug,
+    double epsilon,
+    double minLogP)
+{
+    AssemblyGraph& cGraph = *this;
+
+    if(debug) {
+        cout << "detangleVertexWithCycle begins for " << cGraph[cv].edgeId << endl;
+    }
+
+    // Gather the in-edges.
+    vector<edge_descriptor> inEdges;
+    BGL_FORALL_INEDGES(cv, ce, cGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        SHASTA_ASSERT(bubbleChain.lastBubble().isHaploid());
+        inEdges.push_back(ce);
+    }
+    SHASTA_ASSERT(inEdges.size() == 2);
+
+    // Gather the out-edges.
+    vector<edge_descriptor> outEdges;
+    BGL_FORALL_OUTEDGES(cv, ce, cGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = cGraph[ce];
+        SHASTA_ASSERT(bubbleChain.firstBubble().isHaploid());
+        outEdges.push_back(ce);
+    }
+    SHASTA_ASSERT(outEdges.size() == 2);
+
+    // Swap inEdges and/or outEdges, if necessary, to make sure
+    // the cycle edge is in position 1 of both arrays.
+    using std::swap;
+    if(inEdges[0] == outEdges[0]) {
+        swap(inEdges[0], inEdges[1]);
+        swap(outEdges[0], outEdges[1]);
+    } else if(inEdges[0] == outEdges[1]) {
+        swap(inEdges[0], inEdges[1]);
+    } else if(inEdges[1] == outEdges[0]) {
+        swap(outEdges[0], outEdges[1]);
+    } else if(inEdges[1] == outEdges[1]) {
+        // Do nothing.
+    } else {
+        SHASTA_ASSERT(0);
+    }
+    SHASTA_ASSERT(inEdges[1] == outEdges[1]);
+
+    // Find the inEdge, the outEdge, and the cycleEdge.
+    const edge_descriptor inEdge = inEdges[0];
+    const edge_descriptor outEdge = outEdges[0];
+    const edge_descriptor cycleEdge = inEdges[1];
+    if(debug) {
+        cout << "In-edge " << bubbleChainStringId(inEdge) << endl;
+        cout << "Out-edge " << bubbleChainStringId(outEdge) << endl;
+        cout << "Cycle edge " << bubbleChainStringId(cycleEdge) << endl;
+    }
+    SHASTA_ASSERT(cGraph[inEdge].isSimpleChain());
+    SHASTA_ASSERT(cGraph[outEdge].isSimpleChain());
+    SHASTA_ASSERT(cGraph[cycleEdge].isSimpleChain());
+
+    // Compute the tangle matrix.
+    vector< vector<uint64_t> > tangleMatrix;
+    computeTangleMatrix(inEdges, outEdges, tangleMatrix);
+
+    if(debug) {
+        cout << "Tangle matrix for vertex " << cGraph[cv].edgeId << endl;
+
+        cout << "In-edges: ";
+        for(const edge_descriptor ce: inEdges) {
+            cout << " " << bubbleChainStringId(ce);
+        }
+        cout << endl;
+
+        cout << "Out-edges: ";
+        for(const edge_descriptor ce: outEdges) {
+            cout << " " << bubbleChainStringId(ce);
+        }
+        cout << endl;
+
+        for(uint64_t i0=0; i0<inEdges.size(); i0++) {
+            for(uint64_t i1=0; i1<outEdges.size(); i1++) {
+                cout << bubbleChainStringId(inEdges[i0]) << " " <<
+                    bubbleChainStringId(outEdges[i1]) << " " <<
+                    tangleMatrix[i0][i1] << endl;
+            }
+        }
+    }
+
+    // Use the 2 by 2 Bayesian model for detangling.
+    array< array<uint64_t, 2>, 2> tangleMatrix22;
+    for(uint64_t i=0; i<2; i++) {
+        for(uint64_t j=0; j<2; j++) {
+            tangleMatrix22[i][j] = tangleMatrix[i][j];
+        }
+    }
+
+    // Compute logarithmic probability ratio of in-phase and out-of-phase
+    // against random.
+    double logPin;
+    double logPout;
+    tie(logPin, logPout) = diploidBayesianPhase(tangleMatrix22, epsilon);
+    if(debug) {
+        cout << "logPin = " << logPin << ", logPout = " << logPout << endl;
+    }
+
+    // Ignore the random hypothesis.
+    const bool isInPhase    = (logPin - logPout) >= minLogP;
+    const bool isOutOfPhase = (logPout - logPin) >= minLogP;
+
+
+
+    // Detangle, if possible.
+
+    // In-phase.
+    if(isInPhase) {
+        if(debug) {
+            cout << "In-phase, cycle edge will be detached." << endl;
+        }
+        SHASTA_ASSERT(0);   // Missing code.
+        return false;
+    }
+
+
+
+    // Out-of-phase.
+    else if(isOutOfPhase) {
+        if(debug) {
+            cout << "Out-of-phase, cycle edge will be linearized." << endl;
+        }
+
+        // Create a new edge consisting of the inEdge
+        // without its last Anchor, the cycleEdge without its first and last Anchor,
+        // and the outEdge without its first Anchor.
+        {
+            AssemblyGraphEdge newEdge;
+            newEdge.id = nextEdgeId++;
+            BubbleChain& newBubbleChain = newEdge;              // Empty BubbleChain.
+            newBubbleChain.resize(1);                           // Now the new BubbleChain has one Bubble.
+            Bubble& newBubble = newBubbleChain.firstBubble();   // The new Bubble is empty.
+            newBubble.resize(1);                                // Now the new Bubble has one Chain.
+            Chain& newChain = newBubble.front();                // The new Chain is empty.
+            SHASTA_ASSERT(newBubbleChain.isSimpleChain());
+
+            // Add the chain of the inEdge without its last Anchor.
+            const Chain& inChain = cGraph[inEdge].front().front();
+            copy(inChain.begin(), inChain.end() - 1, back_inserter(newChain));
+
+            // Add the chain of the cycleEdge without its first and last Anchor.
+            const Chain& cycleChain = cGraph[cycleEdge].front().front();
+            copy(cycleChain.begin() + 1, cycleChain.end() - 1, back_inserter(newChain));
+
+            // Add the chain of the outEdge without its first Anchor.
+            const Chain& outChain = cGraph[outEdge].front().front();
+            copy(outChain.begin() + 1, outChain.end(), back_inserter(newChain));
+
+            // Add it to the graph.
+            add_edge(source(inEdge, cGraph), target(outEdge, cGraph), newEdge, cGraph);
+        }
+
+
+        // Create a loop consisting of the cycleEdge closed on itself.
+        {
+            AssemblyGraphEdge newEdge;
+            newEdge.id = nextEdgeId++;
+            BubbleChain& newBubbleChain = newEdge;
+            newBubbleChain = cGraph[cycleEdge];
+            const vertex_descriptor vNew = createVertex(cGraph[cv].edgeId);
+            add_edge(vNew, vNew, newEdge, cGraph);
+        }
+
+        // Now we can remove the vertex we detangled and all its in-edges and out-edges.
+        boost::clear_vertex(cv, cGraph);
+        removeVertex(cv);
+
+        return true;
+    }
+
+
+
+    // Ambiguous.
+    else {
+        if(debug) {
+            cout << "Ambiguous, not detangled." << endl;
+        }
+        return false;
+    }
 }
 
 
