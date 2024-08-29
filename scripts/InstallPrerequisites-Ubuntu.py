@@ -12,7 +12,7 @@ def runCommand(command):
         raise Exception("Error running command: " + command)
         
 def installPackage(package):
-    runCommand("sudo apt-get install " + package)
+    runCommand("sudo apt-get install --assume-yes " + package)
 
 def installAptPackages():
     packages = [
@@ -34,8 +34,7 @@ def installAptPackages():
     "gnuplot",
     "python3-dev", 
     ]
-    for package in packages:
-        installPackage(package)
+    runCommand("sudo apt-get install --assume-yes " + " ".join(packages))
     
 
 
