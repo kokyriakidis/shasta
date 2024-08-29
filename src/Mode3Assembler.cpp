@@ -607,7 +607,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
          anchorGraph.findReverseComplementAnchors(anchors, assembler.markers);
          anchorGraph.findReverseComplementVertices();
          anchorGraph.findReverseComplementEdges();
-         anchorGraph.separateStrands(anchors, assembler.markers);
+         anchorGraph.separateStrands();
          cout << "After strand separation, the AnchorGraph for this connected component has " <<
              num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
      }

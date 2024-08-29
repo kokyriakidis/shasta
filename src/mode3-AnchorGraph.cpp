@@ -339,9 +339,7 @@ void AnchorGraph::removeWeakEdges(double maxLoss, bool debug)
 
 
 
-void AnchorGraph::separateStrands(
-    const Anchors& anchors,
-    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers)
+void AnchorGraph::separateStrands()
 {
     AnchorGraph& anchorGraph = *this;
 

@@ -169,10 +169,8 @@ public:
 
 
 
-    // Strand separatrion.
-    void separateStrands(
-        const Anchors&,
-        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers);
+    // Strand separation.
+    void separateStrands();
 
     // The local anchor id of the reverse complement of an anchor.
     // Indexed by the local anchor id.

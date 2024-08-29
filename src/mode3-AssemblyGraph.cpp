@@ -3523,10 +3523,12 @@ bool AssemblyGraph::detangleEdges(
 
 
 // More general version.
+// This currently does nothing and simply returns false
+// so we could get rid of it.
 bool AssemblyGraph::detangleEdges(
-    bool debug,
-    double epsilon,
-    double minLogP)
+    bool /* debug (currently unused) */,
+    double /* epsilon (currently unused) */,
+    double /* minLogP (currently unused) */)
 {
 #if 0
     if(debug) {
@@ -4161,12 +4163,14 @@ bool AssemblyGraph::detangleEdge(
 
 
 // More general version.
+// This currently does not do anything and simply returns false
+// so we could get rid of it.
 bool AssemblyGraph::detangleEdge(
-    bool debug,
-    std::map<uint64_t, edge_descriptor>& edgeMap,
-    std::map<uint64_t, edge_descriptor>::iterator& it,
-    double epsilon,
-    double minLogP)
+    bool /* debug  currently unused */,
+    std::map<uint64_t, edge_descriptor>& /* edgeMap currently unused */,
+    std::map<uint64_t, edge_descriptor>::iterator& /*it currently unused */,
+    double /* epsilon currently unused */,
+    double /* minLogP currently unused */)
 {
 #if 0
     AssemblyGraph& assemblyGraph = *this;
@@ -8471,7 +8475,8 @@ uint64_t AssemblyGraph::cleanupBubbles(
 
 // Bubble cleanup for a bubble chain, with the purpose of eliminating most bubbles caused by errors.
 uint64_t AssemblyGraph::cleanupBubbles(bool debug, edge_descriptor ce,
-    uint64_t maxOffset, uint64_t chainTerminalCommonThreshold)
+    uint64_t maxOffset,
+    uint64_t /* chainTerminalCommonThreshold currently unused */)
 {
     AssemblyGraph& cGraph = *this;
     BubbleChain& bubbleChain = cGraph[ce];
