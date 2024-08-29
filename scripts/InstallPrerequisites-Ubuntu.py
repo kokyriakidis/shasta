@@ -102,6 +102,6 @@ installPybind11()
 installSpoa()
   
 # Make sure the newly created libraries are immediately visible to the loader.
-runCommand(ldconfig)
+runCommand("ldconfig")
 
 print("Installation of Shasta prerequisies completed successfully.")
