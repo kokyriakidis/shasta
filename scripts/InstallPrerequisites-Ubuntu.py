@@ -40,7 +40,7 @@ def installAptPackages():
 
 def installPybind11():
     installPackage("python3-pip")
-    runCommand("sudo pip3 install pybind11==2.8.1")
+    runCommand("sudo pip3 install pybind11")
 
 
         
