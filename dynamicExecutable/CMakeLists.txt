@@ -5,7 +5,7 @@ project(shastaDynamicExecutable)
 add_definitions(-std=c++20)
 
 # Compilation warnings.
-add_definitions(-Wall -Wconversion -Wno-unused-result -Wno-trigraphs -Wno-psabi)
+add_definitions(-Wall -Wconversion -Wno-unused-result -Wno-trigraphs -Wno-psabi -Wunused-parameter)
 
 # Optimization and debug options.
 if(BUILD_DEBUG)
