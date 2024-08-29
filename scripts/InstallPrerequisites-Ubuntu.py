@@ -39,8 +39,15 @@ def installAptPackages():
 
 
 def installPybind11():
-    installPackage("python3-pip")
-    runCommand("sudo pip3 install pybind11")
+    try:
+        # This works for Ubuntu 22.04 and older
+        print("Attempting pybind11 installation using pip3")
+        installPackage("python3-pip")
+        runCommand("sudo pip3 install pybind11")
+    except:
+        # This works for Ubuntu 24.04 (and newer, presumably).
+        print("Pybind11 installation using pip3 did not work, installing using apt-get.")
+        installPackage("python3-pybind11")
 
 
         
