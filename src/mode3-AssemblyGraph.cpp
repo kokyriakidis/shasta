@@ -203,12 +203,10 @@ void AssemblyGraph::run(
         options.assemblyGraphOptions.minLogP);
     while(compressSequentialEdges());
     compressBubbleChains();
-    write("Y");
     detangleEdges(false,
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP,
         6);
-    write("Z");
 
     // See if we can do more with a TangleGraph.
     // const TangleGraph tangleGraph(*this);
