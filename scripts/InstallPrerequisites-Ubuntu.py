@@ -1,7 +1,11 @@
 #!/usr/bin/python3
 
 import os
+import subprocess
 import tempfile
+
+def isArm():
+    return subprocess.getoutput("uname -p") == "aarch64"
 
 def runCommand(command):
     if(os.system(command)):
@@ -58,18 +62,21 @@ def installSpoa():
         runCommand("curl -L https://github.com/rvaser/spoa/archive/refs/tags/4.0.8.tar.gz -o 4.0.8.tar.gz")
         runCommand("tar -xvf 4.0.8.tar.gz")
     
-
-        # The spoa dispatcher feature selects code at run time based on available hardware features,
-        # which can improve performance.
-        # However, in spoa v4.0.8 it introduces two additional dependencies:
-        # - USCiLab/cereal
-        # - google/cpu_features
-        # To avoid these additional dependencies, we turn off the dispatcher feature for now.
-        # We could turn it back on if we see significant performance degradation in this area.
-        spoaBuildFlags = "-DCMAKE_BUILD_TYPE=Release -Dspoa_optimize_for_portability=ON -Dspoa_build_tests=OFF"
+        # Set spoa build flags.
+        if isArm():
+            spoaBuildFlags="-DCMAKE_BUILD_TYPE=Release -Dspoa_build_tests=OFF"
+        else:
+            # The spoa dispatcher feature selects code at run time based on available hardware features,
+            # which can improve performance.
+            # However, in spoa v4.0.8 it introduces two additional dependencies:
+            # - USCiLab/cereal
+            # - google/cpu_features
+            # To avoid these additional dependencies, we turn off the dispatcher feature for now.
+            # We could turn it back on if we see significant performance degradation in this area.
+            spoaBuildFlags = "-DCMAKE_BUILD_TYPE=Release -Dspoa_optimize_for_portability=ON -Dspoa_build_tests=OFF"
 
         # Build the shared library.
-        print("******** Building spoa shared library")
+        print("\n******** Building spoa shared library")
         os.mkdir("build")
         os.chdir("build")
         runCommand("cmake ../spoa-4.0.8 -DBUILD_SHARED_LIBS=ON " + spoaBuildFlags)
@@ -78,7 +85,7 @@ def installSpoa():
         
         # Build the static library.
         os.chdir("..")
-        print("******** Buildimg spoa static library")
+        print("\n******** Building spoa static library")
         os.mkdir("build-static")
         os.chdir("build-static")
         runCommand("cmake ../spoa-4.0.8 -DBUILD_SHARED_LIBS=OFF " + spoaBuildFlags)
@@ -92,6 +99,9 @@ def installSpoa():
     
 installAptPackages() 
 installPybind11() 
-installSpoa()  
+installSpoa()
+  
+# Make sure the newly created libraries are immediately visible to the loader.
+runCommand(ldconfig)
 
 print("Installation of Shasta prerequisies completed successfully.")
