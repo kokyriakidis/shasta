@@ -356,7 +356,7 @@ void ReadGraph3::writeGraphviz(ostream& s) const
 
 
 
-void Assembler::createReadGraph3(uint64_t maxAlignmentCount)
+void Assembler::createReadGraph3(uint64_t /* maxAlignmentCount */)
 {
     const bool debug = true;
     using boost::add_vertex;

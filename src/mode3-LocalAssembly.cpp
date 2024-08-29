@@ -596,7 +596,7 @@ void LocalAssembly::alignAndDisjointSets(
     uint64_t matchScore,
     uint64_t mismatchScore,
     uint64_t gapScore,
-    uint64_t maxSkipBases,
+    uint64_t /* maxSkipBases */,
     double maxDrift,
     uint64_t minHalfBand,
     double minScoreRatio

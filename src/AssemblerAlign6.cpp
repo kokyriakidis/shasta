@@ -92,7 +92,7 @@ void Assembler::accessAlign6Markers()
 
 
 
-void Assembler::computeAlign6MarkersThreadFunction(size_t threadId)
+void Assembler::computeAlign6MarkersThreadFunction(size_t /* threadId */)
 {
     // Loop over all batches assigned to this thread.
     uint64_t begin, end;
