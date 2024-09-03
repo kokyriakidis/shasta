@@ -362,7 +362,7 @@ void AnchorGraph::separateStrands()
     std::mt19937 randomSource(seed);
 
 
-    // At each iteration, reshuffle the edge pairs, using coVerage as weight.
+    // At each iteration, reshuffle the edge pairs, using coverage as weight.
     // Edge pairs with large coverage are more likely to end up at the beginning
     // of the edgePairs vewctor.
     const uint64_t iterationCount = 100;
@@ -459,16 +459,39 @@ void AnchorGraph::separateStrands()
                     componentIds.push_back(componentId);
                 }
             }
-            SHASTA_ASSERT(componentIds.size() == 2);
+            cout << "This strand separation iteration generates " << componentIds.size() <<
+                " connected components." << endl;
 
-            // Only keep the vertices in the first component.
+            // There must be an even number of connected components.
+            // They come in reverse complemented pairs.
+            SHASTA_ASSERT((componentIds.size() % 2) == 0);
+
+            // Only keep one component in each reverse complemented pair.
+            std::set<uint64_t> discardedComponentIds;
+            for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
+                const uint64_t componentId = disjointSets.find_set(localAnchorId);
+                if(not discardedComponentIds.contains(componentId)) {
+                    // Discard the reverse complement of this component.
+                    const uint64_t localAnchorIdRc = reverseComplementAnchor[localAnchorId];
+                    const uint64_t componentIdRc = disjointSets.find_set(localAnchorIdRc);
+                    discardedComponentIds.insert(componentIdRc);
+                }
+            }
+            SHASTA_ASSERT(2 * discardedComponentIds.size() == componentIds.size());
+
+            // Only keep the vertices in the components we kept.
             verticesToBeRemoved.clear();
             for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
                 const uint64_t componentId = disjointSets.find_set(localAnchorId);
-                if(componentId != componentIds.front()) {
+                if(not discardedComponentIds.contains(componentId)) {
                     verticesToBeRemoved.push_back(vertexDescriptors[localAnchorId]);
                 }
             }
+            SHASTA_ASSERT(2 * verticesToBeRemoved.size() == anchorIds.size());
+        }
+
+        if(skippedCount == 0) {
+            break;
         }
     }
 
