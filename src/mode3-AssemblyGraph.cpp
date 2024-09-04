@@ -40,7 +40,7 @@ template class MultithreadedObject<AssemblyGraph>;
 
 // Create from a connected component of the PrimaryGraph, then call run.
 AssemblyGraph::AssemblyGraph(
-    const AnchorGraph& graph,
+    const AnchorGraph& anchorGraph,
     const Anchors& anchors,
     uint64_t componentId,
     const Assembler& assembler,
@@ -64,7 +64,7 @@ AssemblyGraph::AssemblyGraph(
     }
 
     performanceLog << timestamp << "Creating the assembly graph for component " << componentId << endl;
-    create(graph, debug);
+    create(anchorGraph, debug);
 
     // Serialize it so we can restore it to facilitate debugging.
     save("AssemblyGraph-" + to_string(componentId) + ".data");
@@ -107,10 +107,6 @@ void AssemblyGraph::run(
     bool debug)
 {
     const bool useBayesianModel = true;
-    // const uint64_t detangleWithSearchToleranceLow = 1;
-    // const uint64_t detangleWithSearchToleranceHigh = 6;
-    // const uint64_t optimizeChainsMinCommon = 3;
-    // const uint64_t optimizeChainsK = 100;
 
     SHASTA_ASSERT(std::is_sorted(orientedReadIds.begin(), orientedReadIds.end()));
     SHASTA_ASSERT(std::is_sorted(markerGraphEdgeIds.begin(), markerGraphEdgeIds.end()));
@@ -264,38 +260,38 @@ void AssemblyGraph::run(
 // Initial creation from the AnchorGraph.
 // Each linear chain of edges in the AnchorGraph after transitive reduction generates
 // an AssemblyGraphEdge (BubbleChain) consisting of a single haploid bubble.
-void AssemblyGraph::create(const AnchorGraph& graph, bool /* debug */)
+void AssemblyGraph::create(const AnchorGraph& anchorGraph, bool /* debug */)
 {
     AssemblyGraph& cGraph = *this;
 
-    // Create a filtered version of the PathGraph, containing only the
+    // Create a filtered version of the AnchorGraph, containing only the
     // transitive reduction edges.
     class EdgePredicate {
     public:
         bool operator()(const AnchorGraph::edge_descriptor e) const
         {
-            return not (*graph)[e].isNonTransitiveReductionEdge;
+            return not (*anchorGraph)[e].isNonTransitiveReductionEdge;
         }
-        EdgePredicate(const AnchorGraph& graph) : graph(&graph) {}
-        EdgePredicate() : graph(0) {}
+        EdgePredicate(const AnchorGraph& anchorGraph) : anchorGraph(&anchorGraph) {}
+        EdgePredicate() : anchorGraph(0) {}
     private:
-        const AnchorGraph* graph;
+        const AnchorGraph* anchorGraph;
     };
     using FilteredAnchorGraph = boost::filtered_graph<AnchorGraph, EdgePredicate>;
-    FilteredAnchorGraph filteredGraph(graph, EdgePredicate(graph));
+    FilteredAnchorGraph filteredAnchorGraph(anchorGraph, EdgePredicate(anchorGraph));
 
     // Find linear chains in the PathGraph after transitive reduction.
     vector< vector<AnchorGraph::edge_descriptor> > inputChains;
-    findLinearChains(filteredGraph, 0, inputChains);
+    findLinearChains(filteredAnchorGraph, 0, inputChains);
 
     // Each chain generates an edge.
     // Vertices are added as needed.
     std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
     for(const vector<AnchorGraph::edge_descriptor>& inputChain: inputChains) {
-        const AnchorGraph::vertex_descriptor v0 = source(inputChain.front(), graph);
-        const AnchorGraph::vertex_descriptor v1 = target(inputChain.back(), graph);
-        const AnchorId anchorId0 = graph.getAnchorId(v0);
-        const AnchorId anchorId1 = graph.getAnchorId(v1);
+        const AnchorGraph::vertex_descriptor v0 = source(inputChain.front(), anchorGraph);
+        const AnchorGraph::vertex_descriptor v1 = target(inputChain.back(), anchorGraph);
+        const AnchorId anchorId0 = anchorGraph.getAnchorId(v0);
+        const AnchorId anchorId1 = anchorGraph.getAnchorId(v1);
         const vertex_descriptor cv0 = getVertex(anchorId0, vertexMap);
         const vertex_descriptor cv1 = getVertex(anchorId1, vertexMap);
 
@@ -313,12 +309,12 @@ void AssemblyGraph::create(const AnchorGraph& graph, bool /* debug */)
         // Store the chain.
         Chain& chain = bubble.front();
         for(const AnchorGraph::edge_descriptor e: inputChain) {
-            const AnchorGraph::vertex_descriptor v = source(e, graph);
-            chain.push_back(graph.getAnchorId(v));
+            const AnchorGraph::vertex_descriptor v = source(e, anchorGraph);
+            chain.push_back(anchorGraph.getAnchorId(v));
         }
         const AnchorGraph::edge_descriptor eLast = inputChain.back();
-        const AnchorGraph::vertex_descriptor vLast = target(eLast, graph);
-        chain.push_back(graph.getAnchorId(vLast));
+        const AnchorGraph::vertex_descriptor vLast = target(eLast, anchorGraph);
+        chain.push_back(anchorGraph.getAnchorId(vLast));
     }
 }
 
