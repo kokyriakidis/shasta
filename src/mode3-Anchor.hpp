@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MarkerInterval.hpp"
+
 #include "cstdint.hpp"
 #include "span.hpp"
 
@@ -25,11 +27,43 @@ namespace shasta {
     namespace mode3 {
 
         using AnchorId = uint64_t;
-        using Anchor = span<const MarkerInterval>;
+        class Anchor;
         class Anchors;
 
     }
 }
+
+
+
+// An Anchor defines a set of MarkerIntervals accessible via this public interface.
+// Internals are kept private to facilitate restructuring.
+class shasta::mode3::Anchor : private span<const MarkerInterval> {
+private:
+    using BaseClass = span<const MarkerInterval>;
+public:
+
+    Anchor(const span<const MarkerInterval>& s) : span<const MarkerInterval>(s) {}
+
+    // Operator[] returns a MarkerInterval by copy, not by reference.
+    // This way we can change the internal representation of the Anchor.
+    // But this also means we can't use BaseClass::operator[] because that
+    // returns a reference to a const MarkerInterval.
+    MarkerInterval operator[](uint64_t i) const
+    {
+        return BaseClass::operator[](i);
+    }
+
+    using BaseClass::size;
+    using BaseClass::begin;
+    using BaseClass::end;
+    using BaseClass::front;
+    using BaseClass::empty;
+
+    uint64_t coverage() const
+    {
+        return size();
+    }
+};
 
 
 
