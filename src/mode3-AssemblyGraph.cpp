@@ -3,7 +3,7 @@
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-AnchorGraph.hpp"
 #include "mode3-PhasingTable.hpp"
-#include "mode3-TangleGraph.hpp"
+// #include "mode3-TangleGraph.hpp"
 #include "Assembler.hpp"
 #include "AssemblerOptions.hpp"
 #include "copyNumber.hpp"
@@ -326,11 +326,11 @@ AssemblyGraph::vertex_descriptor AssemblyGraph::getVertex(
     MarkerGraphEdgeId markerGraphEdgeId,
     std::map<MarkerGraphEdgeId, vertex_descriptor>& vertexMap)
 {
-    AssemblyGraph& cGraph = *this;
+    AssemblyGraph& assemblyGraph = *this;
 
     auto it = vertexMap.find(markerGraphEdgeId);
     if(it == vertexMap.end()) {
-        const vertex_descriptor cv = add_vertex({markerGraphEdgeId}, cGraph);
+        const vertex_descriptor cv = add_vertex({markerGraphEdgeId}, assemblyGraph);
         vertexMap.insert({markerGraphEdgeId, cv});
         return cv;
     } else {
@@ -351,12 +351,12 @@ AssemblyGraph::vertex_descriptor AssemblyGraph::createVertex(
 
 void AssemblyGraph::removeVertex(vertex_descriptor cv)
 {
-    AssemblyGraph& cGraph = *this;
+    AssemblyGraph& assemblyGraph = *this;
 
-    SHASTA_ASSERT(in_degree(cv, cGraph) == 0);
-    SHASTA_ASSERT(out_degree(cv, cGraph) == 0);
+    SHASTA_ASSERT(in_degree(cv, assemblyGraph) == 0);
+    SHASTA_ASSERT(out_degree(cv, assemblyGraph) == 0);
 
-    boost::remove_vertex(cv, cGraph);
+    boost::remove_vertex(cv, assemblyGraph);
 }
 
 
@@ -366,10 +366,10 @@ void AssemblyGraph::removeVertex(vertex_descriptor cv)
 // This numbering becomes invalid as soon as a vertex is added or removed.
 void AssemblyGraph::numberVertices()
 {
-    AssemblyGraph& cGraph = *this;
+    AssemblyGraph& assemblyGraph = *this;
     uint64_t index = 0;
-    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
-        cGraph[cv].index = index++;
+    BGL_FORALL_VERTICES(cv, assemblyGraph, AssemblyGraph) {
+        assemblyGraph[cv].index = index++;
     }
 }
 
@@ -377,9 +377,9 @@ void AssemblyGraph::numberVertices()
 
 void AssemblyGraph::clearVertexNumbering()
 {
-    AssemblyGraph& cGraph = *this;
-    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
-        cGraph[cv].index = invalid<uint64_t>;
+    AssemblyGraph& assemblyGraph = *this;
+    BGL_FORALL_VERTICES(cv, assemblyGraph, AssemblyGraph) {
+        assemblyGraph[cv].index = invalid<uint64_t>;
     }
 
 }
@@ -387,11 +387,11 @@ void AssemblyGraph::clearVertexNumbering()
 
 void AssemblyGraph::renumberEdges()
 {
-    AssemblyGraph& cGraph = *this;
+    AssemblyGraph& assemblyGraph = *this;
     nextEdgeId = 0;
 
-    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
-        cGraph[ce].id = nextEdgeId++;
+    BGL_FORALL_EDGES(ce, assemblyGraph, AssemblyGraph) {
+        assemblyGraph[ce].id = nextEdgeId++;
     }
 }
 
@@ -400,22 +400,22 @@ void AssemblyGraph::renumberEdges()
 // Compress parallel edges into bubbles, where possible.
 bool AssemblyGraph::compressParallelEdges()
 {
-    AssemblyGraph& cGraph = *this;
+    AssemblyGraph& assemblyGraph = *this;
     bool changesWereMade = false;
 
     // Look for sets of parallel edges v0->v1.
     vector<vertex_descriptor> childrenVertices;
     vector<edge_descriptor> edgesToBeRemoved;
     Bubble newBubble;
-    BGL_FORALL_VERTICES(v0, cGraph, AssemblyGraph) {
-        if(out_degree(v0, cGraph) < 2) {
+    BGL_FORALL_VERTICES(v0, assemblyGraph, AssemblyGraph) {
+        if(out_degree(v0, assemblyGraph) < 2) {
             continue;
         }
 
         // Find distinct children vertices of v0.
         childrenVertices.clear();
-        BGL_FORALL_OUTEDGES(v0, e, cGraph, AssemblyGraph) {
-            childrenVertices.push_back(target(e, cGraph));
+        BGL_FORALL_OUTEDGES(v0, e, assemblyGraph, AssemblyGraph) {
+            childrenVertices.push_back(target(e, assemblyGraph));
         }
         deduplicate(childrenVertices);
 
@@ -425,11 +425,11 @@ bool AssemblyGraph::compressParallelEdges()
             // Create the new bubble using parallel edges v0->v1.
             newBubble.clear();
             edgesToBeRemoved.clear();
-            BGL_FORALL_OUTEDGES(v0, e, cGraph, AssemblyGraph) {
-                if(target(e, cGraph) != v1) {
+            BGL_FORALL_OUTEDGES(v0, e, assemblyGraph, AssemblyGraph) {
+                if(target(e, assemblyGraph) != v1) {
                     continue;
                 }
-                AssemblyGraphEdge& edge = cGraph[e];
+                AssemblyGraphEdge& edge = assemblyGraph[e];
 
                 // The BubbleChain must have length 1.
                 if(edge.size() > 1) {
@@ -447,8 +447,8 @@ bool AssemblyGraph::compressParallelEdges()
             // Create the new edge.
             changesWereMade = true;
             edge_descriptor eNew;
-            tie(eNew, ignore) = add_edge(v0, v1, cGraph);
-            AssemblyGraphEdge& newEdge = cGraph[eNew];
+            tie(eNew, ignore) = add_edge(v0, v1, assemblyGraph);
+            AssemblyGraphEdge& newEdge = assemblyGraph[eNew];
             newEdge.id = nextEdgeId++;
             newEdge.resize(1);  // Make it a single bubble.
             Bubble& newEdgeBubble = newEdge.front();
@@ -457,7 +457,7 @@ bool AssemblyGraph::compressParallelEdges()
 
             // Remove the old edges.
             for(const edge_descriptor e: edgesToBeRemoved) {
-                boost::remove_edge(e, cGraph);
+                boost::remove_edge(e, assemblyGraph);
             }
 
         }
@@ -478,12 +478,12 @@ void Bubble::deduplicate()
 // Compress linear sequences of edges (BubbleChains) into longer BubbleChains.
 bool AssemblyGraph::compressSequentialEdges()
 {
-    AssemblyGraph& cGraph = *this;
+    AssemblyGraph& assemblyGraph = *this;
     bool changesWereMade = false;
 
     // Find linear chains of edges.
     vector< vector<edge_descriptor> > linearChains;
-    findLinearChains(cGraph, 0, linearChains);
+    findLinearChains(assemblyGraph, 0, linearChains);
 
 
 
@@ -495,26 +495,26 @@ bool AssemblyGraph::compressSequentialEdges()
 
         // Create the new edge.
         changesWereMade = true;
-        const vertex_descriptor v0 = source(linearChain.front(), cGraph);
-        const vertex_descriptor v1 = target(linearChain.back(), cGraph);
+        const vertex_descriptor v0 = source(linearChain.front(), assemblyGraph);
+        const vertex_descriptor v1 = target(linearChain.back(), assemblyGraph);
         edge_descriptor ceNew;
-        tie(ceNew, ignore) = add_edge(v0, v1, cGraph);
-        AssemblyGraphEdge& newEdge = cGraph[ceNew];
+        tie(ceNew, ignore) = add_edge(v0, v1, assemblyGraph);
+        AssemblyGraphEdge& newEdge = assemblyGraph[ceNew];
         newEdge.id = nextEdgeId++;
         for(const edge_descriptor ce: linearChain) {
-            const AssemblyGraphEdge& oldEdge = cGraph[ce];
+            const AssemblyGraphEdge& oldEdge = assemblyGraph[ce];
             copy(oldEdge.begin(), oldEdge.end(), back_inserter(newEdge));
         }
 
         // Remove the old edges.
         for(const edge_descriptor ce: linearChain) {
-            boost::remove_edge(ce, cGraph);
+            boost::remove_edge(ce, assemblyGraph);
         }
 
         // Remove the vertices internal to the old edge.
         for(uint64_t i=1; i<linearChain.size(); i++) {
-            const vertex_descriptor cv = source(linearChain[i], cGraph);
-            cGraph.removeVertex(cv);
+            const vertex_descriptor cv = source(linearChain[i], assemblyGraph);
+            assemblyGraph.removeVertex(cv);
         }
     }
     return changesWereMade;
@@ -550,11 +550,11 @@ bool AssemblyGraph::compress()
 // Call compress on all BubbleChains to merge adjacent haploid bubbles.
 bool AssemblyGraph::compressBubbleChains()
 {
-    AssemblyGraph& cGraph = *this;
+    AssemblyGraph& assemblyGraph = *this;
 
     bool changesWereMade = false;
-    BGL_FORALL_EDGES(e, cGraph, AssemblyGraph) {
-        if(cGraph[e].compress()) {
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        if(assemblyGraph[e].compress()) {
             changesWereMade = true;
         }
     }
@@ -570,11 +570,11 @@ bool AssemblyGraph::compressBubbleChains()
 // For optimal results it is best to call compressBubbleChains before expand.
 void AssemblyGraph::expand()
 {
-    AssemblyGraph& cGraph = *this;
+    AssemblyGraph& assemblyGraph = *this;
 
     // Gather all edges that exist at this point.
     vector<edge_descriptor> initialEdges;
-    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
+    BGL_FORALL_EDGES(ce, assemblyGraph, AssemblyGraph) {
         initialEdges.push_back(ce);
     }
 
@@ -582,7 +582,7 @@ void AssemblyGraph::expand()
 
     // Loop over the initial edges.
     for(const edge_descriptor ce: initialEdges) {
-        BubbleChain& bubbleChain = cGraph[ce];
+        BubbleChain& bubbleChain = assemblyGraph[ce];
 
         // If this bubbleChain consists of a single haploid bubble, don't do anything.
         if(bubbleChain.isSimpleChain()) {
@@ -592,12 +592,12 @@ void AssemblyGraph::expand()
         // Prepare a vector of the vertices that will be the sources and targets
         // of the edges we will create.
         vector<vertex_descriptor> newVertices;
-        newVertices.push_back(source(ce, cGraph));
+        newVertices.push_back(source(ce, assemblyGraph));
         for(uint64_t positionInBubbleChain=1; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
             const vertex_descriptor cv = createVertex(bubbleChain[positionInBubbleChain].front().front());
             newVertices.push_back(cv);
         }
-        newVertices.push_back(target(ce, cGraph));
+        newVertices.push_back(target(ce, assemblyGraph));
 
         // Create a new edge for each chain of each bubble in this bubble chain.
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
@@ -610,12 +610,12 @@ void AssemblyGraph::expand()
 
                 // Create a new edge for this chain.
                 edge_descriptor ceNew;
-                tie(ceNew, ignore) = add_edge(cv0, cv1, cGraph);
-                AssemblyGraphEdge& edge = cGraph[ceNew];
+                tie(ceNew, ignore) = add_edge(cv0, cv1, assemblyGraph);
+                AssemblyGraphEdge& edge = assemblyGraph[ceNew];
                 edge.id = nextEdgeId++;
 
                 // Store this Chain in the new edge.
-                BubbleChain& newBubbleChain = cGraph[ceNew];
+                BubbleChain& newBubbleChain = assemblyGraph[ceNew];
                 newBubbleChain.resize(1);
                 Bubble& newBubble = newBubbleChain.front();
                 newBubble.resize(1);
@@ -625,7 +625,7 @@ void AssemblyGraph::expand()
         }
 
         // Now we can remove the BubbleChain.
-        boost::remove_edge(ce, cGraph);
+        boost::remove_edge(ce, assemblyGraph);
     }
 }
 
@@ -662,15 +662,15 @@ void AssemblyGraph::writeCsv(const string& fileNamePrefix) const
 
 void AssemblyGraph::writeBubbleChainsCsv(const string& fileNamePrefix) const
 {
-    const AssemblyGraph& cGraph = *this;
+    const AssemblyGraph& assemblyGraph = *this;
 
     ofstream csv(fileNamePrefix + "-BubbleChains.csv");
     csv << "Id,ComponentId,BubbleChainId,v0,v1,BubbleCount,AverageOffset,MinOffset,MaxOffset,\n";
 
-    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
-        const vertex_descriptor cv0 = source(ce, cGraph);
-        const vertex_descriptor cv1 = target(ce, cGraph);
-        const BubbleChain& bubbleChain = cGraph[ce];
+    BGL_FORALL_EDGES(ce, assemblyGraph, AssemblyGraph) {
+        const vertex_descriptor cv0 = source(ce, assemblyGraph);
+        const vertex_descriptor cv1 = target(ce, assemblyGraph);
+        const BubbleChain& bubbleChain = assemblyGraph[ce];
 
         uint64_t averageOffset;
         uint64_t minOffset;
@@ -679,9 +679,9 @@ void AssemblyGraph::writeBubbleChainsCsv(const string& fileNamePrefix) const
 
         csv << bubbleChainStringId(ce) << ",";
         csv << componentId << ",";
-        csv << cGraph[ce].id << ",";
-        csv << cGraph[cv0].edgeId << ",";
-        csv << cGraph[cv1].edgeId << ",";
+        csv << assemblyGraph[ce].id << ",";
+        csv << assemblyGraph[cv0].edgeId << ",";
+        csv << assemblyGraph[cv1].edgeId << ",";
         csv << bubbleChain.size() << ",";
         csv << averageOffset << ",";
         csv << minOffset << ",";
@@ -695,13 +695,13 @@ void AssemblyGraph::writeBubbleChainsCsv(const string& fileNamePrefix) const
 
 void AssemblyGraph::writeBubblesCsv(const string& fileNamePrefix) const
 {
-    const AssemblyGraph& cGraph = *this;
+    const AssemblyGraph& assemblyGraph = *this;
 
     ofstream csv(fileNamePrefix + "-Bubbles.csv");
     csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,First,Last,Ploidy,AverageOffset,MinOffset,MaxOffset,\n";
 
-    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
-        const BubbleChain& bubbleChain = cGraph[ce];
+    BGL_FORALL_EDGES(ce, assemblyGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = assemblyGraph[ce];
 
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
             const Bubble& bubble = bubbleChain[positionInBubbleChain];
@@ -720,7 +720,7 @@ void AssemblyGraph::writeBubblesCsv(const string& fileNamePrefix) const
 
             csv << bubbleStringId(ce, positionInBubbleChain) << ",";
             csv << componentId << ",";
-            csv << cGraph[ce].id << ",";
+            csv << assemblyGraph[ce].id << ",";
             csv << positionInBubbleChain << ",";
             csv << firstChain.front() << ",";
             csv << firstChain.back() << ",";
@@ -737,13 +737,13 @@ void AssemblyGraph::writeBubblesCsv(const string& fileNamePrefix) const
 
 void AssemblyGraph::writeChainsCsv(const string& fileNamePrefix) const
 {
-    const AssemblyGraph& cGraph = *this;
+    const AssemblyGraph& assemblyGraph = *this;
 
     ofstream csv(fileNamePrefix + "-Chains.csv");
     csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,Index in bubble,First,Last,Length,Offset\n";
 
-    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
-        const BubbleChain& bubbleChain = cGraph[ce];
+    BGL_FORALL_EDGES(ce, assemblyGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = assemblyGraph[ce];
 
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
             const Bubble& bubble = bubbleChain[positionInBubbleChain];
@@ -755,7 +755,7 @@ void AssemblyGraph::writeChainsCsv(const string& fileNamePrefix) const
 
                 csv << chainStringId(ce, positionInBubbleChain, indexInBubble) << ",";
                 csv << componentId << ",";
-                csv << cGraph[ce].id << ",";
+                csv << assemblyGraph[ce].id << ",";
                 csv << positionInBubbleChain << ",";
                 csv << indexInBubble << ",";
                 csv << chain.front() << ",";
@@ -773,13 +773,13 @@ void AssemblyGraph::writeChainsCsv(const string& fileNamePrefix) const
 
 void AssemblyGraph::writeChainsDetailsCsv(const string& fileNamePrefix) const
 {
-    const AssemblyGraph& cGraph = *this;
+    const AssemblyGraph& assemblyGraph = *this;
 
     ofstream csv(fileNamePrefix + "-ChainsDetails.csv");
     csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,"
         "Index in bubble,Position in chain,MarkerGraphEdgeId,Coverage,Common,Offset\n";
 
-    BGL_FORALL_EDGES(e, cGraph, AssemblyGraph) {
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
         writeChainDetailsCsv(csv, e, false);
     }
 }
@@ -791,8 +791,8 @@ void AssemblyGraph::writeChainDetailsCsv(
     edge_descriptor e,
     bool writeHeader) const
 {
-    const AssemblyGraph& cGraph = *this;
-    const BubbleChain& bubbleChain = cGraph[e];
+    const AssemblyGraph& assemblyGraph = *this;
+    const BubbleChain& bubbleChain = assemblyGraph[e];
 
     if(writeHeader) {
         csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,"
@@ -812,7 +812,7 @@ void AssemblyGraph::writeChainDetailsCsv(
                 const uint64_t coverage = anchors[markerGraphEdgeId].coverage();
                 csv << chainStringId(e, positionInBubbleChain, indexInBubble) << ",";
                 csv << componentId << ",";
-                csv << cGraph[e].id << ",";
+                csv << assemblyGraph[e].id << ",";
                 csv << positionInBubbleChain << ",";
                 csv << indexInBubble << ",";
                 csv << positionInChain << ",";
@@ -841,7 +841,7 @@ void AssemblyGraph::writeGraphviz(
     const string& fileNamePrefix,
     bool labels) const
 {
-    const AssemblyGraph& cGraph = *this;
+    const AssemblyGraph& assemblyGraph = *this;
 
     ofstream dot;
     if(labels) {
@@ -852,25 +852,25 @@ void AssemblyGraph::writeGraphviz(
 
     dot << "digraph Component_" << componentId << "{\n";
 
-    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
-        const MarkerGraphEdgeId edgeId = cGraph[cv].edgeId;
+    BGL_FORALL_VERTICES(cv, assemblyGraph, AssemblyGraph) {
+        const MarkerGraphEdgeId edgeId = assemblyGraph[cv].edgeId;
         const uint64_t coverage = anchors[edgeId].coverage();
         dot << edgeId << "[label=\"" << edgeId << "\\n" << coverage << "\"];\n";
     }
 
 
 
-    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
-        const BubbleChain& bubbleChain = cGraph[ce];
-        const vertex_descriptor cv0 = source(ce, cGraph);
-        const vertex_descriptor cv1 = target(ce, cGraph);
+    BGL_FORALL_EDGES(ce, assemblyGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = assemblyGraph[ce];
+        const vertex_descriptor cv0 = source(ce, assemblyGraph);
+        const vertex_descriptor cv1 = target(ce, assemblyGraph);
 
         uint64_t averageOffset;
         uint64_t minOffset;
         uint64_t maxOffset;
-        bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
+        bubbleChainOffset(assemblyGraph[ce], averageOffset, minOffset, maxOffset);
 
-        dot << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId;
+        dot << assemblyGraph[cv0].edgeId << "->" << assemblyGraph[cv1].edgeId;
 
         if(labels) {
             dot << " [label=\"";
