@@ -3,6 +3,7 @@
 // Shasta
 #include "Base.hpp"
 #include "invalid.hpp"
+#include "mode3-Anchor.hpp"
 #include "mode3-PhasedComponent.hpp"
 #include "MultithreadedObject.hpp"
 #include "ReadId.hpp"
@@ -33,12 +34,12 @@ namespace shasta {
 
     namespace mode3 {
 
-        // Each edge of the CompressedPathGraph describes a BubbleChain.
+        // Each edge of the AssemblyGraph describes a BubbleChain.
 
-        // A Chain is a sequence of MarkerGraphEdgeIds.
+        // A Chain is a sequence of AnchorIds.
         class Chain;
 
-        // A Bubble is a set of Chains that begin and end at the same MarkerGraphEdgeId.
+        // A Bubble is a set of Chains that begin and end at the same AnchorId.
         // It can consist of one or more Chains.
         class Bubble;
 
@@ -63,7 +64,7 @@ namespace shasta {
 
 
 // A Chain is a sequence of MarkerGraphEdgeIds.
-class shasta::mode3::Chain : public vector<MarkerGraphEdgeId> {
+class shasta::mode3::Chain : public vector<AnchorId> {
 public:
 
     // Flag used to indicate that this Chain needs to be assembled.
@@ -86,12 +87,12 @@ public:
     vector<StepSequence> stepSequences;
 
 
-    MarkerGraphEdgeId second() const
+    AnchorId second() const
     {
         SHASTA_ASSERT(size() > 1);
         return (*this)[1];
     }
-    MarkerGraphEdgeId secondToLast() const
+    AnchorId secondToLast() const
     {
         SHASTA_ASSERT(size() > 1);
         return (*this)[size() - 2];
@@ -99,7 +100,7 @@ public:
 
     template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
     {
-        ar & boost::serialization::base_object< vector<MarkerGraphEdgeId> >(*this);
+        ar & boost::serialization::base_object< vector<AnchorId> >(*this);
     }
 };
 
@@ -180,27 +181,50 @@ public:
     // Collapse consecutive haploid bubbles.
     bool compress();
 
-    MarkerGraphEdgeId firstMarkerGraphEdgeId() const
+
+    // Return the AnchorId of the initial Anchor of this BubbleChain.
+    AnchorId firstAnchorId() const
     {
+        // Sanity check.
         SHASTA_ASSERT(not empty());
+
+        // Access the first Bubble of this BubbleChain.
         const Bubble& firstBubble = front();
-        const MarkerGraphEdgeId markerGraphEdgeId = firstBubble.front().front();
+
+        // Get the first AnchorId of the first Chain of this bubble.
+        const AnchorId anchorId = firstBubble.front().front();
+
+        // Check that the AnchorId is the same for all the Chains of this bubble.
         for(const Chain& chain: firstBubble) {
-            SHASTA_ASSERT(chain.front() == markerGraphEdgeId);
+            SHASTA_ASSERT(chain.front() == anchorId);
         }
-        return markerGraphEdgeId;
+
+        return anchorId;
     }
 
-    MarkerGraphEdgeId lastMarkerGraphEdgeId() const
+
+
+    // Return the AnchorId of the final Anchor of this BubbleChain.
+    AnchorId lastAnchorId() const
     {
+        // Sanity check.
         SHASTA_ASSERT(not empty());
+
+        // Access the last Bubble of this BubbleChain.
         const Bubble& lastBubble = back();
-        const MarkerGraphEdgeId markerGraphEdgeId = lastBubble.front().back();
+
+        // Get the last AnchorId of the first Chain of this bubble.
+        const AnchorId anchorId = lastBubble.front().back();
+
+        // Check that the AnchorId is the same for all the Chains of this bubble.
         for(const Chain& chain: lastBubble) {
-            SHASTA_ASSERT(chain.back() == markerGraphEdgeId);
+            SHASTA_ASSERT(chain.back() == anchorId);
         }
-        return markerGraphEdgeId;
+
+        return anchorId;
     }
+
+
 
     // Return the total lenght of this bubble chain.
     uint64_t totalLength() const;
@@ -217,7 +241,12 @@ public:
 
 class shasta::mode3::AssemblyGraphVertex {
 public:
-    MarkerGraphEdgeId edgeId;
+    AnchorId edgeId;
+
+    AnchorId getAnchorId() const
+    {
+        return edgeId;
+    }
 
     // Numbering of vertices consecutively starting at zero.
     // This is computed by renumberVertices, and becomes

@@ -680,8 +680,8 @@ void AssemblyGraph::writeBubbleChainsCsv(const string& fileNamePrefix) const
         csv << bubbleChainStringId(ce) << ",";
         csv << componentId << ",";
         csv << assemblyGraph[ce].id << ",";
-        csv << assemblyGraph[cv0].edgeId << ",";
-        csv << assemblyGraph[cv1].edgeId << ",";
+        csv << assemblyGraph[cv0].getAnchorId() << ",";
+        csv << assemblyGraph[cv1].getAnchorId() << ",";
         csv << bubbleChain.size() << ",";
         csv << averageOffset << ",";
         csv << minOffset << ",";
@@ -853,9 +853,9 @@ void AssemblyGraph::writeGraphviz(
     dot << "digraph Component_" << componentId << "{\n";
 
     BGL_FORALL_VERTICES(cv, assemblyGraph, AssemblyGraph) {
-        const MarkerGraphEdgeId edgeId = assemblyGraph[cv].edgeId;
-        const uint64_t coverage = anchors[edgeId].coverage();
-        dot << edgeId << "[label=\"" << edgeId << "\\n" << coverage << "\"];\n";
+        const AnchorId anchorId = assemblyGraph[cv].getAnchorId();
+        const uint64_t coverage = anchors[anchorId].coverage();
+        dot << anchorId << "[label=\"" << anchorId << "\\n" << coverage << "\"];\n";
     }
 
 
@@ -870,7 +870,7 @@ void AssemblyGraph::writeGraphviz(
         uint64_t maxOffset;
         bubbleChainOffset(assemblyGraph[ce], averageOffset, minOffset, maxOffset);
 
-        dot << assemblyGraph[cv0].edgeId << "->" << assemblyGraph[cv1].edgeId;
+        dot << assemblyGraph[cv0].getAnchorId() << "->" << assemblyGraph[cv1].getAnchorId();
 
         if(labels) {
             dot << " [label=\"";
@@ -1245,7 +1245,7 @@ void AssemblyGraph::writeGfaLinksExpanded(ostream& gfa) const
 
     // Write links between Chains in different bubble chains.
     BGL_FORALL_VERTICES(cv, graph, AssemblyGraph) {
-        const uint64_t overlapLength = assembler.markerGraph.edgeSequence[graph[cv].edgeId].size();
+        const uint64_t overlapLength = assembler.markerGraph.edgeSequence[graph[cv].getAnchorId()].size();
 
         BGL_FORALL_INEDGES(cv, ce0, graph, AssemblyGraph) {
             const BubbleChain& bubbleChain0 = graph[ce0];
@@ -1811,14 +1811,14 @@ AssemblyGraph::Superbubbles::Superbubbles(
             boost::make_assoc_property_map(predecessorMap));
 
         if(debug) {
-            cout << "Forward dominator tree with entrance at " << cGraph[entrance].edgeId << endl;
+            cout << "Forward dominator tree with entrance at " << cGraph[entrance].getAnchorId() << endl;
         }
         for(const auto& p: predecessorMap) {
             const vertex_descriptor cv0 = p.second;
             const vertex_descriptor cv1 = p.first;
             forwardPairs.push_back({cv0, cv1});
             if(debug) {
-                cout << "F " << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId << endl;
+                cout << "F " << cGraph[cv0].getAnchorId() << "->" << cGraph[cv1].getAnchorId() << endl;
             }
         }
     }
@@ -1851,14 +1851,14 @@ AssemblyGraph::Superbubbles::Superbubbles(
             boost::make_assoc_property_map(predecessorMap));
 
         if(debug) {
-            cout << "Backward dominator tree with exit at " << cGraph[entrance].edgeId << endl;
+            cout << "Backward dominator tree with exit at " << cGraph[entrance].getAnchorId() << endl;
         }
         for(const auto& p: predecessorMap) {
             const vertex_descriptor cv0 = p.first;
             const vertex_descriptor cv1 = p.second;
             backwardPairs.push_back({cv0, cv1});
             if(debug) {
-                cout << "B " << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId << endl;
+                cout << "B " << cGraph[cv0].getAnchorId() << "->" << cGraph[cv1].getAnchorId() << endl;
             }
         }
     }
@@ -1896,7 +1896,7 @@ AssemblyGraph::Superbubbles::Superbubbles(
         for(const auto& p: bidirectionalPairs) {
             const vertex_descriptor cv0 = p.first;
             const vertex_descriptor cv1 = p.second;
-            cout << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId << endl;
+            cout << cGraph[cv0].getAnchorId() << "->" << cGraph[cv1].getAnchorId() << endl;
         }
     }
 
@@ -1929,8 +1929,8 @@ AssemblyGraph::Superbubbles::Superbubbles(
         superbubble.fillInFromEntranceAndExit(cGraph);
 
         if(debug) {
-            cout << "Tentative superbubble with entrance " << cGraph[cv0].edgeId <<
-                " exit " << cGraph[cv1].edgeId << " and " << superbubble.size() <<
+            cout << "Tentative superbubble with entrance " << cGraph[cv0].getAnchorId() <<
+                " exit " << cGraph[cv1].getAnchorId() << " and " << superbubble.size() <<
                 " vertices total." << endl;
         }
 
@@ -1952,7 +1952,7 @@ AssemblyGraph::Superbubbles::Superbubbles(
         for(const Superbubble& superbubble: superbubbles) {
             const vertex_descriptor cv0 = superbubble.entrances.front();
             const vertex_descriptor cv1 = superbubble.exits.front();;
-            cout << cGraph[cv0].edgeId << "->" << cGraph[cv1].edgeId << endl;
+            cout << cGraph[cv0].getAnchorId() << "->" << cGraph[cv1].getAnchorId() << endl;
         }
     }
 }
@@ -2022,7 +2022,7 @@ bool AssemblyGraph::removeShortSuperbubbles(
         if(debug) {
             cout << "Found a superbubble with " << superbubble.size() << " vertices:";
             for(const vertex_descriptor v: superbubble) {
-                cout << " " << cGraph[v].edgeId;
+                cout << " " << cGraph[v].getAnchorId();
             }
             cout << endl;
         }
@@ -2049,7 +2049,8 @@ bool AssemblyGraph::removeShortSuperbubbles(
 
         // Check the base offset between the entrance and the exit.
         MarkerGraphEdgePairInfo info;
-        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(cGraph[entrance].edgeId, cGraph[exit].edgeId, info));
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
+            cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId(), info));
         if(info.common == 0) {
             if(debug) {
                 cout << "This superbubble will not be removed because "
@@ -2127,8 +2128,8 @@ bool AssemblyGraph::removeShortSuperbubbles(
         Bubble& bubble = bubbleChain.front();
         bubble.resize(1);
         Chain& chain = bubble.front();
-        chain.push_back(cGraph[entrance].edgeId);
-        chain.push_back(cGraph[exit].edgeId);
+        chain.push_back(cGraph[entrance].getAnchorId());
+        chain.push_back(cGraph[exit].getAnchorId());
 
         changesWereMade = true;
     }
@@ -2237,14 +2238,14 @@ void AssemblyGraph::cleanupSuperbubble(
 
 #if 0
     debug = (superbubble.entrances.size() == 1 and
-        (cGraph[superbubble.entrances.front()].edgeId == 16093908 or
-        cGraph[superbubble.entrances.front()].edgeId == 9555933));
+        (cGraph[superbubble.entrances.front()].anchorId() == 16093908 or
+        cGraph[superbubble.entrances.front()].anchorId() == 9555933));
 #endif
 
     if(debug) {
         cout << "Working on a superbubble with " << superbubble.size() << " vertices:";
         for(const vertex_descriptor v: superbubble) {
-            cout << " " << cGraph[v].edgeId;
+            cout << " " << cGraph[v].getAnchorId();
         }
         cout << endl;
     }
@@ -2281,8 +2282,8 @@ void AssemblyGraph::cleanupSuperbubble(
     const vertex_descriptor entrance = superbubble.entrances.front();
     const vertex_descriptor exit = superbubble.exits.front();
     if(debug) {
-        cout << "Entrance " << cGraph[entrance].edgeId << endl;
-        cout << "Exit " << cGraph[exit].edgeId << endl;
+        cout << "Entrance " << cGraph[entrance].getAnchorId() << endl;
+        cout << "Exit " << cGraph[exit].getAnchorId() << endl;
     }
 
     if(entrance == exit) {
@@ -2297,7 +2298,7 @@ void AssemblyGraph::cleanupSuperbubble(
 
     // Check the base offset between the entrance and the exit.
     MarkerGraphEdgePairInfo info;
-    SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(cGraph[entrance].edgeId, cGraph[exit].edgeId, info));
+    SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId(), info));
     if(info.common == 0) {
         if(debug) {
             cout << "This superbubble will be skipped because "
@@ -2419,7 +2420,7 @@ void AssemblyGraph::cleanupSuperbubble(
                 const edge_descriptor entranceOutEdge = entranceOutEdges[i];
                 Chain& chain = entranceBubble[i];
                 chain = cGraph[entranceOutEdge].getOnlyChain();
-                chain.push_back(cGraph[exit].edgeId);
+                chain.push_back(cGraph[exit].getAnchorId());
                 assembleChain(chain, chainTerminalCommonThreshold);
             }
 
@@ -2479,7 +2480,7 @@ void AssemblyGraph::cleanupSuperbubble(
             for(uint64_t i=0; i<2; i++) {
                 const edge_descriptor exitInEdge = exitInEdges[i];
                 Chain& chain = exitBubble[i];
-                chain.push_back(cGraph[entrance].edgeId);
+                chain.push_back(cGraph[entrance].getAnchorId());
                 const Chain& exitChain = cGraph[exitInEdge].getOnlyChain();
                 copy(exitChain.begin(), exitChain.end(), back_inserter(chain));
                 assembleChain(chain, chainTerminalCommonThreshold);
@@ -2606,8 +2607,8 @@ void AssemblyGraph::cleanupSuperbubble(
         bubbleChain.push_back(newBubble);
     } else {
         Chain newChain;
-        newChain.push_back(cGraph[entrance].edgeId);
-        newChain.push_back(cGraph[exit].edgeId);
+        newChain.push_back(cGraph[entrance].getAnchorId());
+        newChain.push_back(cGraph[exit].getAnchorId());
         Bubble newBubble;
         newBubble.push_back(newChain);
         bubbleChain.push_back(newBubble);
@@ -7736,7 +7737,7 @@ AssemblyGraph::vertex_descriptor
         // Add it to the graph.
         // It will be dangling at its end.
         // Detangling code will later connect it s prescribed by the tangle matrix.
-        const vertex_descriptor cv2 = createVertex(newBubbleChain.lastMarkerGraphEdgeId());
+        const vertex_descriptor cv2 = createVertex(newBubbleChain.lastAnchorId());
         add_edge(cv0, cv2, newEdge, cGraph);
         return cv2;
     }
@@ -7770,7 +7771,7 @@ AssemblyGraph::vertex_descriptor
         // Add it to the graph.
         // It will be dangling at its end.
         // Detangling code will later connect it s prescribed by the tangle matrix.
-        const vertex_descriptor cv2 = createVertex(newBubbleChain.lastMarkerGraphEdgeId());
+        const vertex_descriptor cv2 = createVertex(newBubbleChain.lastAnchorId());
         add_edge(cv0, cv2, newEdge, cGraph);
         return cv2;
     }
@@ -7829,7 +7830,7 @@ AssemblyGraph::vertex_descriptor
         // Add it to the graph.
         // It will be dangling at its beginning.
         // Detangling code will later connect it s prescribed by the tangle matrix.
-        const vertex_descriptor cv2 = createVertex(newBubbleChain.firstMarkerGraphEdgeId());
+        const vertex_descriptor cv2 = createVertex(newBubbleChain.firstAnchorId());
         add_edge(cv2, cv1, newEdge, cGraph);
         return cv2;
     }
@@ -7863,7 +7864,7 @@ AssemblyGraph::vertex_descriptor
         // Add it to the graph.
         // It will be dangling at its end.
         // Detangling code will later connect it s prescribed by the tangle matrix.
-        const vertex_descriptor cv2 = createVertex(newBubbleChain.firstMarkerGraphEdgeId());
+        const vertex_descriptor cv2 = createVertex(newBubbleChain.firstAnchorId());
         add_edge(cv2, cv1, newEdge, cGraph);
         return cv2;
     }
