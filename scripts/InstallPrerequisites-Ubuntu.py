@@ -54,7 +54,7 @@ def installSeqan():
             "Remove it first (using apt remove if it was installed using apt)." % installPath)
         
     with tempfile.TemporaryDirectory() as temporaryDirectory:
-        print("Building spoa library using temporary directory", temporaryDirectory)
+        print("Building seqan library using temporary directory", temporaryDirectory)
         
         # Change to the temporary directory.
         oldDirectory = os.getcwd()
@@ -135,10 +135,10 @@ def installSpoa():
         os.chdir(oldDirectory)
 
 
-# installAptPackages() 
+installAptPackages() 
 installSeqan()
-# installPybind11() 
-# installSpoa()
+installPybind11() 
+installSpoa()
   
 # Make sure the newly created libraries are immediately visible to the loader.
 runCommand("ldconfig")
