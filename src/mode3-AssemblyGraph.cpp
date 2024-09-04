@@ -41,6 +41,7 @@ template class MultithreadedObject<AssemblyGraph>;
 // Create from a connected component of the PrimaryGraph, then call run.
 AssemblyGraph::AssemblyGraph(
     const AnchorGraph& graph,
+    const Anchors& anchors,
     uint64_t componentId,
     const Assembler& assembler,
     const vector<OrientedReadId> orientedReadIds,
@@ -51,6 +52,7 @@ AssemblyGraph::AssemblyGraph(
     bool debug) :
     MultithreadedObject<AssemblyGraph>(*this),
     componentId(componentId),
+    anchors(anchors),
     assembler(assembler),
     options(options),
     orientedReadIds(orientedReadIds),
@@ -77,12 +79,14 @@ AssemblyGraph::AssemblyGraph(
 // Load it from a binary archive, then call run.
 AssemblyGraph::AssemblyGraph(
     const string& fileName,
+    const Anchors& anchors,
     const Assembler& assembler,
     uint64_t threadCount,
     const Mode3AssemblyOptions& options,
     bool assembleSequence,
     bool debug) :
     MultithreadedObject<AssemblyGraph>(*this),
+    anchors(anchors),
     assembler(assembler),
     options(options)
 {
@@ -809,7 +813,7 @@ void AssemblyGraph::writeChainDetailsCsv(
 
             for(uint64_t positionInChain=0; positionInChain<chain.size(); positionInChain++) {
                 const MarkerGraphEdgeId markerGraphEdgeId = chain[positionInChain];
-                const uint64_t coverage = assembler.markerGraph.edgeCoverage(markerGraphEdgeId);
+                const uint64_t coverage = anchors[markerGraphEdgeId].coverage();
                 csv << chainStringId(e, positionInBubbleChain, indexInBubble) << ",";
                 csv << componentId << ",";
                 csv << cGraph[e].id << ",";
@@ -854,7 +858,7 @@ void AssemblyGraph::writeGraphviz(
 
     BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
         const MarkerGraphEdgeId edgeId = cGraph[cv].edgeId;
-        const uint64_t coverage = assembler.markerGraph.edgeCoverage(edgeId);
+        const uint64_t coverage = anchors[edgeId].coverage();
         dot << edgeId << "[label=\"" << edgeId << "\\n" << coverage << "\"];\n";
     }
 
@@ -1577,7 +1581,7 @@ double AssemblyGraph::primaryCoverage(const Chain& chain) const
     uint64_t sum = 0;
     for(uint64_t positionInChain=1; positionInChain<chain.size()-1; positionInChain++) {
         const MarkerGraphEdgeId markerGraphEdgeId = chain[positionInChain];
-        const uint64_t coverage = assembler.markerGraph.edgeCoverage(markerGraphEdgeId);
+        const uint64_t coverage = anchors[markerGraphEdgeId].coverage();
         sum += coverage;
     }
 

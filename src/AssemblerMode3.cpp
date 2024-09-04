@@ -107,7 +107,7 @@ void Assembler::mode3AssembleComponent(
     bool assembleSequence,
     bool debug) const
 {
-    mode3::AssemblyGraph(fileName, *this, threadCount, options, assembleSequence, debug);
+    mode3::AssemblyGraph(fileName, markerGraph, *this, threadCount, options, assembleSequence, debug);
 }
 
 

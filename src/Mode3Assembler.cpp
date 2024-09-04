@@ -625,7 +625,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
      // Create the assembly graph for this connected component.
      return make_shared<AssemblyGraph>(
-         anchorGraph, componentId, assembler, orientedReadIds, anchorIds, threadCount,
+         anchorGraph, anchors, componentId, assembler, orientedReadIds, anchorIds, threadCount,
          options, assembleSequence, debug);
 }
 

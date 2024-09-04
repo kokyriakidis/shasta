@@ -26,6 +26,11 @@
 
 
 namespace shasta {
+
+    class Assembler;
+    class Mode3AssemblyOptions;
+    class OrientedReadId;
+
     namespace mode3 {
 
         // Each edge of the CompressedPathGraph describes a BubbleChain.
@@ -51,10 +56,8 @@ namespace shasta {
             AssemblyGraphEdge>;
 
         class AnchorGraph;
+        class Anchors;
     }
-    class Assembler;
-    class Mode3AssemblyOptions;
-    class OrientedReadId;
 }
 
 
@@ -254,6 +257,7 @@ public:
     // Create from a connected component of the PrimaryGraph, then call run.
     AssemblyGraph(
         const AnchorGraph&,
+        const Anchors&,
         uint64_t componentId,
         const Assembler&,
         const vector<OrientedReadId> orientedReadIds,
@@ -266,6 +270,7 @@ public:
     // Load it from a binary archive, then call run.
     AssemblyGraph(
         const string& fileName,
+        const Anchors&,
         const Assembler&,
         uint64_t threadCount,
         const Mode3AssemblyOptions& options,
@@ -280,6 +285,7 @@ private:
     // Information stored by the constructor.
     uint64_t componentId;
 public:
+    const Anchors& anchors;
     const Assembler& assembler;
     const Mode3AssemblyOptions& options;
 
