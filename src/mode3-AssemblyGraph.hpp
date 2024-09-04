@@ -241,11 +241,11 @@ public:
 
 class shasta::mode3::AssemblyGraphVertex {
 public:
-    AnchorId edgeId;
+    AssemblyGraphVertex(AnchorId anchorId = invalid<AnchorId>) : anchorId(anchorId) {}
 
     AnchorId getAnchorId() const
     {
-        return edgeId;
+        return anchorId;
     }
 
     // Numbering of vertices consecutively starting at zero.
@@ -259,8 +259,11 @@ public:
 
     template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
     {
-        ar & edgeId;
+        ar & anchorId;
     }
+
+private:
+    AnchorId anchorId;
 };
 
 

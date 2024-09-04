@@ -330,7 +330,7 @@ AssemblyGraph::vertex_descriptor AssemblyGraph::getVertex(
 
     auto it = vertexMap.find(markerGraphEdgeId);
     if(it == vertexMap.end()) {
-        const vertex_descriptor cv = add_vertex({markerGraphEdgeId}, assemblyGraph);
+        const vertex_descriptor cv = add_vertex(AssemblyGraphVertex(markerGraphEdgeId), assemblyGraph);
         vertexMap.insert({markerGraphEdgeId, cv});
         return cv;
     } else {
@@ -344,7 +344,7 @@ AssemblyGraph::vertex_descriptor AssemblyGraph::getVertex(
 AssemblyGraph::vertex_descriptor AssemblyGraph::createVertex(
     MarkerGraphEdgeId markerGraphEdgeId)
 {
-    return add_vertex({markerGraphEdgeId}, *this);
+    return add_vertex(AssemblyGraphVertex(markerGraphEdgeId), *this);
 }
 
 
@@ -2255,7 +2255,7 @@ void AssemblyGraph::cleanupSuperbubble(
     for(const vertex_descriptor v: superbubble) {
         if(previousSuperbubblesVertices.contains(v)) {
             if(debug) {
-                cout << "This superbubble ignored because it contains vertex " << cGraph[v].edgeId <<
+                cout << "This superbubble ignored because it contains vertex " << cGraph[v].getAnchorId() <<
                     " which is in a previously processed superbubble." << endl;
             }
             overlaps = true;
@@ -2763,7 +2763,7 @@ bool AssemblyGraph::detangleVertexStrict(
     computeTangleMatrix(inEdges, outEdges, tangleMatrix, false);
 
     if(debug) {
-        cout << "Tangle matrix for vertex " << cGraph[cv].edgeId << endl;
+        cout << "Tangle matrix for vertex " << cGraph[cv].getAnchorId() << endl;
         for(uint64_t i0=0; i0<inEdges.size(); i0++) {
             for(uint64_t i1=0; i1<outEdges.size(); i1++) {
                 cout << bubbleChainStringId(inEdges[i0]) << " " <<
@@ -2871,11 +2871,11 @@ bool AssemblyGraph::detangleVertexStrict(
             Bubble& newBubbleLast = newBubbleChain.back();
             SHASTA_ASSERT(newBubbleLast.size() == 1);
             Chain& newChainLast = newBubbleLast.front();
-            SHASTA_ASSERT(newChainLast.back() == cGraph[cv].edgeId);
+            SHASTA_ASSERT(newChainLast.back() == cGraph[cv].getAnchorId());
             newChainLast.resize(newChainLast.size() - 1);
 
             // Append chain1, except for cv.
-            SHASTA_ASSERT(chain1.front() == cGraph[cv].edgeId);
+            SHASTA_ASSERT(chain1.front() == cGraph[cv].getAnchorId());
             copy(chain1.begin() + 1, chain1.end(), back_inserter(newChainLast));
 
             // Append the rest of bubbleChain1.
@@ -2906,7 +2906,7 @@ bool AssemblyGraph::detangleVertex(
     AssemblyGraph& cGraph = *this;
 
     if(debug) {
-        cout << "Attempting to detangle vertex " << cGraph[cv].edgeId << endl;
+        cout << "Attempting to detangle vertex " << cGraph[cv].getAnchorId() << endl;
     }
 
 
@@ -2999,7 +2999,7 @@ bool AssemblyGraph::detangleVertex(
     computeTangleMatrix(inEdges, outEdges, tangleMatrix);
 
     if(debug) {
-        cout << "Tangle matrix for vertex " << cGraph[cv].edgeId << endl;
+        cout << "Tangle matrix for vertex " << cGraph[cv].getAnchorId() << endl;
 
         cout << "In-edges: ";
         for(const edge_descriptor ce: inEdges) {
@@ -3230,11 +3230,11 @@ bool AssemblyGraph::detangleVertex(
             Bubble& newBubbleLast = newBubbleChain.back();
             SHASTA_ASSERT(newBubbleLast.size() == 1);
             Chain& newChainLast = newBubbleLast.front();
-            SHASTA_ASSERT(newChainLast.back() == cGraph[cv].edgeId);
+            SHASTA_ASSERT(newChainLast.back() == cGraph[cv].getAnchorId());
             newChainLast.resize(newChainLast.size() - 1);
 
             // Append chain1, except for cv.
-            SHASTA_ASSERT(chain1.front() == cGraph[cv].edgeId);
+            SHASTA_ASSERT(chain1.front() == cGraph[cv].getAnchorId());
             copy(chain1.begin() + 1, chain1.end(), back_inserter(newChainLast));
 
             // Append the rest of bubbleChain1.
@@ -3261,7 +3261,7 @@ bool AssemblyGraph::detangleVertexWithCycle(
     AssemblyGraph& cGraph = *this;
 
     if(debug) {
-        cout << "detangleVertexWithCycle begins for " << cGraph[cv].edgeId << endl;
+        cout << "detangleVertexWithCycle begins for " << cGraph[cv].getAnchorId() << endl;
     }
 
     // Gather the in-edges.
@@ -3317,7 +3317,7 @@ bool AssemblyGraph::detangleVertexWithCycle(
     computeTangleMatrix(inEdges, outEdges, tangleMatrix);
 
     if(debug) {
-        cout << "Tangle matrix for vertex " << cGraph[cv].edgeId << endl;
+        cout << "Tangle matrix for vertex " << cGraph[cv].getAnchorId() << endl;
 
         cout << "In-edges: ";
         for(const edge_descriptor ce: inEdges) {
@@ -3418,7 +3418,7 @@ bool AssemblyGraph::detangleVertexWithCycle(
             newEdge.id = nextEdgeId++;
             BubbleChain& newBubbleChain = newEdge;
             newBubbleChain = cGraph[cycleEdge];
-            const vertex_descriptor vNew = createVertex(cGraph[cv].edgeId);
+            const vertex_descriptor vNew = createVertex(cGraph[cv].getAnchorId());
             add_edge(vNew, vNew, newEdge, cGraph);
         }
 
@@ -5055,7 +5055,7 @@ bool AssemblyGraph::detangleShortSuperbubble(
         cout << "Found a superbubble with " << superbubble.size() <<
             " vertices:";
         for(const vertex_descriptor cv: superbubble) {
-            cout << " " << cGraph[cv].edgeId;
+            cout << " " << cGraph[cv].getAnchorId();
         }
         cout << endl;
     }
@@ -7895,8 +7895,8 @@ AssemblyGraph::edge_descriptor AssemblyGraph::connect(vertex_descriptor cv0, ver
     // The new Bubble consists of just the two MarkerGraphEdgeIds
     // corresponding to cv0 and cv1.
     Chain& chain = bubble.front();
-    chain.push_back(cGraph[cv0].edgeId);
-    chain.push_back(cGraph[cv1].edgeId);
+    chain.push_back(cGraph[cv0].getAnchorId());
+    chain.push_back(cGraph[cv1].getAnchorId());
 
     return ceNew;
 
