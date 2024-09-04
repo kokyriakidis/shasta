@@ -3,7 +3,6 @@
 #include "AssemblyGraph.hpp"
 #include "deduplicate.hpp"
 #include "orderPairs.hpp"
-// Shasta.
 #include "seqan.hpp"
 using namespace shasta;
 using namespace mode0;

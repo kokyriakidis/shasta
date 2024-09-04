@@ -8,6 +8,7 @@ using namespace shasta;
 
 // Seqan
 #include <seqan/align.h>
+namespace seqan = seqan2;
 
 // Boost libraries.
 #include <boost/pending/disjoint_sets.hpp>

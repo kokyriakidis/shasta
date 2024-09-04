@@ -85,17 +85,18 @@ template<class Iterator>
     bool freeOnRight,
     vector< pair<bool, bool> >& alignment)
 {
+
     // SeqAn does not handle empty sequences.
     SHASTA_ASSERT(begin0 != end0);
     SHASTA_ASSERT(begin1 != end1);
 
     // SeqAn types used below.
-    using namespace seqan;
+    using namespace seqan2;
     using Int = typename Iterator::value_type;
     using Sequence = String<Int>;
-    using StringSet = seqan::StringSet<Sequence>;
-    using DepStringSet = seqan::StringSet<Sequence, Dependent<> >;
-    using AlignGraph = Graph<seqan::Alignment<DepStringSet> >;
+    using StringSet = seqan2::StringSet<Sequence>;
+    using DepStringSet = seqan2::StringSet<Sequence, Dependent<> >;
+    using AlignGraph = Graph<seqan2::Alignment<DepStringSet> >;
 
     // Fill in the sequences, adding 100 to all values
     // because SeqAn uses 45 to represent gaps.
@@ -124,14 +125,14 @@ template<class Iterator>
             // Free on both sides.
             alignmentScore = globalAlignment(
                 graph,
-                Score<int64_t, seqan::Simple>(matchScore, mismatchScore, gapScore),
+                Score<int64_t, Simple>(matchScore, mismatchScore, gapScore),
                 AlignConfig<true, true, true, true>(),
                 LinearGaps());
         } else {
             // Free on left only.
             alignmentScore = globalAlignment(
                 graph,
-                Score<int64_t, seqan::Simple>(matchScore, mismatchScore, gapScore),
+                Score<int64_t, Simple>(matchScore, mismatchScore, gapScore),
                 AlignConfig<true, true, false, false>(),
                 LinearGaps());
         }
@@ -140,14 +141,14 @@ template<class Iterator>
             // Free on right only.
             alignmentScore = globalAlignment(
                 graph,
-                Score<int64_t, seqan::Simple>(matchScore, mismatchScore, gapScore),
+                Score<int64_t, Simple>(matchScore, mismatchScore, gapScore),
                 AlignConfig<false, false, true, true>(),
                 LinearGaps());
         } else {
             // Free on neither side.
             alignmentScore = globalAlignment(
                 graph,
-                Score<int64_t, seqan::Simple>(matchScore, mismatchScore, gapScore),
+                Score<int64_t, Simple>(matchScore, mismatchScore, gapScore),
                 AlignConfig<false, false, false, false>(),
                 LinearGaps());
         }
@@ -160,7 +161,7 @@ template<class Iterator>
     // of the alignment, concatenated.
     Sequence align;
     convertAlignment(graph, align);
-    const uint64_t totalAlignmentLength = seqan::length(align);
+    const uint64_t totalAlignmentLength = length(align);
     SHASTA_ASSERT((totalAlignmentLength % 2) == 0);
     const uint64_t alignmentLength = totalAlignmentLength / 2;
 
@@ -192,17 +193,18 @@ template<class Iterator>
     bool freeOnRight,
     vector< pair<bool, bool> >& alignment)
 {
+
     // SeqAn does not handle empty sequences.
     SHASTA_ASSERT(begin0 != end0);
     SHASTA_ASSERT(begin1 != end1);
 
     // SeqAn types used below.
-    using namespace seqan;
+    using namespace seqan2;
     using Int = typename Iterator::value_type;
     using Sequence = String<Int>;
-    using StringSet = seqan::StringSet<Sequence>;
-    using DepStringSet = seqan::StringSet<Sequence, Dependent<> >;
-    using AlignGraph = Graph<seqan::Alignment<DepStringSet> >;
+    using StringSet = seqan2::StringSet<Sequence>;
+    using DepStringSet = seqan2::StringSet<Sequence, Dependent<> >;
+    using AlignGraph = Graph<seqan2::Alignment<DepStringSet> >;
 
     // Fill in the sequences, adding 100 to all values
     // because SeqAn uses 45 to represent gaps.
@@ -231,7 +233,7 @@ template<class Iterator>
             // Free on both sides.
             alignmentScore = globalAlignment(
                 graph,
-                Score<int64_t, seqan::Simple>(matchScore, mismatchScore, gapScore),
+                Score<int64_t, Simple>(matchScore, mismatchScore, gapScore),
                 AlignConfig<true, true, true, true>(),
                 int32_t(bandMin), int32_t(bandMax),
                 LinearGaps());
@@ -239,7 +241,7 @@ template<class Iterator>
             // Free on left only.
             alignmentScore = globalAlignment(
                 graph,
-                Score<int64_t, seqan::Simple>(matchScore, mismatchScore, gapScore),
+                Score<int64_t, Simple>(matchScore, mismatchScore, gapScore),
                 AlignConfig<true, true, false, false>(),
                 int32_t(bandMin), int32_t(bandMax),
                 LinearGaps());
@@ -249,7 +251,7 @@ template<class Iterator>
             // Free on right only.
             alignmentScore = globalAlignment(
                 graph,
-                Score<int64_t, seqan::Simple>(matchScore, mismatchScore, gapScore),
+                Score<int64_t, Simple>(matchScore, mismatchScore, gapScore),
                 AlignConfig<false, false, true, true>(),
                 int32_t(bandMin), int32_t(bandMax),
                 LinearGaps());
@@ -257,7 +259,7 @@ template<class Iterator>
             // Free on neither side.
             alignmentScore = globalAlignment(
                 graph,
-                Score<int64_t, seqan::Simple>(matchScore, mismatchScore, gapScore),
+                Score<int64_t, Simple>(matchScore, mismatchScore, gapScore),
                 AlignConfig<false, false, false, false>(),
                 int32_t(bandMin), int32_t(bandMax),
                 LinearGaps());
@@ -271,7 +273,7 @@ template<class Iterator>
     // of the alignment, concatenated.
     Sequence align;
     convertAlignment(graph, align);
-    const uint64_t totalAlignmentLength = seqan::length(align);
+    const uint64_t totalAlignmentLength = length(align);
     SHASTA_ASSERT((totalAlignmentLength % 2) == 0);
     const uint64_t alignmentLength = totalAlignmentLength / 2;
 

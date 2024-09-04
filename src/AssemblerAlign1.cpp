@@ -7,7 +7,7 @@ using namespace shasta;
 
 // Seqan.
 #include <seqan/align.h>
-
+namespace seqan = seqan2;
 
 void Assembler::alignOrientedReads1(
     ReadId readId0, Strand strand0,

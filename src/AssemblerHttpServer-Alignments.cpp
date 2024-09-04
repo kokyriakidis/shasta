@@ -25,6 +25,7 @@ using namespace mode0;
 
 // Seqan
 #include <seqan/align.h>
+namespace seqan = seqan2;
 
 // Standard library.
 #include <chrono>

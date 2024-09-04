@@ -27,6 +27,7 @@ using namespace shasta;
 
 // Seqan
 #include <seqan/align.h>
+namespace seqan = seqan2;
 
 // Standard library.
 #include "fstream.hpp"

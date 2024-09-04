@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import os
+import shutil
 import subprocess
 import tempfile
 
@@ -28,14 +29,46 @@ def installAptPackages():
     "libblas-dev", 
     "liblapack-dev",
     "gfortran",
-    "libseqan2-dev",
     "ncbi-blast+",
     "graphviz",
     "gnuplot",
     "python3-dev", 
     ]
     runCommand("sudo apt-get install --assume-yes " + " ".join(packages))
+
+
+
+# We don't use Ubuntu package libseqan2-dev because
+# it does not include the fix for this issue:
+# https://github.com/seqan/seqan/issues?q=is%3Aissue+author%3A%40me+is%3Aclosed
+# Instead, we clone the GitHub seqan/seqan repository, 
+# then copy seqan/include/seqan to /usr/include/seqan.
+def installSeqan():
+
+    # The path where the include files will go.
+    installPath = "/usr/include/seqan"
     
+    # First check that this path does not exist.
+    if os.path.exists(installPath):
+        raise Exception("The seqan install path %s already exists. "
+            "Remove it first (using apt remove if it was installed using apt)." % installPath)
+        
+    with tempfile.TemporaryDirectory() as temporaryDirectory:
+        print("Building spoa library using temporary directory", temporaryDirectory)
+        
+        # Change to the temporary directory.
+        oldDirectory = os.getcwd()
+        os.chdir(temporaryDirectory)
+        
+        # Clone the Github repository.
+        runCommand("git clone https://github.com/seqan/seqan.git")
+        
+        # Copy the include files.
+        shutil.copytree("seqan/include/seqan", installPath)
+
+        # Change back to the original directory.
+        os.chdir(oldDirectory)
+
 
 
 def installPybind11():
@@ -102,10 +135,10 @@ def installSpoa():
         os.chdir(oldDirectory)
 
 
-    
-installAptPackages() 
-installPybind11() 
-installSpoa()
+# installAptPackages() 
+installSeqan()
+# installPybind11() 
+# installSpoa()
   
 # Make sure the newly created libraries are immediately visible to the loader.
 runCommand("ldconfig")
