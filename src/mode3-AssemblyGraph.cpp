@@ -3370,8 +3370,35 @@ bool AssemblyGraph::detangleVertexWithCycle(
         if(debug) {
             cout << "In-phase, cycle edge will be detached." << endl;
         }
-        SHASTA_ASSERT(0);   // Missing code.
-        return false;
+
+        // We join the inEdge with the outEdge to form a new edge.
+        // We leave the cycle edge alone, so it becomes an isolated loop.
+
+        AssemblyGraphEdge newEdge;
+        newEdge.id = nextEdgeId++;
+        BubbleChain& newBubbleChain = newEdge;              // Empty BubbleChain.
+        newBubbleChain.resize(1);                           // Now the new BubbleChain has one Bubble.
+        Bubble& newBubble = newBubbleChain.firstBubble();   // The new Bubble is empty.
+        newBubble.resize(1);                                // Now the new Bubble has one Chain.
+        Chain& newChain = newBubble.front();                // The new Chain is empty.
+        SHASTA_ASSERT(newBubbleChain.isSimpleChain());
+
+        // Add the chain of the inEdge without its last Anchor.
+        const Chain& inChain = cGraph[inEdge].front().front();
+        copy(inChain.begin(), inChain.end() - 1, back_inserter(newChain));
+
+        // Add the chain of the outEdge without its first Anchor.
+        const Chain& outChain = cGraph[outEdge].front().front();
+        copy(outChain.begin() + 1, outChain.end(), back_inserter(newChain));
+
+        // Add it to the graph.
+        add_edge(source(inEdge, cGraph), target(outEdge, cGraph), newEdge, cGraph);
+
+        // Remove the inEdge and the outEdge.
+        boost::remove_edge(inEdge, cGraph);
+        boost::remove_edge(outEdge, cGraph);
+
+        return true;
     }
 
 
