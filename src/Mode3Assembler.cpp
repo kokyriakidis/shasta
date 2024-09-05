@@ -206,40 +206,6 @@ void Mode3Assembler::computeConnectedComponents()
         // Figure out if this is a self-complementary component (contains both strands).
         const bool isSelfComplementary =  component[0].getReadId() == component[1].getReadId();
 
-
-#if 0
-        // If it is self complementary, split the strands.
-        if(isSelfComplementary) {
-
-            // For a self-complementary component, all oriented reads come in reverse complemented pairs.
-            SHASTA_ASSERT((component.size() %2) == 0);
-            for(uint64_t i=0; i<component.size(); i+=2) {
-                const OrientedReadId orientedReadId0 = component[i];
-                const OrientedReadId orientedReadId1 = component[i+1];
-                SHASTA_ASSERT(orientedReadId0.getReadId() == orientedReadId1.getReadId());
-                SHASTA_ASSERT(orientedReadId0.getStrand() == 0);
-                SHASTA_ASSERT(orientedReadId1.getStrand() == 1);
-            }
-
-            StrandSplitter strandSplitter(
-                componentsOrientedReads[componentId],
-                componentsMarkerGraphEdgeIds[componentId],
-                anchors,
-                reverseComplementAnchor);
-
-            // The StrandSplitter only kept one side, and so we will keep it.
-            componentTable.push_back({componentId, component.size()});
-
-        } else {
-
-            // This is one of a pair of complementary connected components.
-            // Keep it if its first OrientedReadId is on strand 0.
-            if(component.front().getStrand() == 0) {
-                componentTable.push_back({componentId, component.size()});
-            }
-        }
-#endif
-
         if(isSelfComplementary or (component.front().getStrand() == 0)) {
             componentTable.push_back({componentId, component.size()});
         }
