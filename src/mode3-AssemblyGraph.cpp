@@ -3,7 +3,6 @@
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-AnchorGraph.hpp"
 #include "mode3-PhasingTable.hpp"
-// #include "mode3-TangleGraph.hpp"
 #include "Assembler.hpp"
 #include "AssemblerOptions.hpp"
 #include "copyNumber.hpp"
@@ -207,9 +206,6 @@ void AssemblyGraph::run(
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP,
         6);
-
-    // See if we can do more with a TangleGraph.
-    // const TangleGraph tangleGraph(*this);
 
     performanceLog << timestamp << "Detangling ends." << endl;
 
