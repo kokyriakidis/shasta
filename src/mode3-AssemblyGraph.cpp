@@ -789,6 +789,7 @@ void AssemblyGraph::writeChainDetailsCsv(
                     MarkerGraphEdgePairInfo info;
                     SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
                         previousMarkerGraphEdgeId, markerGraphEdgeId, info));
+                    SHASTA_ASSERT(info.common == anchors.countCommon(previousMarkerGraphEdgeId, markerGraphEdgeId));
                     csv << info.common << ",";
                     if(info.common != 0) {
                         csv << info.offsetInBases << ",";
@@ -2016,6 +2017,7 @@ bool AssemblyGraph::removeShortSuperbubbles(
         MarkerGraphEdgePairInfo info;
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
             cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId(), info));
+        SHASTA_ASSERT(info.common == anchors.countCommon(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId()));
         if(info.common == 0) {
             if(debug) {
                 cout << "This superbubble will not be removed because "
@@ -2264,6 +2266,7 @@ void AssemblyGraph::cleanupSuperbubble(
     // Check the base offset between the entrance and the exit.
     MarkerGraphEdgePairInfo info;
     SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId(), info));
+    SHASTA_ASSERT(info.common == anchors.countCommon(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId()));
     if(info.common == 0) {
         if(debug) {
             cout << "This superbubble will be skipped because "
@@ -2683,6 +2686,7 @@ void AssemblyGraph::computeTangleMatrix(
 
             MarkerGraphEdgePairInfo info;
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(markerGraphEdgeId0, markerGraphEdgeId1, info));
+            SHASTA_ASSERT(info.common == anchors.countCommon(markerGraphEdgeId0, markerGraphEdgeId1));
             tangleMatrix[i0][i1] = info.common;
         }
     }
@@ -4548,6 +4552,7 @@ AssemblyGraph::edge_descriptor AssemblyGraph::connect(
 
             MarkerGraphEdgePairInfo info;
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+            SHASTA_ASSERT(info.common == anchors.countCommon(edgeId0, edgeId1));
             const uint64_t commonCount = info.common;
 
             if(debug) {
@@ -5771,6 +5776,7 @@ void AssemblyGraph::phaseBubbleChainUsingPhasingGraph(
                         MarkerGraphEdgePairInfo info;
                         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
                             edges0[j0], edges1[j1], info));
+                        SHASTA_ASSERT(info.common == anchors.countCommon(edges0[j0], edges1[j1]));
                         tangleMatrix[j0][j1] = info.common;
                     }
                 }
@@ -6120,8 +6126,10 @@ void AssemblyGraph::phaseBubbleChainUsingPhasingTable(
 
             MarkerGraphEdgePairInfo info;
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(e00, e10, info));
+            SHASTA_ASSERT(info.common == anchors.countCommon(e00, e10));
             const uint64_t common0 = info.common;
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(e01, e11, info));
+            SHASTA_ASSERT(info.common == anchors.countCommon(e01, e11));
             const uint64_t common1 = info.common;
 
             if(debug) {
@@ -7339,6 +7347,7 @@ void AssemblyGraph::assembleChainsMultithreaded(
                     MarkerGraphEdgePairInfo info;
                     SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
                         edgeIdA, edgeIdB, info));
+                    SHASTA_ASSERT(info.common == anchors.countCommon(edgeIdA, edgeIdB));
                     assemblyStep.offsetInBases = info.offsetInBases;
 
                     // Store this assembly step.
@@ -7638,6 +7647,7 @@ void AssemblyGraph::runAssemblyStep(
         MarkerGraphEdgePairInfo info;
         if((positionInChain == 0) or (positionInChain == chain.size() - 2)) {
             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeIdA, edgeIdB, info));
+            SHASTA_ASSERT(info.common == anchors.countCommon(edgeIdA, edgeIdB));
         }
 
         // If this is the first step of the Chain, we want to set useA to false
@@ -8018,6 +8028,7 @@ void AssemblyGraph::optimizeChain(
         const MarkerGraphEdgeId edgeId1 = chainGraph[i1].edgeId;
         MarkerGraphEdgePairInfo info;
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
+        SHASTA_ASSERT(info.common == anchors.countCommon(edgeId0, edgeId1));
         add_edge(i0, i1, {info.common}, chainGraph);
     }
 
@@ -8057,6 +8068,7 @@ void AssemblyGraph::optimizeChain(
                 }
                 MarkerGraphEdgePairInfo info;
                 SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(chainGraph[j0].edgeId, chainGraph[j1].edgeId, info));
+                SHASTA_ASSERT(info.common == anchors.countCommon(chainGraph[j0].edgeId, chainGraph[j1].edgeId));
 
                 // If the number of common reads is better than for e, add this edge.
                 if(info.common > chainGraph[e].commonCount) {

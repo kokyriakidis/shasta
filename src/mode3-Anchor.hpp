@@ -63,6 +63,9 @@ public:
     {
         return size();
     }
+
+    // Return the number of common oriented reads with another Anchor.
+    uint64_t countCommon(const Anchor& that) const;
 };
 
 
@@ -73,6 +76,9 @@ public:
     Anchors(const MarkerGraph&);
     Anchor operator[](AnchorId anchorId) const;
     uint64_t size() const;
+
+    // Return the number of common oriented reads between two Anchors.
+    uint64_t countCommon(AnchorId, AnchorId) const;
 
 private:
     const MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t>& anchorMarkerIntervals;
