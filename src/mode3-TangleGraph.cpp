@@ -18,7 +18,7 @@ TangleGraph::TangleGraph(const AssemblyGraph& assemblyGraph) :
 {
     TangleGraph& tangleGraph = *this;
     const uint64_t orientedReadCount = assemblyGraph.orientedReadIds.size();
-    const uint64_t primaryCount = assemblyGraph.markerGraphEdgeIds.size();
+    const uint64_t primaryCount = assemblyGraph.anchorIds.size();
 
     cout << "Creating a TangleGraph with " << orientedReadCount <<
         " oriented reads and " << primaryCount <<
@@ -109,7 +109,7 @@ TangleGraph::TangleGraph(const AssemblyGraph& assemblyGraph) :
             continue;
         }
 
-        const MarkerGraphEdgeId markerGraphEdgeId = assemblyGraph.markerGraphEdgeIds[markerGraphEdgeIndex];
+        const MarkerGraphEdgeId markerGraphEdgeId = assemblyGraph.anchorIds[markerGraphEdgeIndex];
         const auto markerIntervals = assemblyGraph.assembler.markerGraph.edgeMarkerIntervals[markerGraphEdgeId];
 
         for(const MarkerInterval& markerInterval: markerIntervals) {
@@ -166,13 +166,13 @@ TangleGraph::TangleGraph(const AssemblyGraph& assemblyGraph) :
         if(vertex0.type == TangleGraphVertexType::OrientedRead) {
             dot << assemblyGraph.orientedReadIds[vertex0.orientedReadIndex];
         } else {
-            dot << assemblyGraph.markerGraphEdgeIds[vertex0.markerGraphEdgeIndex];
+            dot << assemblyGraph.anchorIds[vertex0.markerGraphEdgeIndex];
         }
         dot << "\"--\"";
         if(vertex1.type == TangleGraphVertexType::OrientedRead) {
             dot << assemblyGraph.orientedReadIds[vertex1.orientedReadIndex];
         } else {
-            dot << assemblyGraph.markerGraphEdgeIds[vertex1.markerGraphEdgeIndex];
+            dot << assemblyGraph.anchorIds[vertex1.markerGraphEdgeIndex];
         }
         dot << "\";\n";
     }

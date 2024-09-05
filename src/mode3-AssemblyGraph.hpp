@@ -292,8 +292,8 @@ public:
         const Anchors&,
         uint64_t componentId,
         const Assembler&,
-        const vector<OrientedReadId> orientedReadIds,
-        const vector<MarkerGraphEdgeId> markerGraphEdgeIds,
+        const vector<OrientedReadId>&,
+        const vector<AnchorId>&,
         uint64_t threadCount,
         const Mode3AssemblyOptions& options,
         bool assembleSequence,
@@ -333,10 +333,10 @@ public:
     std::map<OrientedReadId, uint64_t> orientedReadIdTable;
 #endif
 
-    // The MarkerGraphEdgeIds of the primary marker graph edges
+    // The AnchorIds of the anchors
     // of the connected component that generated this AssemblyGraph.
     // These are sorted.
-    vector<MarkerGraphEdgeId> markerGraphEdgeIds;
+    vector<AnchorId> anchorIds;
 
     // Get the index of a MarkerGraphEdgeId in the markerGraphEdgeIds vector.
     uint64_t getMarkerGraphEdgeIndex(MarkerGraphEdgeId) const;
@@ -355,7 +355,7 @@ private:
         ar & componentId;
         ar & nextEdgeId;
         ar & orientedReadIds;
-        ar & markerGraphEdgeIds;
+        ar & anchorIds;
     }
     void save(const string& fileName) const;
     void load(const string& fileName);

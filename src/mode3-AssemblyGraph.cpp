@@ -44,8 +44,8 @@ AssemblyGraph::AssemblyGraph(
     const Anchors& anchors,
     uint64_t componentId,
     const Assembler& assembler,
-    const vector<OrientedReadId> orientedReadIds,
-    const vector<MarkerGraphEdgeId> markerGraphEdgeIds,
+    const vector<OrientedReadId>& orientedReadIds,
+    const vector<AnchorId>& anchorIds,
     uint64_t threadCount,
     const Mode3AssemblyOptions& options,
     bool assembleSequence,
@@ -56,7 +56,7 @@ AssemblyGraph::AssemblyGraph(
     assembler(assembler),
     options(options),
     orientedReadIds(orientedReadIds),
-    markerGraphEdgeIds(markerGraphEdgeIds)
+    anchorIds(anchorIds)
 {
     // Adjust the numbers of threads, if necessary.
     if(threadCount == 0) {
@@ -109,7 +109,7 @@ void AssemblyGraph::run(
     const bool useBayesianModel = true;
 
     SHASTA_ASSERT(std::is_sorted(orientedReadIds.begin(), orientedReadIds.end()));
-    SHASTA_ASSERT(std::is_sorted(markerGraphEdgeIds.begin(), markerGraphEdgeIds.end()));
+    SHASTA_ASSERT(std::is_sorted(anchorIds.begin(), anchorIds.end()));
 
     if(debug) write("A");
 
@@ -8688,9 +8688,9 @@ uint64_t AssemblyGraph::getOrientedReadIndex(OrientedReadId orientedReadId) cons
 // Get the index of a MarkerGraphEdgeId in the markerGraphEdgeIds vector.
 uint64_t AssemblyGraph::getMarkerGraphEdgeIndex(MarkerGraphEdgeId markerGraphEdgeId) const
 {
-    auto it = std::lower_bound(markerGraphEdgeIds.begin(), markerGraphEdgeIds.end(), markerGraphEdgeId);
-    SHASTA_ASSERT(it != markerGraphEdgeIds.end());
+    auto it = std::lower_bound(anchorIds.begin(), anchorIds.end(), markerGraphEdgeId);
+    SHASTA_ASSERT(it != anchorIds.end());
     SHASTA_ASSERT(*it == markerGraphEdgeId);
-    return it - markerGraphEdgeIds.begin();
+    return it - anchorIds.begin();
 
 }
