@@ -19,9 +19,6 @@ using namespace shasta;
 using namespace mode3;
 
 // Boost libraries.
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/graph/adj_list_serialize.hpp>
 #include <boost/graph/filtered_graph.hpp>
 #include <boost/pending/disjoint_sets.hpp>
 #include <boost/graph/reverse_graph.hpp>
@@ -65,37 +62,9 @@ AssemblyGraph::AssemblyGraph(
     performanceLog << timestamp << "Creating the assembly graph for component " << componentId << endl;
     create(anchorGraph, debug);
 
-    // Serialize it so we can restore it to facilitate debugging.
-    save("AssemblyGraph-" + to_string(componentId) + ".data");
-
     performanceLog << timestamp << "Processing the assembly graph for component " << componentId << endl;
     run(threadCount, assembleSequence, debug);
     performanceLog << timestamp << "Done with the assembly graph for component " << componentId << endl;
-}
-
-
-
-// Load it from a binary archive, then call run.
-AssemblyGraph::AssemblyGraph(
-    const string& fileName,
-    const Anchors& anchors,
-    const Assembler& assembler,
-    uint64_t threadCount,
-    const Mode3AssemblyOptions& options,
-    bool assembleSequence,
-    bool debug) :
-    MultithreadedObject<AssemblyGraph>(*this),
-    anchors(anchors),
-    assembler(assembler),
-    options(options)
-{
-    // Adjust the numbers of threads, if necessary.
-    if(threadCount == 0) {
-        threadCount = std::thread::hardware_concurrency();
-    }
-
-    load(fileName);
-    run(threadCount, assembleSequence, debug);
 }
 
 
@@ -7923,24 +7892,6 @@ AssemblyGraph::edge_descriptor AssemblyGraph::connect(vertex_descriptor cv0, ver
 
     return ceNew;
 
-}
-
-
-
-void AssemblyGraph::save(const string& fileName) const
-{
-    ofstream file(fileName);
-    boost::archive::binary_oarchive archive(file);
-    archive << *this;
-}
-
-
-
-void AssemblyGraph::load(const string& fileName)
-{
-    ifstream file(fileName);
-    boost::archive::binary_iarchive archive(file);
-    archive >> *this;
 }
 
 

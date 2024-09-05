@@ -99,20 +99,7 @@ void Assembler::mode3Assembly(
 
 
 
-
-void Assembler::mode3AssembleComponent(
-    const string& fileName,
-    uint64_t threadCount,
-    const Mode3AssemblyOptions& options,
-    bool assembleSequence,
-    bool debug) const
-{
-    mode3::AssemblyGraph(fileName, markerGraph, *this, threadCount, options, assembleSequence, debug);
-}
-
-
-
-// Assemble sequence between two primary edges.
+// Assemble sequence between two Anchors.
 void Assembler::fillMode3AssemblyPathStep(const vector<string>& request, ostream& html)
 {
     // Check that our assumptions are satisfied.

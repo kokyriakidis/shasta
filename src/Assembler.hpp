@@ -2458,14 +2458,6 @@ public:
     // Mode 3 assembly.
     shared_ptr<Mode3Assembler> mode3Assembler;
 
-#if 0
-    // ALL MARKER GRAPH EDGES ARE NOW PRIMARY.
-    void flagPrimaryMarkerGraphEdges(
-        uint64_t minPrimaryCoverage,
-        uint64_t maxPrimaryCoverage,
-        uint64_t threadCount);
-#endif
-
     // If the coverage range for primary marker graph edges is not
     // specified, this uses the disjoint sets histogram to compute reasonable values.
     pair<uint64_t, uint64_t> getPrimaryCoverageRange();
@@ -2479,13 +2471,6 @@ public:
         const Mode3AssemblyOptions&,
         bool debug
     );
-
-    void mode3AssembleComponent(
-        const string& fileName,
-        uint64_t threadCount,
-        const Mode3AssemblyOptions&,
-        bool assembleSequence,
-        bool debug) const;
 
 public:
     void test();

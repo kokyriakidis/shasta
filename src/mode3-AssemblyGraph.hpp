@@ -12,7 +12,6 @@
 
 // Boost libraries.
 #include <boost/graph/adjacency_list.hpp>
-#include <boost/serialization/vector.hpp>
 
 // Standard library
 #include "algorithm.hpp"
@@ -98,10 +97,6 @@ public:
         return (*this)[size() - 2];
     }
 
-    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
-    {
-        ar & boost::serialization::base_object< vector<AnchorId> >(*this);
-    }
 };
 
 
@@ -119,11 +114,6 @@ public:
 
     // Remove duplicate chains.
     void deduplicate();
-
-    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
-    {
-        ar & boost::serialization::base_object< vector<Chain> >(*this);
-    }
 };
 
 
@@ -230,11 +220,6 @@ public:
     uint64_t totalLength() const;
 
 
-    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
-    {
-        ar & boost::serialization::base_object< vector<Bubble> >(*this);
-    }
-
 };
 
 
@@ -257,11 +242,6 @@ public:
     // Stored by class Superbubbles.
     uint64_t superbubbleId = invalid<uint64_t>;
 
-    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
-    {
-        ar & anchorId;
-    }
-
 private:
     AnchorId anchorId;
 };
@@ -271,12 +251,6 @@ private:
 class shasta::mode3::AssemblyGraphEdge : public BubbleChain {
 public:
     uint64_t id = invalid<uint64_t>;
-
-    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
-    {
-        ar & boost::serialization::base_object<BubbleChain>(*this);
-        ar & id;
-    }
 };
 
 
@@ -286,7 +260,7 @@ class shasta::mode3::AssemblyGraph:
     public MultithreadedObject<shasta::mode3::AssemblyGraph> {
 public:
 
-    // Create from a connected component of the PrimaryGraph, then call run.
+    // Create from a connected component of the AnchorGraph, then call run.
     AssemblyGraph(
         const AnchorGraph&,
         const Anchors&,
@@ -294,16 +268,6 @@ public:
         const Assembler&,
         const vector<OrientedReadId>&,
         const vector<AnchorId>&,
-        uint64_t threadCount,
-        const Mode3AssemblyOptions& options,
-        bool assembleSequence,
-        bool debug);
-
-    // Load it from a binary archive, then call run.
-    AssemblyGraph(
-        const string& fileName,
-        const Anchors&,
-        const Assembler&,
         uint64_t threadCount,
         const Mode3AssemblyOptions& options,
         bool assembleSequence,
@@ -328,11 +292,6 @@ public:
     // Get the index of an OrientedReadId in the orientedReadIds sorted vector.
     uint64_t getOrientedReadIndex(OrientedReadId) const;
 
-#if 0
-    // Map OrientedReads to indexes in the orientedReadIds vector.
-    std::map<OrientedReadId, uint64_t> orientedReadIdTable;
-#endif
-
     // The AnchorIds of the anchors
     // of the connected component that generated this AssemblyGraph.
     // These are sorted.
@@ -347,18 +306,6 @@ public:
 #endif
 private:
     // void computeJourneys(bool debug);
-
-    friend class boost::serialization::access;
-    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
-    {
-        ar & boost::serialization::base_object<AssemblyGraphBaseClass>(*this);
-        ar & componentId;
-        ar & nextEdgeId;
-        ar & orientedReadIds;
-        ar & anchorIds;
-    }
-    void save(const string& fileName) const;
-    void load(const string& fileName);
 
     void run(
         uint64_t threadCount,

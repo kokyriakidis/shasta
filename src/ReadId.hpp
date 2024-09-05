@@ -151,10 +151,6 @@ public:
 
     using Int = ReadId;
 
-    template<class Archive> void serialize(Archive & ar, const unsigned int /* version */)
-    {
-        ar & value;
-    }
 private:
     Int value;
 };
