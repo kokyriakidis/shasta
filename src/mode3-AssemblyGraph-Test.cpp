@@ -7,7 +7,6 @@ using namespace mode3;
 // Boost libraries.
 #include <boost/graph/iteration_macros.hpp>
 
-
 const uint64_t haploidCoverageThreshold = 18;
 const uint64_t shortHangingSegmentLength = 100000;
 
@@ -20,22 +19,17 @@ void AssemblyGraph::removeShortHangingBubbleChains(bool debug)
 
     // Variable to keep track of the edges to be removed. 
     // These edges are haploid bubble chains with no coverage.
-    vector<AssemblyGraphEdge> edgesToRemove;
+    vector<edge_descriptor> edgesToRemove;
 
     // Loop over edges of the AssemblyGraph. Each edge corresponds to a
     // BubbleChain (not just a single Chain).
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
         // e is the edge descriptor for this edge (boost graph library).
 
-        const AssemblyGraphEdge& edge = assemblyGraph[e];
-        const BubbleChain& bubbleChain = edge;
-
         const vertex_descriptor v0 = source(e, assemblyGraph);
         const vertex_descriptor v1 = target(e, assemblyGraph);
 
         const uint64_t inDegree0 = in_degree(v0, assemblyGraph);
-        const uint64_t outDegree0 = out_degree(v0, assemblyGraph);
-        const uint64_t inDegree1 = in_degree(v1, assemblyGraph);
         const uint64_t outDegree1 = out_degree(v1, assemblyGraph);
 
         if ((inDegree0 == 0 and outDegree1 == 1) or ((inDegree0 == 1 and outDegree1 == 0))) {
@@ -48,17 +42,20 @@ void AssemblyGraph::removeShortHangingBubbleChains(bool debug)
                 if (debug) {
                     cout << "Edge " << bubbleChainStringId(e) << " is a short hanging segment with total length " << averageOffset << ". Removing it." << endl;
                 }
-                edgesToRemove.push_back(edge);
+                edgesToRemove.push_back(e);
             }
         }
     }
 
     // Remove the edges that we marked for removal
-    for (const AssemblyGraphEdge& edgeToRemove : edgesToRemove) {
+    for (const edge_descriptor& edgeToRemove : edgesToRemove) {
         boost::remove_edge(edgeToRemove, assemblyGraph);
     }
 
 }
+
+
+
 
 
 
@@ -119,12 +116,12 @@ void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
                     for(uint64_t indexInFirstBubble=0; indexInFirstBubble<bubble.size(); indexInFirstBubble++) {
                         const Chain& chain = bubble[indexInFirstBubble];
                         if (chain.size() > 2) {
-                            uint64_t firstPrimaryCoverage = primaryCoverage(chain);
+                            double firstPrimaryCoverage = primaryCoverage(chain);
                             if (firstPrimaryCoverage > haploidCoverageThreshold) {
                                 chainsWithAboveThresholdCoverage++;
                             }
                             if (debug) {
-                                cout << "  Chain at index " << indexInFirstBubble << " has coverage" << primaryCoverage(firstChain) << endl;
+                                cout << "  Chain at index " << indexInFirstBubble << " has coverage" << primaryCoverage(chain) << endl;
                             }
                         }
                     }
@@ -151,7 +148,7 @@ void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
                     for(uint64_t indexInPreviousBubble=0; indexInPreviousBubble<previousBubble.size(); indexInPreviousBubble++) {
                         const Chain& previousChain = previousBubble[indexInPreviousBubble];
                         if (previousChain.size() > 2) {
-                            uint64_t previousPrimaryCoverage = primaryCoverage(previousChain);
+                            double previousPrimaryCoverage = primaryCoverage(previousChain);
                             if (previousPrimaryCoverage > haploidCoverageThreshold) {
                                 chainsWithAboveThresholdCoverage++;
                             }
@@ -169,7 +166,7 @@ void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
                     uint64_t indexInPreviousHaploidBubble = 0;
                     const Chain& previousChain = previousBubble[indexInPreviousHaploidBubble];
                     if (previousChain.size() > 2) {
-                        uint64_t previousPrimaryCoverage = primaryCoverage(previousChain);
+                        double previousPrimaryCoverage = primaryCoverage(previousChain);
                         if (debug) {
                             cout << "  Chain at index " << indexInPreviousHaploidBubble << " has coverage" << primaryCoverage(previousChain) << endl;
                         }
@@ -206,7 +203,7 @@ void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
                     for(uint64_t indexInNextBubble=0; indexInNextBubble<nextBubble.size(); indexInNextBubble++) {
                         const Chain& nextChain = nextBubble[indexInNextBubble];
                         if (nextChain.size() > 2) {
-                            uint64_t nextPrimaryCoverage = primaryCoverage(nextChain);
+                            double nextPrimaryCoverage = primaryCoverage(nextChain);
                             if (nextPrimaryCoverage > haploidCoverageThreshold) {
                                 chainsWithAboveThresholdCoverage++;
                             }
@@ -224,7 +221,7 @@ void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
                     uint64_t indexInNextHaploidBubble = 0;
                     const Chain& nextChain = nextBubble[indexInNextHaploidBubble];
                     if (nextChain.size() > 2) {
-                            uint64_t nextPrimaryCoverage = primaryCoverage(nextChain);
+                            double nextPrimaryCoverage = primaryCoverage(nextChain);
                         if (debug) {
                             cout << "  Chain at index " << indexInNextHaploidBubble << " has coverage" << primaryCoverage(nextChain) << endl;
                         }
@@ -256,7 +253,7 @@ void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
                     for(uint64_t indexInLastBubble=0; indexInLastBubble<lastBubble.size(); indexInLastBubble++) {
                         const Chain& lastChain = lastBubble[indexInLastBubble];
                         if (lastChain.size() > 2) {
-                            uint64_t lastPrimaryCoverage = primaryCoverage(lastChain);
+                            double lastPrimaryCoverage = primaryCoverage(lastChain);
                             if (lastPrimaryCoverage > haploidCoverageThreshold) {
                                 chainsWithAboveThresholdCoverage++;
                             }
@@ -340,15 +337,14 @@ void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
 
 
 
-// TODO
+
 void AssemblyGraph::removeSimpleBubbleChainsWithNoInternalAnchors(bool debug)
 {
 
     AssemblyGraph& assemblyGraph = *this;
 
-    // Variable to keep track of the edges to be removed.
-    // These edges are haploid bubble chains with no coverage.
-    vector<AssemblyGraphEdge> edgesToRemove;
+    // Change the type to store edge descriptors instead of AssemblyGraphEdge
+    vector<edge_descriptor> edgesToRemove;
 
     // Loop over edges of the AssemblyGraph. Each edge corresponds to a
     // BubbleChain (not just a single Chain).
@@ -381,16 +377,20 @@ void AssemblyGraph::removeSimpleBubbleChainsWithNoInternalAnchors(bool debug)
                     cout << "  Chain at index " << 0 << " has only 2 anchors" << endl;
                     cout << "  Removing haploid bubble chain " << bubbleChainStringId(e) << " due to no coverage" << endl;
                 }
-                edgesToRemove.push_back(edge);
+                // Store the edge descriptor instead of the edge itself
+                edgesToRemove.push_back(e);
             }
         }
     }
 
-    // Remove the edges that we marked for removal
-    for (const AssemblyGraphEdge& edgeToRemove : edgesToRemove) {
+    // Remove the edges using the stored edge descriptors
+    for (const edge_descriptor& edgeToRemove : edgesToRemove) {
         boost::remove_edge(edgeToRemove, assemblyGraph);
     }
 }
+
+
+
 
 
 
@@ -452,7 +452,7 @@ void AssemblyGraph::removeChainsInBubblesWithNoInternalAnchors(bool debug)
             for(uint64_t indexInBubble = 0; indexInBubble < bubble.size(); indexInBubble++) {
                 const Chain& chain = bubble[indexInBubble];
                 if (chain.size() > 2) {
-                    uint64_t coverage = primaryCoverage(chain);
+                    double coverage = primaryCoverage(chain);
                     indexesToKeep.push_back(indexInBubble);
                     if (debug) {
                         cout << "  Chain at index " << indexInBubble << " has coverage " << coverage << " . We keep it." << endl;
