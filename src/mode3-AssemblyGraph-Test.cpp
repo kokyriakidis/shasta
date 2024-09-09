@@ -26,8 +26,6 @@ void AssemblyGraph::removeShortHangingBubbleChains(bool debug)
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
         // e is the edge descriptor for this edge (boost graph library).
 
-        const edge_descriptor edge = e;
-
         const vertex_descriptor v0 = source(e, assemblyGraph);
         const vertex_descriptor v1 = target(e, assemblyGraph);
 
@@ -44,7 +42,7 @@ void AssemblyGraph::removeShortHangingBubbleChains(bool debug)
                 if (debug) {
                     cout << "Edge " << bubbleChainStringId(e) << " is a short hanging segment with total length " << averageOffset << ". Removing it." << endl;
                 }
-                edgesToRemove.push_back(edge);
+                edgesToRemove.push_back(e);
             }
         }
     }
