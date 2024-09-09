@@ -896,8 +896,21 @@ private:
         ) const;
 
 
-
     // Code in mode3-AssemblyGraph-test.cpp.
-    void test();
+    void haplotizeWronglyPolyploidBubbles(
+        bool debug
+        );
+
+    void removeChainsInBubblesWithNoInternalAnchors(
+        bool debug
+        );
+
+    void removeSimpleBubbleChainsWithNoInternalAnchors(
+        bool debug
+        );
+
+    void removeShortHangingBubbleChains(
+        bool debug
+        );
 };
 
