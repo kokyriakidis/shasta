@@ -8,11 +8,12 @@ using namespace mode3;
 #include <boost/graph/iteration_macros.hpp>
 
 const uint64_t haploidCoverageThreshold = 18;
-const uint64_t shortHangingSegmentLength = 100000;
 
 
 // This function removes short hanging bubble chains
-void AssemblyGraph::removeShortHangingBubbleChains(bool debug)
+void AssemblyGraph::prune(
+    bool debug,
+    uint64_t pruneLength)
 {
 
     AssemblyGraph& assemblyGraph = *this;
@@ -38,7 +39,7 @@ void AssemblyGraph::removeShortHangingBubbleChains(bool debug)
             uint64_t maxOffset;
             assemblyGraph.bubbleChainOffset(assemblyGraph[e], averageOffset, minOffset, maxOffset);
             
-            if (averageOffset <= shortHangingSegmentLength) {
+            if (averageOffset <= pruneLength) {
                 if (debug) {
                     cout << "Edge " << bubbleChainStringId(e) << " is a short hanging segment with total length " << averageOffset << ". Removing it." << endl;
                 }

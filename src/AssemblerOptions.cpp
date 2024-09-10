@@ -1144,6 +1144,12 @@ void AssemblerOptions::addConfigurableOptions()
         "Length threshold used for superbubble detangling "
         "(Mode 3 assembly only).")
 
+        ("Assembly.mode3.assemblyGraph.pruneLength",
+        value<uint64_t>(&assemblyOptions.mode3Options.assemblyGraphOptions.pruneLength)->
+        default_value(100000),
+        "Length threshold used for pruning of the assembly graph."
+        "(Mode 3 assembly only).")
+
         ("Assembly.mode3.localAssembly.estimatedOffsetRatio",
         value<double>(&assemblyOptions.mode3Options.localAssemblyOptions.estimatedOffsetRatio)->
         default_value(1.1),
@@ -1471,6 +1477,7 @@ void Mode3AssemblyOptions::AssemblyGraphOptions::write(ostream& s) const
     s << "mode3.assemblyGraph.superbubbleLengthThreshold2 = " << superbubbleLengthThreshold2 << "\n";
     s << "mode3.assemblyGraph.superbubbleLengthThreshold3 = " << superbubbleLengthThreshold3 << "\n";
     s << "mode3.assemblyGraph.superbubbleLengthThreshold4 = " << superbubbleLengthThreshold4 << "\n";
+    s << "mode3.assemblyGraph.pruneLength = " << pruneLength << "\n";
 }
 
 

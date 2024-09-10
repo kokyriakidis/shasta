@@ -393,6 +393,7 @@ public:
         uint64_t superbubbleLengthThreshold2;
         uint64_t superbubbleLengthThreshold3;
         uint64_t superbubbleLengthThreshold4;
+        uint64_t pruneLength;
 
         void write(ostream&) const;
     };
