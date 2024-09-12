@@ -909,8 +909,9 @@ private:
         bool debug
         );
 
-    void removeShortHangingBubbleChains(
-        bool debug
+    void prune(
+        bool debug,
+        uint64_t pruneLength
         );
 };
 

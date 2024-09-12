@@ -12,7 +12,7 @@ a map that map configuration names to strings.
 
 The file will be overwritten if it exists.
 
-Each entry inthe table corresponds to a file in shasta/conf.
+Each entry in the table corresponds to a file in shasta/conf.
 
 """
 
@@ -52,6 +52,8 @@ configurations = [
     'Nanopore-Phased-R10-Fast-Nov2022',
     'Nanopore-Phased-R10-Slow-Nov2022',
     'Nanopore-ncm23-May2024',
+    'Nanopore-r10.4.1_e8.2-400bps_sup-Herro-Sep2024',
+    'Nanopore-r10.4.1_e8.2-400bps_sup-Raw-Sep2024',    
     ]
 
 

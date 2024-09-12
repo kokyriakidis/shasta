@@ -182,6 +182,13 @@ void AssemblyGraph::run(
     compressBubbleChains();
     if(debug) write("F");
 
+    // Final cleanup. For now this just prunes the assembly graph.
+    prune(debug, options.assemblyGraphOptions.pruneLength);
+    compress();
+    compressBubbleChains();
+    if(debug) write("G");
+
+
 #if 0
     // Optimize the chains.
     optimizeChains(
@@ -192,14 +199,7 @@ void AssemblyGraph::run(
 
     // Before final output, renumber the edges contiguously.
     renumberEdges();
-    if(debug) write("G");
-
-#if 0
-    // Final cleanup.
-    write("Before");
-    test();
-    write("After");
-#endif
+    if(debug) write("H");
 
     if(assembleSequence) {
 
@@ -209,7 +209,7 @@ void AssemblyGraph::run(
             threadCount);
         writeAssemblyDetails();
 
-        if(debug) write("H", true);
+        if(debug) write("I", true);
 
     } else {
 
