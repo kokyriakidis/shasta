@@ -15,6 +15,13 @@ namespace shasta {
 
     // In Shasta we don't use cerr. All log output is to cout.
     // using std::cerr;
+
+    // Output 128-bit integer.
+    inline ostream& operator<<(ostream& s, __uint128_t)
+    {
+        s << "(__uint128_t)";
+        return s;
+    }
 }
 
 #endif

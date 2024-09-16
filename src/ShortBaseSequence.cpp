@@ -45,9 +45,9 @@ void shasta::testShortBaseSequence()
             s32.set(i, base);
             s64.set(i, base);
         }
-        const uint64_t kmerId16 = s16.id(k);
+        const uint32_t kmerId16 = s16.id(k);
         const uint64_t kmerId32 = s32.id(k);
-        const uint64_t kmerId64 = s64.id(k);
+        const __uint128_t kmerId64 = s64.id(k);
 
         cout << kmerId16 << " " << kmerId32 << " " << kmerId64 << endl;
         SHASTA_ASSERT(kmerId16 == kmerId32);
