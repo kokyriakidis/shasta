@@ -311,7 +311,7 @@ KmerTable1::KmerTable1(
 
         // Check that this k-mer is not already selected as a marker.
         const KmerId kmerId = candidateKmers[index];
-        KmerInfo& info = kmerTable[kmerId];
+        KmerInfo& info = kmerTable[uint64_t(kmerId)];
         if(info.isMarker) {
             continue;
         }
@@ -384,10 +384,10 @@ void KmerTable1::computeKmerFrequency(size_t threadId)
                 const KmerId kmerId = KmerId(kmer.id(k));
 
                 // Increment its frequency.
-                ++frequency[kmerId];
+                ++frequency[uint64_t(kmerId)];
 
                 // Also increment the frequency of the reverse complemented k-mer.
-                ++frequency[kmerTable[kmerId].reverseComplementedKmerId];
+                ++frequency[uint64_t(kmerTable[uint64_t(kmerId)].reverseComplementedKmerId)];
 
                 // Check if we reached the end of the read.
                 if(position+k == read.baseCount) {
@@ -471,7 +471,7 @@ KmerTable3::KmerTable3(
         // Sanity checks.
         const KmerId kmerId = KmerId(kmer.id(k));
         SHASTA_ASSERT(kmerId < kmerTable.size());
-        KmerInfo& kmerInfo = kmerTable[kmerId];
+        KmerInfo& kmerInfo = kmerTable[uint64_t(kmerId)];
         if((readRepresentation==1) and (not kmerInfo.isRleKmer)) {
             throw runtime_error("Non-RLE k-mer (duplicate consecutive bases) in " +
                 fileName + ":\n" + line);
@@ -651,7 +651,7 @@ KmerTable2::KmerTable2(
 
         // Check that this k-mer is not already selected as a marker.
         const KmerId kmerId = candidateKmers[index];
-        KmerInfo& info = kmerTable[kmerId];
+        KmerInfo& info = kmerTable[uint64_t(kmerId)];
         if(info.isMarker) {
             continue;
         }
@@ -659,7 +659,7 @@ KmerTable2::KmerTable2(
         // This k-mer is not already selected as a marker.
         // Let's add it.
         info.isMarker = true;
-        kmerOccurrencesCount += globalFrequency[kmerId];
+        kmerOccurrencesCount += globalFrequency[uint64_t(kmerId)];
         ++kmerCount;
 
         // If this k-mer is palindromic, we are done.
@@ -752,10 +752,10 @@ void KmerTable2::threadFunction(size_t threadId)
                 readKmerIds.push_back(kmerId);
 
                 // Increment its global frequency.
-                ++threadGlobalFrequency[kmerId];
+                ++threadGlobalFrequency[uint64_t(kmerId)];
 
                 // Also increment the frequency of the reverse complemented k-mer.
-                ++threadGlobalFrequency[kmerTable[kmerId].reverseComplementedKmerId];
+                ++threadGlobalFrequency[uint64_t(kmerTable[uint64_t(kmerId)].reverseComplementedKmerId)];
 
                 // Check if we reached the end of the read.
                 if(position+k == read.baseCount) {
@@ -782,8 +782,8 @@ void KmerTable2::threadFunction(size_t threadId)
                 const KmerId kmerId = readKmerIds[i];
                 const uint32_t frequency = readKmerIdFrequencies[i];
                 if(frequency > frequencyThreshold) {
-                    ++threadOverenrichedReadCount[kmerId];
-                    ++threadOverenrichedReadCount[kmerTable[kmerId].reverseComplementedKmerId];
+                    ++threadOverenrichedReadCount[uint64_t(kmerId)];
+                    ++threadOverenrichedReadCount[uint64_t(kmerTable[uint64_t(kmerId)].reverseComplementedKmerId)];
                 }
             }
         }
@@ -949,18 +949,18 @@ KmerTable4::KmerTable4(
         if(kmerId > kmerIdRc) {
             continue;
         }
-        if(minimumDistance[kmerId].second < distanceThreshold) {
+        if(minimumDistance[uint64_t(kmerId)].second < distanceThreshold) {
             // Too close. skip.
             continue;
         }
-        if(minimumDistance[kmerIdRc].second < distanceThreshold) {
+        if(minimumDistance[uint64_t(kmerIdRc)].second < distanceThreshold) {
             // Too close. Skip.
             continue;
         }
 
         candidateKmers.push_back(KmerId(kmerId));
-        candidateFrequency += globalFrequency[kmerId];
-        candidateFrequency += globalFrequency[kmerIdRc];
+        candidateFrequency += globalFrequency[uint64_t(kmerId)];
+        candidateFrequency += globalFrequency[uint64_t(kmerIdRc)];
     }
     cout << "Markers will be chosen randomly from the a pool of " <<
         2*candidateKmers.size() << " RLE k-mers." << endl;
@@ -997,15 +997,15 @@ KmerTable4::KmerTable4(
 
         // This KmerId and its reverse complement  will be used as markers.
         const KmerId kmerId = candidateKmers[i];
-        const KmerId kmerIdRc = kmerTable[kmerId].reverseComplementedKmerId;
+        const KmerId kmerIdRc = kmerTable[uint64_t(kmerId)].reverseComplementedKmerId;
 
-        kmerTable[kmerId].isMarker = true;
-        kmerTable[kmerIdRc].isMarker = true;
+        kmerTable[uint64_t(kmerId)].isMarker = true;
+        kmerTable[uint64_t(kmerIdRc)].isMarker = true;
 
         // Increment counters.
         markerCount += 2;
-        markerOccurrencesCount += globalFrequency[kmerId];
-        markerOccurrencesCount += globalFrequency[kmerIdRc];
+        markerOccurrencesCount += globalFrequency[uint64_t(kmerId)];
+        markerOccurrencesCount += globalFrequency[uint64_t(kmerIdRc)];
 
         // Remove kmerId from the vector of candidates.
         if(i != candidateKmers.size()-1) {
@@ -1072,8 +1072,8 @@ void KmerTable4::threadFunction(size_t threadId)
                 readKmers.push_back(make_pair(kmerId, position));
 
                 // Update the frequency of this k-mer.
-                ++threadGlobalFrequency[kmerId];
-                ++threadGlobalFrequency[kmerTable[kmerId].reverseComplementedKmerId];
+                ++threadGlobalFrequency[uint64_t(kmerId)];
+                ++threadGlobalFrequency[uint64_t(kmerTable[uint64_t(kmerId)].reverseComplementedKmerId)];
 
                 // Check if we reached the end of the read.
                 if(position+k == read.baseCount) {
@@ -1099,7 +1099,7 @@ void KmerTable4::threadFunction(size_t threadId)
                 }
                 const uint32_t distance = p1.second - p0.second;
 
-                pair<std::mutex, uint32_t>& p = minimumDistance[kmerId0];
+                pair<std::mutex, uint32_t>& p = minimumDistance[uint64_t(kmerId0)];
                 std::lock_guard<std::mutex> lock(p.first);;
                 p.second = min(p.second, distance);
             }

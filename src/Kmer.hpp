@@ -12,7 +12,8 @@ namespace shasta {
     // If this changes, KmerId must also be changed.
     using Kmer16 = ShortBaseSequence16;
     using Kmer32 = ShortBaseSequence32;
-    using Kmer = Kmer32;
+    using Kmer64 = ShortBaseSequence64;
+    using Kmer = Kmer64;
     static_assert(
         std::numeric_limits<KmerId>::digits == 2*Kmer::capacity,
         "Kmer and KmerId types are inconsistent.");

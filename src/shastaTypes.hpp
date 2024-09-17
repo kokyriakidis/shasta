@@ -7,7 +7,8 @@ namespace shasta {
 
     using KmerId16 = uint32_t;
     using KmerId32 = uint64_t;
-    using KmerId = KmerId32;
+    using KmerId64 = __uint128_t;
+    using KmerId = KmerId64;
 
     using ReadId = uint32_t;
     using Strand = ReadId;

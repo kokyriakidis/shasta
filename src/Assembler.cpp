@@ -222,7 +222,7 @@ uint32_t Assembler::hashKmerId(KmerId kmerId) const
     // Hash the sum of the two KmerIds.
     // This guarantees that we return the same hash
     // for a k-mer and its reverse complement.
-    const uint64_t sum = kmerId + kmerIdRc;
+    const KmerId sum = kmerId + kmerIdRc;
 
     return MurmurHash2(&sum, sizeof(sum), 13477);
 }

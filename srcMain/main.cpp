@@ -226,9 +226,9 @@ void shasta::main::assemble(
     // that we cannot use k=16.
     // Therefore the maximum allowed value is 15.
     // We also reject values that are grossly too low.
-    if(assemblerOptions.kmersOptions.k > 31 or assemblerOptions.kmersOptions.k < 6) {
+    if(assemblerOptions.kmersOptions.k > 62 or assemblerOptions.kmersOptions.k < 6) {
         throw runtime_error("Invalid value specified for --Kmers.k. "
-            "Must be between 6 and 31");
+            "Must be between 6 and 62");
     }
 
     // Check that we have at least one input file.

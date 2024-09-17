@@ -35,7 +35,7 @@ public:
 
     bool isMarker(KmerId kmerId) const
     {
-        return kmerTable[kmerId].isMarker;
+        return kmerTable[uint64_t(kmerId)].isMarker;
     }
 
     KmerTable(uint64_t k, bool createNew, const MappedMemoryOwner&);
