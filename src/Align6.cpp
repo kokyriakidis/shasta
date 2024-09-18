@@ -549,10 +549,10 @@ bool Align6::canBeConnected(
     }
 
     // Check the ordinals.
-    if(markerPairInfo1.ordinal0 < markerPairInfo0.ordinal0) {
+    if(markerPairInfo1.ordinal0 <= markerPairInfo0.ordinal0) {
         return false;
     }
-    if(markerPairInfo1.ordinal1 < markerPairInfo0.ordinal1) {
+    if(markerPairInfo1.ordinal1 <= markerPairInfo0.ordinal1) {
         return false;
     }
 
