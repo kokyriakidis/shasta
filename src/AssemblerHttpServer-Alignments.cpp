@@ -11,6 +11,7 @@
 #include "LocalAlignmentCandidateGraph.hpp"
 #include "platformDependent.hpp"
 #include "PngImage.hpp"
+#include "ProjectedAlignment.hpp"
 #include "ReadId.hpp"
 #include "Reads.hpp"
 #include "ReferenceOverlapMap.hpp"
@@ -1143,6 +1144,8 @@ void Assembler::exploreAlignment(
 
     string displayDetailsString;
     bool displayDetails = getParameterValue(request, "displayDetails", displayDetailsString);
+    string displayProjectedAlignmentString;
+    bool displayProjectedAlignment = getParameterValue(request, "displayProjectedAlignment", displayProjectedAlignmentString);
     string displayDebugInfoString;
     bool displayDebugInfo = getParameterValue(request, "displayDebugInfo", displayDebugInfoString);
 
@@ -1210,6 +1213,9 @@ void Assembler::exploreAlignment(
     html <<
         "<br><input type=checkbox name=displayDetails" << (displayDetails ? " checked=checked" : "") <<
         "> Display alignment details"
+
+        "<br><input type=checkbox name=displayProjectedAlignment" << (displayProjectedAlignment ? " checked=checked" : "") <<
+        "> Display alignment projection to base space"
 
         "<br><input type=checkbox name=displayDebugInfo" << (displayDebugInfo ? " checked=checked" : "") <<
         "> Display debug information"
@@ -1475,6 +1481,20 @@ void Assembler::exploreAlignment(
         }
 
         html << "</table>";
+    }
+
+
+    // Display the projection of the alignment to base space.
+    if(displayProjectedAlignment) {
+        ProjectedAlignment projectedAlignment(
+            uint32_t(assemblerInfo->k),
+            {orientedReadId0, orientedReadId1},
+            {getReads().getRead(orientedReadId0.getReadId()), getReads().getRead(orientedReadId1.getReadId())},
+            alignment,
+            {markers[orientedReadId0.getValue()], markers[orientedReadId1.getValue()]});
+
+        html << "<h3>Alignment projection to base space</h3>";
+        projectedAlignment.writeHtml(html);
     }
 }
 
