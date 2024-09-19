@@ -220,15 +220,16 @@ void shasta::main::assemble(
     }
 
     // Check --Kmers.k.
-    // Using Kmer=ShortBaseSequence16 limits it to 16 bases.
-    // But alignment methods adds 100 to KmerIds to deal
-    // with the Seqan gap value 45, so this means
-    // that we cannot use k=16.
-    // Therefore the maximum allowed value is 15.
-    // We also reject values that are grossly too low.
     if(assemblerOptions.kmersOptions.k > 62 or assemblerOptions.kmersOptions.k < 6) {
         throw runtime_error("Invalid value specified for --Kmers.k. "
             "Must be between 6 and 62");
+    }
+    // For assembly modes other than 0, k must be even.
+    if((assemblerOptions.assemblyOptions.mode != 0) and
+        ((assemblerOptions.kmersOptions.k % 2) == 1)) {
+        throw runtime_error("Invalid value specified for --Kmers.k. "
+            "Must be even for assembly modes other than 0.");
+
     }
 
     // Check that we have at least one input file.
