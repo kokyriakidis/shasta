@@ -1327,7 +1327,7 @@ void Assembler::exploreAlignment(
 
 
     // Write summary information for this alignment.
-    html << "<h3>Alignment summary</h3>";
+    html << "<h2>Alignment summary</h2>";
     displayAlignment(
         orientedReadId0,
         orientedReadId1,
@@ -1396,7 +1396,7 @@ void Assembler::exploreAlignment(
         // To make sure cut and paste to a spreadsheet works,
         // keep the header simple (no colspan, rowspan).
         html <<
-            "<h3>Alignment details</h3>"
+            "<h2>Alignment details</h2>"
             "<table>"
 
             "<tr>"
@@ -1485,7 +1485,7 @@ void Assembler::exploreAlignment(
 
 
     // Display the projection of the alignment to base space.
-    if(displayProjectedAlignment) {
+    if(displayProjectedAlignment and not alignment.ordinals.empty()) {
         ProjectedAlignment projectedAlignment(
             uint32_t(assemblerInfo->k),
             {orientedReadId0, orientedReadId1},
@@ -1493,8 +1493,16 @@ void Assembler::exploreAlignment(
             alignment,
             {markers[orientedReadId0.getValue()], markers[orientedReadId1.getValue()]});
 
-        html << "<h3>Alignment projection to base space</h3>";
-        projectedAlignment.writeHtml(html);
+        html << "<h2>Alignment projection to base space</h2>";
+
+        html << "<h3>Statistics</h3>";
+        projectedAlignment.writeStatisticsHtml(html);
+
+        html << "<h3>Brief details</h3>";
+        projectedAlignment.writeHtml(html, true);
+
+        html << "<h3>Full details</h3>";
+        projectedAlignment.writeHtml(html, false);
     }
 }
 

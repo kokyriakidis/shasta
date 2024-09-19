@@ -7,6 +7,7 @@
 using namespace shasta;
 
 
+
 ProjectedAlignment::ProjectedAlignment(
     uint32_t k,
     const array<OrientedReadId, 2>& orientedReadIds,
@@ -51,6 +52,8 @@ ProjectedAlignment::ProjectedAlignment(
         segment.fillRleSequences();
         segment.computeRleAlignment(matchScore, mismatchScore, gapScore);
     }
+
+    computeStatistics();
 }
 
 
@@ -116,7 +119,7 @@ void ProjectedAlignmentSegment::computeRleAlignment(
 
 
 
-void ProjectedAlignment::writeHtml(ostream& html) const
+void ProjectedAlignment::writeHtml(ostream& html, bool brief) const
 {
     html <<
         "<table>"
@@ -142,6 +145,9 @@ void ProjectedAlignment::writeHtml(ostream& html) const
 
 
     for(const ProjectedAlignmentSegment& segment: segments) {
+        if(brief and (segment.editDistance == 0)) {
+            continue;
+        }
         segment.writeHtml(html);
     }
 
@@ -345,3 +351,130 @@ void ProjectedAlignmentSegment::fillRleSequences()
     }
 }
 
+
+
+void ProjectedAlignment::computeStatistics()
+{
+    // Compute total lengths.
+    totalLength = {0, 0};
+    totalLengthRle = {0, 0};
+    for(const ProjectedAlignmentSegment& segment: segments) {
+        for(uint64_t i=0; i<2; i++) {
+            totalLength[i] += segment.sequences[i].size();
+            totalLengthRle[i] += segment.rleSequences[i].size();
+        }
+    }
+
+    // Sanity check on the total lengths.
+    for(uint64_t i=0; i<2; i++) {
+        SHASTA_ASSERT(totalLength[i] == segments.back().positionsB[i] - segments.front().positionsA[i]);
+    }
+
+    // Compute total edit distances.
+    totalEditDistance = 0;
+    totalEditDistanceRle = 0;
+    for(const ProjectedAlignmentSegment& segment: segments) {
+        totalEditDistance += segment.editDistance;
+        totalEditDistanceRle += segment.rleEditDistance;
+    }
+}
+
+
+
+double ProjectedAlignment::errorRate() const
+{
+    return double(totalEditDistance) / double(totalLength[0] + totalLength[1]);
+}
+
+
+
+double ProjectedAlignment::errorRateRle() const
+{
+    return double(totalEditDistanceRle) /double(totalLengthRle[0] + totalLengthRle[1]);
+}
+
+
+
+double ProjectedAlignment::Q() const
+{
+    return -10. * log10(errorRate());
+}
+
+
+
+double ProjectedAlignment::QRle() const
+{
+    return -10. * log10(errorRateRle());
+}
+
+
+
+void ProjectedAlignment::writeStatisticsHtml(ostream& html) const
+{
+    using std::fixed;
+    using std::setprecision;
+
+    html << "<table>";
+
+    // Header line.
+    html <<
+        "<tr>"
+        "<th>"
+        "<th>" << orientedReadIds[0] <<
+        "<th>" << orientedReadIds[1] <<
+        "<th>Total";
+
+    // Length.
+    html <<
+        "<tr>"
+        "<th class=left>Length of aligned portion" <<
+        "<td class=centered>" << totalLength[0] <<
+        "<td class=centered>" << totalLength[1] <<
+        "<td class=centered>" << totalLength[0] + totalLength[1];
+
+    // RLE length.
+    html <<
+        "<tr>"
+        "<th class=left>RLE Length of aligned portion" <<
+        "<td class=centered>" << totalLengthRle[0] <<
+        "<td class=centered>" << totalLengthRle[1] <<
+        "<td class=centered>" << totalLengthRle[0] + totalLengthRle[1];
+
+    // Edit distance.
+    html <<
+        "<tr>"
+        "<th class=left>Edit distance" <<
+        "<td colspan=3 class=centered>" << totalEditDistance;
+
+    // RLE edit distance.
+    html <<
+        "<tr>"
+        "<th class=left>RLE edit distance" <<
+        "<td colspan=3 class=centered>" << totalEditDistanceRle;
+
+    // Error rate.
+    html <<
+        "<tr>"
+        "<th class=left>Error rate" <<
+        "<td colspan=3 class=centered>" << errorRate();
+
+    // RLE error rate.
+    html <<
+        "<tr>"
+        "<th class=left>RLE error rate" <<
+        "<td colspan=3 class=centered>" << errorRateRle();
+
+    // Q.
+    html <<
+        "<tr>"
+        "<th class=left>Q (dB)" <<
+        "<td colspan=3 class=centered>" << fixed << setprecision(1) << Q();
+
+    // Q.
+    html <<
+        "<tr>"
+        "<th class=left>RLE Q (dB)" <<
+        "<td colspan=3 class=centered>" << fixed << setprecision(1) << QRle();
+
+    html << "</table>";
+}

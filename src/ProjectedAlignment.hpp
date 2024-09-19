@@ -124,6 +124,25 @@ public:
     // The markers for the two oriented reads in this alignment.
     const array< span<const CompressedMarker>, 2>& markers;
 
-    void writeHtml(ostream&) const;
+
+
+    // Statistics for the entire ProjectedAlignment.
+
+    // Number of aligned bases (raw and RLE) in the aligned portions of the two oriented reads.
+    array<uint64_t, 2> totalLength;
+    array<uint64_t, 2> totalLengthRle;
+
+    // Total edit distance (raw and RLE).
+    int64_t totalEditDistance;
+    int64_t totalEditDistanceRle;
+
+    void computeStatistics();
+    double errorRate() const;
+    double errorRateRle() const;
+    double Q() const;
+    double QRle() const;
+
+    void writeStatisticsHtml(ostream&) const;
+    void writeHtml(ostream&, bool brief) const;
 };
 
