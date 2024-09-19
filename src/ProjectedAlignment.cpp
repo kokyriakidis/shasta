@@ -1,10 +1,34 @@
 #include "ProjectedAlignment.hpp"
 #include "Alignment.hpp"
+#include "Assembler.hpp"
 #include "Base.hpp"
 #include "LongBaseSequence.hpp"
 #include "Marker.hpp"
+#include "Reads.hpp"
 #include "seqan.hpp"
 using namespace shasta;
+
+
+
+ProjectedAlignment::ProjectedAlignment(
+    const Assembler& assembler,
+    const array<OrientedReadId, 2>& orientedReadIds,
+    const Alignment& alignment) :
+
+    ProjectedAlignment(
+        uint32_t(assembler.assemblerInfo->k),
+        orientedReadIds,
+        {
+            assembler.getReads().getRead(orientedReadIds[0].getReadId()),
+            assembler.getReads().getRead(orientedReadIds[1].getReadId())
+        },
+        alignment,
+        {
+            assembler.markers[orientedReadIds[0].getValue()],
+            assembler.markers[orientedReadIds[1].getValue()]
+        })
+{
+}
 
 
 

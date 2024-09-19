@@ -1487,11 +1487,9 @@ void Assembler::exploreAlignment(
     // Display the projection of the alignment to base space.
     if(displayProjectedAlignment and not alignment.ordinals.empty()) {
         ProjectedAlignment projectedAlignment(
-            uint32_t(assemblerInfo->k),
+            *this,
             {orientedReadId0, orientedReadId1},
-            {getReads().getRead(orientedReadId0.getReadId()), getReads().getRead(orientedReadId1.getReadId())},
-            alignment,
-            {markers[orientedReadId0.getValue()], markers[orientedReadId1.getValue()]});
+            alignment);
 
         html << "<h2>Alignment projection to base space</h2>";
 

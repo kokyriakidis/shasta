@@ -19,6 +19,7 @@ namespace shasta {
     class ProjectedAlignmentSegment;
 
     class Alignment;
+    class Assembler;
     class Base;
     class CompressedMarker;
     class LongBaseSequenceView;
@@ -96,6 +97,11 @@ public:
 class shasta::ProjectedAlignment {
 public:
     vector<ProjectedAlignmentSegment> segments;
+
+    ProjectedAlignment(
+        const Assembler&,
+        const array<OrientedReadId, 2>&,
+        const Alignment&);
 
     ProjectedAlignment(
         uint32_t k,
