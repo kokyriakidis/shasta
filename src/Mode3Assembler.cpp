@@ -8,6 +8,7 @@
 #include "mode3-AnchorGraph.hpp"
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"
+#include "Reads.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3;
@@ -252,10 +253,13 @@ void Mode3Assembler::assembleConnectedComponents(
     ofstream summaryCsv("Components.csv");
     summaryCsv << "Component,Reads,Segments,Sequence,N50,Total Bubble chain length,Bubble chain N50\n";
 
+    ofstream orientedReadsCsv("OrientedReadsByComponent.csv");
+    orientedReadsCsv << "Component,OrientedReadId,ReadName\n";
+
     vector< shared_ptr<mode3::AssemblyGraph> > assemblyGraphs;
     for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
         const shared_ptr<AssemblyGraph> assemblyGraph =
-            assembleConnectedComponent(componentId, threadCount, options, true, debug);
+            assembleConnectedComponent(componentId, threadCount, options, true, orientedReadsCsv, debug);
         assemblyGraphs.push_back(assemblyGraph);
 
         // Chain length statistics.
@@ -439,6 +443,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     uint64_t threadCount,
     const Mode3AssemblyOptions& options,
     bool assembleSequence,
+    ostream& orientedReadsCsv,
     bool debug)
 {
     performanceLog << timestamp << "Assembling connected component " <<
@@ -459,6 +464,15 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
         cout << "This connected component is self-complementary." << endl;
     }
 
+    // Write to orientedReadsCsv the oriented reads for this component.
+    for(const OrientedReadId orientedReadId: orientedReadIds) {
+        const auto readName = assembler.getReads().getReadName(orientedReadId.getReadId());
+        orientedReadsCsv <<
+            componentId << "," <<
+            orientedReadId << ",";
+        copy(readName.begin(), readName.end(), ostream_iterator<char>(orientedReadsCsv));
+        orientedReadsCsv << "\n";
+    }
 
 
     // We need to compute the anchor journey of each oriented read,
