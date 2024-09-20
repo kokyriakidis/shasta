@@ -2673,7 +2673,7 @@ void AssemblyGraph::computeTangleMatrix(
         SHASTA_ASSERT(bubble0.isHaploid());
         const Chain& chain0 = bubble0.front();
         SHASTA_ASSERT(chain0.size() >= 2);
-        const MarkerGraphEdgeId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
+        const AnchorId anchorId0 = chain0[chain0.size() - 2];  // Exclude last
 
         for(uint64_t i1=0; i1<outEdges.size(); i1++) {
             const edge_descriptor ce1 = outEdges[i1];
@@ -2682,12 +2682,9 @@ void AssemblyGraph::computeTangleMatrix(
             SHASTA_ASSERT(bubble1.isHaploid());
             const Chain& chain1 = bubble1.front();
             SHASTA_ASSERT(chain1.size() >= 2);
-            const MarkerGraphEdgeId markerGraphEdgeId1 = chain1[1];  // Exclude first
+            const AnchorId anchorId1 = chain1[1];  // Exclude first
 
-            MarkerGraphEdgePairInfo info;
-            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(markerGraphEdgeId0, markerGraphEdgeId1, info));
-            SHASTA_ASSERT(info.common == anchors.countCommon(markerGraphEdgeId0, markerGraphEdgeId1));
-            tangleMatrix[i0][i1] = info.common;
+            tangleMatrix[i0][i1] = anchors.countCommon(anchorId0, anchorId1);
         }
     }
 }
@@ -4550,10 +4547,7 @@ AssemblyGraph::edge_descriptor AssemblyGraph::connect(
                 continue;
             }
 
-            MarkerGraphEdgePairInfo info;
-            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
-            SHASTA_ASSERT(info.common == anchors.countCommon(edgeId0, edgeId1));
-            const uint64_t commonCount = info.common;
+            const uint64_t commonCount = anchors.countCommon(edgeId0, edgeId1);
 
             if(debug) {
                 cout << "Positions in chains " << i0 << " " << i1 <<
@@ -5773,11 +5767,7 @@ void AssemblyGraph::phaseBubbleChainUsingPhasingGraph(
             if(n == 1) {
                 for(uint64_t j0=0; j0<2; j0++) {
                     for(uint64_t j1=0; j1<2; j1++) {
-                        MarkerGraphEdgePairInfo info;
-                        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
-                            edges0[j0], edges1[j1], info));
-                        SHASTA_ASSERT(info.common == anchors.countCommon(edges0[j0], edges1[j1]));
-                        tangleMatrix[j0][j1] = info.common;
+                        tangleMatrix[j0][j1] = anchors.countCommon(edges0[j0], edges1[j1]);
                     }
                 }
             } else {
@@ -6124,13 +6114,8 @@ void AssemblyGraph::phaseBubbleChainUsingPhasingTable(
             MarkerGraphEdgeId e10 = chain10.second();
             MarkerGraphEdgeId e11 = chain11.second();
 
-            MarkerGraphEdgePairInfo info;
-            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(e00, e10, info));
-            SHASTA_ASSERT(info.common == anchors.countCommon(e00, e10));
-            const uint64_t common0 = info.common;
-            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(e01, e11, info));
-            SHASTA_ASSERT(info.common == anchors.countCommon(e01, e11));
-            const uint64_t common1 = info.common;
+            const uint64_t common0 = anchors.countCommon(e00, e10);
+            const uint64_t common1 = anchors.countCommon(e01, e11);
 
             if(debug) {
                 cout << "Bubble pair: " <<
@@ -7549,6 +7534,7 @@ void AssemblyGraph::writeAssemblyDetails() const
                         const MarkerGraphEdgeId nextEdgeId = chain[positionInChain + 1];
                         const uint64_t commonCount = assembler.countCommonOrientedReadsUnsafe(
                             edgeId, nextEdgeId);
+                        SHASTA_ASSERT(commonCount == anchors.countCommon(edgeId, nextEdgeId));
                         const auto& stepSequence = chain.stepSequences[positionInChain];
                         const uint64_t stepSequenceLength = stepSequence.sequence.size();
                         const bool success = stepSequence.success;
@@ -7645,16 +7631,16 @@ void AssemblyGraph::runAssemblyStep(
         // If we are at the beginning or end of the chain, we need to check
         // the number of common oriented reads.
         MarkerGraphEdgePairInfo info;
+        uint64_t commonCount = 0;
         if((positionInChain == 0) or (positionInChain == chain.size() - 2)) {
-            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeIdA, edgeIdB, info));
-            SHASTA_ASSERT(info.common == anchors.countCommon(edgeIdA, edgeIdB));
+            commonCount = anchors.countCommon(edgeIdA, edgeIdB);
         }
 
         // If this is the first step of the Chain, we want to set useA to false
         // to avoid using reads that don't belong. But we only do it
         // if this leaves us with enough reads to assemble.
         if(positionInChain == 0) {
-            if(info.common >= chainTerminalCommonThreshold) {
+            if(commonCount >= chainTerminalCommonThreshold) {
                 useA = false;
             }
         }
@@ -7663,7 +7649,7 @@ void AssemblyGraph::runAssemblyStep(
         // to avoid using reads that don't belong. But we only do it
         // if this leaves us with enough reads to assemble.
         else if(positionInChain == chain.size() - 2) {
-            if(info.common >= chainTerminalCommonThreshold) {
+            if(commonCount >= chainTerminalCommonThreshold) {
                 useB = false;
             }
         }
