@@ -254,7 +254,7 @@ void ProjectedAlignmentSegment::writeAlignmentHtml(ostream& html) const
     for(uint64_t i=0; i<alignment.size(); i++) {
         const bool isDifferent = (alignment0String[i] != alignment1String[i]);
         if(isDifferent) {
-            html << "<span style=background-color:pink'>";
+            html << "<span style='background-color:pink'>";
         }
         html << alignment1String[i];
         if(isDifferent) {
@@ -316,7 +316,7 @@ void ProjectedAlignmentSegment::writeRleAlignmentHtml(ostream& html) const
     for(uint64_t i=0; i<rleAlignment.size(); i++) {
         const bool isDifferent = (alignment0String[i] != alignment1String[i]);
         if(isDifferent) {
-            html << "<span style=background-color:pink'>";
+            html << "<span style='background-color:pink'>";
         }
         html << alignment1String[i];
         if(isDifferent) {
