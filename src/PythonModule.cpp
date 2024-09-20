@@ -340,6 +340,8 @@ PYBIND11_MODULE(shasta, shastaModule)
         .def("createReadGraph3",
              &Assembler::createReadGraph3,
             arg("maxAlignmentCount"))
+        .def("createReadGraph4",
+             &Assembler::createReadGraph4)
         .def("createReadGraphUsingPseudoPaths",
              &Assembler::createReadGraphUsingPseudoPaths,
              arg("matchScore"),

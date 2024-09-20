@@ -8,6 +8,8 @@
 #include "seqan.hpp"
 using namespace shasta;
 
+#include "algorithm.hpp"
+
 
 
 ProjectedAlignment::ProjectedAlignment(
@@ -107,15 +109,22 @@ void ProjectedAlignmentSegment::computeAlignment(
     const vector<uint8_t>& sequence0 = reinterpret_cast< const vector<uint8_t>& >(sequences[0]);
     const vector<uint8_t>& sequence1 = reinterpret_cast< const vector<uint8_t>& >(sequences[1]);
 
-    editDistance =  -seqanAlign(
-        sequence0.begin(), sequence0.end(),
-        sequence1.begin(), sequence1.end(),
-        matchScore,
-        mismatchScore,
-        gapScore,
-        false,
-        false,
-        alignment);
+    if(sequence0 == sequence1) {
+        editDistance = 0;
+        alignment.resize(sequence0.size());
+        fill(alignment.begin(), alignment.end(), make_pair(true, true));
+
+    } else {
+        editDistance =  -seqanAlign(
+            sequence0.begin(), sequence0.end(),
+            sequence1.begin(), sequence1.end(),
+            matchScore,
+            mismatchScore,
+            gapScore,
+            false,
+            false,
+            alignment);
+    }
 
 }
 
@@ -129,15 +138,22 @@ void ProjectedAlignmentSegment::computeRleAlignment(
     const vector<uint8_t>& sequence0 = reinterpret_cast< const vector<uint8_t>& >(rleSequences[0]);
     const vector<uint8_t>& sequence1 = reinterpret_cast< const vector<uint8_t>& >(rleSequences[1]);
 
-    rleEditDistance =  -seqanAlign(
-        sequence0.begin(), sequence0.end(),
-        sequence1.begin(), sequence1.end(),
-        matchScore,
-        mismatchScore,
-        gapScore,
-        false,
-        false,
-        rleAlignment);
+    if(sequence0 == sequence1) {
+        rleEditDistance = 0;
+        rleAlignment.resize(sequence0.size());
+        fill(rleAlignment.begin(), rleAlignment.end(), make_pair(true, true));
+
+    } else {
+        rleEditDistance =  -seqanAlign(
+            sequence0.begin(), sequence0.end(),
+            sequence1.begin(), sequence1.end(),
+            matchScore,
+            mismatchScore,
+            gapScore,
+            false,
+            false,
+            rleAlignment);
+    }
 
 }
 
