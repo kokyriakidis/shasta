@@ -852,10 +852,14 @@ void AssemblyGraph::writeGraphviz(
                     const Chain& chain = bubble.front();
                     dot << "\\nlen=" << chain.size();
                     if(chain.size() > 2) {
-                        // Compute average coverage for the internal edges.
+                        // Compute average coverage for the internal Anchors.
                         uint64_t coverageSum = 0;
                         for(uint64_t i=1; i<chain.size()-1; i++) {
-                            coverageSum += assembler.markerGraph.edgeCoverage(chain[i]);
+                            const AnchorId anchorId = chain[i];
+                            const Anchor anchor = anchors[anchorId];
+                            const uint64_t coverage = assembler.markerGraph.edgeCoverage(anchorId);
+                            SHASTA_ASSERT(coverage == anchor.coverage());
+                            coverageSum += coverage;
                         }
                         const double averageCoverage = double(coverageSum) / double(chain.size() - 2);
                         dot << "\\ncov=" << uint64_t(std::round(averageCoverage));
@@ -6449,12 +6453,20 @@ void AssemblyGraph::gatherOrientedReadIdsAtEnd(
 
     orientedReadIds.clear();
     for(uint64_t i=first; i<=last; i++) {
-        const MarkerGraphEdgeId markerGraphEdgeId = chain[i];
+        const AnchorId anchorId = chain[i];
         const auto& markerIntervals =
-            assembler.markerGraph.edgeMarkerIntervals[markerGraphEdgeId];
+            assembler.markerGraph.edgeMarkerIntervals[anchorId];
         for(const MarkerInterval& markerInterval: markerIntervals) {
             orientedReadIds.push_back(markerInterval.orientedReadId);
         }
+
+        // Check the that Anchor has identical marker intervals.
+        const Anchor anchor = anchors[anchorId];
+        SHASTA_ASSERT(anchor.coverage() == markerIntervals.size());
+        for(uint64_t j=0; j<anchor.coverage(); j++) {
+            SHASTA_ASSERT(markerIntervals[j] == anchor[j]);
+        }
+
     }
     deduplicate(orientedReadIds);
 }
