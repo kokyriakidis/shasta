@@ -5701,11 +5701,18 @@ void AssemblyGraph::gatherOrientedReadIdsAtBeginning(
 
     orientedReadIds.clear();
     for(uint64_t i=first; i<=last; i++) {
-        const MarkerGraphEdgeId markerGraphEdgeId = chain[i];
+        const AnchorId anchorId = chain[i];
         const auto& markerIntervals =
-            assembler.markerGraph.edgeMarkerIntervals[markerGraphEdgeId];
+            assembler.markerGraph.edgeMarkerIntervals[anchorId];
         for(const MarkerInterval& markerInterval: markerIntervals) {
             orientedReadIds.push_back(markerInterval.orientedReadId);
+        }
+
+        // Check the that Anchor has identical marker intervals.
+        const Anchor anchor = anchors[anchorId];
+        SHASTA_ASSERT(anchor.coverage() == markerIntervals.size());
+        for(uint64_t j=0; j<anchor.coverage(); j++) {
+            SHASTA_ASSERT(markerIntervals[j] == anchor[j]);
         }
     }
     deduplicate(orientedReadIds);
@@ -6696,7 +6703,7 @@ void AssemblyGraph::writeAssemblyDetails() const
     // Opeb the csv file and write the header.
     ofstream csv("AssemblyDetails-" + to_string(componentId) + ".csv");
     csv << "Chain,Component,Bubble chain,Position in bubble chain,Index in bubble,"
-        "Position in chain,Type,Marker graph edge id,"
+        "Position in chain,Type,Anchor id,"
         "Assembly status,Length,Sequence begin,Sequence end,Coverage,Common\n";
 
     // Loop over all bubble chains.
@@ -6719,11 +6726,12 @@ void AssemblyGraph::writeAssemblyDetails() const
                 for(uint64_t positionInChain=0; /* Check later */ ; positionInChain++) {
 
                     // Write one line to csv with information about the sequence
-                    // contributed by this the marker graph primary edge.
+                    // contributed by this Anchor.
                     {
-                        const MarkerGraphEdgeId edgeId = chain[positionInChain];
-                        const uint64_t coverage = assembler.markerGraph.edgeMarkerIntervals[edgeId].size();
-                        const uint64_t edgeSequenceLength = assembler.markerGraph.edgeSequence[edgeId].size();
+                        const AnchorId anchorId = chain[positionInChain];
+                        const uint64_t coverage = assembler.markerGraph.edgeMarkerIntervals[anchorId].size();
+                        SHASTA_ASSERT(coverage == anchors[anchorId].coverage());
+                        const uint64_t edgeSequenceLength = assembler.markerGraph.edgeSequence[anchorId].size();
                         const uint64_t beginInSequence = positionInSequence;
                         const uint64_t endInSequence = positionInSequence + edgeSequenceLength;
                         csv << chainString << ",";
@@ -6733,7 +6741,7 @@ void AssemblyGraph::writeAssemblyDetails() const
                         csv << indexInBubble << ",";
                         csv << positionInChain << ",";
                         csv << "E,";
-                        csv << edgeId << ",,";
+                        csv << anchorId << ",,";
                         csv << edgeSequenceLength << ",";
                         csv << beginInSequence << ",";
                         csv << endInSequence << ",";
@@ -7234,11 +7242,11 @@ void AssemblyGraph::optimizeChain(
     // Add the edges that correspond to the initial Chain.
     for(uint64_t i1=1; i1<chain.size(); i1++) {
         const uint64_t i0 = i1 - 1;
-        const MarkerGraphEdgeId edgeId0 = chainGraph[i0].edgeId;
-        const MarkerGraphEdgeId edgeId1 = chainGraph[i1].edgeId;
+        const AnchorId anchorId0 = chainGraph[i0].edgeId;
+        const AnchorId anchorId1 = chainGraph[i1].edgeId;
         MarkerGraphEdgePairInfo info;
-        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(edgeId0, edgeId1, info));
-        SHASTA_ASSERT(info.common == anchors.countCommon(edgeId0, edgeId1));
+        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(anchorId0, anchorId1, info));
+        SHASTA_ASSERT(info.common == anchors.countCommon(anchorId0, anchorId1));
         add_edge(i0, i1, {info.common}, chainGraph);
     }
 
@@ -7792,56 +7800,6 @@ uint64_t AssemblyGraph::cleanupBubbles(bool debug, edge_descriptor ce,
     return removedCount;
 }
 
-
-
-#if 0
-void AssemblyGraph::computeJourneys(bool debug)
-{
-    // A map that gives the index of a given OrientedReadId.
-    orientedReadIdTable.clear();
-    for(uint64_t i=0; i<orientedReadIds.size(); i++) {
-        orientedReadIdTable.insert({orientedReadIds[i], i});
-    }
-
-    // Make space for the journeys.
-    journeys.clear();
-    journeys.resize(orientedReadIds.size());
-
-    performanceLog << timestamp << "Journey computation begins." << endl;
-
-    // Loop over MarkerGraphEdgeIds in the connected component that corresponds
-    // to this assembly graph.
-    for(const MarkerGraphEdgeId edgeId: markerGraphEdgeIds) {
-        const auto markerIntervals = assembler.markerGraph.edgeMarkerIntervals[edgeId];
-        for(const MarkerInterval& markerInterval: markerIntervals) {
-            const OrientedReadId orientedReadId = markerInterval.orientedReadId;
-            const uint64_t i = orientedReadIdTable[orientedReadId];
-            SHASTA_ASSERT(i < orientedReadIds.size());
-            journeys[i].push_back({edgeId, markerInterval.ordinals[0]});
-        }
-    }
-
-    // Sort the journeys.
-    for(vector< pair<uint64_t, uint32_t> >& journey: journeys) {
-        sort(journey.begin(), journey.end(), OrderPairsBySecondOnly<uint64_t, uint32_t>());
-    }
-
-    performanceLog << timestamp << "Journey computation ends." << endl;
-
-    // Write out the journeys.
-    if(debug) {
-        ofstream csv("Journeys-Check-" + to_string(componentId) + ".csv");
-        for(uint64_t i=0; i<orientedReadIds.size(); i++) {
-            csv << orientedReadIds[i] << ",";
-            const auto& journey = journeys[i];
-            for(const auto& p: journey) {
-                 csv << p.first << ",";
-            }
-            csv << "\n";
-        }
-    }
-}
-#endif
 
 
 // Get the index of an OrientedReadId in the orientedReadIds sorted vector.
