@@ -446,31 +446,7 @@ private:
         double minLogP,
         uint64_t n);
 
-    // More general version of the above.
-    bool detangleEdges(
-        bool debug,
-        double epsilon,
-        double minLogP);
-    bool detangleEdge(
-        bool debug,
-        std::map<uint64_t, edge_descriptor>& edgeMap,
-        std::map<uint64_t, edge_descriptor>::iterator&,
-        double epsilon,
-        double minLogP);
 
-
-#if 0
-    bool detangleEdgesWithSearch(
-        bool debug,
-        uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
-    bool detangleEdgeWithSearch(
-        bool debug,
-        std::map<uint64_t, edge_descriptor>& edgeMap,
-        std::map<uint64_t, edge_descriptor>::iterator&,
-        uint64_t detangleToleranceLow,
-        uint64_t detangleToleranceHigh);
-#endif
 
     // Bubble cleanup, with the purpose of eliminating most bubbles caused by errors.
     // See the code for details of what this does.
