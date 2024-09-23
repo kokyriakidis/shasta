@@ -21,6 +21,10 @@ void Assembler::createReadGraph4()
     // Flag all alignments as not to be kept.
     vector<bool> keepAlignment(alignmentCount, false);
 
+    // This will hold the decomepressed Alignment.
+    // Defined here to reduce memory allocation activity.
+    Alignment alignment;
+
     // Loop over all alignments.
     for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
         if((alignmentId % 1000) == 0) {
@@ -43,16 +47,20 @@ void Assembler::createReadGraph4()
         // The alignment is stored in compressed form as a string,
         // so we have to decompress it.
         span<const char> compressedAlignment = compressedAlignments[alignmentId];
-        Alignment alignment;
         shasta::decompress(compressedAlignment, alignment);
 
         // Project this alignment to base space.
+        // We call this with quick=true, so it stores only the following:
+        // - RLE sequences and RLE alignments for segments for which the RLE sequences
+        //   of the two oriented reads are different.
+        // - Total RLE edit distance and total RLE lengths.
         const ProjectedAlignment projectedAlignment(
             *this,
             {orientedReadId0, orientedReadId1},
-            alignment);
+            alignment,
+            true);
 
-        // If the RLE Q is large enough, flag thus alignment as to be kept.
+        // If the RLE Q is large enough, flag this alignment as to be kept.
         if(projectedAlignment.QRle() >= minQRle) {
             keepAlignment[alignmentId] = true;
             thisAlignmentData.info.isInReadGraph = 1;
