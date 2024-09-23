@@ -15,7 +15,8 @@ using namespace shasta;
 ProjectedAlignment::ProjectedAlignment(
     const Assembler& assembler,
     const array<OrientedReadId, 2>& orientedReadIds,
-    const Alignment& alignment) :
+    const Alignment& alignment,
+    bool quick) :
 
     ProjectedAlignment(
         uint32_t(assembler.assemblerInfo->k),
@@ -28,7 +29,8 @@ ProjectedAlignment::ProjectedAlignment(
         {
             assembler.markers[orientedReadIds[0].getValue()],
             assembler.markers[orientedReadIds[1].getValue()]
-        })
+        },
+        quick)
 {
 }
 
@@ -39,19 +41,28 @@ ProjectedAlignment::ProjectedAlignment(
     const array<OrientedReadId, 2>& orientedReadIds,
     const array<LongBaseSequenceView, 2>& sequences,
     const Alignment& alignment,
-    const array< span<const CompressedMarker>, 2>& markers) :
+    const array< span<const CompressedMarker>, 2>& markers,
+    bool quick) :
     k(k),
     kHalf(k / 2),
     orientedReadIds(orientedReadIds),
     sequences(sequences),
+    alignment(alignment),
     markers(markers)
 {
     SHASTA_ASSERT((k % 2) == 0);
 
-    // Scoring scheme for edit distance.
-    const int64_t matchScore = 0;
-    const int64_t mismatchScore = -1;
-    const int64_t gapScore = -1;
+    if(quick) {
+        constructQuick();
+    } else {
+        constructSlow();
+    }
+}
+
+
+
+void ProjectedAlignment::constructSlow()
+{
 
     // Loop over pairs of consecutive aligned markers (A, B).
     for(uint64_t iB=1; iB<alignment.ordinals.size(); iB++) {
@@ -84,14 +95,69 @@ ProjectedAlignment::ProjectedAlignment(
 
 
 
+// This stores only the following:
+// - RLE sequences and RLE alignments for segments for which the RLE sequences
+//   of the two oriented reads are different.
+// - Total RLE edit distance and total RLE lengths.
+void ProjectedAlignment::constructQuick()
+{
+    // Create the segment outside the loop and reuse it to reduce
+    // memory allocation activity.
+    ProjectedAlignmentSegment segment;
+
+    totalLengthRle = {0, 0};
+    totalEditDistanceRle = 0;
+
+    // Loop over pairs of consecutive aligned markers (A, B).
+    for(uint64_t iB=1; iB<alignment.ordinals.size(); iB++) {
+        const uint64_t iA = iB - 1;
+
+        // Store in the segment the ordinals of these pair of consecutive aligned markers.
+        segment.ordinalsA = alignment.ordinals[iA];
+        segment.ordinalsB = alignment.ordinals[iB];
+
+        // Store the corresponding positions.
+        for(uint64_t i=0; i<2; i++) {
+            segment.positionsA[i] = markers[i][segment.ordinalsA[i]].position + kHalf;
+            segment.positionsB[i] = markers[i][segment.ordinalsB[i]].position + kHalf;
+        }
+
+        // Store RLE sequences, without going through the raw sequences for speed.
+        // Also increment the total RLE lengths.
+        for(uint64_t i=0; i<2; i++) {
+            vector<Base>& rleSequence = segment.rleSequences[i];
+            rleSequence.clear();
+            for(uint32_t position=segment.positionsA[i]; position!=segment.positionsB[i]; position++) {
+                const Base b = getBase(i, position);
+                if(rleSequence.empty() or b != rleSequence.back()) {
+                    rleSequence.push_back(b);
+                }
+            }
+            totalLengthRle[i] += rleSequence.size();
+        }
+
+        // If the RLE sequences are the same, there is no contribution to RLE edit distance,
+        // and we don't store the segment.
+        if(segment.rleSequences[0] == segment.rleSequences[1]) {
+            continue;
+        }
+
+        // Otherwise, we compute the RLE alignment and store this segment.
+        segment.computeRleAlignment(matchScore, mismatchScore, gapScore);
+        totalEditDistanceRle += segment.rleEditDistance;
+        segments.push_back(segment);
+    }
+}
+
+
+
 ProjectedAlignmentSegment::ProjectedAlignmentSegment(
     uint32_t kHalf,
     const array<uint32_t, 2>& ordinalsA,
     const array<uint32_t, 2>& ordinalsB,
     const array< span<const CompressedMarker>, 2>& markers) :
     ordinalsA(ordinalsA),
-    ordinalsB(ordinalsB),
-    markers(markers)
+    ordinalsB(ordinalsB)
 {
     for(uint64_t i=0; i<2; i++) {
         positionsA[i] = markers[i][ordinalsA[i]].position + kHalf;

@@ -39,6 +39,8 @@ public:
         const array<uint32_t, 2>& ordinalB,
         const array< span<const CompressedMarker>, 2>& markers);
 
+    ProjectedAlignmentSegment() {}
+
     // In the arrays below, the index can be 0 or 1 and correspond
     // to the first and second oriented reads in the Alignment.
     // The A and B suffix refer to the left and right markers
@@ -48,9 +50,6 @@ public:
     // described by this ProjectedAlignmentSegment.
     array<uint32_t, 2> ordinalsA;
     array<uint32_t, 2> ordinalsB;
-
-    // The markers for the two oriented reads in this alignment.
-    const array< span<const CompressedMarker>, 2>& markers;
 
     // The begin/end positions in base space, taken
     // at the midpoints of the two consecutive aligned markers.
@@ -101,18 +100,28 @@ public:
     ProjectedAlignment(
         const Assembler&,
         const array<OrientedReadId, 2>&,
-        const Alignment&);
+        const Alignment&,
+        bool quick);
 
     ProjectedAlignment(
         uint32_t k,
         const array<OrientedReadId, 2>&,
         const array<LongBaseSequenceView, 2>&,
         const Alignment&,
-        const array< span<const CompressedMarker>, 2>& markers);
+        const array< span<const CompressedMarker>, 2>& markers,
+        bool quick);
+
+    void constructSlow();
+    void constructQuick();
 
     // Marker length and its half.
     uint32_t k;
     uint32_t kHalf;
+
+    // Scoring scheme for edit distance.
+    const int64_t matchScore = 0;
+    const int64_t mismatchScore = -1;
+    const int64_t gapScore = -1;
 
     // The two OrientedReadIds in this alignment.
     const array<OrientedReadId, 2>& orientedReadIds;
@@ -126,6 +135,9 @@ public:
     // Get the Base at a given position in one of the two oriented reads,
     // doing a reverse complement if necessary.
     Base getBase(uint64_t i, uint32_t position) const;
+
+    // The input Alignment in marker space.
+    const Alignment& alignment;
 
     // The markers for the two oriented reads in this alignment.
     const array< span<const CompressedMarker>, 2>& markers;
