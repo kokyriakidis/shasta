@@ -503,14 +503,18 @@ double ProjectedAlignment::errorRateRle() const
 
 double ProjectedAlignment::Q() const
 {
-    return -10. * log10(errorRate());
+    const double er = errorRate();
+    SHASTA_ASSERT(er > 0.);
+    return -10. * log10(er);
 }
 
 
 
 double ProjectedAlignment::QRle() const
 {
-    return -10. * log10(errorRateRle());
+    const double er = errorRateRle();
+    SHASTA_ASSERT(er > 0.);
+    return -10. * log10(er);
 }
 
 
