@@ -3,6 +3,7 @@
 #include "MarkerInterval.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "MemoryMappedVectorOfVectors.hpp"
+#include "MultithreadedObject.hpp"
 
 #include "cstdint.hpp"
 #include "span.hpp"
@@ -69,7 +70,9 @@ public:
 
 
 
-class shasta::mode3::Anchors : public MappedMemoryOwner {
+class shasta::mode3::Anchors :
+    public MultithreadedObject<Anchors>,
+    public MappedMemoryOwner {
 public:
 
     // This constructor creates the Anchors from marker graph edges.

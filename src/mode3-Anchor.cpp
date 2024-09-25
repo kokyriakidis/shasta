@@ -3,11 +3,17 @@
 using namespace shasta;
 using namespace mode3;
 
+// Explicit instantiation.
+#include "MultithreadedObject.tpp"
+template class MultithreadedObject<Anchors>;
+
+
 
 // This constructor creates the Anchor MarkerIntervals from marker graph edges.
 Anchors::Anchors(
     const MappedMemoryOwner& mappedMemoryOwner,
     const MarkerGraph& markerGraph) :
+    MultithreadedObject<Anchors>(*this),
     MappedMemoryOwner(mappedMemoryOwner)
 {
     anchorMarkerIntervals.createNew(largeDataName("AnchorMarkerIntervals"), largeDataPageSize);
@@ -23,6 +29,7 @@ Anchors::Anchors(
 
 // This constructor access existing Anchors.
 Anchors::Anchors(const MappedMemoryOwner& mappedMemoryOwner) :
+    MultithreadedObject<Anchors>(*this),
     MappedMemoryOwner(mappedMemoryOwner)
 {
     anchorMarkerIntervals.accessExistingReadOnly(largeDataName("AnchorMarkerIntervals"));
