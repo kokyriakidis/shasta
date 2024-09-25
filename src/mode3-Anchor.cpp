@@ -27,6 +27,8 @@ Anchors::Anchors(
         const auto v = markerGraph.edgeMarkerIntervals[anchorId];
         anchorMarkerIntervals.appendVector(v.begin(), v.end());
     }
+
+    check();
 }
 
 
@@ -57,6 +59,30 @@ uint64_t Anchors::size() const
 {
     return anchorMarkerIntervals.size();
 }
+
+
+
+void Anchors::check() const
+{
+    const Anchors& anchors = *this;
+
+    for(AnchorId anchorId=0; anchorId<size(); anchorId++) {
+        const Anchor& anchor = anchors[anchorId];
+        anchor.check();
+    }
+}
+
+
+
+void Anchor::check() const
+{
+    const Anchor& anchor = *this;
+
+    for(uint64_t i=1; i<size(); i++) {
+        SHASTA_ASSERT(anchor[i-1].orientedReadId.getReadId() < anchor[i].orientedReadId.getReadId());
+    }
+}
+
 
 
 // Return the number of common oriented reads between two Anchors.

@@ -55,6 +55,8 @@ public:
         return BaseClass::operator[](i);
     }
 
+    void check() const;
+
     using BaseClass::size;
     using BaseClass::begin;
     using BaseClass::end;
@@ -100,4 +102,6 @@ private:
     MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> anchorMarkerIntervals;
     const Reads& reads;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
+
+    void check() const;
 };
