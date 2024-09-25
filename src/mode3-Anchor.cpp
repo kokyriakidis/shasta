@@ -4,7 +4,10 @@ using namespace shasta;
 using namespace mode3;
 
 
-Anchors::Anchors(const MarkerGraph& markerGraph) :
+Anchors::Anchors(
+    const MappedMemoryOwner& mappedMemoryOwner,
+    const MarkerGraph& markerGraph) :
+    MappedMemoryOwner(mappedMemoryOwner),
     anchorMarkerIntervals(markerGraph.edgeMarkerIntervals)
 {
 }

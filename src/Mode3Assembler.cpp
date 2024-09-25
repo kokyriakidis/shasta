@@ -32,7 +32,7 @@ Mode3Assembler::Mode3Assembler(
     assembler(assembler),
     debug(debug)
 {
-    anchorsPointer = make_shared<Anchors>(assembler.markerGraph);
+    anchorsPointer = make_shared<Anchors>(MappedMemoryOwner(*this), assembler.markerGraph);
 
     performanceLog << timestamp << "Mode 3 assembly begins." << endl;
     findReverseComplementAnchors();

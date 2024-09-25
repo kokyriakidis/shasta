@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MarkerInterval.hpp"
+#include "MappedMemoryOwner.hpp"
 
 #include "cstdint.hpp"
 #include "span.hpp"
@@ -70,10 +71,12 @@ public:
 
 
 
-class shasta::mode3::Anchors {
+class shasta::mode3::Anchors : public MappedMemoryOwner {
 public:
 
-    Anchors(const MarkerGraph&);
+    Anchors(
+        const MappedMemoryOwner&,
+        const MarkerGraph&);
     Anchor operator[](AnchorId anchorId) const;
     uint64_t size() const;
 
