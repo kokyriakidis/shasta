@@ -34,12 +34,14 @@ class shasta::Mode3Assembler :
     public MultithreadedObject<Mode3Assembler>,
     public MappedMemoryOwner {
 public:
+
     Mode3Assembler(
         const Assembler& assembler,
-        bool useExistingAnchors,
+        shared_ptr<mode3::Anchors> anchorsPointer,
         uint64_t threadCount,
         const Mode3AssemblyOptions&,
         bool debug);
+
 private:
     const Assembler& assembler;
     bool debug;

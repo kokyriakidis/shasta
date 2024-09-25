@@ -68,6 +68,10 @@ namespace shasta {
         class AssemblyGraph;
     }
 
+    namespace mode3 {
+        class Anchors;
+    }
+
     namespace MemoryMapped {
         class ByteAllocator;
     }
@@ -2469,6 +2473,7 @@ public:
     // Top level function for Mode 3 assembly.
     void mode3Assembly(
         uint64_t threadCount,
+        shared_ptr<mode3::Anchors>,
         const Mode3AssemblyOptions&,
         bool debug
     );

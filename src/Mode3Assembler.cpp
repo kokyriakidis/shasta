@@ -24,20 +24,17 @@ template class MultithreadedObject<Mode3Assembler>;
 
 Mode3Assembler::Mode3Assembler(
     const Assembler& assembler,
-    bool useExistingAnchors,
+    shared_ptr<mode3::Anchors> anchorsPointer,
     uint64_t threadCount,
     const Mode3AssemblyOptions& options,
     bool debug) :
     MultithreadedObject<Mode3Assembler>(*this),
     MappedMemoryOwner(assembler),
     assembler(assembler),
-    debug(debug)
+    debug(debug),
+    anchorsPointer(anchorsPointer)
 {
-    if(useExistingAnchors) {
-        anchorsPointer = make_shared<Anchors>(MappedMemoryOwner(*this));
-    } else {
-        anchorsPointer = make_shared<Anchors>(MappedMemoryOwner(*this), assembler.markerGraph);
-    }
+    SHASTA_ASSERT(anchorsPointer);
 
     performanceLog << timestamp << "Mode 3 assembly begins." << endl;
     findReverseComplementAnchors();

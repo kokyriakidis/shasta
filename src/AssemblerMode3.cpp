@@ -90,11 +90,12 @@ pair<uint64_t, uint64_t> Assembler::getPrimaryCoverageRange()
 
 void Assembler::mode3Assembly(
     uint64_t threadCount,
+    shared_ptr<mode3::Anchors> anchorsPointer,
     const Mode3AssemblyOptions& options,
     bool debug
     )
 {
-    mode3Assembler = make_shared<Mode3Assembler>(*this, false, threadCount, options, debug);
+    mode3Assembler = make_shared<Mode3Assembler>(*this, anchorsPointer, threadCount, options, debug);
 }
 
 
@@ -106,7 +107,12 @@ void Assembler::mode3Reassembly(
     bool debug
     )
 {
-    mode3Assembler = make_shared<Mode3Assembler>(*this, true, threadCount, options, debug);
+    // Create the Anchors from binary data.
+    shared_ptr<mode3::Anchors> anchorsPointer =
+        make_shared<mode3::Anchors>(MappedMemoryOwner(*this), markerGraph);
+
+    // Run the Mode 3 assembly.
+    mode3Assembler = make_shared<Mode3Assembler>(*this, anchorsPointer, threadCount, options, debug);
 }
 
 
