@@ -52,7 +52,15 @@ private:
     // - The anchor coverage (number of oriented reads) is isn [minPrimaryCoverage, maxPrimaryCoverage].
     // For now the anchors are simply a reference to assembler.markerGraph.edgeMarkerIntervals,
     // butit might be possible to construct the anchors by other means.
-    const mode3::Anchors& anchors;
+    shared_ptr<mode3::Anchors> anchorsPointer;
+    mode3::Anchors& anchors()
+    {
+        return *anchorsPointer;
+    }
+    const mode3::Anchors& anchors() const
+    {
+        return *anchorsPointer;
+    }
 
     // Keep track of the reverse complement of each anchor:
     // the reverse complement of anchorId is reverseComplementAnchor[anchorId],

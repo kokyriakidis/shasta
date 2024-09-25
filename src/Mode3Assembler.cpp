@@ -30,9 +30,10 @@ Mode3Assembler::Mode3Assembler(
     MultithreadedObject<Mode3Assembler>(*this),
     MappedMemoryOwner(assembler),
     assembler(assembler),
-    debug(debug),
-    anchors(assembler.markerGraph)
+    debug(debug)
 {
+    anchorsPointer = make_shared<Anchors>(assembler.markerGraph);
+
     performanceLog << timestamp << "Mode 3 assembly begins." << endl;
     findReverseComplementAnchors();
 
@@ -66,8 +67,8 @@ void Mode3Assembler::findReverseComplementAnchors()
     for(uint64_t i=0; i<2; i++) {
         anchorInfos[i].resize(readCount);
     }
-    for(AnchorId anchorId=0; anchorId<anchors.size(); anchorId++) {
-        const MarkerInterval& markerInterval = anchors[anchorId].front();
+    for(AnchorId anchorId=0; anchorId<anchors().size(); anchorId++) {
+        const MarkerInterval& markerInterval = anchors()[anchorId].front();
         const OrientedReadId orientedReadId = markerInterval.orientedReadId;
         const ReadId readId = orientedReadId.getReadId();
         const Strand strand = orientedReadId.getStrand();
@@ -87,7 +88,7 @@ void Mode3Assembler::findReverseComplementAnchors()
 
     // Now we can find the reverse complement of each Anchor
     // by scanning the anchorInfos for the two OrientedReadId of each ReadId.
-    reverseComplementAnchor.resize(anchors.size(), invalid<AnchorId>);
+    reverseComplementAnchor.resize(anchors().size(), invalid<AnchorId>);
     for(ReadId readId=0; readId<readCount; readId++) {
         const OrientedReadId orientedReadId0(readId, 0);
         const OrientedReadId orientedReadId1(readId, 1);
@@ -107,8 +108,8 @@ void Mode3Assembler::findReverseComplementAnchors()
             const AnchorId anchorId0 = anchorInfo0.anchorId;
             const AnchorId anchorId1 = anchorInfo1.anchorId;
 
-            const Anchor& anchor0 = anchors[anchorId0];
-            const Anchor& anchor1 = anchors[anchorId1];
+            const Anchor& anchor0 = anchors()[anchorId0];
+            const Anchor& anchor1 = anchors()[anchorId1];
 
             const MarkerInterval& markerInterval0 = anchor0.front();
             const MarkerInterval& markerInterval1 = anchor1.front();
@@ -124,7 +125,7 @@ void Mode3Assembler::findReverseComplementAnchors()
     }
 
     // Sanity check.
-    for(AnchorId anchorId=0; anchorId<anchors.size(); anchorId++) {
+    for(AnchorId anchorId=0; anchorId<anchors().size(); anchorId++) {
         const AnchorId anchorIdRc = reverseComplementAnchor[anchorId];
         SHASTA_ASSERT(anchorIdRc != invalid<AnchorId>);
         SHASTA_ASSERT(anchorIdRc != anchorId);
@@ -151,8 +152,8 @@ void Mode3Assembler::computeConnectedComponents()
     // Loop over all Anchors.
     // All oriented reads in an Anchor belong to the same connected component.
     // This could be multithreaded but runs at decent speed as is.
-    for(AnchorId anchorId=0; anchorId<anchors.size(); anchorId++) {
-        const Anchor anchor = anchors[anchorId];
+    for(AnchorId anchorId=0; anchorId<anchors().size(); anchorId++) {
+        const Anchor anchor = anchors()[anchorId];
         SHASTA_ASSERT(not anchor.empty());
         const OrientedReadId orientedReadId0 = anchor.front().orientedReadId;
         for(const MarkerInterval& markerInterval: anchor) {
@@ -170,8 +171,8 @@ void Mode3Assembler::computeConnectedComponents()
 
     // Gather the anchors (marker graph edges) in each connected component.
     vector< vector<uint64_t> > componentsMarkerGraphEdgeIds(orientedReadCount);
-    for(MarkerGraphEdgeId edgeId=0; edgeId<anchors.size(); edgeId++) {
-        const auto markerIntervals = anchors[edgeId];
+    for(MarkerGraphEdgeId edgeId=0; edgeId<anchors().size(); edgeId++) {
+        const auto markerIntervals = anchors()[edgeId];
         SHASTA_ASSERT(not markerIntervals.empty());
         const OrientedReadId orientedReadId0 = markerIntervals.front().orientedReadId;
         const uint64_t componentId = disjointSets.find(orientedReadId0.getValue());
@@ -485,7 +486,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     performanceLog << timestamp << "Journey computation begins." << endl;
     for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
         const AnchorId anchorId = anchorIds[localAnchorId];
-        const Anchor anchor = anchors[anchorId];
+        const Anchor anchor = anchors()[anchorId];
         for(const MarkerInterval& markerInterval: anchor) {
             const OrientedReadId orientedReadId = markerInterval.orientedReadId;
             const uint32_t ordinal0 = markerInterval.ordinals[0];
@@ -585,7 +586,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      // Strand separation does not work well ans is skipped.
      // If the component is self-complementary, it will be assembled double-stranded.
      if(false /*isSelfComplementary*/) {
-         anchorGraph.findReverseComplementAnchors(anchors, assembler.markers);
+         anchorGraph.findReverseComplementAnchors(anchors(), assembler.markers);
          anchorGraph.findReverseComplementVertices();
          anchorGraph.findReverseComplementEdges();
          anchorGraph.separateStrands();
@@ -606,7 +607,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
      // Create the assembly graph for this connected component.
      return make_shared<AssemblyGraph>(
-         anchorGraph, anchors, componentId, assembler, orientedReadIds, anchorIds, threadCount,
+         anchorGraph, anchors(), componentId, assembler, orientedReadIds, anchorIds, threadCount,
          options, assembleSequence, debug);
 }
 
@@ -646,7 +647,7 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
 
         for(uint64_t localAnchorId=0; localAnchorId<component.anchorIds.size(); localAnchorId++) {
             const AnchorId anchorId = anchorIds[localAnchorId];
-            const Anchor anchor = anchors[anchorId];
+            const Anchor anchor = anchors()[anchorId];
             for(const MarkerInterval& markerInterval: anchor) {
                 csv << anchorId << ",";
                 csv << markerInterval.orientedReadId << ",";
