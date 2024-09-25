@@ -461,7 +461,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     cout << "This connected component has " << orientedReadIds.size() <<
         " oriented reads and " << anchorIds.size() << " anchors." << endl;
     if(isSelfComplementary) {
-        cout << "This connected component is self-complementary." << endl;
+        cout << "This connected component is self-complementary and will be assembled double-stranded." << endl;
     }
 
     // Write to orientedReadsCsv the oriented reads for this component.
@@ -582,8 +582,9 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      cout << "After removing cross-edges, the AnchorGraph for this connected component has " <<
          num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
 
-     // Strand separation.
-     if(isSelfComplementary) {
+     // Strand separation does not work well ans is skipped.
+     // If the component is self-complementary, it will be assembled double-stranded.
+     if(false /*isSelfComplementary*/) {
          anchorGraph.findReverseComplementAnchors(anchors, assembler.markers);
          anchorGraph.findReverseComplementVertices();
          anchorGraph.findReverseComplementEdges();
