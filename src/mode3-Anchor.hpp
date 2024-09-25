@@ -10,8 +10,10 @@
 
 namespace shasta {
 
+    class CompressedMarker;
     class MarkerGraph;
     class MarkerInterval;
+    class Reads;
 
 
     // The main input to mode 3 assembly is a set of anchors.
@@ -78,10 +80,15 @@ public:
     // This constructor creates the Anchors from marker graph edges.
     Anchors(
         const MappedMemoryOwner&,
+        const Reads& reads,
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         const MarkerGraph&);
 
     // This constructor access existing Anchors.
-    Anchors(const MappedMemoryOwner&);
+    Anchors(
+        const MappedMemoryOwner&,
+        const Reads& reads,
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers);
 
     Anchor operator[](AnchorId anchorId) const;
     uint64_t size() const;
@@ -91,4 +98,6 @@ public:
 
 private:
     MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> anchorMarkerIntervals;
+    const Reads& reads;
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
 };

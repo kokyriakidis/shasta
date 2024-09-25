@@ -12,9 +12,13 @@ template class MultithreadedObject<Anchors>;
 // This constructor creates the Anchor MarkerIntervals from marker graph edges.
 Anchors::Anchors(
     const MappedMemoryOwner& mappedMemoryOwner,
+    const Reads& reads,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     const MarkerGraph& markerGraph) :
     MultithreadedObject<Anchors>(*this),
-    MappedMemoryOwner(mappedMemoryOwner)
+    MappedMemoryOwner(mappedMemoryOwner),
+    reads(reads),
+    markers(markers)
 {
     anchorMarkerIntervals.createNew(largeDataName("AnchorMarkerIntervals"), largeDataPageSize);
 
@@ -28,9 +32,14 @@ Anchors::Anchors(
 
 
 // This constructor access existing Anchors.
-Anchors::Anchors(const MappedMemoryOwner& mappedMemoryOwner) :
+Anchors::Anchors(
+    const MappedMemoryOwner& mappedMemoryOwner,
+    const Reads& reads,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) :
     MultithreadedObject<Anchors>(*this),
-    MappedMemoryOwner(mappedMemoryOwner)
+    MappedMemoryOwner(mappedMemoryOwner),
+    reads(reads),
+    markers(markers)
 {
     anchorMarkerIntervals.accessExistingReadOnly(largeDataName("AnchorMarkerIntervals"));
 }

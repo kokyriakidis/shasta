@@ -1132,7 +1132,11 @@ void shasta::main::mode3Assembly(
 
     // Construct the mode3::Anchors.
     shared_ptr<mode3::Anchors> anchors =
-        make_shared<mode3::Anchors>(MappedMemoryOwner(assembler), assembler.markerGraph);
+        make_shared<mode3::Anchors>(
+            MappedMemoryOwner(assembler),
+            assembler.getReads(),
+            assembler.markers,
+            assembler.markerGraph);
 
     // We can now remove the marker graph vertices.
     assembler.markerGraph.vertices().remove();
