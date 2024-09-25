@@ -35,7 +35,8 @@ class shasta::Mode3Assembler :
     public MappedMemoryOwner {
 public:
     Mode3Assembler(
-        const Assembler&,
+        const Assembler& assembler,
+        bool useExistingAnchors,
         uint64_t threadCount,
         const Mode3AssemblyOptions&,
         bool debug);

@@ -94,7 +94,19 @@ void Assembler::mode3Assembly(
     bool debug
     )
 {
-    mode3Assembler = make_shared<Mode3Assembler>(*this, threadCount, options, debug);
+    mode3Assembler = make_shared<Mode3Assembler>(*this, false, threadCount, options, debug);
+}
+
+
+
+// Same, but use existing Anchors. Python callable.
+void Assembler::mode3Reassembly(
+    uint64_t threadCount,
+    const Mode3AssemblyOptions& options,
+    bool debug
+    )
+{
+    mode3Assembler = make_shared<Mode3Assembler>(*this, true, threadCount, options, debug);
 }
 
 

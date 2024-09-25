@@ -2,6 +2,7 @@
 
 #include "MarkerInterval.hpp"
 #include "MappedMemoryOwner.hpp"
+#include "MemoryMappedVectorOfVectors.hpp"
 
 #include "cstdint.hpp"
 #include "span.hpp"
@@ -11,9 +12,6 @@ namespace shasta {
     class MarkerGraph;
     class MarkerInterval;
 
-    namespace MemoryMapped {
-        template<class T, class Int> class VectorOfVectors;
-    }
 
     // The main input to mode 3 assembly is a set of anchors.
     // Each anchor consists of a span of MarkerIntervals, with the following requirements:
@@ -74,9 +72,14 @@ public:
 class shasta::mode3::Anchors : public MappedMemoryOwner {
 public:
 
+    // This constructor creates the Anchors from marker graph edges.
     Anchors(
         const MappedMemoryOwner&,
         const MarkerGraph&);
+
+    // This constructor access existing Anchors.
+    Anchors(const MappedMemoryOwner&);
+
     Anchor operator[](AnchorId anchorId) const;
     uint64_t size() const;
 
@@ -84,5 +87,5 @@ public:
     uint64_t countCommon(AnchorId, AnchorId) const;
 
 private:
-    const MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t>& anchorMarkerIntervals;
+    MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> anchorMarkerIntervals;
 };

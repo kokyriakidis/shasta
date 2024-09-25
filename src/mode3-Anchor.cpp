@@ -4,13 +4,30 @@ using namespace shasta;
 using namespace mode3;
 
 
+// This constructor creates the Anchor MarkerIntervals from marker graph edges.
 Anchors::Anchors(
     const MappedMemoryOwner& mappedMemoryOwner,
     const MarkerGraph& markerGraph) :
-    MappedMemoryOwner(mappedMemoryOwner),
-    anchorMarkerIntervals(markerGraph.edgeMarkerIntervals)
+    MappedMemoryOwner(mappedMemoryOwner)
 {
+    anchorMarkerIntervals.createNew(largeDataName("AnchorMarkerIntervals"), largeDataPageSize);
+
+    // For now copy the marker intervals from the marker graph graph.
+    for(uint64_t anchorId=0; anchorId<markerGraph.edgeMarkerIntervals.size(); anchorId++) {
+        const auto v = markerGraph.edgeMarkerIntervals[anchorId];
+        anchorMarkerIntervals.appendVector(v.begin(), v.end());
+    }
 }
+
+
+
+// This constructor access existing Anchors.
+Anchors::Anchors(const MappedMemoryOwner& mappedMemoryOwner) :
+    MappedMemoryOwner(mappedMemoryOwner)
+{
+    anchorMarkerIntervals.accessExistingReadOnly(largeDataName("AnchorMarkerIntervals"));
+}
+
 
 
 Anchor Anchors::operator[](AnchorId anchorId) const
