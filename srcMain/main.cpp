@@ -11,6 +11,7 @@
 #include "ConfigurationTable.hpp"
 #include "Coverage.hpp"
 #include "filesystem.hpp"
+#include "mode3-Anchor.hpp"
 #include "performanceLog.hpp"
 #include "Reads.hpp"
 #include "Tee.hpp"
@@ -1129,12 +1130,20 @@ void shasta::main::mode3Assembly(
         assemblerOptions.assemblyOptions.mode3Options.maxPrimaryCoverage,
         threadCount);
 
+    // Construct the mode3::Anchors.
+    shared_ptr<mode3::Anchors> anchors =
+        make_shared<mode3::Anchors>(
+            MappedMemoryOwner(assembler),
+            assembler.getReads(),
+            assembler.markers,
+            assembler.markerGraph);
+
     // We can now remove the marker graph vertices.
     assembler.markerGraph.vertices().remove();
     assembler.markerGraph.vertexTable.remove();
 
     // Run Mode 3 assembly.
-    assembler.mode3Assembly(threadCount, assemblerOptions.assemblyOptions.mode3Options, false);
+    assembler.mode3Assembly(threadCount, anchors, assemblerOptions.assemblyOptions.mode3Options, false);
 }
 
 

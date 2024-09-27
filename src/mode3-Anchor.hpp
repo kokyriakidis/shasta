@@ -1,18 +1,20 @@
 #pragma once
 
 #include "MarkerInterval.hpp"
+#include "MappedMemoryOwner.hpp"
+#include "MemoryMappedVectorOfVectors.hpp"
+#include "MultithreadedObject.hpp"
 
 #include "cstdint.hpp"
 #include "span.hpp"
 
 namespace shasta {
 
+    class CompressedMarker;
     class MarkerGraph;
     class MarkerInterval;
+    class Reads;
 
-    namespace MemoryMapped {
-        template<class T, class Int> class VectorOfVectors;
-    }
 
     // The main input to mode 3 assembly is a set of anchors.
     // Each anchor consists of a span of MarkerIntervals, with the following requirements:
@@ -53,6 +55,8 @@ public:
         return BaseClass::operator[](i);
     }
 
+    void check() const;
+
     using BaseClass::size;
     using BaseClass::begin;
     using BaseClass::end;
@@ -70,10 +74,24 @@ public:
 
 
 
-class shasta::mode3::Anchors {
+class shasta::mode3::Anchors :
+    public MultithreadedObject<Anchors>,
+    public MappedMemoryOwner {
 public:
 
-    Anchors(const MarkerGraph&);
+    // This constructor creates the Anchors from marker graph edges.
+    Anchors(
+        const MappedMemoryOwner&,
+        const Reads& reads,
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+        const MarkerGraph&);
+
+    // This constructor access existing Anchors.
+    Anchors(
+        const MappedMemoryOwner&,
+        const Reads& reads,
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers);
+
     Anchor operator[](AnchorId anchorId) const;
     uint64_t size() const;
 
@@ -81,5 +99,9 @@ public:
     uint64_t countCommon(AnchorId, AnchorId) const;
 
 private:
-    const MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t>& anchorMarkerIntervals;
+    MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> anchorMarkerIntervals;
+    const Reads& reads;
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
+
+    void check() const;
 };

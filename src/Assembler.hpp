@@ -68,6 +68,10 @@ namespace shasta {
         class AssemblyGraph;
     }
 
+    namespace mode3 {
+        class Anchors;
+    }
+
     namespace MemoryMapped {
         class ByteAllocator;
     }
@@ -2466,8 +2470,15 @@ public:
     // Assemble sequence between two primary edges.
     void fillMode3AssemblyPathStep(const vector<string>&, ostream&);
 
-    // Top level function for Mode 3 assembly, starting from the MarkerGraph.
+    // Top level function for Mode 3 assembly.
     void mode3Assembly(
+        uint64_t threadCount,
+        shared_ptr<mode3::Anchors>,
+        const Mode3AssemblyOptions&,
+        bool debug
+    );
+    // Same, but use existing Anchors. Python callable.
+    void mode3Reassembly(
         uint64_t threadCount,
         const Mode3AssemblyOptions&,
         bool debug

@@ -90,11 +90,29 @@ pair<uint64_t, uint64_t> Assembler::getPrimaryCoverageRange()
 
 void Assembler::mode3Assembly(
     uint64_t threadCount,
+    shared_ptr<mode3::Anchors> anchorsPointer,
     const Mode3AssemblyOptions& options,
     bool debug
     )
 {
-    mode3Assembler = make_shared<Mode3Assembler>(*this, threadCount, options, debug);
+    mode3Assembler = make_shared<Mode3Assembler>(*this, anchorsPointer, threadCount, options, debug);
+}
+
+
+
+// Same, but use existing Anchors. Python callable.
+void Assembler::mode3Reassembly(
+    uint64_t threadCount,
+    const Mode3AssemblyOptions& options,
+    bool debug
+    )
+{
+    // Create the Anchors from binary data.
+    shared_ptr<mode3::Anchors> anchorsPointer =
+        make_shared<mode3::Anchors>(MappedMemoryOwner(*this), getReads(), markers, markerGraph);
+
+    // Run the Mode 3 assembly.
+    mode3Assembler = make_shared<Mode3Assembler>(*this, anchorsPointer, threadCount, options, debug);
 }
 
 

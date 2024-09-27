@@ -30,6 +30,6 @@ a.accessMarkerGraphEdgeMarkerIntervals()
 a.accessMarkerGraphConsensus()
 a.accessDisjointSetsHistogram()
 
-# Run Mode 3 assembly.
-a.mode3Assembly(0, options.assemblyOptions.mode3Options, arguments.debug)
+# Run Mode 3 assembly using existing Anchors.
+a.mode3Reassembly(0, options.assemblyOptions.mode3Options, arguments.debug)
  

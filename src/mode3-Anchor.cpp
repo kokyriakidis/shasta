@@ -3,11 +3,49 @@
 using namespace shasta;
 using namespace mode3;
 
+// Explicit instantiation.
+#include "MultithreadedObject.tpp"
+template class MultithreadedObject<Anchors>;
 
-Anchors::Anchors(const MarkerGraph& markerGraph) :
-    anchorMarkerIntervals(markerGraph.edgeMarkerIntervals)
+
+
+// This constructor creates the Anchor MarkerIntervals from marker graph edges.
+Anchors::Anchors(
+    const MappedMemoryOwner& mappedMemoryOwner,
+    const Reads& reads,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+    const MarkerGraph& markerGraph) :
+    MultithreadedObject<Anchors>(*this),
+    MappedMemoryOwner(mappedMemoryOwner),
+    reads(reads),
+    markers(markers)
 {
+    anchorMarkerIntervals.createNew(largeDataName("AnchorMarkerIntervals"), largeDataPageSize);
+
+    // For now copy the marker intervals from the marker graph graph.
+    for(uint64_t anchorId=0; anchorId<markerGraph.edgeMarkerIntervals.size(); anchorId++) {
+        const auto v = markerGraph.edgeMarkerIntervals[anchorId];
+        anchorMarkerIntervals.appendVector(v.begin(), v.end());
+    }
+
+    check();
 }
+
+
+
+// This constructor access existing Anchors.
+Anchors::Anchors(
+    const MappedMemoryOwner& mappedMemoryOwner,
+    const Reads& reads,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) :
+    MultithreadedObject<Anchors>(*this),
+    MappedMemoryOwner(mappedMemoryOwner),
+    reads(reads),
+    markers(markers)
+{
+    anchorMarkerIntervals.accessExistingReadOnly(largeDataName("AnchorMarkerIntervals"));
+}
+
 
 
 Anchor Anchors::operator[](AnchorId anchorId) const
@@ -21,6 +59,30 @@ uint64_t Anchors::size() const
 {
     return anchorMarkerIntervals.size();
 }
+
+
+
+void Anchors::check() const
+{
+    const Anchors& anchors = *this;
+
+    for(AnchorId anchorId=0; anchorId<size(); anchorId++) {
+        const Anchor& anchor = anchors[anchorId];
+        anchor.check();
+    }
+}
+
+
+
+void Anchor::check() const
+{
+    const Anchor& anchor = *this;
+
+    for(uint64_t i=1; i<size(); i++) {
+        SHASTA_ASSERT(anchor[i-1].orientedReadId.getReadId() < anchor[i].orientedReadId.getReadId());
+    }
+}
+
 
 
 // Return the number of common oriented reads between two Anchors.
