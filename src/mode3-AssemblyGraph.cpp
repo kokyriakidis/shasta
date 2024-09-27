@@ -786,10 +786,8 @@ void AssemblyGraph::writeChainDetailsCsv(
 
                 if(positionInChain != 0) {
                     const MarkerGraphEdgeId previousMarkerGraphEdgeId = chain[positionInChain - 1];
-                    MarkerGraphEdgePairInfo info;
-                    SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
-                        previousMarkerGraphEdgeId, markerGraphEdgeId, info));
-                    SHASTA_ASSERT(info.common == anchors.countCommon(previousMarkerGraphEdgeId, markerGraphEdgeId));
+                    AnchorPairInfo info;
+                    anchors.analyzeAnchorPair(previousMarkerGraphEdgeId, markerGraphEdgeId, info);
                     csv << info.common << ",";
                     if(info.common != 0) {
                         csv << info.offsetInBases << ",";
@@ -857,8 +855,7 @@ void AssemblyGraph::writeGraphviz(
                         for(uint64_t i=1; i<chain.size()-1; i++) {
                             const AnchorId anchorId = chain[i];
                             const Anchor anchor = anchors[anchorId];
-                            const uint64_t coverage = assembler.markerGraph.edgeCoverage(anchorId);
-                            SHASTA_ASSERT(coverage == anchor.coverage());
+                            const uint64_t coverage = anchor.coverage();
                             coverageSum += coverage;
                         }
                         const double averageCoverage = double(coverageSum) / double(chain.size() - 2);
@@ -1525,9 +1522,11 @@ uint64_t AssemblyGraph::chainOffset(const Chain& chain) const
         const MarkerGraphEdgeId edgeId0 = chain[i-1];
         const MarkerGraphEdgeId edgeId1 = chain[i];
 
-        const uint64_t offsetThisPair = assembler.estimateBaseOffsetUnsafe(edgeId0, edgeId1);
+        AnchorPairInfo info;
+        anchors.analyzeAnchorPair(edgeId0, edgeId1, info);
+        const int64_t offsetThisPair = info.offsetInBases;
 
-        if(offsetThisPair != invalid<uint64_t>) {
+        if(offsetThisPair != invalid<int64_t>) {
             offset += offsetThisPair;
         }
     }
@@ -2018,10 +2017,9 @@ bool AssemblyGraph::removeShortSuperbubbles(
         }
 
         // Check the base offset between the entrance and the exit.
-        MarkerGraphEdgePairInfo info;
-        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
-            cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId(), info));
-        SHASTA_ASSERT(info.common == anchors.countCommon(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId()));
+        AnchorPairInfo info;
+        anchors.analyzeAnchorPair(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId(), info);
+
         if(info.common == 0) {
             if(debug) {
                 cout << "This superbubble will not be removed because "
@@ -2268,9 +2266,9 @@ void AssemblyGraph::cleanupSuperbubble(
 
 
     // Check the base offset between the entrance and the exit.
-    MarkerGraphEdgePairInfo info;
-    SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId(), info));
-    SHASTA_ASSERT(info.common == anchors.countCommon(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId()));
+    AnchorPairInfo info;
+    anchors.analyzeAnchorPair(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId(), info);
+
     if(info.common == 0) {
         if(debug) {
             cout << "This superbubble will be skipped because "
@@ -5666,19 +5664,10 @@ void AssemblyGraph::gatherOrientedReadIdsAtEnd(
     orientedReadIds.clear();
     for(uint64_t i=first; i<=last; i++) {
         const AnchorId anchorId = chain[i];
-        const auto& markerIntervals =
-            assembler.markerGraph.edgeMarkerIntervals[anchorId];
-        for(const MarkerInterval& markerInterval: markerIntervals) {
+        const Anchor anchor = anchors[anchorId];
+        for(const MarkerInterval& markerInterval: anchor) {
             orientedReadIds.push_back(markerInterval.orientedReadId);
         }
-
-        // Check the that Anchor has identical marker intervals.
-        const Anchor anchor = anchors[anchorId];
-        SHASTA_ASSERT(anchor.coverage() == markerIntervals.size());
-        for(uint64_t j=0; j<anchor.coverage(); j++) {
-            SHASTA_ASSERT(markerIntervals[j] == anchor[j]);
-        }
-
     }
     deduplicate(orientedReadIds);
 }
@@ -5702,17 +5691,9 @@ void AssemblyGraph::gatherOrientedReadIdsAtBeginning(
     orientedReadIds.clear();
     for(uint64_t i=first; i<=last; i++) {
         const AnchorId anchorId = chain[i];
-        const auto& markerIntervals =
-            assembler.markerGraph.edgeMarkerIntervals[anchorId];
-        for(const MarkerInterval& markerInterval: markerIntervals) {
-            orientedReadIds.push_back(markerInterval.orientedReadId);
-        }
-
-        // Check the that Anchor has identical marker intervals.
         const Anchor anchor = anchors[anchorId];
-        SHASTA_ASSERT(anchor.coverage() == markerIntervals.size());
-        for(uint64_t j=0; j<anchor.coverage(); j++) {
-            SHASTA_ASSERT(markerIntervals[j] == anchor[j]);
+        for(const MarkerInterval& markerInterval: anchor) {
+            orientedReadIds.push_back(markerInterval.orientedReadId);
         }
     }
     deduplicate(orientedReadIds);
@@ -6560,10 +6541,10 @@ void AssemblyGraph::assembleChainsMultithreaded(
                     // Compute the offset.
                     const MarkerGraphEdgeId edgeIdA = chain[positionInChain];
                     const MarkerGraphEdgeId edgeIdB = chain[positionInChain + 1];
-                    MarkerGraphEdgePairInfo info;
-                    SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
-                        edgeIdA, edgeIdB, info));
-                    SHASTA_ASSERT(info.common == anchors.countCommon(edgeIdA, edgeIdB));
+
+                    AnchorPairInfo info;
+                    anchors.analyzeAnchorPair(edgeIdA, edgeIdB, info);
+
                     assemblyStep.offsetInBases = info.offsetInBases;
 
                     // Store this assembly step.
@@ -6729,8 +6710,7 @@ void AssemblyGraph::writeAssemblyDetails() const
                     // contributed by this Anchor.
                     {
                         const AnchorId anchorId = chain[positionInChain];
-                        const uint64_t coverage = assembler.markerGraph.edgeMarkerIntervals[anchorId].size();
-                        SHASTA_ASSERT(coverage == anchors[anchorId].coverage());
+                        const uint64_t coverage = anchors[anchorId].coverage();
                         const uint64_t edgeSequenceLength = assembler.markerGraph.edgeSequence[anchorId].size();
                         const uint64_t beginInSequence = positionInSequence;
                         const uint64_t endInSequence = positionInSequence + edgeSequenceLength;
@@ -6764,9 +6744,7 @@ void AssemblyGraph::writeAssemblyDetails() const
                     {
                         const MarkerGraphEdgeId edgeId = chain[positionInChain];
                         const MarkerGraphEdgeId nextEdgeId = chain[positionInChain + 1];
-                        const uint64_t commonCount = assembler.countCommonOrientedReadsUnsafe(
-                            edgeId, nextEdgeId);
-                        SHASTA_ASSERT(commonCount == anchors.countCommon(edgeId, nextEdgeId));
+                        const uint64_t commonCount = anchors.countCommon(edgeId, nextEdgeId);
                         const auto& stepSequence = chain.stepSequences[positionInChain];
                         const uint64_t stepSequenceLength = stepSequence.sequence.size();
                         const bool success = stepSequence.success;
@@ -7244,10 +7222,8 @@ void AssemblyGraph::optimizeChain(
         const uint64_t i0 = i1 - 1;
         const AnchorId anchorId0 = chainGraph[i0].edgeId;
         const AnchorId anchorId1 = chainGraph[i1].edgeId;
-        MarkerGraphEdgePairInfo info;
-        SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(anchorId0, anchorId1, info));
-        SHASTA_ASSERT(info.common == anchors.countCommon(anchorId0, anchorId1));
-        add_edge(i0, i1, {info.common}, chainGraph);
+        const uint64_t commonCount = anchors.countCommon(anchorId0, anchorId1);
+        add_edge(i0, i1, {commonCount}, chainGraph);
     }
 
 
@@ -7284,22 +7260,20 @@ void AssemblyGraph::optimizeChain(
                     // We already have the edge between v0 and v1.
                     continue;
                 }
-                MarkerGraphEdgePairInfo info;
-                SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(chainGraph[j0].edgeId, chainGraph[j1].edgeId, info));
-                SHASTA_ASSERT(info.common == anchors.countCommon(chainGraph[j0].edgeId, chainGraph[j1].edgeId));
+                const uint64_t commonCount = anchors.countCommon(chainGraph[j0].edgeId, chainGraph[j1].edgeId);
 
                 // If the number of common reads is better than for e, add this edge.
-                if(info.common > chainGraph[e].commonCount) {
-                    add_edge(j0, j1, {info.common}, chainGraph);
+                if(commonCount > chainGraph[e].commonCount) {
+                    add_edge(j0, j1, {commonCount}, chainGraph);
                     ++addedEdgesCount;
                     if(debug) {
                     cout << " Added " << j0 << "->" << j1 << " " << chainGraph[j0].edgeId << "->" << chainGraph[j1].edgeId <<
-                        " with " << info.common << " common oriented reads." << endl;
+                        " with " << commonCount << " common oriented reads." << endl;
                     }
                 } else {
                     if(debug) {
                         cout << "Found " << j0 << "->" << j1 << " " << chainGraph[j0].edgeId << "->" << chainGraph[j1].edgeId <<
-                            " with " << info.common << " common oriented reads." << endl;
+                            " with " << commonCount << " common oriented reads." << endl;
 
                     }
                 }
