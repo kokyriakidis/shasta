@@ -124,7 +124,6 @@ public:
 
     PhasingTable(
         const BubbleChain&,
-        const MarkerGraph&,
         const Anchors&,
         double phaseErrorThreshold);
 
@@ -172,7 +171,6 @@ private:
 
     void fill(
         const BubbleChain&,
-        const MarkerGraph&,
         const Anchors&,
         double phaseErrorThreshold);
 

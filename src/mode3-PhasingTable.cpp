@@ -51,8 +51,8 @@ void AssemblyGraph::writeBubbleChainsPhasingTables(
         const AssemblyGraphEdge& edge = cGraph[ce];
         const BubbleChain& bubbleChain = edge;
 
-        // Create the phasing table for this bubble chain.
-        PhasingTable phasingTable(bubbleChain, assembler.markerGraph, anchors, phaseErrorThreshold);
+        // Create the PhasingTable for this bubble chain.
+        PhasingTable phasingTable(bubbleChain, anchors, phaseErrorThreshold);
 
         if(phasingTable.empty()) {
             continue;
@@ -94,11 +94,10 @@ void AssemblyGraph::writeBubbleChainsPhasingTables(
 
 PhasingTable::PhasingTable(
     const BubbleChain& bubbleChain,
-    const MarkerGraph& markerGraph,
     const Anchors& anchors,
     double phaseErrorThreshold)
 {
-    fill(bubbleChain, markerGraph, anchors, phaseErrorThreshold);
+    fill(bubbleChain, anchors, phaseErrorThreshold);
     gatherOrientedReads();
     gatherBubbles();
     fillIndexes();
@@ -108,7 +107,6 @@ PhasingTable::PhasingTable(
 
 void PhasingTable::fill(
     const BubbleChain& bubbleChain,
-    const MarkerGraph& markerGraph,
     const Anchors& anchors,
     double phaseErrorThreshold)
 {
@@ -133,20 +131,10 @@ void PhasingTable::fill(
             SHASTA_ASSERT(chain.size() >= 2);
             for(uint64_t i=1; i<chain.size()-1; i++) {
                 const MarkerGraphEdgeId markerGraphEdgeId = chain[i];
-
-                // Loop over MarkerIntervals of this marker graph edge.
-                const span<const MarkerInterval> markerIntervals = markerGraph.edgeMarkerIntervals[markerGraphEdgeId];
-
-                // Check that the Anchors contain identical marker intervals for this Anchor.
                 const span<const MarkerInterval> anchor = anchors[markerGraphEdgeId];
-                SHASTA_ASSERT(std::equal(
-                    markerIntervals.begin(), markerIntervals.end(),
-                    anchor.begin(), anchor.end()
-                    ));
 
-
-
-                for(const MarkerInterval& markerInterval: markerIntervals) {
+                // Loop over MarkerIntervals of this anchor.
+                for(const MarkerInterval& markerInterval: anchor) {
                     const OrientedReadId orientedReadId = markerInterval.orientedReadId;
 
                     // Access the PhasingTableEntry for this OrientedReadId and

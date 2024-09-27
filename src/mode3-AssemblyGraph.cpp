@@ -5233,7 +5233,7 @@ void AssemblyGraph::phaseBubbleChainUsingPhasingTable(
 #endif
 
     // Create the phasing table for this bubble chain.
-    PhasingTable phasingTable(bubbleChain, assembler.markerGraph, anchors, phaseErrorThreshold);
+    PhasingTable phasingTable(bubbleChain, anchors, phaseErrorThreshold);
 
     if(phasingTable.empty()) {
         if(debug) {
@@ -5442,7 +5442,7 @@ void AssemblyGraph::cleanupBubbleChainUsingPhasingTable(
     }
 
     // Create the phasing table for this bubble chain.
-    PhasingTable phasingTable(bubbleChain, assembler.markerGraph, anchors, phaseErrorThreshold);
+    PhasingTable phasingTable(bubbleChain, anchors, phaseErrorThreshold);
 
     if(phasingTable.empty()) {
         return;
