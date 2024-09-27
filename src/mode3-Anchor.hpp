@@ -11,6 +11,7 @@
 
 namespace shasta {
 
+    class Base;
     class CompressedMarker;
     class MarkerGraph;
     class MarkerGraphEdgePairInfo;
@@ -95,8 +96,10 @@ public:
         const Reads& reads,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers);
 
-    Anchor operator[](AnchorId anchorId) const;
+    Anchor operator[](AnchorId) const;
     uint64_t size() const;
+
+    span<const Base> anchorSequence(AnchorId) const;
 
     // Return the number of common oriented reads between two Anchors.
     uint64_t countCommon(AnchorId, AnchorId) const;
@@ -108,6 +111,19 @@ private:
     MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> anchorMarkerIntervals;
     const Reads& reads;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
+
+    // The sequences of the anchors.
+    // We assume that marker length k is even, and anchor sequence
+    // starts at the midpoint of the first marker of the anchor
+    // and ends at the midpoint of the second marker of the anchor.
+    // This means:
+    // - If the Anchor ordinal are consecutive (as it happens
+    //   when getting Anchors from marker graph edges),
+    //   its sequence is guaranteed to have at least one base.
+    // - If the Anchor ordinal are identical (as it may happen
+    //   in a future alignment free formulation), its sequence
+    //   is empty.
+    MemoryMapped::VectorOfVectors<Base, uint64_t> anchorSequences;
 
     void check() const;
 };

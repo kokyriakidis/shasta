@@ -25,13 +25,22 @@ Anchors::Anchors(
     reads(reads),
     markers(markers)
 {
-    anchorMarkerIntervals.createNew(largeDataName("AnchorMarkerIntervals"), largeDataPageSize);
 
-    // For now copy the marker intervals from the marker graph graph.
+    // For now copy the marker intervals from the marker graph.
+    anchorMarkerIntervals.createNew(largeDataName("AnchorMarkerIntervals"), largeDataPageSize);
     for(uint64_t anchorId=0; anchorId<markerGraph.edgeMarkerIntervals.size(); anchorId++) {
         const auto v = markerGraph.edgeMarkerIntervals[anchorId];
         anchorMarkerIntervals.appendVector(v.begin(), v.end());
     }
+
+    // Also copy the Anchor sequences from the marker graph.
+    anchorSequences.createNew(largeDataName("AnchorSequences"), largeDataPageSize);
+    for(uint64_t anchorId=0; anchorId<markerGraph.edgeSequence.size(); anchorId++) {
+        const auto v = markerGraph.edgeSequence[anchorId];
+        anchorSequences.appendVector(v.begin(), v.end());
+    }
+
+    SHASTA_ASSERT(anchorSequences.size() == anchorMarkerIntervals.size());
 
     check();
 }
@@ -49,6 +58,7 @@ Anchors::Anchors(
     markers(markers)
 {
     anchorMarkerIntervals.accessExistingReadOnly(largeDataName("AnchorMarkerIntervals"));
+    anchorSequences.accessExistingReadOnly(largeDataName("AnchorSequences"));
 }
 
 
@@ -56,6 +66,13 @@ Anchors::Anchors(
 Anchor Anchors::operator[](AnchorId anchorId) const
 {
     return anchorMarkerIntervals[anchorId];
+}
+
+
+
+span<const Base> Anchors::anchorSequence(AnchorId anchorId) const
+{
+    return anchorSequences[anchorId];
 }
 
 
