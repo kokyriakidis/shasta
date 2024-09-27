@@ -3,7 +3,6 @@
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-AnchorGraph.hpp"
 #include "mode3-PhasingTable.hpp"
-#include "Assembler.hpp"
 #include "AssemblerOptions.hpp"
 #include "copyNumber.hpp"
 #include "deduplicate.hpp"
@@ -1191,8 +1190,7 @@ void AssemblyGraph::writeGfaLinksExpanded(ostream& gfa) const
             ++positionInBubbleChain) {
             const Bubble& bubble0 = bubbleChain[positionInBubbleChain - 1];
             const Bubble& bubble1 = bubbleChain[positionInBubbleChain];
-            const uint64_t overlapLength = assembler.markerGraph.edgeSequence[bubble1.front().front()].size();
-            SHASTA_ASSERT(overlapLength == anchors.anchorSequence(bubble1.front().front()).size());
+            const uint64_t overlapLength = anchors.anchorSequence(bubble1.front().front()).size();
 
             for(uint64_t indexInBubble0=0; indexInBubble0<bubble0.size(); indexInBubble0++) {
                 const string chain0StringId = chainStringId(ce, positionInBubbleChain-1, indexInBubble0);
@@ -1213,8 +1211,7 @@ void AssemblyGraph::writeGfaLinksExpanded(ostream& gfa) const
 
     // Write links between Chains in different bubble chains.
     BGL_FORALL_VERTICES(cv, graph, AssemblyGraph) {
-        const uint64_t overlapLength = assembler.markerGraph.edgeSequence[graph[cv].getAnchorId()].size();
-        SHASTA_ASSERT(overlapLength == anchors.anchorSequence(graph[cv].getAnchorId()).size());
+        const uint64_t overlapLength = anchors.anchorSequence(graph[cv].getAnchorId()).size();
 
         BGL_FORALL_INEDGES(cv, ce0, graph, AssemblyGraph) {
             const BubbleChain& bubbleChain0 = graph[ce0];
@@ -6661,12 +6658,7 @@ void AssemblyGraph::combineStepSequences(Chain& chain)
 
         // Add the sequence for the marker graph primary edge.
         const MarkerGraphEdgeId edgeId = chain[positionInChain];
-        const auto edgeSequence = assembler.markerGraph.edgeSequence[edgeId];
-        const auto edgeSequenceCheck = anchors.anchorSequence(edgeId);
-        SHASTA_ASSERT(std::equal(
-            edgeSequence.begin(), edgeSequence.end(),
-            edgeSequenceCheck.begin(), edgeSequenceCheck.end()
-            ));
+        const auto edgeSequence = anchors.anchorSequence(edgeId);
         copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(chain.sequence));
 
         // If this was the last primary edge for the chain, we are done.
@@ -6718,8 +6710,7 @@ void AssemblyGraph::writeAssemblyDetails() const
                     {
                         const AnchorId anchorId = chain[positionInChain];
                         const uint64_t coverage = anchors[anchorId].coverage();
-                        const uint64_t edgeSequenceLength = assembler.markerGraph.edgeSequence[anchorId].size();
-                        SHASTA_ASSERT(edgeSequenceLength == anchors.anchorSequence(anchorId).size());
+                        const uint64_t edgeSequenceLength = anchors.anchorSequence(anchorId).size();
                         const uint64_t beginInSequence = positionInSequence;
                         const uint64_t endInSequence = positionInSequence + edgeSequenceLength;
                         csv << chainString << ",";
