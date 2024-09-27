@@ -23,6 +23,7 @@ namespace shasta {
         class PhasingTable;
         class PhasingTableEntry;
 
+        class Anchors;
         class BubbleChain;
     }
     class MarkerGraph;
@@ -124,6 +125,7 @@ public:
     PhasingTable(
         const BubbleChain&,
         const MarkerGraph&,
+        const Anchors&,
         double phaseErrorThreshold);
 
     uint64_t entryCount() const
@@ -171,6 +173,7 @@ private:
     void fill(
         const BubbleChain&,
         const MarkerGraph&,
+        const Anchors&,
         double phaseErrorThreshold);
 
 

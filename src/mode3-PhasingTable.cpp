@@ -52,7 +52,7 @@ void AssemblyGraph::writeBubbleChainsPhasingTables(
         const BubbleChain& bubbleChain = edge;
 
         // Create the phasing table for this bubble chain.
-        PhasingTable phasingTable(bubbleChain, assembler.markerGraph, phaseErrorThreshold);
+        PhasingTable phasingTable(bubbleChain, assembler.markerGraph, anchors, phaseErrorThreshold);
 
         if(phasingTable.empty()) {
             continue;
@@ -95,9 +95,10 @@ void AssemblyGraph::writeBubbleChainsPhasingTables(
 PhasingTable::PhasingTable(
     const BubbleChain& bubbleChain,
     const MarkerGraph& markerGraph,
+    const Anchors& anchors,
     double phaseErrorThreshold)
 {
-    fill(bubbleChain, markerGraph, phaseErrorThreshold);
+    fill(bubbleChain, markerGraph, anchors, phaseErrorThreshold);
     gatherOrientedReads();
     gatherBubbles();
     fillIndexes();
@@ -108,6 +109,7 @@ PhasingTable::PhasingTable(
 void PhasingTable::fill(
     const BubbleChain& bubbleChain,
     const MarkerGraph& markerGraph,
+    const Anchors& anchors,
     double phaseErrorThreshold)
 {
     clear();
@@ -134,6 +136,16 @@ void PhasingTable::fill(
 
                 // Loop over MarkerIntervals of this marker graph edge.
                 const span<const MarkerInterval> markerIntervals = markerGraph.edgeMarkerIntervals[markerGraphEdgeId];
+
+                // Check that the Anchors contain identical marker intervals for this Anchor.
+                const span<const MarkerInterval> anchor = anchors[markerGraphEdgeId];
+                SHASTA_ASSERT(std::equal(
+                    markerIntervals.begin(), markerIntervals.end(),
+                    anchor.begin(), anchor.end()
+                    ));
+
+
+
                 for(const MarkerInterval& markerInterval: markerIntervals) {
                     const OrientedReadId orientedReadId = markerInterval.orientedReadId;
 
