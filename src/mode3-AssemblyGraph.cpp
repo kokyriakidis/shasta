@@ -789,7 +789,11 @@ void AssemblyGraph::writeChainDetailsCsv(
                     MarkerGraphEdgePairInfo info;
                     SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
                         previousMarkerGraphEdgeId, markerGraphEdgeId, info));
-                    SHASTA_ASSERT(info.common == anchors.countCommon(previousMarkerGraphEdgeId, markerGraphEdgeId));
+
+                    AnchorPairInfo infoCheck;
+                    anchors.analyzeAnchorPair(previousMarkerGraphEdgeId, markerGraphEdgeId, infoCheck);
+                    infoCheck.checkIdentical(info);
+
                     csv << info.common << ",";
                     if(info.common != 0) {
                         csv << info.offsetInBases << ",";
@@ -2021,7 +2025,11 @@ bool AssemblyGraph::removeShortSuperbubbles(
         MarkerGraphEdgePairInfo info;
         SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
             cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId(), info));
-        SHASTA_ASSERT(info.common == anchors.countCommon(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId()));
+
+        AnchorPairInfo infoCheck;
+        anchors.analyzeAnchorPair(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId(), infoCheck);
+        infoCheck.checkIdentical(info);
+
         if(info.common == 0) {
             if(debug) {
                 cout << "This superbubble will not be removed because "
@@ -2270,7 +2278,11 @@ void AssemblyGraph::cleanupSuperbubble(
     // Check the base offset between the entrance and the exit.
     MarkerGraphEdgePairInfo info;
     SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId(), info));
-    SHASTA_ASSERT(info.common == anchors.countCommon(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId()));
+
+    AnchorPairInfo infoCheck;
+    anchors.analyzeAnchorPair(cGraph[entrance].getAnchorId(), cGraph[exit].getAnchorId(), infoCheck);
+    infoCheck.checkIdentical(info);
+
     if(info.common == 0) {
         if(debug) {
             cout << "This superbubble will be skipped because "
@@ -6563,7 +6575,11 @@ void AssemblyGraph::assembleChainsMultithreaded(
                     MarkerGraphEdgePairInfo info;
                     SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(
                         edgeIdA, edgeIdB, info));
-                    SHASTA_ASSERT(info.common == anchors.countCommon(edgeIdA, edgeIdB));
+
+                    AnchorPairInfo infoCheck;
+                    anchors.analyzeAnchorPair(edgeIdA, edgeIdB, infoCheck);
+                    infoCheck.checkIdentical(info);
+
                     assemblyStep.offsetInBases = info.offsetInBases;
 
                     // Store this assembly step.
