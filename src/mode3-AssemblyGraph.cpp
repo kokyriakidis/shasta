@@ -5708,11 +5708,11 @@ void AssemblyGraph::gatherOrientedReadIdsAtBeginning(
         }
 
         // Check the that Anchor has identical marker intervals.
-        const Anchor anchor = anchors[anchorId];
-        SHASTA_ASSERT(anchor.coverage() == markerIntervals.size());
-        for(uint64_t j=0; j<anchor.coverage(); j++) {
-            SHASTA_ASSERT(markerIntervals[j] == anchor[j]);
-        }
+        const auto& markerIntervalsCheck = anchors[anchorId];
+        SHASTA_ASSERT(std::equal(
+            markerIntervals.begin(), markerIntervals.end(),
+            markerIntervalsCheck.begin(), markerIntervalsCheck.end()
+            ));
     }
     deduplicate(orientedReadIds);
 }
@@ -6732,8 +6732,7 @@ void AssemblyGraph::writeAssemblyDetails() const
                     // contributed by this Anchor.
                     {
                         const AnchorId anchorId = chain[positionInChain];
-                        const uint64_t coverage = assembler.markerGraph.edgeMarkerIntervals[anchorId].size();
-                        SHASTA_ASSERT(coverage == anchors[anchorId].coverage());
+                        const uint64_t coverage = anchors[anchorId].coverage();
                         const uint64_t edgeSequenceLength = assembler.markerGraph.edgeSequence[anchorId].size();
                         const uint64_t beginInSequence = positionInSequence;
                         const uint64_t endInSequence = positionInSequence + edgeSequenceLength;
