@@ -2,6 +2,10 @@
 
 import os
 import shasta
+import GetConfig
+
+# Read the config file.
+config = GetConfig.getConfig()
 
 # Initialize the assembler and access what we need.
 a = shasta.Assembler()
@@ -9,6 +13,7 @@ a.accessMarkers()
 a.accessAlignmentDataReadWrite()
 a.accessCompressedAlignments()
 
-a.createReadGraph4()
+a.createReadGraph4(
+    maxAlignmentCount = int(config['ReadGraph']['maxAlignmentCount']))
 
 

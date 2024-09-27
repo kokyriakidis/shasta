@@ -1018,7 +1018,7 @@ public:
     void writeReadGraphEdges(bool useReadName=false) const;
 
     void createReadGraph3(uint64_t maxAlignmentCount);
-    void createReadGraph4();
+    void createReadGraph4(uint32_t maxAlignmentCount);
 
 
 
