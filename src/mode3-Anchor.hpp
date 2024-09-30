@@ -113,7 +113,6 @@ private:
 public:
     const Reads& reads;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
-private:
 
     // The sequences of the anchors.
     // We assume that marker length k is even, and anchor sequence
@@ -128,6 +127,7 @@ private:
     //   is empty.
     MemoryMapped::VectorOfVectors<Base, uint64_t> anchorSequences;
 
+private:
     void check() const;
 };
 

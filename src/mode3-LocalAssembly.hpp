@@ -150,6 +150,7 @@ private:
     // Store constructor arguments.
     const Assembler& assembler;
     uint64_t k;
+    uint64_t kHalf;
     const Reads& reads;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
     const Anchors& anchors;

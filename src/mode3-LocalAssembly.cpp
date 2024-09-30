@@ -67,6 +67,9 @@ LocalAssembly::LocalAssembly(
     html(displayOptions.html)
 {
 
+    SHASTA_ASSERT((k % 2) == 0);
+    kHalf = k / 2;
+
 
     // If the edges are adjacent, stop here, leaving the AssemblyPath empty.
     // This results in empty secondary sequence.
@@ -187,13 +190,6 @@ void LocalAssembly::checkAssumptions() const
 {
     SHASTA_ASSERT(edgeIdA != edgeIdB);
     SHASTA_ASSERT(reads.representation == 0);
-
-    // The remaining assumptions are checked at a higher level.
-#if 0
-    SHASTA_ASSERT(assembler.assemblerInfo->assemblyMode == 3);
-    SHASTA_ASSERT(not assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdA));
-    SHASTA_ASSERT(not assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdB));
-#endif
 }
 
 
@@ -470,7 +466,7 @@ void LocalAssembly::gatherMarkers(double estimatedOffsetRatio)
         // Oriented reads that appear on edgeIdA but not on edgeIdB.
         else if(info.isOnA() and not info.isOnB()) {
             const int64_t maxPosition = basePosition(orientedReadId, info.ordinalA) + offsetThreshold;
-            const int64_t markerCount = int64_t(assembler.markers.size(orientedReadId.getValue()));
+            const int64_t markerCount = int64_t(markers.size(orientedReadId.getValue()));
 
             for(int64_t ordinal=info.ordinalA;
                 ordinal<markerCount; ordinal++) {
@@ -518,7 +514,7 @@ void LocalAssembly::addMarkerInfo(uint64_t i, int64_t ordinal)
     markerInfo.kmerId = getOrientedReadMarkerKmerId(
         info.orientedReadId,
         uint32_t(ordinal),
-        assembler.assemblerInfo->k,
+        k,
         reads,
         markers);
 
@@ -532,8 +528,6 @@ void LocalAssembly::writeMarkers()
     if(not (html and options.showMarkers)) {
         return;
     }
-
-    const uint64_t k = assembler.assemblerInfo->k;
 
     html <<
         "<h2>Markers used in this assembly step</h2>"
@@ -1017,8 +1011,8 @@ uint64_t LocalAssembly::createVertices(
     if(minVertexCoverage == 0) {
 
         // Estimate the desired number of vertices given the estimated offset.
-        const uint64_t totalBaseCount = assembler.assemblerInfo->baseCount * 2; // Both strands.
-        const uint64_t totalMarkerCount = assembler.markers.totalSize();
+        const uint64_t totalBaseCount = reads.getTotalBaseCount() * 2; // Both strands.
+        const uint64_t totalMarkerCount = markers.totalSize();
         const double markerDensity = double(totalMarkerCount) / double(totalBaseCount);
         const uint64_t desiredVertexCount = uint64_t(
             vertexSamplingRate *  markerDensity * double(estimatedABOffset));
@@ -1533,10 +1527,6 @@ void LocalAssembly::assembleEdge(
             "<tr><th>Oriented<br>read<th>Sequence<br>length<th>Sequence";
     }
 
-    const uint64_t k = assembler.assemblerInfo->k;
-    SHASTA_ASSERT((k % 2) == 0);
-    const uint64_t kHalf = k / 2;
-
     // Gather the sequences of the contributing oriented reads.
     // Each sequence is stored with the number of distinct oriented reads that
     // have that sequence.
@@ -1836,7 +1826,7 @@ void LocalAssembly::getCompleteSequence(
 
     sequence.clear();
 
-    const auto edgeASequence = assembler.markerGraph.edgeSequence[edgeIdA];
+    const auto edgeASequence = anchors.anchorSequences[edgeIdA];
     copy(edgeASequence.begin(), edgeASequence.end(), back_inserter(sequence));
 
     for(const edge_descriptor e: assemblyPath) {
@@ -1844,7 +1834,7 @@ void LocalAssembly::getCompleteSequence(
         copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
     }
 
-    const auto edgeBSequence = assembler.markerGraph.edgeSequence[edgeIdB];
+    const auto edgeBSequence = anchors.anchorSequences[edgeIdB];
     copy(edgeBSequence.begin(), edgeBSequence.end(), back_inserter(sequence));
 
 
@@ -1963,10 +1953,6 @@ void LocalAssembly::writeOrientedReadsSequences() const
     if(not options.showOrientedReads) {
         return;
     }
-
-    const uint64_t k = assembler.assemblerInfo->k;
-    SHASTA_ASSERT((k % 2) == 0);
-    const uint64_t kHalf = k / 2;
 
     ofstream fasta("LocalAssembly-OrientedReadSequences.fasta");
 
