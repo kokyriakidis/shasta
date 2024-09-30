@@ -265,7 +265,7 @@ public:
         const AnchorGraph&,
         const Anchors&,
         uint64_t componentId,
-        const Assembler&,
+        uint64_t k,
         const vector<OrientedReadId>&,
         const vector<AnchorId>&,
         uint64_t threadCount,
@@ -282,7 +282,7 @@ private:
     uint64_t componentId;
 public:
     const Anchors& anchors;
-    const Assembler& assembler;
+    uint64_t k;
     const Mode3AssemblyOptions& options;
 
     // The OrientedReadIds of the connected component that generated this AssemblyGraph.

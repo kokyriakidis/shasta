@@ -3,7 +3,6 @@
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-AnchorGraph.hpp"
 #include "mode3-PhasingTable.hpp"
-#include "Assembler.hpp"
 #include "AssemblerOptions.hpp"
 #include "copyNumber.hpp"
 #include "deduplicate.hpp"
@@ -39,7 +38,7 @@ AssemblyGraph::AssemblyGraph(
     const AnchorGraph& anchorGraph,
     const Anchors& anchors,
     uint64_t componentId,
-    const Assembler& assembler,
+    uint64_t k,
     const vector<OrientedReadId>& orientedReadIds,
     const vector<AnchorId>& anchorIds,
     uint64_t threadCount,
@@ -49,7 +48,7 @@ AssemblyGraph::AssemblyGraph(
     MultithreadedObject<AssemblyGraph>(*this),
     componentId(componentId),
     anchors(anchors),
-    assembler(assembler),
+    k(k),
     options(options),
     orientedReadIds(orientedReadIds),
     anchorIds(anchorIds)
@@ -6871,7 +6870,7 @@ void AssemblyGraph::runAssemblyStep(
     auto& stepSequence = chain.stepSequences[positionInChain];
     try {
         LocalAssembly localAssembly(
-            assembler.assemblerInfo->k, anchors.reads, anchors.markers, anchors,
+            k, anchors.reads, anchors.markers, anchors,
             edgeIdA, edgeIdB, 0, html, options.localAssemblyOptions, useA, useB);
         localAssembly.getSecondarySequence(stepSequence.sequence);
         stepSequence.success = true;

@@ -1,6 +1,5 @@
 // Shasta.
 
-#include "Assembler.hpp"
 #include "bits/stdint-uintn.h"
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-PhasingTable.hpp"

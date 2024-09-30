@@ -1,6 +1,6 @@
 // Shasta.
 #include "mode3-AssemblyGraph.hpp"
-#include "Assembler.hpp"
+#include "mode3-Anchor.hpp"
 using namespace shasta;
 using namespace mode3;
 
@@ -295,12 +295,8 @@ void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
             const MarkerGraphEdgeId firstAnchor = firstChainInBubble.front();
             const MarkerGraphEdgeId lastAnchor = firstChainInBubble.back();
 
-            // Check if there are supporting reads between the first and last anchors
-            // Check for supporting reads between first and last anchor
-
-            MarkerGraphEdgePairInfo info;
-            SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(firstAnchor, lastAnchor, info));
-            const uint64_t commonCount = info.common;
+            // Check if there are common oriented reads between the first and last anchors.
+            const uint64_t commonCount = anchors.countCommon(firstAnchor, lastAnchor);
 
             if (debug) {
                 cout << " MarkerGraphedgeIds " << firstAnchor << " " << lastAnchor <<
