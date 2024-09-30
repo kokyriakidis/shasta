@@ -109,8 +109,11 @@ public:
 
 private:
     MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> anchorMarkerIntervals;
+
+public:
     const Reads& reads;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
+private:
 
     // The sequences of the anchors.
     // We assume that marker length k is even, and anchor sequence

@@ -6869,7 +6869,8 @@ void AssemblyGraph::runAssemblyStep(
     // Do the local assembly between these two MarkerGraphEdgeIds.
     auto& stepSequence = chain.stepSequences[positionInChain];
     try {
-        LocalAssembly localAssembly(assembler, edgeIdA, edgeIdB, 0, html, options.localAssemblyOptions, useA, useB);
+        LocalAssembly localAssembly(assembler, anchors.reads, anchors.markers,
+            edgeIdA, edgeIdB, 0, html, options.localAssemblyOptions, useA, useB);
         localAssembly.getSecondarySequence(stepSequence.sequence);
         stepSequence.success = true;
     } catch (...) {
