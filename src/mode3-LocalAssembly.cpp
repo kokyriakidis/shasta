@@ -181,21 +181,13 @@ LocalAssembly::LocalAssembly(
 void LocalAssembly::checkAssumptions() const
 {
     SHASTA_ASSERT(edgeIdA != edgeIdB);
+    SHASTA_ASSERT(reads.representation == 0);
+
+    // The remaining assumptions are checked at a higher level.
+#if 0
     SHASTA_ASSERT(assembler.assemblerInfo->assemblyMode == 3);
-    SHASTA_ASSERT(assembler.getReads().representation == 0);
     SHASTA_ASSERT(not assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdA));
     SHASTA_ASSERT(not assembler.markerGraph.edgeHasDuplicateOrientedReadIds(edgeIdB));
-
-#if 0
-    // Neither can their source and target vertices.
-    // This is checked when creating the marke rgraph edge in Mode 3 assembly,
-    // and it's too late now because we no longer have the vertices.
-    if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdA, markers)) {
-        throw runtime_error("Duplicated oriented read on target vertex of edgeIdA.");
-    }
-    if(markerGraph.vertexHasDuplicateOrientedReadIds(vertexIdB, markers)) {
-        throw runtime_error("Duplicated oriented read on source vertex of edgeIdB.");
-    }
 #endif
 }
 
@@ -523,8 +515,8 @@ void LocalAssembly::addMarkerInfo(uint64_t i, int64_t ordinal)
         info.orientedReadId,
         uint32_t(ordinal),
         assembler.assemblerInfo->k,
-        assembler.getReads(),
-        assembler.markers);
+        reads,
+        markers);
 
     info.markerInfos.push_back(markerInfo);
 }
@@ -1574,7 +1566,7 @@ void LocalAssembly::assembleEdge(
         // Now we can get the sequence contributed by this oriented read.
         orientedReadSequence.clear();
         for(uint64_t position=position0; position!=position1; position++) {
-            const Base base = assembler.getReads().getOrientedReadBase(orientedReadId, uint32_t(position));
+            const Base base = reads.getOrientedReadBase(orientedReadId, uint32_t(position));
             orientedReadSequence.push_back(base);
         }
 
@@ -1985,7 +1977,7 @@ void LocalAssembly::writeOrientedReadsSequences() const
             position0 << ":" << position1 <<
             " length " << position1-position0 << "\n";
         for(uint64_t position=position0; position!=position1; position++) {
-            const Base base = assembler.getReads().getOrientedReadBase(info.orientedReadId, uint32_t(position));
+            const Base base = reads.getOrientedReadBase(info.orientedReadId, uint32_t(position));
             fasta << base;
         }
         fasta << "\n";
