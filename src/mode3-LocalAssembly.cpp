@@ -44,8 +44,10 @@ namespace seqan = seqan2;
 // oriented reads on edgeIdB, regardless of whether they appear on edgeIdA.
 LocalAssembly::LocalAssembly(
     const Assembler& assembler,
+    uint64_t k,
     const Reads& reads,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+    const Anchors& anchors,
     MarkerGraphEdgeId edgeIdA,
     MarkerGraphEdgeId edgeIdB,
     uint64_t minVertexCoverage, // 0 = automatic
@@ -54,8 +56,10 @@ LocalAssembly::LocalAssembly(
     bool useA,
     bool useB) :
     assembler(assembler),
+    k(k),
     reads(reads),
     markers(markers),
+    anchors(anchors),
     edgeIdA(edgeIdA),
     edgeIdB(edgeIdB),
     options(displayOptions),

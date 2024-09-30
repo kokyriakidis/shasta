@@ -3,6 +3,7 @@
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-AnchorGraph.hpp"
 #include "mode3-PhasingTable.hpp"
+#include "Assembler.hpp"
 #include "AssemblerOptions.hpp"
 #include "copyNumber.hpp"
 #include "deduplicate.hpp"
@@ -6869,7 +6870,8 @@ void AssemblyGraph::runAssemblyStep(
     // Do the local assembly between these two MarkerGraphEdgeIds.
     auto& stepSequence = chain.stepSequences[positionInChain];
     try {
-        LocalAssembly localAssembly(assembler, anchors.reads, anchors.markers,
+        LocalAssembly localAssembly(
+            assembler, assembler.assemblerInfo->k, anchors.reads, anchors.markers, anchors,
             edgeIdA, edgeIdB, 0, html, options.localAssemblyOptions, useA, useB);
         localAssembly.getSecondarySequence(stepSequence.sequence);
         stepSequence.success = true;

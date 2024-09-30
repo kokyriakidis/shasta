@@ -707,17 +707,6 @@ void Assembler::accessAllSoft()
         allDataAreAvailable = false;
     }
 
-#if 0
-    if(assemblerInfo->assemblyMode == 3) {
-        try {
-            accessMarkerGraphPrimaryJourneys();
-        } catch(const exception& e) {
-            cout << "MarkerGraph graph primary journeys are not accessible." << endl;
-            allDataAreAvailable = false;
-        }
-    }
-#endif
-
     try {
         accessCompressedAlignments();
     } catch(const exception& e) {
@@ -759,6 +748,17 @@ void Assembler::accessAllSoft()
 
     }
 
+
+
+    // Data specific to assembly mode 3.
+    if(assemblerInfo->assemblyMode == 3) {
+        try {
+            accessMode3Assembler();
+        } catch(const exception& e) {
+            cout << "The mode 3 assembler is not accessible." << endl;
+            allDataAreAvailable = false;
+        }
+    }
 
 
     if(!allDataAreAvailable) {

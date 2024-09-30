@@ -115,6 +115,13 @@ void Assembler::mode3Reassembly(
     mode3Assembler = make_shared<Mode3Assembler>(*this, anchorsPointer, threadCount, options, debug);
 }
 
+void Assembler::accessMode3Assembler()
+{
+    shared_ptr<mode3::Anchors> anchorsPointer =
+        make_shared<mode3::Anchors>(MappedMemoryOwner(*this), getReads(), markers, markerGraph);
+    mode3Assembler = make_shared<Mode3Assembler>(*this, anchorsPointer);
+}
+
 
 
 // Assemble sequence between two Anchors.
@@ -286,7 +293,7 @@ void Assembler::fillMode3AssemblyPathStep(const vector<string>& request, ostream
 
     // Local assembly for this assembly step.
     mode3::LocalAssembly localAssembly(
-        *this, getReads(), markers,
+        *this, assemblerInfo->k, getReads(), markers, mode3Assembler->anchors(),
         edgeIdA, edgeIdB, minVertexCoverage,
         options,
         httpServerData.assemblerOptions->assemblyOptions.mode3Options.localAssemblyOptions,

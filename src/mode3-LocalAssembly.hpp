@@ -33,6 +33,8 @@ namespace shasta {
             >;
         class LocalAssemblyDisplayOptions;
         class LocalAssemblyMarkerIndexes;
+
+        class Anchors;
     }
 
     class Assembler;
@@ -122,8 +124,10 @@ public:
     // oriented reads on edgeIdB, regardless of whether they appear on edgeIdA.
     LocalAssembly(
         const Assembler&,
+        uint64_t k,
         const Reads&,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+        const Anchors& anchors,
         MarkerGraphEdgeId edgeIdA,
         MarkerGraphEdgeId edgeIdB,
         uint64_t minVertexCoverage, // 0 = automatic
@@ -145,8 +149,10 @@ private:
 
     // Store constructor arguments.
     const Assembler& assembler;
+    uint64_t k;
     const Reads& reads;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
+    const Anchors& anchors;
     MarkerGraphEdgeId edgeIdA;
     MarkerGraphEdgeId edgeIdB;
     const LocalAssemblyDisplayOptions& options;

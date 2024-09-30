@@ -50,6 +50,19 @@ Mode3Assembler::Mode3Assembler(
 
 
 
+Mode3Assembler::Mode3Assembler(
+    const Assembler& assembler,
+    shared_ptr<mode3::Anchors> anchorsPointer) :
+    MultithreadedObject<Mode3Assembler>(*this),
+    MappedMemoryOwner(assembler),
+    assembler(assembler),
+    anchorsPointer(anchorsPointer)
+{
+    SHASTA_ASSERT(anchorsPointer);
+}
+
+
+
 void Mode3Assembler::findReverseComplementAnchors()
 {
     const uint64_t readCount = assembler.markers.size() / 2;

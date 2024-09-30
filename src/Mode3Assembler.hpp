@@ -35,12 +35,18 @@ class shasta::Mode3Assembler :
     public MappedMemoryOwner {
 public:
 
+    // This constructor runs the assembly.
     Mode3Assembler(
         const Assembler& assembler,
         shared_ptr<mode3::Anchors> anchorsPointer,
         uint64_t threadCount,
         const Mode3AssemblyOptions&,
         bool debug);
+
+    // This constructor just accesses binary data.
+    Mode3Assembler(
+        const Assembler& assembler,
+        shared_ptr<mode3::Anchors> anchorsPointer);
 
 private:
     const Assembler& assembler;
@@ -56,6 +62,7 @@ private:
     // For now the anchors are simply a reference to assembler.markerGraph.edgeMarkerIntervals,
     // butit might be possible to construct the anchors by other means.
     shared_ptr<mode3::Anchors> anchorsPointer;
+public:
     mode3::Anchors& anchors()
     {
         return *anchorsPointer;
@@ -64,6 +71,7 @@ private:
     {
         return *anchorsPointer;
     }
+private:
 
     // Keep track of the reverse complement of each anchor:
     // the reverse complement of anchorId is reverseComplementAnchor[anchorId],

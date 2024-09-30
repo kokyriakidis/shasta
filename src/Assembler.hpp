@@ -2462,6 +2462,7 @@ public:
 
     // Mode 3 assembly.
     shared_ptr<Mode3Assembler> mode3Assembler;
+    void accessMode3Assembler();
 
     // If the coverage range for primary marker graph edges is not
     // specified, this uses the disjoint sets histogram to compute reasonable values.
