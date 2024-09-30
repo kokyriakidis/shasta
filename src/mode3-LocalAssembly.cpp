@@ -4,6 +4,7 @@
 #include "globalMsa.hpp"
 #include "markerAccessFunctions.hpp"
 #include "MarkerGraph.hpp"
+#include "mode3-Anchor.hpp"
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"
 #include "platformDependent.hpp"
@@ -200,8 +201,8 @@ void LocalAssembly::checkAssumptions() const
 void LocalAssembly::gatherOrientedReads(bool useA, bool useB)
 {
     // Joint loop over marker intervals that appear in edgeIdA and/or edgeIdB.
-    const auto markerIntervalsA = assembler.markerGraph.edgeMarkerIntervals[edgeIdA];
-    const auto markerIntervalsB = assembler.markerGraph.edgeMarkerIntervals[edgeIdB];
+    const auto markerIntervalsA = anchors[edgeIdA];
+    const auto markerIntervalsB = anchors[edgeIdB];
     const auto beginA = markerIntervalsA.begin();
     const auto beginB = markerIntervalsB.begin();
     const auto endA = markerIntervalsA.end();
@@ -405,10 +406,9 @@ void LocalAssembly::writeOrientedReads() const
 // given the ordinal.
 int64_t LocalAssembly::basePosition(OrientedReadId orientedReadId, int64_t ordinal) const
 {
-    const MarkerId markerId = assembler.getMarkerId(orientedReadId, uint32_t(ordinal));
-    const int64_t position = int64_t(assembler.markers.begin()[markerId].position);
+    const auto orientedReadMarkers = markers[orientedReadId.getValue()];
+    const int64_t position = int64_t(orientedReadMarkers[ordinal].position);
     return position;
-
 }
 
 
