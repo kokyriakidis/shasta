@@ -18,27 +18,6 @@ using namespace shasta;
 #include <map>
 
 
-#if 0
-void Assembler::flagPrimaryMarkerGraphEdges(
-    uint64_t minPrimaryCoverage,
-    uint64_t maxPrimaryCoverage,
-    uint64_t threadCount)
-{
-    // Check that we have what we need.
-    SHASTA_ASSERT(markers.isOpen());
-    checkMarkerGraphVerticesAreAvailable();
-    SHASTA_ASSERT(markerGraph.edges.isOpenWithWriteAccess);
-    SHASTA_ASSERT(markerGraph.disjointSetsHistogram.isOpen);
-
-    markerGraph.flagPrimaryEdges(
-        minPrimaryCoverage,
-        maxPrimaryCoverage,
-        markers,
-        threadCount);
-}
-#endif
-
-
 
 // If the coverage range for primary marker graph edges is not
 // specified, this uses the disjoint sets histogram to compute reasonable values.

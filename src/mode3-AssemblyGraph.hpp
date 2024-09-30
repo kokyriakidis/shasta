@@ -27,7 +27,6 @@
 
 namespace shasta {
 
-    class Assembler;
     class Mode3AssemblyOptions;
     class OrientedReadId;
 
