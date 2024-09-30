@@ -107,6 +107,10 @@ public:
     // Analyze the oriented read composition of two anchors.
     void analyzeAnchorPair(AnchorId, AnchorId, AnchorPairInfo&) const;
 
+    // Return true if the second Anchor is adjacent to the first one.
+    // For precise definition see the code.
+    bool areAdjacentAnchors(AnchorId, AnchorId) const;
+
 private:
     MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> anchorMarkerIntervals;
 

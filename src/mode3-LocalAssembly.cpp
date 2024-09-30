@@ -73,7 +73,7 @@ LocalAssembly::LocalAssembly(
 
     // If the edges are adjacent, stop here, leaving the AssemblyPath empty.
     // This results in empty secondary sequence.
-    if(assembler.markerGraph.areAdjacentEdges(edgeIdA, edgeIdB)) {
+    if(anchors.areAdjacentAnchors(edgeIdA, edgeIdB)) {
         if(html) {
             html << "<br>The two edges are adjacent. Intervening sequence is empty.";
         }

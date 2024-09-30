@@ -327,3 +327,39 @@ void AnchorPairInfo::checkIdentical(const MarkerGraphEdgePairInfo& info) const
     SHASTA_ASSERT(std::memcmp(this, &info, n) == 0);
 
 }
+
+
+
+// Return true if the second Anchor is adjacent to the first one,
+// as seen by at least one of the common oriented reads.
+// THIS CRITERION MAY BE TOO LOSE.
+bool Anchors::areAdjacentAnchors(AnchorId anchorId0, AnchorId anchorId1) const
+{
+    const auto markerIntervals0 = anchorMarkerIntervals[anchorId0];
+    const auto markerIntervals1 = anchorMarkerIntervals[anchorId1];
+
+    // Joint loop over the marker intervals.
+    auto it0 = markerIntervals0.begin();
+    auto it1 = markerIntervals1.begin();
+    const auto end0 = markerIntervals0.end();
+    const auto end1 = markerIntervals1.end();
+    while(it0 != end0 and it1 != end1) {
+        const OrientedReadId orientedReadId0 = it0->orientedReadId;
+        const OrientedReadId orientedReadId1 = it1->orientedReadId;
+
+        if(orientedReadId0 < orientedReadId1) {
+            ++it0;
+        } else if(orientedReadId1 < orientedReadId0) {
+            ++it1;
+        } else {
+            if(it0->ordinals[1] == it1->ordinals[0]) {
+                return true;
+            }
+            ++it0;
+            ++it1;
+        }
+    }
+
+    return false;
+
+}
