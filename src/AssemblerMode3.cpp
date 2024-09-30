@@ -74,7 +74,9 @@ void Assembler::mode3Assembly(
     bool debug
     )
 {
-    mode3Assembler = make_shared<Mode3Assembler>(*this, anchorsPointer, threadCount, options, debug);
+    mode3Assembler = make_shared<Mode3Assembler>(*this,
+        assemblerInfo->k, getReads(), markers,
+        anchorsPointer, threadCount, options, debug);
 }
 
 
@@ -91,14 +93,18 @@ void Assembler::mode3Reassembly(
         make_shared<mode3::Anchors>(MappedMemoryOwner(*this), getReads(), markers, markerGraph);
 
     // Run the Mode 3 assembly.
-    mode3Assembler = make_shared<Mode3Assembler>(*this, anchorsPointer, threadCount, options, debug);
+    mode3Assembler = make_shared<Mode3Assembler>(*this,
+        assemblerInfo->k, getReads(), markers,
+        anchorsPointer, threadCount, options, debug);
 }
 
 void Assembler::accessMode3Assembler()
 {
     shared_ptr<mode3::Anchors> anchorsPointer =
         make_shared<mode3::Anchors>(MappedMemoryOwner(*this), getReads(), markers, markerGraph);
-    mode3Assembler = make_shared<Mode3Assembler>(*this, anchorsPointer);
+    mode3Assembler = make_shared<Mode3Assembler>(*this,
+        assemblerInfo->k, getReads(), markers,
+        anchorsPointer);
 }
 
 

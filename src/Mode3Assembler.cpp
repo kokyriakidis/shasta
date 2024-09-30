@@ -24,6 +24,9 @@ template class MultithreadedObject<Mode3Assembler>;
 
 Mode3Assembler::Mode3Assembler(
     const Assembler& assembler,
+    uint64_t k,
+    const Reads& reads,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     shared_ptr<mode3::Anchors> anchorsPointer,
     uint64_t threadCount,
     const Mode3AssemblyOptions& options,
@@ -31,6 +34,9 @@ Mode3Assembler::Mode3Assembler(
     MultithreadedObject<Mode3Assembler>(*this),
     MappedMemoryOwner(assembler),
     assembler(assembler),
+    k(k),
+    reads(reads),
+    markers(markers),
     debug(debug),
     anchorsPointer(anchorsPointer)
 {
@@ -52,10 +58,16 @@ Mode3Assembler::Mode3Assembler(
 
 Mode3Assembler::Mode3Assembler(
     const Assembler& assembler,
+    uint64_t k,
+    const Reads& reads,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     shared_ptr<mode3::Anchors> anchorsPointer) :
     MultithreadedObject<Mode3Assembler>(*this),
     MappedMemoryOwner(assembler),
     assembler(assembler),
+    k(k),
+    reads(reads),
+    markers(markers),
     anchorsPointer(anchorsPointer)
 {
     SHASTA_ASSERT(anchorsPointer);
