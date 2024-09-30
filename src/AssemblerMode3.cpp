@@ -293,7 +293,7 @@ void Assembler::fillMode3AssemblyPathStep(const vector<string>& request, ostream
 
     // Local assembly for this assembly step.
     mode3::LocalAssembly localAssembly(
-        *this, assemblerInfo->k, getReads(), markers, mode3Assembler->anchors(),
+        assemblerInfo->k, getReads(), markers, mode3Assembler->anchors(),
         edgeIdA, edgeIdB, minVertexCoverage,
         options,
         httpServerData.assemblerOptions->assemblyOptions.mode3Options.localAssemblyOptions,

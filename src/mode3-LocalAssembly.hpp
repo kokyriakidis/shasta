@@ -37,7 +37,6 @@ namespace shasta {
         class Anchors;
     }
 
-    class Assembler;
     class CompressedMarker;
     class Reads;
 
@@ -123,7 +122,6 @@ public:
     // If useA is false and useB is true, the assembly uses the
     // oriented reads on edgeIdB, regardless of whether they appear on edgeIdA.
     LocalAssembly(
-        const Assembler&,
         uint64_t k,
         const Reads&,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
@@ -148,7 +146,6 @@ public:
 private:
 
     // Store constructor arguments.
-    const Assembler& assembler;
     uint64_t k;
     uint64_t kHalf;
     const Reads& reads;

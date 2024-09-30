@@ -44,7 +44,6 @@ namespace seqan = seqan2;
 // If useA is false and useB is true, the assembly uses the
 // oriented reads on edgeIdB, regardless of whether they appear on edgeIdA.
 LocalAssembly::LocalAssembly(
-    const Assembler& assembler,
     uint64_t k,
     const Reads& reads,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
@@ -56,7 +55,6 @@ LocalAssembly::LocalAssembly(
     const Mode3AssemblyOptions::LocalAssemblyOptions& options,
     bool useA,
     bool useB) :
-    assembler(assembler),
     k(k),
     reads(reads),
     markers(markers),

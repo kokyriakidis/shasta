@@ -6871,7 +6871,7 @@ void AssemblyGraph::runAssemblyStep(
     auto& stepSequence = chain.stepSequences[positionInChain];
     try {
         LocalAssembly localAssembly(
-            assembler, assembler.assemblerInfo->k, anchors.reads, anchors.markers, anchors,
+            assembler.assemblerInfo->k, anchors.reads, anchors.markers, anchors,
             edgeIdA, edgeIdB, 0, html, options.localAssemblyOptions, useA, useB);
         localAssembly.getSecondarySequence(stepSequence.sequence);
         stepSequence.success = true;
