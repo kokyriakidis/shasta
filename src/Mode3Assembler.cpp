@@ -77,7 +77,7 @@ Mode3Assembler::Mode3Assembler(
 
 void Mode3Assembler::findReverseComplementAnchors()
 {
-    const uint64_t readCount = assembler.markers.size() / 2;
+    const uint64_t readCount = reads.readCount();
 
     // For each Anchor, we look at the lowest numbered ReadId,
     // and store the ReadId and ordinal in anchorInfos[strand][readId].
@@ -119,7 +119,7 @@ void Mode3Assembler::findReverseComplementAnchors()
     for(ReadId readId=0; readId<readCount; readId++) {
         const OrientedReadId orientedReadId0(readId, 0);
         const OrientedReadId orientedReadId1(readId, 1);
-        const uint64_t markerCount = assembler.markers.size(orientedReadId0.getValue());
+        const uint64_t markerCount = markers.size(orientedReadId0.getValue());
 
         const vector<AnchorInfo>& anchorInfos0 = anchorInfos[0][readId];
         const vector<AnchorInfo>& anchorInfos1 = anchorInfos[1][readId];
@@ -172,7 +172,7 @@ void Mode3Assembler::computeConnectedComponents()
     // Compute connected components of the oriented reads portion
     // of the bipartite graph.
     // OrientedReadIds are indexed by OrientedReadId::getValue().
-    const uint64_t orientedReadCount = assembler.markers.size();
+    const uint64_t orientedReadCount = markers.size();
     vector<DisjointSets::Aint> disjointSetsData(orientedReadCount);
     DisjointSets disjointSets(&disjointSetsData[0], orientedReadCount);
 
@@ -494,7 +494,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
     // Write to orientedReadsCsv the oriented reads for this component.
     for(const OrientedReadId orientedReadId: orientedReadIds) {
-        const auto readName = assembler.getReads().getReadName(orientedReadId.getReadId());
+        const auto readName = reads.getReadName(orientedReadId.getReadId());
         orientedReadsCsv <<
             componentId << "," <<
             orientedReadId << ",";
@@ -613,7 +613,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      // Strand separation does not work well ans is skipped.
      // If the component is self-complementary, it will be assembled double-stranded.
      if(false /*isSelfComplementary*/) {
-         anchorGraph.findReverseComplementAnchors(anchors(), assembler.markers);
+         anchorGraph.findReverseComplementAnchors(anchors(), markers);
          anchorGraph.findReverseComplementVertices();
          anchorGraph.findReverseComplementEdges();
          anchorGraph.separateStrands();
@@ -634,7 +634,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
      // Create the assembly graph for this connected component.
      return make_shared<AssemblyGraph>(
-         anchorGraph, anchors(), componentId, assembler.assemblerInfo->k, orientedReadIds, anchorIds, threadCount,
+         anchorGraph, anchors(), componentId, k, orientedReadIds, anchorIds, threadCount,
          options, assembleSequence, debug);
 }
 
