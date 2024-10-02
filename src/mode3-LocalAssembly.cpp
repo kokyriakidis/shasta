@@ -47,8 +47,8 @@ LocalAssembly::LocalAssembly(
     const Reads& reads,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     const Anchors& anchors,
-    MarkerGraphEdgeId edgeIdA,
-    MarkerGraphEdgeId edgeIdB,
+    AnchorId anchorIdA,
+    AnchorId anchorIdB,
     uint64_t minVertexCoverage, // 0 = automatic
     const LocalAssemblyDisplayOptions& displayOptions,
     const Mode3AssemblyOptions::LocalAssemblyOptions& options,
@@ -58,8 +58,8 @@ LocalAssembly::LocalAssembly(
     reads(reads),
     markers(markers),
     anchors(anchors),
-    edgeIdA(edgeIdA),
-    edgeIdB(edgeIdB),
+    anchorIdA(anchorIdA),
+    anchorIdB(anchorIdB),
     options(displayOptions),
     html(displayOptions.html)
 {
@@ -70,9 +70,9 @@ LocalAssembly::LocalAssembly(
 
     // If the edges are adjacent, stop here, leaving the AssemblyPath empty.
     // This results in empty secondary sequence.
-    if(anchors.areAdjacentAnchors(edgeIdA, edgeIdB)) {
+    if(anchors.areAdjacentAnchors(anchorIdA, anchorIdB)) {
         if(html) {
-            html << "<br>The two edges are adjacent. Intervening sequence is empty.";
+            html << "<br>The two anchors are adjacent. Intervening sequence is empty.";
         }
         return;
     }
@@ -185,7 +185,7 @@ LocalAssembly::LocalAssembly(
 
 void LocalAssembly::checkAssumptions() const
 {
-    SHASTA_ASSERT(edgeIdA != edgeIdB);
+    SHASTA_ASSERT(anchorIdA != anchorIdB);
     SHASTA_ASSERT(reads.representation == 0);
 }
 
@@ -194,8 +194,8 @@ void LocalAssembly::checkAssumptions() const
 void LocalAssembly::gatherOrientedReads(bool useA, bool useB)
 {
     // Joint loop over marker intervals that appear in edgeIdA and/or edgeIdB.
-    const auto markerIntervalsA = anchors[edgeIdA];
-    const auto markerIntervalsB = anchors[edgeIdB];
+    const auto markerIntervalsA = anchors[anchorIdA];
+    const auto markerIntervalsB = anchors[anchorIdB];
     const auto beginA = markerIntervalsA.begin();
     const auto beginB = markerIntervalsB.begin();
     const auto endA = markerIntervalsA.end();
@@ -427,7 +427,7 @@ void LocalAssembly::estimateOffset()
 
         if(html) {
             html << "<br>The offset cannot be estimated because there are no common oriented reads between " <<
-                edgeIdA << " and " << edgeIdB;
+                anchorIdA << " and " << anchorIdB;
         }
     } else {
         estimatedABOffset = int64_t(std::round(double(sum) / double(n)));
@@ -1435,7 +1435,7 @@ void LocalAssembly::findAssemblyPath()
         if(bestCoverage == 0) {
             cout << "LocalAssembly: at " << graph[v].disjointSetId <<
                 ": no out-edge found when filling path from " <<
-                edgeIdA << " to " << edgeIdB << endl;
+                anchorIdA << " to " << anchorIdB << endl;
         }
         SHASTA_ASSERT(bestCoverage > 0);
 
@@ -1823,7 +1823,7 @@ void LocalAssembly::getCompleteSequence(
 
     sequence.clear();
 
-    const auto edgeASequence = anchors.anchorSequences[edgeIdA];
+    const auto edgeASequence = anchors.anchorSequences[anchorIdA];
     copy(edgeASequence.begin(), edgeASequence.end(), back_inserter(sequence));
 
     for(const edge_descriptor e: assemblyPath) {
@@ -1831,7 +1831,7 @@ void LocalAssembly::getCompleteSequence(
         copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(sequence));
     }
 
-    const auto edgeBSequence = anchors.anchorSequences[edgeIdB];
+    const auto edgeBSequence = anchors.anchorSequences[anchorIdB];
     copy(edgeBSequence.begin(), edgeBSequence.end(), back_inserter(sequence));
 
 

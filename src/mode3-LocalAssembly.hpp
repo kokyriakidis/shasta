@@ -35,6 +35,7 @@ namespace shasta {
         class LocalAssemblyMarkerIndexes;
 
         class Anchors;
+        using AnchorId = uint64_t;
     }
 
     class CompressedMarker;
@@ -109,25 +110,25 @@ public:
     // Hide class Base defined in boost::adjacency_list.
     using Base = shasta::Base;
 
-    // The oriented reads common between edgeIdA and edgeIdB are always
+    // The oriented reads common between anchorIdA and anchorIdB are always
     // used for assembly. The oriented reads that appear only
-    // on edgeIdA or edgeIdB are used for assembly under control
+    // on anchorIdA or anchorIdB are used for assembly under control
     // of useA and useB.
     // So, if useA and useB are both true (the default), the assembly uses the
-    // union of the oriented reads on edgeIdA and edgeIdB.
+    // union of the oriented reads on anchorIdA and anchorIdB.
     // If they are both false, the assembly uses the
-    // intersection of the oriented reads on edgeIdA and edgeIdB.
+    // intersection of the oriented reads on anchorIdA and anchorIdB.
     // If useA is true and useB is false, the assembly uses the
-    // oriented reads on edgeIdA, regardless of whether they appear on edgeIdB.
+    // oriented reads on anchorIdA, regardless of whether they appear on anchorIdB.
     // If useA is false and useB is true, the assembly uses the
-    // oriented reads on edgeIdB, regardless of whether they appear on edgeIdA.
+    // oriented reads on anchorIdB, regardless of whether they appear on anchorIdA.
     LocalAssembly(
         uint64_t k,
         const Reads&,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         const Anchors& anchors,
-        MarkerGraphEdgeId edgeIdA,
-        MarkerGraphEdgeId edgeIdB,
+        AnchorId anchorIdA,
+        AnchorId anchorIdB,
         uint64_t minVertexCoverage, // 0 = automatic
         const LocalAssemblyDisplayOptions&,
         const Mode3AssemblyOptions::LocalAssemblyOptions&,
@@ -151,8 +152,8 @@ private:
     const Reads& reads;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
     const Anchors& anchors;
-    MarkerGraphEdgeId edgeIdA;
-    MarkerGraphEdgeId edgeIdB;
+    AnchorId anchorIdA;
+    AnchorId anchorIdB;
     const LocalAssemblyDisplayOptions& options;
     ostream& html;
 
