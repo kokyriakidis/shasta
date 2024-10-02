@@ -194,23 +194,14 @@ void Mode3Assembler::computeConnectedComponents()
     }
 
     // Gather the anchors (marker graph edges) in each connected component.
-    vector< vector<uint64_t> > componentsMarkerGraphEdgeIds(orientedReadCount);
-    for(MarkerGraphEdgeId edgeId=0; edgeId<anchors().size(); edgeId++) {
-        const auto markerIntervals = anchors()[edgeId];
+    vector< vector<uint64_t> > componentsAnchorIds(orientedReadCount);
+    for(AnchorId anchorId=0; anchorId<anchors().size(); anchorId++) {
+        const auto markerIntervals = anchors()[anchorId];
         SHASTA_ASSERT(not markerIntervals.empty());
         const OrientedReadId orientedReadId0 = markerIntervals.front().orientedReadId;
         const uint64_t componentId = disjointSets.find(orientedReadId0.getValue());
-
-        // Check that all MarkerIntervals are in the same component.
-        // THIS CHECK CAN BE REMOVED FOR PERFORMANCE.
-        for(const MarkerInterval& markerInterval: markerIntervals) {
-            const OrientedReadId orientedReadId1 = markerInterval.orientedReadId;
-            SHASTA_ASSERT(disjointSets.find(orientedReadId1.getValue()) == componentId);
-        }
-        componentsMarkerGraphEdgeIds[componentId].push_back(edgeId);
+        componentsAnchorIds[componentId].push_back(anchorId);
     }
-
-
 
     disjointSetsData.clear();
 
@@ -246,7 +237,7 @@ void Mode3Assembler::computeConnectedComponents()
     for(uint64_t i=0; i<connectedComponents.size(); i++) {
         const uint64_t componentId = componentTable[i].first;
         connectedComponents[i].orientedReadIds.swap(componentsOrientedReads[componentId]);
-        connectedComponents[i].anchorIds.swap(componentsMarkerGraphEdgeIds[componentId]);
+        connectedComponents[i].anchorIds.swap(componentsAnchorIds[componentId]);
     }
 
     // Fill in the orientedReadIdTable.
