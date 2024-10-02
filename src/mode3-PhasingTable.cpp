@@ -128,8 +128,8 @@ void PhasingTable::fill(
             // Loop over marker graph edges of this chain, excluding the terminal ones.
             SHASTA_ASSERT(chain.size() >= 2);
             for(uint64_t i=1; i<chain.size()-1; i++) {
-                const MarkerGraphEdgeId markerGraphEdgeId = chain[i];
-                const span<const MarkerInterval> anchor = anchors[markerGraphEdgeId];
+                const AnchorId anchorId = chain[i];
+                const span<const MarkerInterval> anchor = anchors[anchorId];
 
                 // Loop over MarkerIntervals of this anchor.
                 for(const MarkerInterval& markerInterval: anchor) {

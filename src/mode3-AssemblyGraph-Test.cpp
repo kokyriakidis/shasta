@@ -292,14 +292,14 @@ void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
             SHASTA_ASSERT(firstChainInBubble.size() >= 2);
 
             // Get the first and last anchor of the bubble.
-            const MarkerGraphEdgeId firstAnchor = firstChainInBubble.front();
-            const MarkerGraphEdgeId lastAnchor = firstChainInBubble.back();
+            const AnchorId firstAnchor = firstChainInBubble.front();
+            const AnchorId lastAnchor = firstChainInBubble.back();
 
             // Check if there are common oriented reads between the first and last anchors.
             const uint64_t commonCount = anchors.countCommon(firstAnchor, lastAnchor);
 
             if (debug) {
-                cout << " MarkerGraphedgeIds " << firstAnchor << " " << lastAnchor <<
+                cout << "Anchors " << firstAnchor << " " << lastAnchor <<
                         ", common count " << commonCount << endl;
                 }
 

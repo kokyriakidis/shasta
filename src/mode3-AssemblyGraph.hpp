@@ -61,7 +61,7 @@ namespace shasta {
 
 
 
-// A Chain is a sequence of MarkerGraphEdgeIds.
+// A Chain is a sequence of AnchorIds.
 class shasta::mode3::Chain : public vector<AnchorId> {
 public:
 
@@ -75,7 +75,7 @@ public:
     vector<Base> sequence;
 
     // The internal sequence assembled between consecutive pairs
-    // of MarkerGraphEdgeIds in the chain.
+    // of AnchorIds in the chain.
     // If a local assembly fails, the success flag remains false and the sequence remains empty.
     class StepSequence {
     public:
@@ -296,13 +296,9 @@ public:
     // These are sorted.
     vector<AnchorId> anchorIds;
 
-    // Get the index of a MarkerGraphEdgeId in the markerGraphEdgeIds vector.
-    uint64_t getMarkerGraphEdgeIndex(MarkerGraphEdgeId) const;
+    // Get the index of a AnchorId in the anchorIds vector.
+    uint64_t getAnchorIndex(AnchorId) const;
 
-#if 0
-    // Compute the journeys of the oriented reads listed above.
-    vector< vector< pair<MarkerGraphEdgeId, uint32_t> > > journeys;
-#endif
 private:
     // void computeJourneys(bool debug);
 
@@ -320,16 +316,16 @@ private:
     uint64_t nextEdgeId = 0;
     void renumberEdges();
 
-    // Return the vertex corresponding to a given MarkerGraphEdgeId,
+    // Return the vertex corresponding to a given AnchorId,
     // creating it if it is not in the given vertexMap.
     // This is only used in create().
     vertex_descriptor getVertex(
-        MarkerGraphEdgeId,
-        std::map<MarkerGraphEdgeId, vertex_descriptor>& vertexMap
+        AnchorId,
+        std::map<AnchorId, vertex_descriptor>& vertexMap
         );
 
-    // Create a new vertex with a given MarkerGraphEdgeId.
-    vertex_descriptor createVertex(MarkerGraphEdgeId);
+    // Create a new vertex with a given AnchorId.
+    vertex_descriptor createVertex(AnchorId);
 
     void removeVertex(vertex_descriptor);
 
@@ -347,8 +343,8 @@ private:
     // Create a new edge consisting of the concatenation of two edges,
     // which must be simple chains. The original edges are not removed.
     // The concatenation is done connecting one of the last n
-    // MarkerGraphEdgeIds of e0 (excluding the very last) and
-    // one of the first n MarkerGraphEdgeIds of e1 (excluding the very first),
+    // AnchorIds of e0 (excluding the very last) and
+    // one of the first n AnchorIds of e1 (excluding the very first),
     // choosing the pair with the largest number of common oriented reads.
     edge_descriptor connect(bool debug, edge_descriptor e0, edge_descriptor e1, uint64_t n);
 
@@ -410,8 +406,8 @@ private:
         double minLogP);
 
     // Edge detangling using only
-    // the second-to-last MarkerGraphEdgeId of incoming chains and
-    // the second MarkerGraphEdgeId of outgoing chains.
+    // the second-to-last AnchorId of incoming chains and
+    // the second AnchorId of outgoing chains.
     bool detangleEdges(
         bool debug,
         uint64_t detangleToleranceLow,
@@ -429,7 +425,7 @@ private:
         double epsilon,
         double minLogP);
 
-    // Edge detangling using up to n MarkerGraphEdgeIds
+    // Edge detangling using up to n AnchorIds
     // of incoming and outgoing chains.
     // This version only handles the 2 by 2 case and always uses the Bayesian model.
     bool detangleEdges(
@@ -577,7 +573,7 @@ private:
     // Phasing of bubble chains using the PhasingGraph.
     void phaseBubbleChainsUsingPhasingGraph(
         bool debug,
-        uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
+        uint64_t n, // Maximum number of Chain AnchorIds to use when computing tangle matrices.
         uint64_t lowThreshold,
         uint64_t highThreshold,
         bool useBayesianModel,
@@ -586,7 +582,7 @@ private:
         uint64_t longBubbleThreshold);
     void phaseBubbleChainUsingPhasingGraph(
         edge_descriptor e,
-        uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
+        uint64_t n, // Maximum number of Chain AnchorIds to use when computing tangle matrices.
         uint64_t lowThreshold,
         uint64_t highThreshold,
         bool useBayesianModel,
@@ -620,14 +616,14 @@ private:
 
     // Compute the tangle matrix between two incoming chains
     // and two outgoing chains, taking into account up to
-    // n MarkergraphEdgeIds for each Chain.
+    // n AnchorIds for each Chain.
     void computeTangleMatrix(
         const array<const Chain*, 2> inChains,
         const array<const Chain*, 2> outChains,
         uint64_t n,
         TangleMatrix&) const;
 
-    // Gather OrientedReadIds from up to n MarkergraphEdgeIds
+    // Gather OrientedReadIds from up to n AnchorIds
     // near the beginning or end of a chain.
     void gatherOrientedReadIdsAtBeginning(
         const Chain&,
@@ -841,7 +837,7 @@ private:
     string chainStringId(edge_descriptor, uint64_t positionInBubbleChain, uint64_t indexInBubble) const;
 
 
-    // Return average coverage for the internal MarkerGraphEdgeIds of a Chain.
+    // Return average coverage for the internal AnchorIds of a Chain.
     // For chain of length 2, this returns 0.
     double primaryCoverage(const Chain&) const;
 

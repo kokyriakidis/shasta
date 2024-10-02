@@ -250,7 +250,7 @@ void AssemblyGraph::create(const AnchorGraph& anchorGraph, bool /* debug */)
 
     // Each chain generates an edge.
     // Vertices are added as needed.
-    std::map<MarkerGraphEdgeId, vertex_descriptor> vertexMap;
+    std::map<AnchorId, vertex_descriptor> vertexMap;
     for(const vector<AnchorGraph::edge_descriptor>& inputChain: inputChains) {
         const AnchorGraph::vertex_descriptor v0 = source(inputChain.front(), anchorGraph);
         const AnchorGraph::vertex_descriptor v1 = target(inputChain.back(), anchorGraph);
@@ -284,18 +284,18 @@ void AssemblyGraph::create(const AnchorGraph& anchorGraph, bool /* debug */)
 
 
 
-// Return the vertex corresponding to a given MarkerGraphEdgeId,
+// Return the vertex corresponding to a given AnchorEdgeId,
 // creating it if it is not in the given vertexMap
 AssemblyGraph::vertex_descriptor AssemblyGraph::getVertex(
-    MarkerGraphEdgeId markerGraphEdgeId,
-    std::map<MarkerGraphEdgeId, vertex_descriptor>& vertexMap)
+    AnchorId anchorId,
+    std::map<AnchorId, vertex_descriptor>& vertexMap)
 {
     AssemblyGraph& assemblyGraph = *this;
 
-    auto it = vertexMap.find(markerGraphEdgeId);
+    auto it = vertexMap.find(anchorId);
     if(it == vertexMap.end()) {
-        const vertex_descriptor cv = add_vertex(AssemblyGraphVertex(markerGraphEdgeId), assemblyGraph);
-        vertexMap.insert({markerGraphEdgeId, cv});
+        const vertex_descriptor cv = add_vertex(AssemblyGraphVertex(anchorId), assemblyGraph);
+        vertexMap.insert({anchorId, cv});
         return cv;
     } else {
         return it->second;
@@ -304,11 +304,11 @@ AssemblyGraph::vertex_descriptor AssemblyGraph::getVertex(
 
 
 
-// Create a new vertex with a given MarkerGraphEdgeId.
+// Create a new vertex with a given AnchorId.
 AssemblyGraph::vertex_descriptor AssemblyGraph::createVertex(
-    MarkerGraphEdgeId markerGraphEdgeId)
+    AnchorId anchorId)
 {
-    return add_vertex(AssemblyGraphVertex(markerGraphEdgeId), *this);
+    return add_vertex(AssemblyGraphVertex(anchorId), *this);
 }
 
 
@@ -741,7 +741,7 @@ void AssemblyGraph::writeChainsDetailsCsv(const string& fileNamePrefix) const
 
     ofstream csv(fileNamePrefix + "-ChainsDetails.csv");
     csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,"
-        "Index in bubble,Position in chain,MarkerGraphEdgeId,Coverage,Common,Offset\n";
+        "Index in bubble,Position in chain,AnchorId,Coverage,Common,Offset\n";
 
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
         writeChainDetailsCsv(csv, e, false);
@@ -760,7 +760,7 @@ void AssemblyGraph::writeChainDetailsCsv(
 
     if(writeHeader) {
         csv << "Id,ComponentId,BubbleChainId,Position in bubble chain,"
-            "Index in bubble,Position in chain,MarkerGraphEdgeId,Coverage,Common,Offset\n";
+            "Index in bubble,Position in chain,AnchorId,Coverage,Common,Offset\n";
     }
 
     for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
@@ -772,21 +772,21 @@ void AssemblyGraph::writeChainDetailsCsv(
             SHASTA_ASSERT(chain.size() >= 2);
 
             for(uint64_t positionInChain=0; positionInChain<chain.size(); positionInChain++) {
-                const MarkerGraphEdgeId markerGraphEdgeId = chain[positionInChain];
-                const uint64_t coverage = anchors[markerGraphEdgeId].coverage();
+                const AnchorId anchorId = chain[positionInChain];
+                const uint64_t coverage = anchors[anchorId].coverage();
                 csv << chainStringId(e, positionInBubbleChain, indexInBubble) << ",";
                 csv << componentId << ",";
                 csv << assemblyGraph[e].id << ",";
                 csv << positionInBubbleChain << ",";
                 csv << indexInBubble << ",";
                 csv << positionInChain << ",";
-                csv << markerGraphEdgeId << ",";
+                csv << anchorId << ",";
                 csv << coverage << ",";
 
                 if(positionInChain != 0) {
-                    const MarkerGraphEdgeId previousMarkerGraphEdgeId = chain[positionInChain - 1];
+                    const AnchorId previousAnchorId = chain[positionInChain - 1];
                     AnchorPairInfo info;
-                    anchors.analyzeAnchorPair(previousMarkerGraphEdgeId, markerGraphEdgeId, info);
+                    anchors.analyzeAnchorPair(previousAnchorId, anchorId, info);
                     csv << info.common << ",";
                     if(info.common != 0) {
                         csv << info.offsetInBases << ",";
@@ -1518,11 +1518,11 @@ uint64_t AssemblyGraph::chainOffset(const Chain& chain) const
 
     uint64_t offset = 0;
     for(uint64_t i=1; i<length; i++) {
-        const MarkerGraphEdgeId edgeId0 = chain[i-1];
-        const MarkerGraphEdgeId edgeId1 = chain[i];
+        const AnchorId anchorId0 = chain[i-1];
+        const AnchorId anchorId1 = chain[i];
 
         AnchorPairInfo info;
-        anchors.analyzeAnchorPair(edgeId0, edgeId1, info);
+        anchors.analyzeAnchorPair(anchorId0, anchorId1, info);
         const int64_t offsetThisPair = info.offsetInBases;
 
         if(offsetThisPair != invalid<int64_t>) {
@@ -1534,7 +1534,7 @@ uint64_t AssemblyGraph::chainOffset(const Chain& chain) const
 
 
 
-// Return average coverage for the internal MarkerGraphEdgeIds of a Chain.
+// Return average coverage for the internal AnchorIds of a Chain.
 // For chain of length 2, this returns 0.
 double AssemblyGraph::primaryCoverage(const Chain& chain) const
 {
@@ -1544,8 +1544,8 @@ double AssemblyGraph::primaryCoverage(const Chain& chain) const
 
     uint64_t sum = 0;
     for(uint64_t positionInChain=1; positionInChain<chain.size()-1; positionInChain++) {
-        const MarkerGraphEdgeId markerGraphEdgeId = chain[positionInChain];
-        const uint64_t coverage = anchors[markerGraphEdgeId].coverage();
+        const AnchorId anchorId = chain[positionInChain];
+        const uint64_t coverage = anchors[anchorId].coverage();
         sum += coverage;
     }
 
@@ -2398,8 +2398,8 @@ void AssemblyGraph::cleanupSuperbubble(
                 for(uint64_t i=0; i<2; i++) {
                     const Chain& chain = entranceBubble[i];
                     cout << "Entrance bubble chain " << i << ":";
-                    for (const MarkerGraphEdgeId edgeId: chain) {
-                        cout << " " << edgeId;
+                    for (const AnchorId anchorId: chain) {
+                        cout << " " << anchorId;
                     }
                     cout << endl;
                 }
@@ -2460,8 +2460,8 @@ void AssemblyGraph::cleanupSuperbubble(
                 for(uint64_t i=0; i<2; i++) {
                     const Chain& chain = exitBubble[i];
                     cout << "Exit bubble chain " << i << ":";
-                    for (const MarkerGraphEdgeId edgeId: chain) {
-                        cout << " " << edgeId;
+                    for (const AnchorId anchorId: chain) {
+                        cout << " " << anchorId;
                     }
                     cout << endl;
                 }
@@ -4117,8 +4117,8 @@ bool AssemblyGraph::detangleEdge(
 // Create a new edge consisting of the concatenation of two edges,
 // which must be simple chains. The original edges are not removed.
 // The concatenation is done connecting one of the last n
-// MarkerGraphEdgeIds of e0 (excluding the very last) and
-// one of the first n MarkerGraphEdgeIds of e1 (excluding the very first),
+// AnchorIds of e0 (excluding the very last) and
+// one of the first n AnchorIds of e1 (excluding the very first),
 // choosing the pair with the largest number of common oriented reads.
 AssemblyGraph::edge_descriptor AssemblyGraph::connect(
     bool debug,
@@ -4141,14 +4141,14 @@ AssemblyGraph::edge_descriptor AssemblyGraph::connect(
     const Chain& chain0 = bubbleChain0.front().front();
     const Chain& chain1 = bubbleChain1.front().front();
 
-    // Find the last n MarkerGraphEdgeIds of chain0 (excluding the very last).
-    const uint64_t last0 = chain0.size() - 2;                      // Exclude last MarkergraphEdgeId.
+    // Find the last n AnchorIds of chain0 (excluding the very last).
+    const uint64_t last0 = chain0.size() - 2;                      // Exclude last AnchorIds.
     const uint64_t first0 = (last0 > (n-1)) ? last0 + 1 - n : 0;   // Use up to n.
     SHASTA_ASSERT(first0 < chain0.size());
     SHASTA_ASSERT(last0 < chain0.size());
 
-    // Find the first n MarkerGraphEdgeIds of chain0 (excluding the very first).
-    const uint64_t first1 = 1;   // / Exclude first MarkergraphEdgeId.
+    // Find the first n AnchorIds of chain0 (excluding the very first).
+    const uint64_t first1 = 1;   // / Exclude first AnchorIds.
     const uint64_t last1 = (chain1.size() > (n+1)) ? n : chain1.size() - 1;
     SHASTA_ASSERT(first1 < chain1.size());
     SHASTA_ASSERT(last1 < chain1.size());
@@ -4161,20 +4161,20 @@ AssemblyGraph::edge_descriptor AssemblyGraph::connect(
     uint64_t i0Best = invalid<uint64_t>;
     uint64_t i1Best = invalid<uint64_t>;
     for(uint64_t i0=first0; i0<=last0; i0++) {
-        const MarkerGraphEdgeId edgeId0 = chain0[i0];
+        const AnchorId anchorId0 = chain0[i0];
         for(uint64_t i1=first1; i1<=last1; i1++) {
-            const MarkerGraphEdgeId edgeId1 = chain1[i1];
+            const AnchorId anchorId1 = chain1[i1];
 
             // Don't allow generating a chain with identical consecutive MarkerGraphEdgeIds.
-            if(edgeId1 == edgeId0) {
+            if(anchorId1 == anchorId0) {
                 continue;
             }
 
-            const uint64_t commonCount = anchors.countCommon(edgeId0, edgeId1);
+            const uint64_t commonCount = anchors.countCommon(anchorId0, anchorId1);
 
             if(debug) {
                 cout << "Positions in chains " << i0 << " " << i1 <<
-                    " MarkerGraphedgeIds " << edgeId0 << " " << edgeId1 <<
+                    " MarkerGraphedgeIds " << anchorId0 << " " << anchorId1 <<
                     ", common count " << commonCount << endl;
             }
 
@@ -7786,12 +7786,12 @@ uint64_t AssemblyGraph::getOrientedReadIndex(OrientedReadId orientedReadId) cons
 }
 
 
-// Get the index of a MarkerGraphEdgeId in the markerGraphEdgeIds vector.
-uint64_t AssemblyGraph::getMarkerGraphEdgeIndex(MarkerGraphEdgeId markerGraphEdgeId) const
+// Get the index of a AnchorId in the anchorIds vector.
+uint64_t AssemblyGraph::getAnchorIndex(AnchorId anchorId) const
 {
-    auto it = std::lower_bound(anchorIds.begin(), anchorIds.end(), markerGraphEdgeId);
+    auto it = std::lower_bound(anchorIds.begin(), anchorIds.end(), anchorId);
     SHASTA_ASSERT(it != anchorIds.end());
-    SHASTA_ASSERT(*it == markerGraphEdgeId);
+    SHASTA_ASSERT(*it == anchorId);
     return it - anchorIds.begin();
 
 }
