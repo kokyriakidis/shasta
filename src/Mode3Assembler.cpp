@@ -1,6 +1,5 @@
 // Shasta.
 #include "Mode3Assembler.hpp"
-#include "Assembler.hpp"
 #include "AssemblerOptions.hpp"
 #include "deduplicate.hpp"
 #include "dset64-gccAtomic.hpp"
@@ -23,7 +22,7 @@ template class MultithreadedObject<Mode3Assembler>;
 
 
 Mode3Assembler::Mode3Assembler(
-    const Assembler& assembler,
+    const MappedMemoryOwner& mappedMemoryOwner,
     uint64_t k,
     const Reads& reads,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
@@ -32,8 +31,7 @@ Mode3Assembler::Mode3Assembler(
     const Mode3AssemblyOptions& options,
     bool debug) :
     MultithreadedObject<Mode3Assembler>(*this),
-    MappedMemoryOwner(assembler),
-    assembler(assembler),
+    MappedMemoryOwner(mappedMemoryOwner),
     k(k),
     reads(reads),
     markers(markers),
@@ -57,14 +55,13 @@ Mode3Assembler::Mode3Assembler(
 
 
 Mode3Assembler::Mode3Assembler(
-    const Assembler& assembler,
+    const MappedMemoryOwner& mappedMemoryOwner,
     uint64_t k,
     const Reads& reads,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
     shared_ptr<mode3::Anchors> anchorsPointer) :
     MultithreadedObject<Mode3Assembler>(*this),
-    MappedMemoryOwner(assembler),
-    assembler(assembler),
+    MappedMemoryOwner(mappedMemoryOwner),
     k(k),
     reads(reads),
     markers(markers),

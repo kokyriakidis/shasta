@@ -74,7 +74,10 @@ void Assembler::mode3Assembly(
     bool debug
     )
 {
-    mode3Assembler = make_shared<Mode3Assembler>(*this,
+    const MappedMemoryOwner& mappedMemoryOwner = *this;
+
+    mode3Assembler = make_shared<Mode3Assembler>(
+        mappedMemoryOwner,
         assemblerInfo->k, getReads(), markers,
         anchorsPointer, threadCount, options, debug);
 }
@@ -88,12 +91,15 @@ void Assembler::mode3Reassembly(
     bool debug
     )
 {
+    const MappedMemoryOwner& mappedMemoryOwner = *this;
+
     // Create the Anchors from binary data.
     shared_ptr<mode3::Anchors> anchorsPointer =
-        make_shared<mode3::Anchors>(MappedMemoryOwner(*this), getReads(), markers, markerGraph);
+        make_shared<mode3::Anchors>(mappedMemoryOwner, getReads(), markers, markerGraph);
 
     // Run the Mode 3 assembly.
-    mode3Assembler = make_shared<Mode3Assembler>(*this,
+    mode3Assembler = make_shared<Mode3Assembler>(
+        mappedMemoryOwner,
         assemblerInfo->k, getReads(), markers,
         anchorsPointer, threadCount, options, debug);
 }

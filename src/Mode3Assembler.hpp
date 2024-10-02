@@ -16,7 +16,6 @@
 namespace shasta {
     class Mode3Assembler;
 
-    class Assembler;
     class MarkerInterval;
     class Mode3AssemblyOptions;
 
@@ -37,7 +36,7 @@ public:
 
     // This constructor runs the assembly.
     Mode3Assembler(
-        const Assembler& assembler,
+        const MappedMemoryOwner&,
         uint64_t k,
         const Reads&,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
@@ -48,14 +47,13 @@ public:
 
     // This constructor just accesses binary data.
     Mode3Assembler(
-        const Assembler& assembler,
+        const MappedMemoryOwner&,
         uint64_t k,
         const Reads&,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         shared_ptr<mode3::Anchors> anchorsPointer);
 
 private:
-    const Assembler& assembler;
     uint64_t k;
     const Reads& reads;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
