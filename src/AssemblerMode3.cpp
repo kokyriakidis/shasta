@@ -92,7 +92,7 @@ void Assembler::mode3Reassembly(
 
     // Create the Anchors from binary data.
     shared_ptr<mode3::Anchors> anchorsPointer =
-        make_shared<mode3::Anchors>(mappedMemoryOwner, getReads(), markers);
+        make_shared<mode3::Anchors>(mappedMemoryOwner, getReads(), assemblerInfo->k, markers);
 
     // Run the Mode 3 assembly.
     mode3Assembler = make_shared<Mode3Assembler>(
@@ -104,7 +104,7 @@ void Assembler::mode3Reassembly(
 void Assembler::accessMode3Assembler()
 {
     shared_ptr<mode3::Anchors> anchorsPointer =
-        make_shared<mode3::Anchors>(MappedMemoryOwner(*this), getReads(), markers);
+        make_shared<mode3::Anchors>(MappedMemoryOwner(*this), getReads(), assemblerInfo->k, markers);
     mode3Assembler = make_shared<Mode3Assembler>(*this,
         assemblerInfo->k, getReads(), markers,
         anchorsPointer);
@@ -311,7 +311,6 @@ void Assembler::createPrimaryMarkerGraphEdges(
     // Check that we have what we need.
     checkMarkersAreOpen();
     checkMarkerGraphVerticesAreAvailable();
-    SHASTA_ASSERT(markerGraph.disjointSetsHistogram.isOpen);
 
     // Adjust the numbers of threads, if necessary.
     if(threadCount == 0) {

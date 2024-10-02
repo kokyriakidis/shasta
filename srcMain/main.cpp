@@ -1138,28 +1138,21 @@ void shasta::main::mode3Assembly(
             ", maxPrimaryCoverage = " << maxPrimaryCoverage << endl;
     }
 
-    // Create marker graph edges.
-    assembler.createPrimaryMarkerGraphEdges(
-        minPrimaryCoverage,
-        maxPrimaryCoverage,
-        threadCount);
-
     // Construct the mode3::Anchors.
     shared_ptr<mode3::Anchors> anchors =
         make_shared<mode3::Anchors>(
             MappedMemoryOwner(assembler),
             assembler.getReads(),
+            assembler.assemblerInfo->k,
             assembler.markers,
             assembler.markerGraph,
             minPrimaryCoverage,
             maxPrimaryCoverage,
             threadCount);
 
-    // We no longer need anything in the MarkerGraph.
+    // We no longer need the MarkerGraph vertices.
     assembler.markerGraph.vertices().remove();
     assembler.markerGraph.vertexTable.remove();
-    assembler.markerGraph.edgeMarkerIntervals.remove();
-    assembler.markerGraph.edgeSequence.remove();
 
     // Run Mode 3 assembly.
     assembler.mode3Assembly(threadCount, anchors, assemblerOptions.assemblyOptions.mode3Options, false);

@@ -7,6 +7,7 @@
 #include "MultithreadedObject.hpp"
 
 #include "cstdint.hpp"
+#include "memory.hpp"
 #include "span.hpp"
 
 namespace shasta {
@@ -87,6 +88,7 @@ public:
     Anchors(
         const MappedMemoryOwner&,
         const Reads& reads,
+        uint64_t k,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
         const MarkerGraph&,
         uint64_t minPrimaryCoverage,
@@ -97,6 +99,7 @@ public:
     Anchors(
         const MappedMemoryOwner&,
         const Reads& reads,
+        uint64_t k,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers);
 
     Anchor operator[](AnchorId) const;
@@ -119,6 +122,8 @@ private:
 
 public:
     const Reads& reads;
+    uint64_t k;
+    uint64_t kHalf;
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
 
     // The sequences of the anchors.
@@ -136,6 +141,25 @@ public:
 
 private:
     void check() const;
+
+
+
+    // Data and functions used when constructing the Anchors from the MarkerGraph.
+    class ConstructFromMarkerGraphData {
+    public:
+        uint64_t minPrimaryCoverage;
+        uint64_t maxPrimaryCoverage;
+
+        const MarkerGraph* markerGraphPointer;
+
+        // The marker intervals of the edges found by each thread.
+        vector< shared_ptr< MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> > > threadMarkerIntervals;
+
+        // The corresponding sequences
+        vector< shared_ptr< MemoryMapped::VectorOfVectors<Base, uint64_t> > > threadSequences;
+    };
+    ConstructFromMarkerGraphData constructFromMarkerGraphData;
+    void constructFromMarkerGraphThreadFunction(uint64_t threadId);
 };
 
 

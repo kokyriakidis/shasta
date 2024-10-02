@@ -16,12 +16,17 @@ template class MultithreadedObject<Anchors>;
 Anchors::Anchors(
     const MappedMemoryOwner& mappedMemoryOwner,
     const Reads& reads,
+    uint64_t k,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) :
     MultithreadedObject<Anchors>(*this),
     MappedMemoryOwner(mappedMemoryOwner),
     reads(reads),
+    k(k),
     markers(markers)
 {
+    SHASTA_ASSERT((k %2) == 0);
+    kHalf = k / 2;
+
     anchorMarkerIntervals.accessExistingReadOnly(largeDataName("AnchorMarkerIntervals"));
     anchorSequences.accessExistingReadOnly(largeDataName("AnchorSequences"));
 }
