@@ -199,5 +199,4 @@ public:
         offsetInBases = - offsetInBases;
     }
 
-    void checkIdentical(const MarkerGraphEdgePairInfo&) const;
 };
