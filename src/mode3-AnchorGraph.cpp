@@ -64,7 +64,7 @@ void AnchorGraph::addEdgeFromLocalAnchorIds(
 void AnchorGraph::writeGraphviz(
     const string& name,
     const AnchorGraphDisplayOptions& options,
-    const MarkerGraph& markerGraph) const
+    const Anchors& anchors) const
 {
     ofstream out(name + ".dot");
 
@@ -80,7 +80,7 @@ void AnchorGraph::writeGraphviz(
 
         if(options.labels) {
             out << "label=\"";
-            out << getAnchorId(v) << "\\n" << markerGraph.edgeCoverage(getAnchorId(v));
+            out << getAnchorId(v) << "\\n" << anchors[getAnchorId(v)].coverage();
             out << "\" ";
         }
 

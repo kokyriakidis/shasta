@@ -143,7 +143,7 @@ public:
     void writeGraphviz(
         const string& name,
         const AnchorGraphDisplayOptions&,
-        const MarkerGraph&) const;
+        const Anchors&) const;
 
     void writeEdgeCoverageHistogram(const string& fileName) const;
 

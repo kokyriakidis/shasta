@@ -576,6 +576,12 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
              const AnchorId anchorId1 = anchorIds[localAnchorId1];
              MarkerGraphEdgePairInfo info;
              SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(anchorId0, anchorId1, info));
+
+             // Get it from the Anchors instead, and check that we get the same result.
+             AnchorPairInfo infoCheck;
+             anchors().analyzeAnchorPair(anchorId0, anchorId1, infoCheck);
+             infoCheck.checkIdentical(info);
+
              anchorGraph.addEdgeFromLocalAnchorIds(localAnchorId0, localAnchorId1, info, coverage);
          }
      }
@@ -589,10 +595,10 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
          AnchorGraphDisplayOptions options;
          options.showNonTransitiveReductionEdges = true;
          anchorGraph.writeGraphviz(
-             "AnchorGraphInitial" + to_string(componentId), options, assembler.markerGraph);
+             "AnchorGraphInitial" + to_string(componentId), options, anchors());
          options.makeCompact();
          anchorGraph.writeGraphviz(
-             "AnchorGraphCompactInitial" + to_string(componentId), options, assembler.markerGraph);
+             "AnchorGraphCompactInitial" + to_string(componentId), options, anchors());
          anchorGraph.writeEdgeCoverageHistogram("AnchorGraphInitial" + to_string(componentId) + "-EdgeCoverageHistogram.csv");
      }
 
@@ -626,10 +632,10 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
          AnchorGraphDisplayOptions options;
          options.showNonTransitiveReductionEdges = false;
          anchorGraph.writeGraphviz(
-             "AnchorGraph" + to_string(componentId), options, assembler.markerGraph);
+             "AnchorGraph" + to_string(componentId), options, anchors());
          options.makeCompact();
          anchorGraph.writeGraphviz(
-             "AnchorGraphCompact" + to_string(componentId), options, assembler.markerGraph);
+             "AnchorGraphCompact" + to_string(componentId), options, anchors());
      }
 
      // Create the assembly graph for this connected component.
