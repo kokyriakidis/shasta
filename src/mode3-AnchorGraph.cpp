@@ -49,7 +49,7 @@ AnchorGraph::AnchorGraph(const vector<AnchorId>& anchorIds) :
 void AnchorGraph::addEdgeFromLocalAnchorIds(
     uint64_t localAnchorId0,
     uint64_t localAnchorId1,
-    const MarkerGraphEdgePairInfo& info,
+    const AnchorPairInfo& info,
     uint64_t coverage)
 {
     boost::add_edge(

@@ -97,10 +97,10 @@ public:
 
 class shasta::mode3::AnchorGraphEdge {
 public:
-    MarkerGraphEdgePairInfo info;
+    AnchorPairInfo info;
     uint64_t coverage;
     bool isNonTransitiveReductionEdge = false;
-    AnchorGraphEdge(const MarkerGraphEdgePairInfo& info, uint64_t coverage) :
+    AnchorGraphEdge(const AnchorPairInfo& info, uint64_t coverage) :
         info(info), coverage(coverage) {}
 
     // The reverse complement edge.
@@ -137,7 +137,7 @@ public:
     void addEdgeFromLocalAnchorIds(
         uint64_t,
         uint64_t,
-        const MarkerGraphEdgePairInfo&,
+        const AnchorPairInfo&,
         uint64_t coverage);
 
     void writeGraphviz(

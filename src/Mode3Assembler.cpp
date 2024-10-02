@@ -574,13 +574,9 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
              const uint64_t localAnchorId1 = journeyPairs0[j];
              const uint64_t coverage = count[j];
              const AnchorId anchorId1 = anchorIds[localAnchorId1];
-             MarkerGraphEdgePairInfo info;
-             SHASTA_ASSERT(assembler.analyzeMarkerGraphEdgePair(anchorId0, anchorId1, info));
 
-             // Get it from the Anchors instead, and check that we get the same result.
-             AnchorPairInfo infoCheck;
-             anchors().analyzeAnchorPair(anchorId0, anchorId1, infoCheck);
-             infoCheck.checkIdentical(info);
+             AnchorPairInfo info;
+             anchors().analyzeAnchorPair(anchorId0, anchorId1, info);
 
              anchorGraph.addEdgeFromLocalAnchorIds(localAnchorId0, localAnchorId1, info, coverage);
          }
