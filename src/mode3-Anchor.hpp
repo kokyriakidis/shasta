@@ -88,7 +88,10 @@ public:
         const MappedMemoryOwner&,
         const Reads& reads,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
-        const MarkerGraph&);
+        const MarkerGraph&,
+        uint64_t minPrimaryCoverage,
+        uint64_t maxPrimaryCoverage,
+        uint64_t threadCount);
 
     // This constructor access existing Anchors.
     Anchors(

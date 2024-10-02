@@ -104,7 +104,7 @@ void Assembler::mode3Reassembly(
 void Assembler::accessMode3Assembler()
 {
     shared_ptr<mode3::Anchors> anchorsPointer =
-        make_shared<mode3::Anchors>(MappedMemoryOwner(*this), getReads(), markers, markerGraph);
+        make_shared<mode3::Anchors>(MappedMemoryOwner(*this), getReads(), markers);
     mode3Assembler = make_shared<Mode3Assembler>(*this,
         assemblerInfo->k, getReads(), markers,
         anchorsPointer);

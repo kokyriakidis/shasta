@@ -1150,7 +1150,10 @@ void shasta::main::mode3Assembly(
             MappedMemoryOwner(assembler),
             assembler.getReads(),
             assembler.markers,
-            assembler.markerGraph);
+            assembler.markerGraph,
+            minPrimaryCoverage,
+            maxPrimaryCoverage,
+            threadCount);
 
     // We no longer need anything in the MarkerGraph.
     assembler.markerGraph.vertices().remove();

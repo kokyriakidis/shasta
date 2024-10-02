@@ -31,7 +31,10 @@ Anchors::Anchors(
     const MappedMemoryOwner& mappedMemoryOwner,
     const Reads& reads,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
-    const MarkerGraph& markerGraph) :
+    const MarkerGraph& markerGraph,
+    uint64_t /* minPrimaryCoverage */,
+    uint64_t /* maxPrimaryCoverage */,
+    uint64_t /* threadCount */) :
     MultithreadedObject<Anchors>(*this),
     MappedMemoryOwner(mappedMemoryOwner),
     reads(reads),
