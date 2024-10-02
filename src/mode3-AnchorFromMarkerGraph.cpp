@@ -1,4 +1,22 @@
-// Creation of Anchors from the MarkerGraph.
+/********************************************************************************
+
+Creation of Anchors from the MarkerGraph.
+
+Each Anchor corresponds to a "primary marker graph edge"
+defined as follows:
+
+- All contributing oriented reads have exactly the same sequence.
+  If more than one distinct sequence is present, the edge (anchor)
+  is split into two edges (anchors).
+- Edge coverage is >= minPrimaryCoverage and <= maxPrimaryCoverage.
+- Both vertices have no duplicate ReadIds, and as a result the
+  resulting anchor has no duplicate ReadIds.
+
+This uses as input the MarkerGraph vertices. MarkerGraph edges
+are created implicitly and never stored. Instead, the corresponding
+information is stored directly in the Anchors.
+
+********************************************************************************/
 
 #include "mode3-Anchor.hpp"
 #include "Marker.hpp"
