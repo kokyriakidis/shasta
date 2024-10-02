@@ -1139,9 +1139,11 @@ void shasta::main::mode3Assembly(
             assembler.markers,
             assembler.markerGraph);
 
-    // We can now remove the marker graph vertices.
+    // We no longer need anything in the MarkerGraph.
     assembler.markerGraph.vertices().remove();
     assembler.markerGraph.vertexTable.remove();
+    assembler.markerGraph.edgeMarkerIntervals.remove();
+    assembler.markerGraph.edgeSequence.remove();
 
     // Run Mode 3 assembly.
     assembler.mode3Assembly(threadCount, anchors, assemblerOptions.assemblyOptions.mode3Options, false);

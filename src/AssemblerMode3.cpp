@@ -95,7 +95,7 @@ void Assembler::mode3Reassembly(
 
     // Create the Anchors from binary data.
     shared_ptr<mode3::Anchors> anchorsPointer =
-        make_shared<mode3::Anchors>(mappedMemoryOwner, getReads(), markers, markerGraph);
+        make_shared<mode3::Anchors>(mappedMemoryOwner, getReads(), markers);
 
     // Run the Mode 3 assembly.
     mode3Assembler = make_shared<Mode3Assembler>(

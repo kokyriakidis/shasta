@@ -26,9 +26,6 @@ shasta.openPerformanceLog('Mode3Assembly.log')
 options = shasta.AssemblerOptions('shasta.conf')
 a = shasta.Assembler()
 a.accessMarkers()
-a.accessMarkerGraphEdgeMarkerIntervals()
-a.accessMarkerGraphConsensus()
-a.accessDisjointSetsHistogram()
 
 # Run Mode 3 assembly using existing Anchors.
 a.mode3Reassembly(0, options.assemblyOptions.mode3Options, arguments.debug)
