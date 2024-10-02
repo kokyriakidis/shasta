@@ -59,9 +59,6 @@ pair<uint64_t, uint64_t> Assembler::getPrimaryCoverageRange()
     }
     SHASTA_ASSERT(maxPrimaryCoverage != invalid<uint64_t>);
 
-    cout << "Automatically set: minPrimaryCoverage = " << minPrimaryCoverage <<
-        ", maxPrimaryCoverage = " << maxPrimaryCoverage << endl;
-
     return {minPrimaryCoverage, maxPrimaryCoverage};
 }
 
@@ -319,12 +316,6 @@ void Assembler::createPrimaryMarkerGraphEdges(
     // Adjust the numbers of threads, if necessary.
     if(threadCount == 0) {
         threadCount = std::thread::hardware_concurrency();
-    }
-
-    // If the coverage range for primary marker graph edges is not
-    // specified, use the disjoint sets histogram to compute reasonable values.
-    if((minPrimaryCoverage == 0) and (maxPrimaryCoverage == 0)) {
-        tie(minPrimaryCoverage, maxPrimaryCoverage) = getPrimaryCoverageRange();
     }
 
     // Store the arguments so the threads can see them.

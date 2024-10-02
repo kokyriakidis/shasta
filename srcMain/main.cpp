@@ -1125,10 +1125,23 @@ void shasta::main::mode3Assembly(
         invalid<uint64_t>,                              // For peak finder, unused because minVertexCoverage is not 0.
         threadCount);
 
+    // If the coverage range for primary marker graph edges (anchors) is not
+    // specified, use the disjoint sets histogram to compute reasonable values.
+    uint64_t minPrimaryCoverage = assemblerOptions.assemblyOptions.mode3Options.minPrimaryCoverage;
+    uint64_t maxPrimaryCoverage = assemblerOptions.assemblyOptions.mode3Options.maxPrimaryCoverage;
+    if((minPrimaryCoverage == 0) and (maxPrimaryCoverage == 0)) {
+        tie(minPrimaryCoverage, maxPrimaryCoverage) = assembler.getPrimaryCoverageRange();
+        cout << "Set automatically: minPrimaryCoverage = " << minPrimaryCoverage <<
+            ", maxPrimaryCoverage = " << maxPrimaryCoverage << endl;
+    } else {
+        cout << "Using minPrimaryCoverage = " << minPrimaryCoverage <<
+            ", maxPrimaryCoverage = " << maxPrimaryCoverage << endl;
+    }
+
     // Create marker graph edges.
     assembler.createPrimaryMarkerGraphEdges(
-        assemblerOptions.assemblyOptions.mode3Options.minPrimaryCoverage,
-        assemblerOptions.assemblyOptions.mode3Options.maxPrimaryCoverage,
+        minPrimaryCoverage,
+        maxPrimaryCoverage,
         threadCount);
 
     // Construct the mode3::Anchors.
