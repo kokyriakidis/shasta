@@ -6839,7 +6839,6 @@ void AssemblyGraph::runAssemblyStep(
 
         // If we are at the beginning or end of the chain, we need to check
         // the number of common oriented reads.
-        MarkerGraphEdgePairInfo info;
         uint64_t commonCount = 0;
         if((positionInChain == 0) or (positionInChain == chain.size() - 2)) {
             commonCount = anchors.countCommon(edgeIdA, edgeIdB);

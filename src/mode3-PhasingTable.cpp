@@ -3,7 +3,6 @@
 #include "bits/stdint-uintn.h"
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-PhasingTable.hpp"
-#include "MarkerGraph.hpp"
 #include "MarkerInterval.hpp"
 #include "orderPairs.hpp"
 #include "PngImage.hpp"

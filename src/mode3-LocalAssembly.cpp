@@ -3,7 +3,6 @@
 #include "globalMsa.hpp"
 #include "Marker.hpp"
 #include "markerAccessFunctions.hpp"
-#include "MarkerGraph.hpp"
 #include "mode3-Anchor.hpp"
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"
