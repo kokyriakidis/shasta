@@ -40,20 +40,22 @@ namespace shasta {
 
 
 
-// For now the AnchorMarkerInterval is the same as MarkerInterval,
-// but we want a separate class so we can add to it and remove from it.
+// The second ordinal of the marker interval is not stored.
+// It can be obtained by adding to ordinal0 the value returned
+// by Anchors::ordinalOffset(AnchorId).
+// This value is the same for all marker intervals of an Anchor, by construction.
+// Currently this is also the same value for all Anchors and equal to 1,
+// but this could change.
 class shasta::mode3::AnchorMarkerInterval {
 public:
     OrientedReadId orientedReadId;
     uint32_t ordinal0;
-    uint32_t ordinal1;
 
     AnchorMarkerInterval() {}
 
     AnchorMarkerInterval(const MarkerInterval& markerInterval) :
         orientedReadId(markerInterval.orientedReadId),
-        ordinal0(markerInterval.ordinals[0]),
-        ordinal1(markerInterval.ordinals[1])
+        ordinal0(markerInterval.ordinals[0])
     {}
 };
 
@@ -129,6 +131,11 @@ public:
     // Return true if the second Anchor is adjacent to the first one.
     // For precise definition see the code.
     bool areAdjacentAnchors(AnchorId, AnchorId) const;
+
+    uint32_t ordinalOffset(AnchorId) const
+    {
+        return 1;
+    }
 
 private:
     MemoryMapped::VectorOfVectors<AnchorMarkerInterval, uint64_t> anchorMarkerIntervals;

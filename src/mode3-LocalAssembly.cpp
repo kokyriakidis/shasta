@@ -213,7 +213,7 @@ void LocalAssembly::gatherOrientedReads(bool useA, bool useB)
             if(useA) {
                 const AnchorMarkerInterval& markerIntervalA = *itA;
                 const OrientedReadId orientedReadIdA = markerIntervalA.orientedReadId;
-                const uint32_t ordinalA = markerIntervalA.ordinal1;    // Because vertexIdA is the target of edgeIdA
+                const uint32_t ordinalA = markerIntervalA.ordinal0 + anchors.ordinalOffset(anchorIdA);    // Because vertexIdA is the target of anchorIdA
 
                 OrientedReadInfo info(orientedReadIdA);
                 info.ordinalA = ordinalA;
@@ -231,7 +231,7 @@ void LocalAssembly::gatherOrientedReads(bool useA, bool useB)
             if(useB) {
                 const AnchorMarkerInterval& markerIntervalB = *itB;
                 const OrientedReadId orientedReadIdB = markerIntervalB.orientedReadId;
-                const uint32_t ordinalB = markerIntervalB.ordinal0;    // Because vertexIdB is the source of edgeIdB
+                const uint32_t ordinalB = markerIntervalB.ordinal0;    // Because vertexIdB is the source of anchorIdB
 
                 OrientedReadInfo info(orientedReadIdB);
                 info.ordinalB = ordinalB;
@@ -258,8 +258,8 @@ void LocalAssembly::gatherOrientedReads(bool useA, bool useB)
             SHASTA_ASSERT(orientedReadIdA == orientedReadIdB);
             const OrientedReadId orientedReadId = orientedReadIdA;
 
-            const uint32_t ordinalA = markerIntervalA.ordinal1;    // Because vertexIdA is the target of edgeIdA
-            const uint32_t ordinalB = markerIntervalB.ordinal0;    // Because vertexIdB is the source of edgeIdB
+            const uint32_t ordinalA = markerIntervalA.ordinal0 + anchors.ordinalOffset(anchorIdA);    // Because vertexIdA is the target of anchorIdA
+            const uint32_t ordinalB = markerIntervalB.ordinal0;    // Because vertexIdB is the source of anchorIdB
 
             // Only use it if the ordinal offset is not negative.
             if(ordinalB >= ordinalA) {

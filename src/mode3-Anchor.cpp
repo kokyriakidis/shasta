@@ -170,8 +170,8 @@ void Anchors::analyzeAnchorPair(
         // Compute the offset in markers.
         // This assumes an ordinal offset of 1.
         // If this changes, this code will need some changes.
-        SHASTA_ASSERT(itA->ordinal1 == itA->ordinal0 + 1);
-        SHASTA_ASSERT(itB->ordinal1 == itB->ordinal0 + 1);
+        SHASTA_ASSERT(ordinalOffset(anchorIdA) == 1);
+        SHASTA_ASSERT(ordinalOffset(anchorIdB) == 1);
         const uint32_t ordinalA = itA->ordinal0;
         const uint32_t ordinalB = itB->ordinal0;
         const int64_t markerOffset = int64_t(ordinalB) - int64_t(ordinalA);
@@ -232,7 +232,7 @@ void Anchors::analyzeAnchorPair(
 
             // Get the positions of edge A in this oriented read.
             const uint32_t ordinalA0 = itA->ordinal0;
-            const uint32_t ordinalA1 = itA->ordinal1;
+            const uint32_t ordinalA1 = ordinalA0 + ordinalOffset(anchorIdA);
             const int64_t positionA0 = int64_t(orientedReadMarkers[ordinalA0].position);
             const int64_t positionA1 = int64_t(orientedReadMarkers[ordinalA1].position);
 
@@ -258,7 +258,7 @@ void Anchors::analyzeAnchorPair(
 
             // Get the positions of edge B in this oriented read.
             const uint32_t ordinalB0 = itB->ordinal0;
-            const uint32_t ordinalB1 = itB->ordinal1;
+            const uint32_t ordinalB1 = ordinalB0 + ordinalOffset(anchorIdB);
             const int64_t positionB0 = int64_t(orientedReadMarkers[ordinalB0].position);
             const int64_t positionB1 = int64_t(orientedReadMarkers[ordinalB1].position);
 
@@ -310,7 +310,7 @@ bool Anchors::areAdjacentAnchors(AnchorId anchorId0, AnchorId anchorId1) const
         } else if(orientedReadId1 < orientedReadId0) {
             ++it1;
         } else {
-            if(it0->ordinal1 == it1->ordinal0) {
+            if(it0->ordinal0 + ordinalOffset(anchorId0) == it1->ordinal0) {
                 return true;
             }
             ++it0;

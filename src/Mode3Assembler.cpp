@@ -558,9 +558,9 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
 
 
 
-    // Write the marker intervals.
+    // Write the anchors.
     {
-        ofstream csv("MarkerIntervals-" + to_string(componentId) + ".csv");
+        ofstream csv("Anchors-" + to_string(componentId) + ".csv");
         csv << "AnchorId,OrientedReadId,Ordinal0,Ordinal1\n";
 
         for(uint64_t localAnchorId=0; localAnchorId<component.anchorIds.size(); localAnchorId++) {
@@ -570,7 +570,7 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
                 csv << anchorId << ",";
                 csv << markerInterval.orientedReadId << ",";
                 csv << markerInterval.ordinal0 << ",";
-                csv << markerInterval.ordinal1 << "\n";
+                csv << markerInterval.ordinal0 + anchors().ordinalOffset(anchorId) << "\n";
             }
         }
 
