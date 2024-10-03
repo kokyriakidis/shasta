@@ -3,7 +3,6 @@
 #include "deduplicate.hpp"
 #include "longestPath.hpp"
 #include "Marker.hpp"
-#include "MarkerGraph.hpp"
 #include "MurmurHash2.hpp"
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"

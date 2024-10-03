@@ -15,7 +15,6 @@ namespace shasta {
     class Base;
     class CompressedMarker;
     class MarkerGraph;
-    class MarkerGraphEdgePairInfo;
     class MarkerInterval;
     class Reads;
 
@@ -27,8 +26,6 @@ namespace shasta {
     //      * They apear in a low number of copies in the genome being sequenced.
     // - There are no duplicate oriented reads in an anchor.
     // - The anchor coverage (number of oriented reads) is in [minPrimaryCoverage, maxPrimaryCoverage].
-    // For now the anchors are simply a reference to assembler.markerGraph.edgeMarkerIntervals,
-    // but it might be possible to construct the anchors by other means.
 
     namespace mode3 {
 

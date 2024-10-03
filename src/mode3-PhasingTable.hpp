@@ -26,7 +26,6 @@ namespace shasta {
         class Anchors;
         class BubbleChain;
     }
-    class MarkerGraph;
 }
 
 
