@@ -2940,7 +2940,7 @@ bool AssemblyGraph::detangleVertex(
         SHASTA_ASSERT(bubble0.isHaploid());
         const Chain& chain0 = bubble0.front();
         SHASTA_ASSERT(chain0.size() >= 2);
-        const AnchorId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
+        const AnchorId anchorId0 = chain0[chain0.size() - 2];  // Exclude last
 
         for(const edge_descriptor ce1: outEdges) {
             const BubbleChain& bubbleChain1 = cGraph[ce1];
@@ -2948,9 +2948,9 @@ bool AssemblyGraph::detangleVertex(
             SHASTA_ASSERT(bubble1.isHaploid());
             const Chain& chain1 = bubble1.front();
             SHASTA_ASSERT(chain1.size() >= 2);
-            const AnchorId markerGraphEdgeId1 = chain1[1];  // Exclude first
+            const AnchorId anchorId1 = chain1[1];  // Exclude first
 
-            if(markerGraphEdgeId0 == markerGraphEdgeId1) {
+            if(anchorId0 == anchorId1) {
                 if(debug) {
                     cout << "Not detangling due to cycle." << endl;
                 }
@@ -3478,7 +3478,7 @@ bool AssemblyGraph::detangleEdges(
 
 
 
-// Edge detangling using up to n MarkerGraphEdgeIds
+// Edge detangling using up to n AnchorIds
 // of incoming and outgoing chains.
 // This version only handles the 2 by 2 case and always uses the Bayesian model.
 bool AssemblyGraph::detangleEdges(
@@ -3641,7 +3641,7 @@ bool AssemblyGraph::detangleEdge(
         SHASTA_ASSERT(bubble0.isHaploid());
         const Chain& chain0 = bubble0.front();
         SHASTA_ASSERT(chain0.size() >= 2);
-        const AnchorId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
+        const AnchorId anchorId0 = chain0[chain0.size() - 2];  // Exclude last
 
         for(const edge_descriptor ce1: outEdges) {
             const BubbleChain& bubbleChain1 = cGraph[ce1];
@@ -3649,9 +3649,9 @@ bool AssemblyGraph::detangleEdge(
             SHASTA_ASSERT(bubble1.isHaploid());
             const Chain& chain1 = bubble1.front();
             SHASTA_ASSERT(chain1.size() >= 2);
-            const AnchorId markerGraphEdgeId1 = chain1[1];  // Exclude first
+            const AnchorId anchorId1 = chain1[1];  // Exclude first
 
-            if(markerGraphEdgeId0 == markerGraphEdgeId1) {
+            if(anchorId0 == anchorId1) {
                 if(debug) {
                     cout << "Not detangling due to cycle." << endl;
                 }
@@ -3900,7 +3900,7 @@ bool AssemblyGraph::detangleEdge(
 
 
 
-// Edge detangling using up to n MarkerGraphEdgeIds
+// Edge detangling using up to n AnchorIds
 // of incoming and outgoing chains.
 // This version only handles the 2 by 2 case and always uses the Bayesian model.
 bool AssemblyGraph::detangleEdge(
@@ -3982,7 +3982,7 @@ bool AssemblyGraph::detangleEdge(
     }
 
 
-    // Compute the tangle matrix using up to n MarkerGraphEdgeIds
+    // Compute the tangle matrix using up to n AnchorIds
     // of incoming and outgoing chains.
     const array<const Chain*, 2> inChains = {
         &cGraph[inEdges[0]].back().front(),
@@ -4165,7 +4165,7 @@ AssemblyGraph::edge_descriptor AssemblyGraph::connect(
         for(uint64_t i1=first1; i1<=last1; i1++) {
             const AnchorId anchorId1 = chain1[i1];
 
-            // Don't allow generating a chain with identical consecutive MarkerGraphEdgeIds.
+            // Don't allow generating a chain with identical consecutive AnchorIds.
             if(anchorId1 == anchorId0) {
                 continue;
             }
@@ -4174,7 +4174,7 @@ AssemblyGraph::edge_descriptor AssemblyGraph::connect(
 
             if(debug) {
                 cout << "Positions in chains " << i0 << " " << i1 <<
-                    " MarkerGraphedgeIds " << anchorId0 << " " << anchorId1 <<
+                    " AnchorIds " << anchorId0 << " " << anchorId1 <<
                     ", common count " << commonCount << endl;
             }
 
@@ -4364,7 +4364,7 @@ bool AssemblyGraph::detangleShortSuperbubble(
         SHASTA_ASSERT(bubble0.isHaploid());
         const Chain& chain0 = bubble0.front();
         SHASTA_ASSERT(chain0.size() >= 2);
-        const AnchorId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
+        const AnchorId anchorId0 = chain0[chain0.size() - 2];  // Exclude last
 
         for(const edge_descriptor ce1: outEdges) {
             const BubbleChain& bubbleChain1 = cGraph[ce1];
@@ -4372,9 +4372,9 @@ bool AssemblyGraph::detangleShortSuperbubble(
             SHASTA_ASSERT(bubble1.isHaploid());
             const Chain& chain1 = bubble1.front();
             SHASTA_ASSERT(chain1.size() >= 2);
-            const AnchorId markerGraphEdgeId1 = chain1[1];  // Exclude first
+            const AnchorId anchorId1 = chain1[1];  // Exclude first
 
-            if(markerGraphEdgeId0 == markerGraphEdgeId1) {
+            if(anchorId0 == anchorId1) {
                 if(debug) {
                     cout << "Not detangling due to cycle." << endl;
                 }
@@ -4787,7 +4787,7 @@ bool AssemblyGraph::detangleShortSuperbubble(
 
 void AssemblyGraph::phaseBubbleChainsUsingPhasingGraph(
     bool debug,
-    uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
+    uint64_t n, // Maximum number of Chain AnchorIds to use when computing tangle matrices.
     uint64_t lowThreshold,
     uint64_t highThreshold,
     bool useBayesianModel,
@@ -4867,7 +4867,7 @@ void AssemblyGraph::phaseBubbleChainsUsingPhasingTable(
 
 void AssemblyGraph::phaseBubbleChainUsingPhasingGraph(
     edge_descriptor ce,
-    uint64_t n, // Maximum number of Chain MarkerGraphEdgeIds to use when computing tangle matrices.
+    uint64_t n, // Maximum number of Chain AnchorIds to use when computing tangle matrices.
     uint64_t lowThreshold,
     uint64_t highThreshold,
     bool useBayesianModel,
@@ -5137,7 +5137,7 @@ void AssemblyGraph::phaseBubbleChainUsingPhasedComponents(
                     newBubbleChain.push_back(bubble);
                 } else {
                     // Just add a simple haploid bubble with only the source
-                    // and target MarkerGraphEdgeIds.
+                    // and target AnchorIds.
                     Bubble newBubble;
                     newBubble.resize(1);    // Make it haploid
                     Chain& newChain = newBubble.front();    // Its only chain.
@@ -5173,7 +5173,7 @@ void AssemblyGraph::phaseBubbleChainUsingPhasedComponents(
         newChain0.push_back(bubbleChain[minPositionInBubbleChain].front().front());
         newChain1.push_back(bubbleChain[minPositionInBubbleChain].front().front());
 
-        // Add the internal MarkerGraphEdgeIds of all phased diploid bubbles in this PhasedComponent.
+        // Add the internal AnchorIds of all phased diploid bubbles in this PhasedComponent.
         for(const auto& p: phasedComponent) {
             const uint64_t positionInBubbleChain = p.first;
             const int64_t phase = p.second;
@@ -5495,7 +5495,7 @@ void AssemblyGraph::cleanupBubbleChainUsingPhasingTable(
     // - All bubbles with ploidy greater than 2,
     //   unless they are longer than longBubbleThreshold.
     // Each bubble that is removed is replaced by a haploid bubble consisting
-    // of only the terminal MarkerGraphEdgeIds.
+    // of only the terminalAnchorIds.
     BubbleChain newBubbleChain;
     for(uint64_t positionInBubbleChain = 0; positionInBubbleChain < bubbleChain.size();
         positionInBubbleChain++) {
@@ -5546,7 +5546,7 @@ void AssemblyGraph::cleanupBubbleChainUsingPhasingTable(
             }
         } else {
             // Just add a simple haploid bubble with only the source
-            // and target MarkerGraphEdgeIds.
+            // and target AnchorIds.
             Bubble newBubble;
             newBubble.resize(1);    // Make it haploid
             Chain& newChain = newBubble.front();    // Its only chain.
@@ -5592,7 +5592,7 @@ void AssemblyGraph::cleanupBubbleChainUsingPhasingTable(
 
 // Compute the tangle matrix between two incoming chains
 // and two outgoing chains, taking into account up to
-// n MarkergraphEdgeIds for each Chain.
+// n AnchorIds for each Chain.
 void AssemblyGraph::computeTangleMatrix(
     const array<const Chain*, 2> inChains,
     const array<const Chain*, 2> outChains,
@@ -5646,7 +5646,7 @@ void AssemblyGraph::computeTangleMatrix(
 
 
 
-// Gather OrientedReadIds from up to n MarkergraphEdgeIds
+// Gather OrientedReadIds from up to n AnchorIds
 // near the end of a chain.
 void AssemblyGraph::gatherOrientedReadIdsAtEnd(
     const Chain& chain,
@@ -5654,7 +5654,7 @@ void AssemblyGraph::gatherOrientedReadIdsAtEnd(
     vector<OrientedReadId>& orientedReadIds) const
 {
 
-    const uint64_t last = chain.size() - 2;                     // Exclude last MarkergraphEdgeId.
+    const uint64_t last = chain.size() - 2;                     // Exclude last AnchorId.
     const uint64_t first = (last > (n-1)) ? last + 1 - n : 0;   // Use up to n.
 
     SHASTA_ASSERT(first < chain.size());
@@ -5673,7 +5673,7 @@ void AssemblyGraph::gatherOrientedReadIdsAtEnd(
 
 
 
-// Gather OrientedReadIds from up to n MarkergraphEdgeIds
+// Gather OrientedReadIds from up to n AnchorIds
 // near the beginning of a chain.
 void AssemblyGraph::gatherOrientedReadIdsAtBeginning(
     const Chain& chain,
@@ -5681,7 +5681,7 @@ void AssemblyGraph::gatherOrientedReadIdsAtBeginning(
     vector<OrientedReadId>& orientedReadIds) const
 {
 
-    const uint64_t first = 1;   // / Exclude first MarkergraphEdgeId.
+    const uint64_t first = 1;   // / Exclude first AnchorId.
     const uint64_t last = (chain.size() > (n+1)) ? n : chain.size() - 1;
 
     SHASTA_ASSERT(first < chain.size());
@@ -6821,7 +6821,7 @@ void AssemblyGraph::runAssemblyStep(
     uint64_t chainTerminalCommonThreshold)
 {
 
-    // Find the MarkerGraphEdgeIds for this local assembly.
+    // Find the AnchorIds for this local assembly.
     const AnchorId edgeIdA = chain[positionInChain];
     const AnchorId edgeIdB = chain[positionInChain + 1];
 
@@ -6865,7 +6865,7 @@ void AssemblyGraph::runAssemblyStep(
 
 
 
-    // Do the local assembly between these two MarkerGraphEdgeIds.
+    // Do the local assembly between these two AnchorIds.
     auto& stepSequence = chain.stepSequences[positionInChain];
     try {
         LocalAssembly localAssembly(
@@ -7090,7 +7090,7 @@ AssemblyGraph::edge_descriptor AssemblyGraph::connect(vertex_descriptor cv0, ver
     // The new Bubble is haploid, that is, consists of a single Chain.
     bubble.resize(1);
 
-    // The new Bubble consists of just the two MarkerGraphEdgeIds
+    // The new Bubble consists of just the two AnchorIds
     // corresponding to cv0 and cv1.
     Chain& chain = bubble.front();
     chain.push_back(cGraph[cv0].getAnchorId());
@@ -7529,8 +7529,8 @@ void AssemblyGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
 
         // Get the target vertex for the new edge.
         const Chain& firstChain = firstBubble.front();
-        const AnchorId markerGraphEdgeId2 = firstChain.back();
-        cv2 = createVertex(markerGraphEdgeId2);
+        const AnchorId anchorId2 = firstChain.back();
+        cv2 = createVertex(anchorId2);
 
         // Add the new edge.
         edge_descriptor eNew;
@@ -7550,8 +7550,8 @@ void AssemblyGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
 
         // Get the source vertex for the new edge.
         const Chain& lastChain = lastBubble.front();
-        const AnchorId markerGraphEdgeId3 = lastChain.front();
-        cv3 = createVertex(markerGraphEdgeId3);
+        const AnchorId anchorId3 = lastChain.front();
+        cv3 = createVertex(anchorId3);
 
         // Add the new edge.
         edge_descriptor eNew;
@@ -7756,7 +7756,7 @@ uint64_t AssemblyGraph::cleanupBubbles(bool debug, edge_descriptor ce,
             }
         } else {
             // Remove the bubble and replace it with a haploid bubble
-            // consisting of only the terminal MarkerGraphEdgeIds.
+            // consisting of only the terminal AnchorIds.
             Chain newChain;
             newChain.push_back(bubble.front().front());
             newChain.push_back(bubble.front().back());
