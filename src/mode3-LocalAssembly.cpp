@@ -211,7 +211,7 @@ void LocalAssembly::gatherOrientedReads(bool useA, bool useB)
         if((itB == endB) or (itA != endA and itA->orientedReadId < itB->orientedReadId)) {
 
             if(useA) {
-                const MarkerInterval& markerIntervalA = *itA;
+                const AnchorMarkerInterval& markerIntervalA = *itA;
                 const OrientedReadId orientedReadIdA = markerIntervalA.orientedReadId;
                 const uint32_t ordinalA = markerIntervalA.ordinals[1];    // Because vertexIdA is the target of edgeIdA
 
@@ -229,7 +229,7 @@ void LocalAssembly::gatherOrientedReads(bool useA, bool useB)
         else if((itA == endA) or (itB != endB and itB->orientedReadId < itA->orientedReadId)) {
 
             if(useB) {
-                const MarkerInterval& markerIntervalB = *itB;
+                const AnchorMarkerInterval& markerIntervalB = *itB;
                 const OrientedReadId orientedReadIdB = markerIntervalB.orientedReadId;
                 const uint32_t ordinalB = markerIntervalB.ordinals[0];    // Because vertexIdB is the source of edgeIdB
 
@@ -249,10 +249,10 @@ void LocalAssembly::gatherOrientedReads(bool useA, bool useB)
             SHASTA_ASSERT(itA != endA);
             SHASTA_ASSERT(itB != endB);
 
-            const MarkerInterval& markerIntervalA = *itA;
+            const AnchorMarkerInterval& markerIntervalA = *itA;
             const OrientedReadId orientedReadIdA = markerIntervalA.orientedReadId;
 
-            const MarkerInterval& markerIntervalB = *itB;
+            const AnchorMarkerInterval& markerIntervalB = *itB;
             const OrientedReadId orientedReadIdB = markerIntervalB.orientedReadId;
 
             SHASTA_ASSERT(orientedReadIdA == orientedReadIdB);

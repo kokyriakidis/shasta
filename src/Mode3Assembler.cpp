@@ -92,7 +92,7 @@ void Mode3Assembler::findReverseComplementAnchors()
         anchorInfos[i].resize(readCount);
     }
     for(AnchorId anchorId=0; anchorId<anchors().size(); anchorId++) {
-        const MarkerInterval& markerInterval = anchors()[anchorId].front();
+        const AnchorMarkerInterval& markerInterval = anchors()[anchorId].front();
         const OrientedReadId orientedReadId = markerInterval.orientedReadId;
         const ReadId readId = orientedReadId.getReadId();
         const Strand strand = orientedReadId.getStrand();
@@ -135,8 +135,8 @@ void Mode3Assembler::findReverseComplementAnchors()
             const Anchor& anchor0 = anchors()[anchorId0];
             const Anchor& anchor1 = anchors()[anchorId1];
 
-            const MarkerInterval& markerInterval0 = anchor0.front();
-            const MarkerInterval& markerInterval1 = anchor1.front();
+            const AnchorMarkerInterval& markerInterval0 = anchor0.front();
+            const AnchorMarkerInterval& markerInterval1 = anchor1.front();
 
             SHASTA_ASSERT(markerInterval0.orientedReadId == orientedReadId0);
             SHASTA_ASSERT(markerInterval1.orientedReadId == orientedReadId1);
@@ -180,7 +180,7 @@ void Mode3Assembler::computeConnectedComponents()
         const Anchor anchor = anchors()[anchorId];
         SHASTA_ASSERT(not anchor.empty());
         const OrientedReadId orientedReadId0 = anchor.front().orientedReadId;
-        for(const MarkerInterval& markerInterval: anchor) {
+        for(const AnchorMarkerInterval& markerInterval: anchor) {
             const OrientedReadId orientedReadId1 = markerInterval.orientedReadId;
             disjointSets.unite(orientedReadId0.getValue(), orientedReadId1.getValue());
         }
@@ -502,7 +502,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
         const AnchorId anchorId = anchorIds[localAnchorId];
         const Anchor anchor = anchors()[anchorId];
-        for(const MarkerInterval& markerInterval: anchor) {
+        for(const AnchorMarkerInterval& markerInterval: anchor) {
             const OrientedReadId orientedReadId = markerInterval.orientedReadId;
             const uint32_t ordinal0 = markerInterval.ordinals[0];
             const auto& p = orientedReadIdTable[orientedReadId.getValue()];
@@ -665,7 +665,7 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
         for(uint64_t localAnchorId=0; localAnchorId<component.anchorIds.size(); localAnchorId++) {
             const AnchorId anchorId = anchorIds[localAnchorId];
             const Anchor anchor = anchors()[anchorId];
-            for(const MarkerInterval& markerInterval: anchor) {
+            for(const AnchorMarkerInterval& markerInterval: anchor) {
                 csv << anchorId << ",";
                 csv << markerInterval.orientedReadId << ",";
                 csv << markerInterval.ordinals[0] << ",";

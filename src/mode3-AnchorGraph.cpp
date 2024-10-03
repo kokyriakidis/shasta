@@ -534,14 +534,14 @@ void AnchorGraph::findReverseComplementAnchors(
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers)
 {
 
-    // Index the AnchorIds by their first MarkerInterval.
+    // Index the AnchorIds by their first AnchorMarkerInterval.
     class AnchorInfo {
     public:
         uint64_t localAnchorId;
-        MarkerInterval firstMarkerInterval;
+        AnchorMarkerInterval firstMarkerInterval;
         AnchorInfo(
             uint64_t localAnchorId,
-            MarkerInterval firstMarkerInterval) :
+            AnchorMarkerInterval firstMarkerInterval) :
             localAnchorId(localAnchorId), firstMarkerInterval(firstMarkerInterval) {}
         bool operator<(const AnchorInfo& that) const
         {
@@ -564,7 +564,7 @@ void AnchorGraph::findReverseComplementAnchors(
     for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
         const AnchorId anchorId = anchorIds[localAnchorId];
         const Anchor anchor = anchors[anchorId];
-        const MarkerInterval& firstMarkerInterval = anchor[0];
+        const AnchorMarkerInterval& firstMarkerInterval = anchor[0];
 
         // Get the reverse complemented OrientedReadId.
         const OrientedReadId orientedReadId = firstMarkerInterval.orientedReadId;
@@ -572,9 +572,9 @@ void AnchorGraph::findReverseComplementAnchors(
         orientedReadIdRc.flipStrand();
 
 
-        // Get the reverse complemented MarkerInterval.
+        // Get the reverse complemented AnchorMarkerInterval.
         const uint32_t markerCount = uint32_t(markers[orientedReadId.getValue()].size());
-        MarkerInterval firstMarkerIntervalRc;
+        AnchorMarkerInterval firstMarkerIntervalRc;
         firstMarkerIntervalRc.orientedReadId = orientedReadIdRc;
         firstMarkerIntervalRc.ordinals[0] = markerCount - 1 - firstMarkerInterval.ordinals[1];
         firstMarkerIntervalRc.ordinals[1] = markerCount - 1 - firstMarkerInterval.ordinals[0];

@@ -5664,7 +5664,7 @@ void AssemblyGraph::gatherOrientedReadIdsAtEnd(
     for(uint64_t i=first; i<=last; i++) {
         const AnchorId anchorId = chain[i];
         const Anchor anchor = anchors[anchorId];
-        for(const MarkerInterval& markerInterval: anchor) {
+        for(const AnchorMarkerInterval& markerInterval: anchor) {
             orientedReadIds.push_back(markerInterval.orientedReadId);
         }
     }
@@ -5691,7 +5691,7 @@ void AssemblyGraph::gatherOrientedReadIdsAtBeginning(
     for(uint64_t i=first; i<=last; i++) {
         const AnchorId anchorId = chain[i];
         const Anchor anchor = anchors[anchorId];
-        for(const MarkerInterval& markerInterval: anchor) {
+        for(const AnchorMarkerInterval& markerInterval: anchor) {
             orientedReadIds.push_back(markerInterval.orientedReadId);
         }
     }

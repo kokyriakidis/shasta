@@ -31,6 +31,7 @@ namespace shasta {
 
         using AnchorId = uint64_t;
         class Anchor;
+        class AnchorMarkerInterval;
         class Anchors;
         class AnchorPairInfo;
 
@@ -39,20 +40,48 @@ namespace shasta {
 
 
 
+// For now the AnchorMarkerInterval is the same as MarkerInterval,
+// but we want a separate class so we can add to it and remove from it.
+class shasta::mode3::AnchorMarkerInterval {
+public:
+    OrientedReadId orientedReadId;
+    array<uint32_t, 2> ordinals;
+
+    AnchorMarkerInterval() {}
+
+    AnchorMarkerInterval(const MarkerInterval& markerInterval) :
+        orientedReadId(markerInterval.orientedReadId),
+        ordinals(markerInterval.ordinals)
+    {}
+
+    bool operator==(const AnchorMarkerInterval& that) const
+    {
+        return
+            tie(orientedReadId, ordinals[0], ordinals[1])
+            ==
+            tie(that.orientedReadId, that.ordinals[0], that.ordinals[1]);
+    }
+    bool operator<(const AnchorMarkerInterval& that) const
+    {
+        return
+            tie(orientedReadId, ordinals[0], ordinals[1])
+            <
+            tie(that.orientedReadId, that.ordinals[0], that.ordinals[1]);
+    }
+};
+
+
+
 // An Anchor defines a set of MarkerIntervals accessible via this public interface.
 // Internals are kept private to facilitate restructuring.
-class shasta::mode3::Anchor : private span<const MarkerInterval> {
+class shasta::mode3::Anchor : private span<const AnchorMarkerInterval> {
 private:
-    using BaseClass = span<const MarkerInterval>;
+    using BaseClass = span<const AnchorMarkerInterval>;
 public:
 
-    Anchor(const span<const MarkerInterval>& s) : span<const MarkerInterval>(s) {}
+    Anchor(const span<const AnchorMarkerInterval>& s) : span<const AnchorMarkerInterval>(s) {}
 
-    // Operator[] returns a MarkerInterval by copy, not by reference.
-    // This way we can change the internal representation of the Anchor.
-    // But this also means we can't use BaseClass::operator[] because that
-    // returns a reference to a const MarkerInterval.
-    MarkerInterval operator[](uint64_t i) const
+    const AnchorMarkerInterval& operator[](uint64_t i) const
     {
         return BaseClass::operator[](i);
     }
@@ -115,7 +144,7 @@ public:
     bool areAdjacentAnchors(AnchorId, AnchorId) const;
 
 private:
-    MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> anchorMarkerIntervals;
+    MemoryMapped::VectorOfVectors<AnchorMarkerInterval, uint64_t> anchorMarkerIntervals;
 
 public:
     const Reads& reads;

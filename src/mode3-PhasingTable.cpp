@@ -129,10 +129,10 @@ void PhasingTable::fill(
             SHASTA_ASSERT(chain.size() >= 2);
             for(uint64_t i=1; i<chain.size()-1; i++) {
                 const AnchorId anchorId = chain[i];
-                const span<const MarkerInterval> anchor = anchors[anchorId];
+                const span<const AnchorMarkerInterval> anchor = anchors[anchorId];
 
-                // Loop over MarkerIntervals of this anchor.
-                for(const MarkerInterval& markerInterval: anchor) {
+                // Loop over AnchorMarkerInterval of this anchor.
+                for(const AnchorMarkerInterval& markerInterval: anchor) {
                     const OrientedReadId orientedReadId = markerInterval.orientedReadId;
 
                     // Access the PhasingTableEntry for this OrientedReadId and
