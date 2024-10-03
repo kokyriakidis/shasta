@@ -2931,16 +2931,16 @@ bool AssemblyGraph::detangleVertex(
         }
     }
 
-    // If a MarkerGraphEdgeId appears both in the inEdges and in the outEdges,
+    // If an AnchorId appears both in the inEdges and in the outEdges,
     // detangling could generate a chain with two consecutive copies of the same
-    // MarkerGraphEdgeId. Don't detangle.
+    // AnchorId. Don't detangle.
     for(const edge_descriptor ce0: inEdges) {
         const BubbleChain& bubbleChain0 = cGraph[ce0];
         const Bubble& bubble0 = bubbleChain0.lastBubble();
         SHASTA_ASSERT(bubble0.isHaploid());
         const Chain& chain0 = bubble0.front();
         SHASTA_ASSERT(chain0.size() >= 2);
-        const MarkerGraphEdgeId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
+        const AnchorId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
 
         for(const edge_descriptor ce1: outEdges) {
             const BubbleChain& bubbleChain1 = cGraph[ce1];
@@ -2948,7 +2948,7 @@ bool AssemblyGraph::detangleVertex(
             SHASTA_ASSERT(bubble1.isHaploid());
             const Chain& chain1 = bubble1.front();
             SHASTA_ASSERT(chain1.size() >= 2);
-            const MarkerGraphEdgeId markerGraphEdgeId1 = chain1[1];  // Exclude first
+            const AnchorId markerGraphEdgeId1 = chain1[1];  // Exclude first
 
             if(markerGraphEdgeId0 == markerGraphEdgeId1) {
                 if(debug) {
@@ -3437,8 +3437,8 @@ bool AssemblyGraph::detangleVertexWithCycle(
 
 
 // Edge detangling using only
-// the second-to-last MarkerGraphEdgeId of incoming chains and
-// the second MarkerGraphEdgeId of outgoing chains.
+// the second-to-last AnchorId of incoming chains and
+// the second AnchorId of outgoing chains.
 bool AssemblyGraph::detangleEdges(
     bool debug,
     uint64_t detangleToleranceLow,
@@ -3518,8 +3518,8 @@ bool AssemblyGraph::detangleEdges(
 
 
 // Edge detangling using only
-// the second-to-last MarkerGraphEdgeId of incoming chains and
-// the second MarkerGraphEdgeId of outgoing chains.
+// the second-to-last AnchorId of incoming chains and
+// the second AnchorId of outgoing chains.
 bool AssemblyGraph::detangleEdge(
     bool debug,
     std::map<uint64_t, edge_descriptor>& edgeMap,
@@ -3632,16 +3632,16 @@ bool AssemblyGraph::detangleEdge(
     }
 
 
-    // If a MarkerGraphEdgeId appears both in the inEdges and in the outEdges,
+    // If an AnchorId appears both in the inEdges and in the outEdges,
     // detangling could generate a chain with two consecutive copies of the same
-    // MarkerGraphEdgeId. Don't detangle.
+    // AnchorId. Don't detangle.
     for(const edge_descriptor ce0: inEdges) {
         const BubbleChain& bubbleChain0 = cGraph[ce0];
         const Bubble& bubble0 = bubbleChain0.lastBubble();
         SHASTA_ASSERT(bubble0.isHaploid());
         const Chain& chain0 = bubble0.front();
         SHASTA_ASSERT(chain0.size() >= 2);
-        const MarkerGraphEdgeId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
+        const AnchorId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
 
         for(const edge_descriptor ce1: outEdges) {
             const BubbleChain& bubbleChain1 = cGraph[ce1];
@@ -3649,7 +3649,7 @@ bool AssemblyGraph::detangleEdge(
             SHASTA_ASSERT(bubble1.isHaploid());
             const Chain& chain1 = bubble1.front();
             SHASTA_ASSERT(chain1.size() >= 2);
-            const MarkerGraphEdgeId markerGraphEdgeId1 = chain1[1];  // Exclude first
+            const AnchorId markerGraphEdgeId1 = chain1[1];  // Exclude first
 
             if(markerGraphEdgeId0 == markerGraphEdgeId1) {
                 if(debug) {
@@ -4355,16 +4355,16 @@ bool AssemblyGraph::detangleShortSuperbubble(
 
 
 
-    // If a MarkerGraphEdgeId appears both in the inEdges and in the outEdges,
+    // If an AnchorId appears both in the inEdges and in the outEdges,
     // detangling could generate a chain with two consecutive copies of the same
-    // MarkerGraphEdgeId. Don't detangle.
+    // AnchorId. Don't detangle.
     for(const edge_descriptor ce0: inEdges) {
         const BubbleChain& bubbleChain0 = cGraph[ce0];
         const Bubble& bubble0 = bubbleChain0.lastBubble();
         SHASTA_ASSERT(bubble0.isHaploid());
         const Chain& chain0 = bubble0.front();
         SHASTA_ASSERT(chain0.size() >= 2);
-        const MarkerGraphEdgeId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
+        const AnchorId markerGraphEdgeId0 = chain0[chain0.size() - 2];  // Exclude last
 
         for(const edge_descriptor ce1: outEdges) {
             const BubbleChain& bubbleChain1 = cGraph[ce1];
@@ -4372,7 +4372,7 @@ bool AssemblyGraph::detangleShortSuperbubble(
             SHASTA_ASSERT(bubble1.isHaploid());
             const Chain& chain1 = bubble1.front();
             SHASTA_ASSERT(chain1.size() >= 2);
-            const MarkerGraphEdgeId markerGraphEdgeId1 = chain1[1];  // Exclude first
+            const AnchorId markerGraphEdgeId1 = chain1[1];  // Exclude first
 
             if(markerGraphEdgeId0 == markerGraphEdgeId1) {
                 if(debug) {
@@ -4957,7 +4957,7 @@ void AssemblyGraph::phaseBubbleChainUsingPhasingGraph(
         SHASTA_ASSERT(bubble0.size() == 2);
         const Chain& chain00 = bubble0[0];
         const Chain& chain01 = bubble0[1];
-        const array<MarkerGraphEdgeId, 2> edges0 =
+        const array<AnchorId, 2> edges0 =
             {chain00[chain00.size()-2], chain01[chain01.size()-2]};
 
         for(uint64_t i1=i0+1; i1<bubbleChain.size(); i1++) {
@@ -4972,7 +4972,7 @@ void AssemblyGraph::phaseBubbleChainUsingPhasingGraph(
             SHASTA_ASSERT(bubble1.size() == 2);
             const Chain& chain10 = bubble1[0];
             const Chain& chain11 = bubble1[1];
-            const array<MarkerGraphEdgeId, 2> edges1 =
+            const array<AnchorId, 2> edges1 =
                 {chain10[1], chain11[1]};
 
             // Compute the tangle matrix.
@@ -5141,8 +5141,8 @@ void AssemblyGraph::phaseBubbleChainUsingPhasedComponents(
                     Bubble newBubble;
                     newBubble.resize(1);    // Make it haploid
                     Chain& newChain = newBubble.front();    // Its only chain.
-                    newChain.push_back(bubble.front().front()); // Source MarkerGraphEdgeId
-                    newChain.push_back(bubble.front().back());  // Target MarkerGraphEdgeId
+                    newChain.push_back(bubble.front().front()); // Source AnchorId
+                    newChain.push_back(bubble.front().back());  // Target AnchorId
                     newBubbleChain.push_back(newBubble);
                 }
             }
@@ -5169,7 +5169,7 @@ void AssemblyGraph::phaseBubbleChainUsingPhasedComponents(
         Chain& newChain0 = newBubble[0];    // The first haplotype after phasing.
         Chain& newChain1 = newBubble[1];    // The second haplotype after phasing.
 
-        // Add the source MarkerGraphEdgeId.
+        // Add the source AnchorId.
         newChain0.push_back(bubbleChain[minPositionInBubbleChain].front().front());
         newChain1.push_back(bubbleChain[minPositionInBubbleChain].front().front());
 
@@ -5186,7 +5186,7 @@ void AssemblyGraph::phaseBubbleChainUsingPhasedComponents(
             copy(chain1.begin()+1, chain1.end()-1, back_inserter(newChain1));
         }
 
-        // Add the target MarkerGraphEdgeId.
+        // Add the target AnchorId.
         newChain0.push_back(bubbleChain[maxPositionInBubbleChain].front().back());
         newChain1.push_back(bubbleChain[maxPositionInBubbleChain].front().back());
     }
@@ -5322,10 +5322,10 @@ void AssemblyGraph::phaseBubbleChainUsingPhasingTable(
             const Chain& chain10 = (phase0 == phase1) ? bubble1[0] : bubble1[1];
             const Chain& chain11 = (phase0 == phase1) ? bubble1[1] : bubble1[0];
 
-            MarkerGraphEdgeId e00 = chain00.secondToLast();
-            MarkerGraphEdgeId e01 = chain01.secondToLast();
-            MarkerGraphEdgeId e10 = chain10.second();
-            MarkerGraphEdgeId e11 = chain11.second();
+            AnchorId e00 = chain00.secondToLast();
+            AnchorId e01 = chain01.secondToLast();
+            AnchorId e10 = chain10.second();
+            AnchorId e11 = chain11.second();
 
             const uint64_t common0 = anchors.countCommon(e00, e10);
             const uint64_t common1 = anchors.countCommon(e01, e11);
@@ -5550,8 +5550,8 @@ void AssemblyGraph::cleanupBubbleChainUsingPhasingTable(
             Bubble newBubble;
             newBubble.resize(1);    // Make it haploid
             Chain& newChain = newBubble.front();    // Its only chain.
-            newChain.push_back(bubble.front().front()); // Source MarkerGraphEdgeId
-            newChain.push_back(bubble.front().back());  // Target MarkerGraphEdgeId
+            newChain.push_back(bubble.front().front()); // Source AnchorId
+            newChain.push_back(bubble.front().back());  // Target AnchorId
             newBubbleChain.push_back(newBubble);
             if(debug) {
                 cout << "Bubble at position in bubble chain " << positionInBubbleChain <<
@@ -6538,8 +6538,8 @@ void AssemblyGraph::assembleChainsMultithreaded(
                     assemblyStep.positionInChain = positionInChain;
 
                     // Compute the offset.
-                    const MarkerGraphEdgeId edgeIdA = chain[positionInChain];
-                    const MarkerGraphEdgeId edgeIdB = chain[positionInChain + 1];
+                    const AnchorId edgeIdA = chain[positionInChain];
+                    const AnchorId edgeIdB = chain[positionInChain + 1];
 
                     AnchorPairInfo info;
                     anchors.analyzeAnchorPair(edgeIdA, edgeIdB, info);
@@ -6657,7 +6657,7 @@ void AssemblyGraph::combineStepSequences(Chain& chain)
     for(uint64_t positionInChain=0; /* Check later */ ; positionInChain++) {
 
         // Add the sequence for the marker graph primary edge.
-        const MarkerGraphEdgeId edgeId = chain[positionInChain];
+        const AnchorId edgeId = chain[positionInChain];
         const auto edgeSequence = anchors.anchorSequence(edgeId);
         copy(edgeSequence.begin(), edgeSequence.end(), back_inserter(chain.sequence));
 
@@ -6741,8 +6741,8 @@ void AssemblyGraph::writeAssemblyDetails() const
                     // contributed by the assemby step between this marker graph primary edge
                     // and the next in the chain.
                     {
-                        const MarkerGraphEdgeId edgeId = chain[positionInChain];
-                        const MarkerGraphEdgeId nextEdgeId = chain[positionInChain + 1];
+                        const AnchorId edgeId = chain[positionInChain];
+                        const AnchorId nextEdgeId = chain[positionInChain + 1];
                         const uint64_t commonCount = anchors.countCommon(edgeId, nextEdgeId);
                         const auto& stepSequence = chain.stepSequences[positionInChain];
                         const uint64_t stepSequenceLength = stepSequence.sequence.size();
@@ -6822,8 +6822,8 @@ void AssemblyGraph::runAssemblyStep(
 {
 
     // Find the MarkerGraphEdgeIds for this local assembly.
-    const MarkerGraphEdgeId edgeIdA = chain[positionInChain];
-    const MarkerGraphEdgeId edgeIdB = chain[positionInChain + 1];
+    const AnchorId edgeIdA = chain[positionInChain];
+    const AnchorId edgeIdB = chain[positionInChain + 1];
 
     // Suppress html output from LocalAssembly.
     ostream html(0);
@@ -6887,7 +6887,7 @@ void AssemblyGraph::runAssemblyStep(
 
 
 
-// Make a copy of an edge, truncating it at its end by removing the last MarkerGraphEdgeId.
+// Make a copy of an edge, truncating it at its end by removing the last AnchorId.
 // Return the target vertex of the newly created edge.
 // The last bubble of the bubble chain of the given edge must be haploid.
 // If the bubble chain consists of just a single haploid bubble with a chain of length 2,
@@ -6930,7 +6930,7 @@ AssemblyGraph::vertex_descriptor
         SHASTA_ASSERT(newBubble.isHaploid());
         Chain& newChain = newBubble.front();
         SHASTA_ASSERT(chain.size() > 2);
-        newChain.pop_back();    // Remove the last MarkerGraphEdgeId.
+        newChain.pop_back();    // Remove the last AnchorId.
 
         // Add it to the graph.
         // It will be dangling at its end.
@@ -6959,7 +6959,7 @@ AssemblyGraph::vertex_descriptor
         Chain& newLastChain = newLastBubble.front();
 
         // If the last chain has length 2, just remove the last bubble from newBubbleChain.
-        // Otherwise, remove the last MarkerGraphEdgeId from the lastChain.
+        // Otherwise, remove the last AnchorId from the lastChain.
         if(newLastChain.size() == 2) {
             newBubbleChain.pop_back();
         } else {
@@ -6980,7 +6980,7 @@ AssemblyGraph::vertex_descriptor
 
 
 
-// Make a copy of an edge, truncating it at its beginning by removing the first MarkerGraphEdgeId.
+// Make a copy of an edge, truncating it at its beginning by removing the first AnchorId.
 // Return the source vertex of the newly created edge.
 // The first bubble of the bubble chain of the given edge must be haploid.
 // If the bubble chain consists of just a single haploid bubble with a chain of length 2,
@@ -7023,7 +7023,7 @@ AssemblyGraph::vertex_descriptor
         SHASTA_ASSERT(newBubble.isHaploid());
         Chain& newChain = newBubble.front();
         SHASTA_ASSERT(chain.size() > 2);
-        newChain.erase(newChain.begin());    // Remove the first MarkerGraphEdgeId.
+        newChain.erase(newChain.begin());    // Remove the first AnchorId.
 
         // Add it to the graph.
         // It will be dangling at its beginning.
@@ -7052,7 +7052,7 @@ AssemblyGraph::vertex_descriptor
         Chain& newFirstChain = newFirstBubble.front();
 
         // If the last chain has length 2, just remove the first bubble from newBubbleChain.
-        // Otherwise, remove the first MarkerGraphEdgeId from the lastChain.
+        // Otherwise, remove the first AnchorId from the lastChain.
         if(newFirstChain.size() == 2) {
             newBubbleChain.erase(newBubbleChain.begin());
         } else {
@@ -7149,11 +7149,11 @@ void AssemblyGraph::optimizeChain(
 
 
     // A directed graph describing the initial and final chains.
-    // Each vertex stores a MarkerGraphEdgeId.
+    // Each vertex stores an AnchorId.
     // Each edge stores the number of common oriented reads.
     class ChainGraphVertex {
     public:
-        MarkerGraphEdgeId edgeId;
+        AnchorId edgeId;
         uint64_t immediateDominator = invalid<uint64_t>;
     };
     class ChainGraphEdge {
@@ -7213,7 +7213,7 @@ void AssemblyGraph::optimizeChain(
     // Add the vertices.
     // We are using vecS as the second template argument for ChainGraph,
     // so positions in the chain are also vertex descriptors in the ChainGraph.
-    for(const MarkerGraphEdgeId edgeId: chain) {
+    for(const AnchorId edgeId: chain) {
         add_vertex({edgeId}, chainGraph);
     }
 
@@ -7529,7 +7529,7 @@ void AssemblyGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
 
         // Get the target vertex for the new edge.
         const Chain& firstChain = firstBubble.front();
-        const MarkerGraphEdgeId markerGraphEdgeId2 = firstChain.back();
+        const AnchorId markerGraphEdgeId2 = firstChain.back();
         cv2 = createVertex(markerGraphEdgeId2);
 
         // Add the new edge.
@@ -7550,7 +7550,7 @@ void AssemblyGraph::splitTerminalHaploidBubbles(edge_descriptor ce)
 
         // Get the source vertex for the new edge.
         const Chain& lastChain = lastBubble.front();
-        const MarkerGraphEdgeId markerGraphEdgeId3 = lastChain.front();
+        const AnchorId markerGraphEdgeId3 = lastChain.front();
         cv3 = createVertex(markerGraphEdgeId3);
 
         // Add the new edge.
