@@ -53,21 +53,6 @@ public:
         orientedReadId(markerInterval.orientedReadId),
         ordinals(markerInterval.ordinals)
     {}
-
-    bool operator==(const AnchorMarkerInterval& that) const
-    {
-        return
-            tie(orientedReadId, ordinals[0], ordinals[1])
-            ==
-            tie(that.orientedReadId, that.ordinals[0], that.ordinals[1]);
-    }
-    bool operator<(const AnchorMarkerInterval& that) const
-    {
-        return
-            tie(orientedReadId, ordinals[0], ordinals[1])
-            <
-            tie(that.orientedReadId, that.ordinals[0], that.ordinals[1]);
-    }
 };
 
 

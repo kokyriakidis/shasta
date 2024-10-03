@@ -164,20 +164,5 @@ public:
     // Remove edges for which loss = (commonCount - coverage) / commonCount > maxLoss
     void removeWeakEdges(double maxLoss, bool debug);
 
-
-
-    // Strand separation.
-    void separateStrands();
-
-    // The local anchor id of the reverse complement of an anchor.
-    // Indexed by the local anchor id.
-    vector<AnchorId> reverseComplementAnchor;
-
-    void findReverseComplementAnchors(
-        const Anchors&,
-        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers);
-    void findReverseComplementVertices();
-    void findReverseComplementEdges();
-
 };
 

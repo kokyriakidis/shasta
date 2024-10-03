@@ -600,17 +600,6 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      cout << "After removing cross-edges, the AnchorGraph for this connected component has " <<
          num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
 
-     // Strand separation does not work well ans is skipped.
-     // If the component is self-complementary, it will be assembled double-stranded.
-     if(false /*isSelfComplementary*/) {
-         anchorGraph.findReverseComplementAnchors(anchors(), markers);
-         anchorGraph.findReverseComplementVertices();
-         anchorGraph.findReverseComplementEdges();
-         anchorGraph.separateStrands();
-         cout << "After strand separation, the AnchorGraph for this connected component has " <<
-             num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
-     }
-
      // Graphviz output.
      if(debug) {
          AnchorGraphDisplayOptions options;
