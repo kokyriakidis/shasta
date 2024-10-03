@@ -45,13 +45,15 @@ namespace shasta {
 class shasta::mode3::AnchorMarkerInterval {
 public:
     OrientedReadId orientedReadId;
-    array<uint32_t, 2> ordinals;
+    uint32_t ordinal0;
+    uint32_t ordinal1;
 
     AnchorMarkerInterval() {}
 
     AnchorMarkerInterval(const MarkerInterval& markerInterval) :
         orientedReadId(markerInterval.orientedReadId),
-        ordinals(markerInterval.ordinals)
+        ordinal0(markerInterval.ordinals[0]),
+        ordinal1(markerInterval.ordinals[1])
     {}
 };
 

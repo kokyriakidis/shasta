@@ -170,10 +170,10 @@ void Anchors::analyzeAnchorPair(
         // Compute the offset in markers.
         // This assumes an ordinal offset of 1.
         // If this changes, this code will need some changes.
-        SHASTA_ASSERT(itA->ordinals[1] == itA->ordinals[0] + 1);
-        SHASTA_ASSERT(itB->ordinals[1] == itB->ordinals[0] + 1);
-        const uint32_t ordinalA = itA->ordinals[0];
-        const uint32_t ordinalB = itB->ordinals[0];
+        SHASTA_ASSERT(itA->ordinal1 == itA->ordinal0 + 1);
+        SHASTA_ASSERT(itB->ordinal1 == itB->ordinal0 + 1);
+        const uint32_t ordinalA = itA->ordinal0;
+        const uint32_t ordinalB = itB->ordinal0;
         const int64_t markerOffset = int64_t(ordinalB) - int64_t(ordinalA);
         sumMarkerOffsets += markerOffset;
 
@@ -231,8 +231,8 @@ void Anchors::analyzeAnchorPair(
             const int64_t lengthInBases = int64_t(reads.getReadRawSequenceLength(orientedReadId.getReadId()));
 
             // Get the positions of edge A in this oriented read.
-            const uint32_t ordinalA0 = itA->ordinals[0];
-            const uint32_t ordinalA1 = itA->ordinals[1];
+            const uint32_t ordinalA0 = itA->ordinal0;
+            const uint32_t ordinalA1 = itA->ordinal1;
             const int64_t positionA0 = int64_t(orientedReadMarkers[ordinalA0].position);
             const int64_t positionA1 = int64_t(orientedReadMarkers[ordinalA1].position);
 
@@ -257,8 +257,8 @@ void Anchors::analyzeAnchorPair(
             const int64_t lengthInBases = int64_t(reads.getReadRawSequenceLength(orientedReadId.getReadId()));
 
             // Get the positions of edge B in this oriented read.
-            const uint32_t ordinalB0 = itB->ordinals[0];
-            const uint32_t ordinalB1 = itB->ordinals[1];
+            const uint32_t ordinalB0 = itB->ordinal0;
+            const uint32_t ordinalB1 = itB->ordinal1;
             const int64_t positionB0 = int64_t(orientedReadMarkers[ordinalB0].position);
             const int64_t positionB1 = int64_t(orientedReadMarkers[ordinalB1].position);
 
@@ -310,7 +310,7 @@ bool Anchors::areAdjacentAnchors(AnchorId anchorId0, AnchorId anchorId1) const
         } else if(orientedReadId1 < orientedReadId0) {
             ++it1;
         } else {
-            if(it0->ordinals[1] == it1->ordinals[0]) {
+            if(it0->ordinal1 == it1->ordinal0) {
                 return true;
             }
             ++it0;

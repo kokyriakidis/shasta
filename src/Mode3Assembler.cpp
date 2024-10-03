@@ -96,7 +96,7 @@ void Mode3Assembler::findReverseComplementAnchors()
         const OrientedReadId orientedReadId = markerInterval.orientedReadId;
         const ReadId readId = orientedReadId.getReadId();
         const Strand strand = orientedReadId.getStrand();
-        const uint32_t ordinal0 = markerInterval.ordinals[0];
+        const uint32_t ordinal0 = markerInterval.ordinal0;
         anchorInfos[strand][readId].push_back({anchorId, ordinal0});
     }
 
@@ -141,7 +141,7 @@ void Mode3Assembler::findReverseComplementAnchors()
             SHASTA_ASSERT(markerInterval0.orientedReadId == orientedReadId0);
             SHASTA_ASSERT(markerInterval1.orientedReadId == orientedReadId1);
 
-            SHASTA_ASSERT(markerInterval0.ordinals[0] + markerInterval1.ordinals[1] == markerCount - 1);
+            SHASTA_ASSERT(markerInterval0.ordinal0 + markerInterval1.ordinal1 == markerCount - 1);
 
             reverseComplementAnchor[anchorId0] = anchorId1;
             reverseComplementAnchor[anchorId1] = anchorId0;
@@ -504,7 +504,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
         const Anchor anchor = anchors()[anchorId];
         for(const AnchorMarkerInterval& markerInterval: anchor) {
             const OrientedReadId orientedReadId = markerInterval.orientedReadId;
-            const uint32_t ordinal0 = markerInterval.ordinals[0];
+            const uint32_t ordinal0 = markerInterval.ordinal0;
             const auto& p = orientedReadIdTable[orientedReadId.getValue()];
             if(p.first == componentId) { // Due to StrandSplitter this is not always the case.
                 journeys[p.second].push_back({ordinal0, localAnchorId});
@@ -657,8 +657,8 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
             for(const AnchorMarkerInterval& markerInterval: anchor) {
                 csv << anchorId << ",";
                 csv << markerInterval.orientedReadId << ",";
-                csv << markerInterval.ordinals[0] << ",";
-                csv << markerInterval.ordinals[1] << "\n";
+                csv << markerInterval.ordinal0 << ",";
+                csv << markerInterval.ordinal1 << "\n";
             }
         }
 
