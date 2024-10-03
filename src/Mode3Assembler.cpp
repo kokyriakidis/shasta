@@ -41,7 +41,6 @@ Mode3Assembler::Mode3Assembler(
     SHASTA_ASSERT(anchorsPointer);
 
     performanceLog << timestamp << "Mode 3 assembly begins." << endl;
-    findReverseComplementAnchors();
 
     computeConnectedComponents();
     if(debug) {
@@ -68,93 +67,6 @@ Mode3Assembler::Mode3Assembler(
     anchorsPointer(anchorsPointer)
 {
     SHASTA_ASSERT(anchorsPointer);
-}
-
-
-
-void Mode3Assembler::findReverseComplementAnchors()
-{
-    const uint64_t readCount = reads.readCount();
-
-    // For each Anchor, we look at the lowest numbered ReadId,
-    // and store the ReadId and ordinal in anchorInfos[strand][readId].
-    class AnchorInfo {
-    public:
-        AnchorId anchorId;
-        uint32_t ordinal;
-        bool operator<(const AnchorInfo& that) const
-        {
-            return ordinal < that.ordinal;
-        }
-    };
-    array<vector< vector<AnchorInfo> >, 2> anchorInfos;
-    for(uint64_t i=0; i<2; i++) {
-        anchorInfos[i].resize(readCount);
-    }
-    for(AnchorId anchorId=0; anchorId<anchors().size(); anchorId++) {
-        const AnchorMarkerInterval& markerInterval = anchors()[anchorId].front();
-        const OrientedReadId orientedReadId = markerInterval.orientedReadId;
-        const ReadId readId = orientedReadId.getReadId();
-        const Strand strand = orientedReadId.getStrand();
-        const uint32_t ordinal0 = markerInterval.ordinal0;
-        anchorInfos[strand][readId].push_back({anchorId, ordinal0});
-    }
-
-    // Sort by ordinal the AnchorInfos for each Strand and Read.
-    for(Strand strand=0; strand<2; strand++) {
-        for(ReadId readId=0; readId<readCount; readId++) {
-            vector<AnchorInfo>& v = anchorInfos[strand][readId];
-            sort(v.begin(), v.end());
-        }
-    }
-
-
-
-    // Now we can find the reverse complement of each Anchor
-    // by scanning the anchorInfos for the two OrientedReadId of each ReadId.
-    reverseComplementAnchor.resize(anchors().size(), invalid<AnchorId>);
-    for(ReadId readId=0; readId<readCount; readId++) {
-        const OrientedReadId orientedReadId0(readId, 0);
-        const OrientedReadId orientedReadId1(readId, 1);
-        const uint64_t markerCount = markers.size(orientedReadId0.getValue());
-
-        const vector<AnchorInfo>& anchorInfos0 = anchorInfos[0][readId];
-        const vector<AnchorInfo>& anchorInfos1 = anchorInfos[1][readId];
-        const uint64_t n = anchorInfos0.size();
-        SHASTA_ASSERT(anchorInfos1.size() == n);
-
-        for(uint64_t i0=0; i0<n; i0++) {
-            const uint64_t i1 = n - i0 - 1;
-
-            const AnchorInfo& anchorInfo0 = anchorInfos0[i0];
-            const AnchorInfo& anchorInfo1 = anchorInfos1[i1];
-
-            const AnchorId anchorId0 = anchorInfo0.anchorId;
-            const AnchorId anchorId1 = anchorInfo1.anchorId;
-
-            const Anchor& anchor0 = anchors()[anchorId0];
-            const Anchor& anchor1 = anchors()[anchorId1];
-
-            const AnchorMarkerInterval& markerInterval0 = anchor0.front();
-            const AnchorMarkerInterval& markerInterval1 = anchor1.front();
-
-            SHASTA_ASSERT(markerInterval0.orientedReadId == orientedReadId0);
-            SHASTA_ASSERT(markerInterval1.orientedReadId == orientedReadId1);
-
-            SHASTA_ASSERT(markerInterval0.ordinal0 + markerInterval1.ordinal1 == markerCount - 1);
-
-            reverseComplementAnchor[anchorId0] = anchorId1;
-            reverseComplementAnchor[anchorId1] = anchorId0;
-        }
-    }
-
-    // Sanity check.
-    for(AnchorId anchorId=0; anchorId<anchors().size(); anchorId++) {
-        const AnchorId anchorIdRc = reverseComplementAnchor[anchorId];
-        SHASTA_ASSERT(anchorIdRc != invalid<AnchorId>);
-        SHASTA_ASSERT(anchorIdRc != anchorId);
-        SHASTA_ASSERT(reverseComplementAnchor[anchorIdRc] == anchorId);
-    }
 }
 
 
