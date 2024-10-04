@@ -20,10 +20,10 @@ namespace shasta {
 
 
     // The main input to mode 3 assembly is a set of anchors.
-    // Each anchor consists of a span of MarkerIntervals, with the following requirements:
-    // - All MarkerIntervals correspond to exactly the same sequence in the corresponding oriented reads, and:
+    // Each anchor consists of a span of AnchorMarkerInterval, with the following requirements:
+    // - All AnchorMarkerInterval correspond to exactly the same sequence in the corresponding oriented reads, and:
     //      * Those portions of the oriented reads are believed to be aligned.
-    //      * They apear in a low number of copies in the genome being sequenced.
+    //      * They appear in a low number of copies in the genome being sequenced.
     // - There are no duplicate oriented reads in an anchor.
     // - The anchor coverage (number of oriented reads) is in [minPrimaryCoverage, maxPrimaryCoverage].
 
@@ -35,6 +35,7 @@ namespace shasta {
         class Anchors;
         class AnchorPairInfo;
 
+        using AnchorBaseClass = span<const AnchorMarkerInterval>;
     }
 }
 
@@ -61,27 +62,13 @@ public:
 
 
 
-// An Anchor defines a set of MarkerIntervals accessible via this public interface.
-// Internals are kept private to facilitate restructuring.
-class shasta::mode3::Anchor : private span<const AnchorMarkerInterval> {
-private:
-    using BaseClass = span<const AnchorMarkerInterval>;
+// An Anchor is a set of AnchorMarkerIntervals.
+class shasta::mode3::Anchor : public AnchorBaseClass {
 public:
 
-    Anchor(const span<const AnchorMarkerInterval>& s) : span<const AnchorMarkerInterval>(s) {}
-
-    const AnchorMarkerInterval& operator[](uint64_t i) const
-    {
-        return BaseClass::operator[](i);
-    }
+    Anchor(const AnchorBaseClass& s) : AnchorBaseClass(s) {}
 
     void check() const;
-
-    using BaseClass::size;
-    using BaseClass::begin;
-    using BaseClass::end;
-    using BaseClass::front;
-    using BaseClass::empty;
 
     uint64_t coverage() const
     {
@@ -132,6 +119,9 @@ public:
     // For precise definition see the code.
     bool areAdjacentAnchors(AnchorId, AnchorId) const;
 
+    // The offset to be added to ordinal0 of an Anchor to obtaine ordinal1.
+    // Currently this is the same for all Anchors and always equal to 1,
+    // but this could change.
     uint32_t ordinalOffset(AnchorId) const
     {
         return 1;
