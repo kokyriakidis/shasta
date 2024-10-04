@@ -111,8 +111,12 @@ Anchors::Anchors(
         auto& threadSequences = *data.threadSequences[threadId];
         SHASTA_ASSERT(threadMarkerIntervals.size() == threadSequences.size());
         for(uint64_t i=0; i<threadMarkerIntervals.size(); i++) {
-            const span<MarkerInterval> markerIntervals = threadMarkerIntervals[i];
-            anchorMarkerIntervals.appendVector(markerIntervals.begin(), markerIntervals.end());
+            const auto thisAnchorMarkerIntervals = threadMarkerIntervals[i];
+            anchorMarkerIntervals.appendVector();
+            for(const auto& threadMarkerInterval: thisAnchorMarkerIntervals) {
+                anchorMarkerIntervals.append(
+                    AnchorMarkerInterval(threadMarkerInterval.orientedReadId, threadMarkerInterval.ordinal0));
+            }
             const span<Base> sequence = threadSequences[i];
             anchorSequences.appendVector(sequence.begin(), sequence.end());
         }
@@ -133,6 +137,7 @@ Anchors::Anchors(
 void Anchors::constructFromMarkerGraphThreadFunction(uint64_t threadId)
 {
     // Access the data set up by createPrimaryMarkerGraphEdges.
+    using ThreadMarkerInterval = ConstructFromMarkerGraphData::ThreadMarkerInterval;
     auto& data = constructFromMarkerGraphData;
 
     // Get the primary coverage range.
@@ -144,10 +149,10 @@ void Anchors::constructFromMarkerGraphThreadFunction(uint64_t threadId)
         markerGraph.vertices();
 
     // Create the vector to contain the marker intervals for the Anchors found by this thread.
-    shared_ptr< MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> > markerIntervalsPointer =
-        make_shared< MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> >();
+    shared_ptr< MemoryMapped::VectorOfVectors<ThreadMarkerInterval, uint64_t> > markerIntervalsPointer =
+        make_shared< MemoryMapped::VectorOfVectors<ThreadMarkerInterval, uint64_t> >();
     data.threadMarkerIntervals[threadId] = markerIntervalsPointer;
-    MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t>&
+    MemoryMapped::VectorOfVectors<ThreadMarkerInterval, uint64_t>&
         markerIntervals = *markerIntervalsPointer;
     markerIntervals.createNew(
             largeDataName("tmp-ThreadAnchorMarkerIntervals-" + to_string(threadId)),
@@ -167,11 +172,11 @@ void Anchors::constructFromMarkerGraphThreadFunction(uint64_t threadId)
     public:
         vector<Base> sequence;
         MarkerGraphVertexId vertexId1;
-        vector<MarkerInterval> markerIntervals;
+        vector<ThreadMarkerInterval> markerIntervals;
         Info(
             const vector<Base>& sequence,
             MarkerGraphVertexId vertexId1,
-            const MarkerInterval& markerInterval) :
+            const ThreadMarkerInterval& markerInterval) :
             sequence(sequence),
             vertexId1(vertexId1),
             markerIntervals(1, markerInterval) {}
@@ -236,11 +241,10 @@ void Anchors::constructFromMarkerGraphThreadFunction(uint64_t threadId)
                     sequence.push_back(base);
                 }
 
-                // Construct this MarkerInterval.
-                MarkerInterval markerInterval;
+                // Construct this ThreadMarkerInterval.
+                ThreadMarkerInterval markerInterval;
                 markerInterval.orientedReadId = orientedReadId;
-                markerInterval.ordinals[0] = ordinal0;
-                markerInterval.ordinals[1] = ordinal1;
+                markerInterval.ordinal0 = ordinal0;
 
                 // If we already have an Info with this sequence and vertexId1, add id there.
                 // Otherwise create a new Info.

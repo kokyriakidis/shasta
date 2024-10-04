@@ -54,9 +54,11 @@ public:
 
     AnchorMarkerInterval() {}
 
-    AnchorMarkerInterval(const MarkerInterval& markerInterval) :
-        orientedReadId(markerInterval.orientedReadId),
-        ordinal0(markerInterval.ordinals[0])
+    AnchorMarkerInterval(
+        OrientedReadId orientedReadId,
+        uint32_t ordinal0) :
+        orientedReadId(orientedReadId),
+        ordinal0(ordinal0)
     {}
 };
 
@@ -162,8 +164,13 @@ private:
 
         const MarkerGraph* markerGraphPointer;
 
-        // The marker intervals of the edges found by each thread.
-        vector< shared_ptr< MemoryMapped::VectorOfVectors<MarkerInterval, uint64_t> > > threadMarkerIntervals;
+        // The marker intervals of the anchors found by each thread.
+        class ThreadMarkerInterval {
+        public:
+            OrientedReadId orientedReadId;
+            uint32_t ordinal0;
+        };
+        vector< shared_ptr< MemoryMapped::VectorOfVectors<ThreadMarkerInterval, uint64_t> > > threadMarkerIntervals;
 
         // The corresponding sequences
         vector< shared_ptr< MemoryMapped::VectorOfVectors<Base, uint64_t> > > threadSequences;
