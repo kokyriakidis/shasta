@@ -36,6 +36,9 @@ namespace shasta {
         class AnchorPairInfo;
 
         using AnchorBaseClass = span<const AnchorMarkerInterval>;
+
+        string anchorIdToString(AnchorId);
+        AnchorId anchorIdFromString(const string&);
     }
 }
 

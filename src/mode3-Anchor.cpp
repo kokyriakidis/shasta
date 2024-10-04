@@ -321,3 +321,49 @@ bool Anchors::areAdjacentAnchors(AnchorId anchorId0, AnchorId anchorId1) const
     return false;
 
 }
+
+
+// Anchors are numbered such that each pair of reverse complemented
+// AnchorIds are numbered (n, n+1), where n is even, n = 2*m.
+// We represent an AnchorId as a string as follows:
+// - AnchorId n is represented as m+
+// - AnchorId n+1 is represented as m-
+// For example, the reverse complemented pair (150, 151) is represented as (75+, 75-).
+
+string shasta::mode3::anchorIdToString(AnchorId n)
+{
+    std::ostringstream s;
+
+    const AnchorId m = (n >> 1);
+    s << m;
+
+    if(n & 1) {
+        s << "-";
+    } else {
+        s << "+";
+    }
+
+    return s.str();
+}
+
+
+
+AnchorId shasta::mode3::anchorIdFromString(const string& s)
+{
+    SHASTA_ASSERT(s.size() >= 2);
+
+    const char cLast = s.back();
+
+    uint64_t lastBit;
+    if(cLast == '+') {
+        lastBit = 0;
+    } else if(cLast == '-') {
+        lastBit = 1;
+    } else {
+        SHASTA_ASSERT(0);
+    }
+
+    const uint64_t m = std::stoul(s.substr(0, s.size()-1));
+
+    return 2* m + lastBit;
+}

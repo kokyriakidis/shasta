@@ -818,7 +818,7 @@ void AssemblyGraph::writeGraphviz(
     BGL_FORALL_VERTICES(cv, assemblyGraph, AssemblyGraph) {
         const AnchorId anchorId = assemblyGraph[cv].getAnchorId();
         const uint64_t coverage = anchors[anchorId].coverage();
-        dot << anchorId << "[label=\"" << anchorId << "\\n" << coverage << "\"];\n";
+        dot << "\"" << anchorIdToString(anchorId) << "\" [label=\"" << anchorIdToString(anchorId) << "\\n" << coverage << "\"];\n";
     }
 
 
@@ -833,7 +833,8 @@ void AssemblyGraph::writeGraphviz(
         uint64_t maxOffset;
         bubbleChainOffset(assemblyGraph[ce], averageOffset, minOffset, maxOffset);
 
-        dot << assemblyGraph[cv0].getAnchorId() << "->" << assemblyGraph[cv1].getAnchorId();
+        dot << "\"" << anchorIdToString(assemblyGraph[cv0].getAnchorId()) <<
+            "\"->\"" << anchorIdToString(assemblyGraph[cv1].getAnchorId()) << "\"";
 
         if(labels) {
             dot << " [label=\"";
@@ -860,9 +861,9 @@ void AssemblyGraph::writeGraphviz(
                         const double averageCoverage = double(coverageSum) / double(chain.size() - 2);
                         dot << "\\ncov=" << uint64_t(std::round(averageCoverage));
 
-                        dot << "\\n" << chain.second();
+                        dot << "\\n" << anchorIdToString(chain.second());
                         if(chain.size() > 3) {
-                            dot << "\\n" << chain.secondToLast();
+                            dot << "\\n" << anchorIdToString(chain.secondToLast());
                         }
                     }
                 }
