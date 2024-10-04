@@ -168,12 +168,12 @@ void Anchors::constructFromMarkerGraphThreadFunction(uint64_t threadId)
             largeDataPageSize);
 
     // For each sequence and next vertex we encounter, we store the corresponding MarkerIntervals.
-    class Info {
+    class AnchorCandidate {
     public:
         vector<Base> sequence;
         MarkerGraphVertexId vertexId1;
         vector<ThreadMarkerInterval> markerIntervals;
-        Info(
+        AnchorCandidate(
             const vector<Base>& sequence,
             MarkerGraphVertexId vertexId1,
             const ThreadMarkerInterval& markerInterval) :
@@ -181,7 +181,7 @@ void Anchors::constructFromMarkerGraphThreadFunction(uint64_t threadId)
             vertexId1(vertexId1),
             markerIntervals(1, markerInterval) {}
     };
-    vector<Info> infos;
+    vector<AnchorCandidate> anchorCandidates;
 
     // Work vector used in the loop below.
     vector<Base> sequence;
@@ -193,7 +193,7 @@ void Anchors::constructFromMarkerGraphThreadFunction(uint64_t threadId)
         // Loop over source vertex ids assigned to this batch.
         for(MarkerGraphVertexId vertexId0=begin; vertexId0!=end; vertexId0++) {
 
-            infos.clear();
+            anchorCandidates.clear();
 
             // Access the markers of this vertex.
             const auto vertexMarkerIds = markerGraphVertices[vertexId0];
@@ -246,38 +246,65 @@ void Anchors::constructFromMarkerGraphThreadFunction(uint64_t threadId)
                 markerInterval.orientedReadId = orientedReadId;
                 markerInterval.ordinal0 = ordinal0;
 
-                // If we already have an Info with this sequence and vertexId1, add id there.
+                // If we already have an AnchorCandidate with this sequence and vertexId1, add id there.
                 // Otherwise create a new Info.
                 bool found = false;
-                for(Info& info: infos) {
-                    if(info.sequence == sequence and info.vertexId1 == vertexId1) {
-                        info.markerIntervals.push_back(markerInterval);
+                for(AnchorCandidate& anchorCandidate: anchorCandidates) {
+                    if(anchorCandidate.sequence == sequence and anchorCandidate.vertexId1 == vertexId1) {
+                        anchorCandidate.markerIntervals.push_back(markerInterval);
                         found = true;
                         break;
                     }
                 }
                 if(not found) {
-                    infos.push_back(Info(sequence, vertexId1, markerInterval));
+                    anchorCandidates.push_back(AnchorCandidate(sequence, vertexId1, markerInterval));
                 }
             }
 
-            // Each of our Infos object can generate a primary edge, but we have to check that:
+            // Each of our Infos object can generate an Anchor, but we have to check that:
             // - Coverage is in the primary coverage range.
             // - vertexId1 does not have duplicate ReadIds.
-            for(const Info& info: infos) {
-                if(info.markerIntervals.size() < minPrimaryCoverage) {
+            // In addition, we want to make sure that pairs of reverse complemented Anchors
+            // are numbered consecutively.
+            // To achieve this, we do the following:
+            // - If the first OrientedReadId is on strand 1, we do nothing.
+            // - Otherwise, we store this Anchor and its reverse complement.
+            for(AnchorCandidate& anchorCandidate: anchorCandidates) {
+                if(anchorCandidate.markerIntervals.size() < minPrimaryCoverage) {
                     continue;
                 }
-                if(info.markerIntervals.size() > maxPrimaryCoverage) {
+                if(anchorCandidate.markerIntervals.size() > maxPrimaryCoverage) {
                     continue;
                 }
-                if(markerGraph.vertexHasDuplicateReadIds(info.vertexId1, markers)) {
+                if(markerGraph.vertexHasDuplicateReadIds(anchorCandidate.vertexId1, markers)) {
                     continue;
                 }
 
-                // Generate a new primary marker graph edge.
-                markerIntervals.appendVector(info.markerIntervals);
-                sequences.appendVector(info.sequence);
+                // If the first OrientedReadId is on strand 1, we do nothing.
+                if(anchorCandidate.markerIntervals.front().orientedReadId.getStrand() == 1) {
+                    continue;
+                }
+
+                // Store this Anchor.
+                markerIntervals.appendVector(anchorCandidate.markerIntervals);
+                sequences.appendVector(anchorCandidate.sequence);
+
+                // Reverse complement the marker intervals.
+                for(auto& markerInterval: anchorCandidate.markerIntervals) {
+                    markerInterval.orientedReadId.flipStrand();
+                    const uint64_t markerCount = markers.size(markerInterval.orientedReadId.getValue());
+                    markerInterval.ordinal0 = uint32_t(markerCount) - 2 - markerInterval.ordinal0;
+                }
+
+                // Reverse complement the sequence.
+                std::reverse(anchorCandidate.sequence.begin(), anchorCandidate.sequence.end());
+                for(Base& b: anchorCandidate.sequence) {
+                    b.complementInPlace();
+                }
+
+                // Store the reverse complement Anchor.
+                markerIntervals.appendVector(anchorCandidate.markerIntervals);
+                sequences.appendVector(anchorCandidate.sequence);
             }
 
         }
