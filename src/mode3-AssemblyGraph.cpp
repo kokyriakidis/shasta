@@ -644,8 +644,8 @@ void AssemblyGraph::writeBubbleChainsCsv(const string& fileNamePrefix) const
         csv << bubbleChainStringId(ce) << ",";
         csv << componentId << ",";
         csv << assemblyGraph[ce].id << ",";
-        csv << assemblyGraph[cv0].getAnchorId() << ",";
-        csv << assemblyGraph[cv1].getAnchorId() << ",";
+        csv << anchorIdToString(assemblyGraph[cv0].getAnchorId()) << ",";
+        csv << anchorIdToString(assemblyGraph[cv1].getAnchorId()) << ",";
         csv << bubbleChain.size() << ",";
         csv << averageOffset << ",";
         csv << minOffset << ",";
@@ -686,8 +686,8 @@ void AssemblyGraph::writeBubblesCsv(const string& fileNamePrefix) const
             csv << componentId << ",";
             csv << assemblyGraph[ce].id << ",";
             csv << positionInBubbleChain << ",";
-            csv << firstChain.front() << ",";
-            csv << firstChain.back() << ",";
+            csv << anchorIdToString(firstChain.front()) << ",";
+            csv << anchorIdToString(firstChain.back()) << ",";
             csv << bubble.size() << ",";
             csv << averageOffset << ",";
             csv << minOffset << ",";
@@ -722,8 +722,8 @@ void AssemblyGraph::writeChainsCsv(const string& fileNamePrefix) const
                 csv << assemblyGraph[ce].id << ",";
                 csv << positionInBubbleChain << ",";
                 csv << indexInBubble << ",";
-                csv << chain.front() << ",";
-                csv << chain.back() << ",";
+                csv << anchorIdToString(chain.front()) << ",";
+                csv << anchorIdToString(chain.back()) << ",";
                 csv << chain.size() << ",";
                 csv << chainOffset(chain) << ",";
                 csv << "\n";
@@ -780,7 +780,7 @@ void AssemblyGraph::writeChainDetailsCsv(
                 csv << positionInBubbleChain << ",";
                 csv << indexInBubble << ",";
                 csv << positionInChain << ",";
-                csv << anchorId << ",";
+                csv << anchorIdToString(anchorId) << ",";
                 csv << coverage << ",";
 
                 if(positionInChain != 0) {
@@ -6721,7 +6721,7 @@ void AssemblyGraph::writeAssemblyDetails() const
                         csv << indexInBubble << ",";
                         csv << positionInChain << ",";
                         csv << "E,";
-                        csv << anchorId << ",,";
+                        csv << anchorIdToString(anchorId) << ",,";
                         csv << edgeSequenceLength << ",";
                         csv << beginInSequence << ",";
                         csv << endInSequence << ",";
