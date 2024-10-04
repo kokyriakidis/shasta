@@ -154,6 +154,21 @@ public:
     //   is empty.
     MemoryMapped::VectorOfVectors<Base, uint64_t> anchorSequences;
 
+
+    // The journey of each oriented read is the sequence of AnchorIds
+    // encountered by the oriented read.
+    MemoryMapped::VectorOfVectors<AnchorId, uint64_t> journeys;
+    void computeJourneys(uint64_t threadCount);
+    void writeJourneys() const;
+    void computeJourneysThreadFunction1(uint64_t threadId);
+    void computeJourneysThreadFunction2(uint64_t threadId);
+    void computeJourneysThreadFunction12(uint64_t pass);
+    void computeJourneysThreadFunction3(uint64_t threadId);
+    void computeJourneysThreadFunction4(uint64_t threadId);
+
+    // Temporary storage of journeys with ordinals.
+    MemoryMapped::VectorOfVectors<pair<uint64_t, uint32_t>, uint64_t> journeysWithOrdinals;
+
 private:
     void check() const;
 

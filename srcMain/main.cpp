@@ -1154,6 +1154,9 @@ void shasta::main::mode3Assembly(
     assembler.markerGraph.vertices().remove();
     assembler.markerGraph.vertexTable.remove();
 
+    // Compute oriented read journeys.
+    anchors->computeJourneys(threadCount);
+
     // Run Mode 3 assembly.
     assembler.mode3Assembly(threadCount, anchors, assemblerOptions.assemblyOptions.mode3Options, false);
 }

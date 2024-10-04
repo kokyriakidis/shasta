@@ -439,7 +439,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
             for(const auto& p: journey) {
                 const uint64_t localAnchorId = p.second;
                 const AnchorId anchorId = anchorIds[localAnchorId];
-                csv << anchorId << ",";
+                csv << anchorIdToString(anchorId) << ",";
             }
             csv << "\n";
         }

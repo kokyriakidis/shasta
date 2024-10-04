@@ -1,6 +1,9 @@
 #include "mode3-Anchor.hpp"
 #include "Marker.hpp"
+#include "orderPairs.hpp"
+#include "performanceLog.hpp"
 #include "Reads.hpp"
+#include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3;
 
@@ -367,3 +370,150 @@ AnchorId shasta::mode3::anchorIdFromString(const string& s)
 
     return 2* m + lastBit;
 }
+
+
+
+void Anchors::computeJourneys(uint64_t threadCount)
+{
+    performanceLog << timestamp << "Anchors::computeJourneys begins." << endl;
+
+    const uint64_t orientedReadCount = 2 * reads.readCount();
+
+    // Pass1: make space for the journeysWithOrdinals.
+    journeysWithOrdinals.createNew(largeDataName("tmp-JourneysWithOrdinals"), largeDataPageSize);
+    journeysWithOrdinals.beginPass1(orientedReadCount);
+    const uint64_t anchorBatchCount = 1000;
+    setupLoadBalancing(size(), anchorBatchCount);
+    runThreads(&Anchors::computeJourneysThreadFunction1, threadCount);
+
+    // Pass2: store the unsorted journeysWithOrdinals.
+    journeysWithOrdinals.beginPass2();
+    setupLoadBalancing(size(), anchorBatchCount);
+    runThreads(&Anchors::computeJourneysThreadFunction2, threadCount);
+    journeysWithOrdinals.endPass2();
+
+    // Pass 3:sort the journeysWithOrdinals and make space for the journeys
+    journeys.createNew(largeDataName("Journeys"), largeDataPageSize);
+    journeys.beginPass1(orientedReadCount);
+    const uint64_t orientedReadBatchCount = 1000;
+    setupLoadBalancing(orientedReadCount, orientedReadBatchCount);
+    runThreads(&Anchors::computeJourneysThreadFunction3, threadCount);
+
+    // Pass 4: copy the sorted journeysWithOrdinals to the journeys.
+    journeys.beginPass2();
+    setupLoadBalancing(orientedReadCount, orientedReadBatchCount);
+    runThreads(&Anchors::computeJourneysThreadFunction4, threadCount);
+    journeys.endPass2(false, true);
+
+    journeysWithOrdinals.remove();
+
+    performanceLog << timestamp << "Anchors::computeJourneys ends." << endl;
+
+    writeJourneys();
+}
+
+
+
+void Anchors::computeJourneysThreadFunction1(uint64_t /* threadId */)
+{
+    computeJourneysThreadFunction12(1);
+}
+
+
+void Anchors::writeJourneys() const
+{
+    const ReadId readCount = reads.readCount();
+
+    ofstream csv("Journeys.csv");
+    for(ReadId readId=0; readId<readCount; readId++) {
+        for(Strand strand=0; strand<2; strand++) {
+            const OrientedReadId orientedReadId(readId, strand);
+            csv << orientedReadId << ",";
+            const auto journey = journeys[orientedReadId.getValue()];
+            for(const AnchorId anchorId: journey) {
+                csv << anchorIdToString(anchorId) << ",";
+            }
+            csv << "\n";
+        }
+    }
+}
+
+
+
+void Anchors::computeJourneysThreadFunction2(uint64_t /* threadId */)
+{
+    computeJourneysThreadFunction12(2);
+}
+
+
+
+void Anchors::computeJourneysThreadFunction12(uint64_t pass)
+{
+    Anchors& anchors = *this;
+
+    // Loop over all batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over all AnchorIds in this batch.
+        for(AnchorId anchorId=begin; anchorId!=end; anchorId++) {
+            Anchor anchor = anchors[anchorId];
+
+            // Loop over the marker intervals of this Anchor.
+            for(const auto& anchorMarkerInterval: anchor) {
+                const auto orientedReadIdValue = anchorMarkerInterval.orientedReadId.getValue();
+
+                if(pass == 1) {
+                    journeysWithOrdinals.incrementCountMultithreaded(orientedReadIdValue);
+                } else {
+                    journeysWithOrdinals.storeMultithreaded(
+                        orientedReadIdValue, {anchorId, anchorMarkerInterval.ordinal0});
+                }
+
+            }
+        }
+
+    }
+}
+
+
+
+
+void Anchors::computeJourneysThreadFunction3(uint64_t /* threadId */)
+{
+    // Loop over all batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over all oriented reads assigned to this thread.
+        for(uint64_t orientedReadValue=begin; orientedReadValue!=end; orientedReadValue++) {
+            auto v = journeysWithOrdinals[orientedReadValue];
+            sort(v.begin(), v.end(), OrderPairsBySecondOnly<uint64_t, uint32_t>());
+            journeys.incrementCountMultithreaded(orientedReadValue, v.size());
+        }
+    }
+}
+
+
+
+void Anchors::computeJourneysThreadFunction4(uint64_t /* threadId */)
+{
+    // Loop over all batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over all oriented reads assigned to this thread.
+        for(uint64_t orientedReadValue=begin; orientedReadValue!=end; orientedReadValue++) {
+            const auto v = journeysWithOrdinals[orientedReadValue];
+            const auto u = journeys[orientedReadValue];
+            SHASTA_ASSERT(u.size() == v.size());
+
+            for(uint64_t i=0; i<v.size(); i++) {
+                u[i] = v[i].first;
+            }
+        }
+    }
+}
+
+
+
