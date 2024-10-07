@@ -947,7 +947,6 @@ void Assembler::exploreReadRaw(
 
     // Access the read information we need.
     const OrientedReadId orientedReadId(readId, strand);
-    const auto sequence = reads->getRead(readId);
     const auto readName = reads->getReadName(readId);
     const auto metaData = reads->getReadMetaData(readId);
     const span<const CompressedMarker> orientedReadMarkers = markers[orientedReadId.getValue()];
@@ -957,7 +956,7 @@ void Assembler::exploreReadRaw(
         beginPosition = 0;
     }
     if(!endPositionIsPresent) {
-        endPosition = uint32_t(sequence.baseCount);
+        endPosition = uint32_t(getReads().getReadRawSequenceLength(readId));
     } else {
         endPosition++; // To include the base at `endPosition`.
     }
@@ -990,7 +989,7 @@ void Assembler::exploreReadRaw(
     html << "<tr><th class=left>Read meta data<td>";
     copy(metaData.begin(), metaData.end(), ostream_iterator<char>(html));
 
-    html << "<tr><th class=left>Length<td>" << sequence.baseCount;
+    html << "<tr><th class=left>Length<td>" << getReads().getReadRawSequenceLength(readId);
 
     html << "<tr><th class=left>Length displayed<td>" << endPosition - beginPosition;
 
@@ -1028,8 +1027,8 @@ void Assembler::exploreReadRaw(
     html<< "<br>";
 
     // Sequence.
-    for(uint64_t position=beginPosition; position!=endPosition; position++) {
-        html << sequence[position];
+    for(uint32_t position=beginPosition; position!=endPosition; position++) {
+        html << getReads().getOrientedReadBase(orientedReadId, position);
     }
     html<< "<br>";
 
@@ -1219,7 +1218,6 @@ void Assembler::exploreReadSequence(const vector<string>& request, ostream& html
 
     // Access the read information we need.
     const OrientedReadId orientedReadId(readId, strand);
-    const auto sequence = reads->getRead(readId);
     const auto readName = reads->getReadName(readId);
     const auto metaData = reads->getReadMetaData(readId);
     const span<const CompressedMarker> orientedReadMarkers = markers[orientedReadId.getValue()];
@@ -1229,7 +1227,7 @@ void Assembler::exploreReadSequence(const vector<string>& request, ostream& html
         beginPosition = 0;
     }
     if(!endPositionIsPresent) {
-        endPosition = uint32_t(sequence.baseCount);
+        endPosition = uint32_t(getReads().getReadRawSequenceLength(readId));
     } else {
         endPosition++; // To include the base at `endPosition`.
     }
@@ -1262,7 +1260,7 @@ void Assembler::exploreReadSequence(const vector<string>& request, ostream& html
     html << "<tr><th class=left>Read meta data<td>";
     copy(metaData.begin(), metaData.end(), ostream_iterator<char>(html));
 
-    html << "<tr><th class=left>Length<td>" << sequence.baseCount;
+    html << "<tr><th class=left>Length<td>" << getReads().getReadRawSequenceLength(readId);
 
     html << "<tr><th class=left>Length displayed<td>" << endPosition - beginPosition;
 
@@ -1302,8 +1300,8 @@ void Assembler::exploreReadSequence(const vector<string>& request, ostream& html
     html<< "<br>";
 
     // Sequence.
-    for(uint64_t position=beginPosition; position!=endPosition; position++) {
-        html << sequence[position];
+    for(uint32_t position=beginPosition; position!=endPosition; position++) {
+        html << getReads().getOrientedReadBase(orientedReadId, position);
     }
     html<< "<br>";
 
