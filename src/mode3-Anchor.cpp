@@ -32,6 +32,8 @@ Anchors::Anchors(
 
     anchorMarkerIntervals.accessExistingReadOnly(largeDataName("AnchorMarkerIntervals"));
     anchorSequences.accessExistingReadOnly(largeDataName("AnchorSequences"));
+    anchorInfos.accessExistingReadWrite(largeDataName("AnchorInfos"));
+    journeys.accessExistingReadOnly(largeDataName("Journeys"));
 }
 
 

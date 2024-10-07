@@ -129,6 +129,9 @@ Anchors::Anchors(
     data.threadSequences.clear();
     cout << "Found " << anchorMarkerIntervals.size() << " anchors." << endl;
 
+    anchorInfos.createNew(largeDataName("AnchorInfos"), largeDataPageSize);
+    anchorInfos.resize(anchorMarkerIntervals.size());
+
     performanceLog << timestamp << "Anchor creation from the marker graph ends." << endl;
 }
 

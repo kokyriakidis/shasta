@@ -392,6 +392,16 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
         cout << "This connected component is self-complementary and will be assembled double-stranded." << endl;
     }
 
+
+
+    // Store AnchorInfos for this component.
+    for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
+        const AnchorId anchorId = anchorIds[localAnchorId];
+        anchors().storeAnchorInfo(anchorId, componentId, localAnchorId);
+    }
+
+
+
     // Write to orientedReadsCsv the oriented reads for this component.
     for(const OrientedReadId orientedReadId: orientedReadIds) {
         const auto readName = reads.getReadName(orientedReadId.getReadId());

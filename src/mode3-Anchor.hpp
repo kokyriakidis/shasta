@@ -33,6 +33,7 @@ namespace shasta {
         class Anchor;
         class AnchorMarkerInterval;
         class Anchors;
+        class AnchorInfo;
         class AnchorPairInfo;
 
         using AnchorBaseClass = span<const AnchorMarkerInterval>;
@@ -63,6 +64,14 @@ public:
         orientedReadId(orientedReadId),
         ordinal0(ordinal0)
     {}
+};
+
+
+
+class shasta::mode3::AnchorInfo {
+public:
+    uint64_t componentId = invalid<uint64_t>;
+    uint64_t localAnchorIdInComponent = invalid<uint64_t>;
 };
 
 
@@ -160,6 +169,7 @@ public:
     MemoryMapped::VectorOfVectors<AnchorId, uint64_t> journeys;
     void computeJourneys(uint64_t threadCount);
     void writeJourneys() const;
+private:
     void computeJourneysThreadFunction1(uint64_t threadId);
     void computeJourneysThreadFunction2(uint64_t threadId);
     void computeJourneysThreadFunction12(uint64_t pass);
@@ -169,8 +179,26 @@ public:
     // Temporary storage of journeys with ordinals.
     MemoryMapped::VectorOfVectors<pair<uint64_t, uint32_t>, uint64_t> journeysWithOrdinals;
 
-private:
     void check() const;
+
+
+    // In addition to the marker intervals, we also store an AnchorInfo for each Anchor.
+    MemoryMapped::Vector<AnchorInfo> anchorInfos;
+public:
+        void storeAnchorInfo(
+            AnchorId anchorId,
+            uint64_t componentId,
+            uint64_t localAnchorIdInComponent)
+        {
+            AnchorInfo& anchorInfo = anchorInfos[anchorId];
+            anchorInfo.componentId =  componentId;
+            anchorInfo.localAnchorIdInComponent =  localAnchorIdInComponent;
+        }
+        uint64_t getLocalAnchorIdInComponent(AnchorId anchorId) const
+        {
+            return anchorInfos[anchorId].localAnchorIdInComponent;
+        }
+private:
 
 
 
