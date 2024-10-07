@@ -522,3 +522,31 @@ void Assembler::createPrimaryMarkerGraphEdgesThreadFunction(uint64_t threadId)
     }
 
 }
+
+
+
+void Assembler::exploreAnchor(const vector<string>& request, ostream& html)
+{
+    mode3Assembler->exploreAnchor(request, html);
+}
+
+
+
+void Assembler::exploreAnchorPair(const vector<string>& request, ostream& html)
+{
+    mode3Assembler->exploreAnchorPair(request, html);
+}
+
+
+
+void Assembler::exploreLocalAssembly(const vector<string>& request, ostream& html)
+{
+    mode3Assembler->exploreLocalAssembly(request, html);
+}
+
+
+
+void Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostream& html)
+{
+    mode3Assembler->exploreLocalAnchorGraph(request, html);
+}

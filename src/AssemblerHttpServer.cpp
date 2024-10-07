@@ -248,6 +248,11 @@ void Assembler::fillServerFunctionTable()
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreCompressedAssemblyGraph);
 
     SHASTA_ADD_TO_FUNCTION_TABLE(fillMode3AssemblyPathStep);
+
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreAnchor);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreAnchorPair);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreLocalAssembly);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreLocalAnchorGraph);
 }
 #undef SHASTA_ADD_TO_FUNCTION_TABLE
 
@@ -489,6 +494,17 @@ void Assembler::writeNavigation(ostream& html) const
             {"Assembly graph edges", "exploreAssemblyGraphEdge"},
             {"Assembly graph edges support", "exploreAssemblyGraphEdgesSupport"},
             {"Compressed assembly graph", "exploreCompressedAssemblyGraph"},
+            });
+    }
+
+
+
+    if(assemblerInfo->assemblyMode == 3) {
+        writeNavigation(html, "Assembly", {
+            {"Anchor", "exploreAnchor"},
+            {"Anchor pair", "exploreAnchorPair"},
+            {"Local assembly", "exploreLocalAssembly"},
+            {"Local anchor graph", "exploreLocalAnchorGraph"},
             });
     }
 

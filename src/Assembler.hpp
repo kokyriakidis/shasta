@@ -2485,6 +2485,13 @@ public:
         bool debug
     );
 
+    // Http server functions related to Mode 3 assembly.
+    void exploreAnchor(const vector<string>&, ostream&);
+    void exploreAnchorPair(const vector<string>&, ostream&);
+    void exploreLocalAssembly(const vector<string>&, ostream&);
+    void exploreLocalAnchorGraph(const vector<string>&, ostream&);
+
+
 public:
     void test();
 };
