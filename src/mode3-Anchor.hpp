@@ -55,6 +55,7 @@ class shasta::mode3::AnchorMarkerInterval {
 public:
     OrientedReadId orientedReadId;
     uint32_t ordinal0;
+    uint32_t positionInJourney = invalid<uint32_t>;
 
     AnchorMarkerInterval() {}
 
@@ -180,6 +181,16 @@ private:
     MemoryMapped::VectorOfVectors<pair<uint64_t, uint32_t>, uint64_t> journeysWithOrdinals;
 
     void check() const;
+
+public:
+
+    // For a given AnchorId, follow the read journeys forward by one step.
+    // Return a vector of the AnchorIds reached in this way.
+    // The count vector is the number of oriented reads each of the AnchorIds.
+    void findChildren(
+        AnchorId,
+        vector<AnchorId>&,
+        vector<uint64_t>& count) const;
 
 
     // In addition to the marker intervals, we also store an AnchorInfo for each Anchor.

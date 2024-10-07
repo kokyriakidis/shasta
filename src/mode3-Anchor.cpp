@@ -1,4 +1,5 @@
 #include "mode3-Anchor.hpp"
+#include "deduplicate.hpp"
 #include "Marker.hpp"
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"
@@ -506,12 +507,29 @@ void Anchors::computeJourneysThreadFunction4(uint64_t /* threadId */)
 
         // Loop over all oriented reads assigned to this thread.
         for(uint64_t orientedReadValue=begin; orientedReadValue!=end; orientedReadValue++) {
-            const auto v = journeysWithOrdinals[orientedReadValue];
-            const auto u = journeys[orientedReadValue];
-            SHASTA_ASSERT(u.size() == v.size());
+            const OrientedReadId orientedReadId = OrientedReadId::fromValue(ReadId(orientedReadValue));
 
+            // Copy the journeysWithOrdinals to the journeys.
+            const auto v = journeysWithOrdinals[orientedReadValue];
+            const auto journey = journeys[orientedReadValue];
+            SHASTA_ASSERT(journey.size() == v.size());
             for(uint64_t i=0; i<v.size(); i++) {
-                u[i] = v[i].first;
+                journey[i] = v[i].first;
+            }
+
+            // Store journey information for this oriented read in the marker interval.
+            for(uint64_t position=0; position<journey.size(); position++) {
+                const AnchorId anchorId = journey[position];
+                span<AnchorMarkerInterval> markerIntervals = anchorMarkerIntervals[anchorId];
+                bool found = false;
+                for(AnchorMarkerInterval& markerInterval: markerIntervals) {
+                    if(markerInterval.orientedReadId == orientedReadId) {
+                        markerInterval.positionInJourney = uint32_t(position);
+                        found = true;
+                        break;
+                    }
+                }
+                SHASTA_ASSERT(found);
             }
         }
     }
@@ -519,3 +537,25 @@ void Anchors::computeJourneysThreadFunction4(uint64_t /* threadId */)
 
 
 
+// For a given AnchorId, follow the read journeys forward by one step.
+// Return a vector of the AnchorIds reached in this way.
+// The count vector is the number of oriented reads each of the AnchorIds.
+void Anchors::findChildren(
+    AnchorId anchorId,
+    vector<AnchorId>& children,
+    vector<uint64_t>& count) const
+{
+    children.clear();
+    for(const auto& markerInterval: anchorMarkerIntervals[anchorId]) {
+        const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+        const auto journey = journeys[orientedReadId.getValue()];
+        const uint64_t position = markerInterval.positionInJourney;
+        const uint64_t nextPosition = position + 1;
+        if(nextPosition < journey.size()) {
+            const AnchorId nextAnchorId = journey[nextPosition];
+            children.push_back(nextAnchorId);
+        }
+    }
+
+    deduplicateAndCount(children, count);
+}
