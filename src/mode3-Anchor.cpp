@@ -366,7 +366,7 @@ AnchorId shasta::mode3::anchorIdFromString(const string& s)
     } else if(cLast == '-') {
         lastBit = 1;
     } else {
-        SHASTA_ASSERT(0);
+        return invalid<AnchorId>;
     }
 
     const uint64_t m = std::stoul(s.substr(0, s.size()-1));
