@@ -413,131 +413,30 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     }
 
 
-    // We need to compute the anchor journey of each oriented read,
-    // that is, the sequence of anchors encountered by each read.
-    // We store each journey as a vector of pairs of
-    // (ordinal0, localAnchorId), where localAnchorId is an index into anchorIds (markerGraphEdgeIds)
-    // for this connected component.
-    vector< vector< pair<uint32_t, uint64_t> > > journeys(orientedReadIds.size());
-
-    performanceLog << timestamp << "Journey computation begins." << endl;
-    for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
-        const AnchorId anchorId = anchorIds[localAnchorId];
-        const Anchor anchor = anchors()[anchorId];
-        for(const AnchorMarkerInterval& markerInterval: anchor) {
-            const OrientedReadId orientedReadId = markerInterval.orientedReadId;
-            const uint32_t ordinal0 = markerInterval.ordinal0;
-            const auto& p = orientedReadIdTable[orientedReadId.getValue()];
-            if(p.first == componentId) { // Due to StrandSplitter this is not always the case.
-                journeys[p.second].push_back({ordinal0, localAnchorId});
-            }
-        }
-    }
-    for(vector< pair<uint32_t, uint64_t> >& journey: journeys) {
-        sort(journey.begin(), journey.end(), OrderPairsByFirstOnly<uint32_t, uint64_t>());
-    }
-    performanceLog << timestamp << "Journey computation ends." << endl;
-
-
-
-    // Write out the journeys.
-    if(debug) {
-        ofstream csv("Journeys-" + to_string(componentId) + ".csv");
-        for(uint64_t i=0; i<orientedReadIds.size(); i++) {
-            csv << orientedReadIds[i] << ",";
-            const auto& journey = journeys[i];
-            for(const auto& p: journey) {
-                const uint64_t localAnchorId = p.second;
-                const AnchorId anchorId = anchorIds[localAnchorId];
-                csv << anchorIdToString(anchorId) << ",";
-            }
-            csv << "\n";
-        }
-    }
-
-
-
-    // Check that the journeys are identical to the ones stored in the Anchors.
-    {
-        for(uint64_t i=0; i<orientedReadIds.size(); i++) {
-            const OrientedReadId orientedReadId = orientedReadIds[i];
-            const auto& journey = journeys[i];
-            const auto journeyCheck = anchors().journeys[orientedReadId.getValue()];
-            SHASTA_ASSERT(journeyCheck.size() == journey.size());
-            for(uint64_t position=0; position<journey.size(); position++) {
-                const auto& p = journey[position];
-                const uint64_t localAnchorId = p.second;
-                SHASTA_ASSERT(anchorIds[localAnchorId] == journeyCheck[position]);
-            }
-        }
-    }
-
-
 
     // Now we can create the AnchorGraph for this connected component.
     // The constructor generates the vertices.
     AnchorGraph anchorGraph(anchorIds);
 
+    // Generate edges using the journeys stored in the Anchors.
+    vector<AnchorId> children;
+    vector<uint64_t> counts;
+    for(uint64_t localAnchorId0=0; localAnchorId0<anchorIds.size(); localAnchorId0++) {
+        const AnchorId anchorId0 = anchorIds[localAnchorId0];
+        anchors().findChildren(anchorId0, children, counts);
+        const uint64_t n = children.size();
+        SHASTA_ASSERT(n == counts.size());
+        for(uint64_t i=0; i<n; i++) {
+            const AnchorId anchorId1 = children[i];
+            const uint64_t coverage = counts[i];
+            const AnchorId localAnchorId1 = anchors().getLocalAnchorIdInComponent(anchorId1);
 
+            AnchorPairInfo info;
+            anchors().analyzeAnchorPair(anchorId0, anchorId1, info);
 
-#if 0
-    // OLD CODE TO GENERATE ANCHOR GRAPH EDGES.
-    // To generate edges of the AnchorGraph, we need to gather pairs of consecutive
-    // journey entries. Each pair (localAnchorId0, localAnchorId1) is stored
-    // as a localAnchorId1 in journeyPairs[localAnchorId0].
-    // For now use a simple vector of vector and sequential code, but later
-    // switch to MemoryMapped::VectorOfVectors<uint64_t, uint64_t> and multithreaded code.
-    vector< vector<uint64_t> > journeyPairs(anchorIds.size());
-    performanceLog << timestamp << "AnchorGraph edge creation begins." << endl;
-    for(const auto& journey: journeys) {
-        for(uint64_t i1=1; i1<journey.size(); i1++) {
-            const uint64_t i0 = i1 - 1;
-            const uint64_t localAnchorId0 = journey[i0].second;
-            const uint64_t localAnchorId1 = journey[i1].second;
-            journeyPairs[localAnchorId0].push_back(localAnchorId1);
+            anchorGraph.addEdgeFromLocalAnchorIds(localAnchorId0, localAnchorId1, info, coverage);
         }
-     }
-     vector<uint64_t> count;
-     for(uint64_t localAnchorId0=0; localAnchorId0<anchorIds.size(); localAnchorId0++) {
-         const AnchorId anchorId0 = anchorIds[localAnchorId0];
-         auto journeyPairs0 = journeyPairs[localAnchorId0];
-         deduplicateAndCount(journeyPairs0, count);
-         SHASTA_ASSERT(journeyPairs0.size() == count.size());
-         for(uint64_t j=0; j<journeyPairs0.size(); j++) {
-             const uint64_t localAnchorId1 = journeyPairs0[j];
-             const uint64_t coverage = count[j];
-             const AnchorId anchorId1 = anchorIds[localAnchorId1];
-
-             AnchorPairInfo info;
-             anchors().analyzeAnchorPair(anchorId0, anchorId1, info);
-
-             anchorGraph.addEdgeFromLocalAnchorIds(localAnchorId0, localAnchorId1, info, coverage);
-         }
-     }
-#else
-
-
-     // Generate edges using the journeys stored in the Anchors.
-     vector<AnchorId> children;
-     vector<uint64_t> counts;
-     for(uint64_t localAnchorId0=0; localAnchorId0<anchorIds.size(); localAnchorId0++) {
-         const AnchorId anchorId0 = anchorIds[localAnchorId0];
-         anchors().findChildren(anchorId0, children, counts);
-         const uint64_t n = children.size();
-         SHASTA_ASSERT(n == counts.size());
-         for(uint64_t i=0; i<n; i++) {
-             const AnchorId anchorId1 = children[i];
-             const uint64_t coverage = counts[i];
-             const AnchorId localAnchorId1 = anchors().getLocalAnchorIdInComponent(anchorId1);
-
-             AnchorPairInfo info;
-             anchors().analyzeAnchorPair(anchorId0, anchorId1, info);
-
-             anchorGraph.addEdgeFromLocalAnchorIds(localAnchorId0, localAnchorId1, info, coverage);
-         }
-     }
-#endif
-
+    }
 
      performanceLog << timestamp << "AnchorGraph edge creation ends." << endl;
 
