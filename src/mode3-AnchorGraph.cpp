@@ -24,8 +24,8 @@ using namespace mode3;
 
 
 
-// Create the AnchorGraph and its vertices given a vector of AnchorIds.
-AnchorGraph::AnchorGraph(const vector<AnchorId>& anchorIds) :
+// Create the AnchorGraph and its vertices and edges given a vector of AnchorIds.
+AnchorGraph::AnchorGraph(const Anchors& anchors, const vector<AnchorId>& anchorIds) :
     anchorIds(anchorIds)
 {
 
@@ -40,6 +40,26 @@ AnchorGraph::AnchorGraph(const vector<AnchorId>& anchorIds) :
         vertex.localAnchorId = localAnchorId;
         const vertex_descriptor v = add_vertex(vertex, *this);
         vertexDescriptors.push_back(v);
+    }
+
+    // Create the edges.
+    vector<AnchorId> children;
+    vector<uint64_t> counts;
+    for(uint64_t localAnchorId0=0; localAnchorId0<anchorIds.size(); localAnchorId0++) {
+        const AnchorId anchorId0 = anchorIds[localAnchorId0];
+        anchors.findChildren(anchorId0, children, counts);
+        const uint64_t n = children.size();
+        SHASTA_ASSERT(n == counts.size());
+        for(uint64_t i=0; i<n; i++) {
+            const AnchorId anchorId1 = children[i];
+            const uint64_t coverage = counts[i];
+            const AnchorId localAnchorId1 = anchors.getLocalAnchorIdInComponent(anchorId1);
+
+            AnchorPairInfo info;
+            anchors.analyzeAnchorPair(anchorId0, anchorId1, info);
+
+            addEdgeFromLocalAnchorIds(localAnchorId0, localAnchorId1, info, coverage);
+        }
     }
 }
 

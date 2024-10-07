@@ -111,8 +111,8 @@ public:
 class shasta::mode3::AnchorGraph : public AnchorGraphBaseClass {
 public:
 
-    // Create the AnchorGraph and its vertices given a vector of AnchorIds.
-    AnchorGraph(const vector<AnchorId>& anchorId);
+    // Create the AnchorGraph and its vertices and edges given a vector of AnchorIds.
+    AnchorGraph(const Anchors&, const vector<AnchorId>& anchorId);
 
     // The AnchorIds of this AnchorGraph. Each of these corresponds to a vertex.
     // An index in this vector is called a local anchor id.

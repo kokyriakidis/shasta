@@ -415,31 +415,8 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
 
     // Now we can create the AnchorGraph for this connected component.
-    // The constructor generates the vertices.
-    AnchorGraph anchorGraph(anchorIds);
-
-    // Generate edges using the journeys stored in the Anchors.
-    vector<AnchorId> children;
-    vector<uint64_t> counts;
-    for(uint64_t localAnchorId0=0; localAnchorId0<anchorIds.size(); localAnchorId0++) {
-        const AnchorId anchorId0 = anchorIds[localAnchorId0];
-        anchors().findChildren(anchorId0, children, counts);
-        const uint64_t n = children.size();
-        SHASTA_ASSERT(n == counts.size());
-        for(uint64_t i=0; i<n; i++) {
-            const AnchorId anchorId1 = children[i];
-            const uint64_t coverage = counts[i];
-            const AnchorId localAnchorId1 = anchors().getLocalAnchorIdInComponent(anchorId1);
-
-            AnchorPairInfo info;
-            anchors().analyzeAnchorPair(anchorId0, anchorId1, info);
-
-            anchorGraph.addEdgeFromLocalAnchorIds(localAnchorId0, localAnchorId1, info, coverage);
-        }
-    }
-
-     performanceLog << timestamp << "AnchorGraph edge creation ends." << endl;
-
+    // The constructor generates the vertices and edges.
+    AnchorGraph anchorGraph(anchors(), anchorIds);
 
 
      cout << "The AnchorGraph for this connected component has " <<
