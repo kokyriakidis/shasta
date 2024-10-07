@@ -445,6 +445,25 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
         }
     }
 
+
+
+    // Check that the journeys are identical to the ones stored in the Anchors.
+    {
+        for(uint64_t i=0; i<orientedReadIds.size(); i++) {
+            const OrientedReadId orientedReadId = orientedReadIds[i];
+            const auto& journey = journeys[i];
+            const auto journeyCheck = anchors().journeys[orientedReadId.getValue()];
+            SHASTA_ASSERT(journeyCheck.size() == journey.size());
+            for(uint64_t position=0; position<journey.size(); position++) {
+                const auto& p = journey[position];
+                const uint64_t localAnchorId = p.second;
+                SHASTA_ASSERT(anchorIds[localAnchorId] == journeyCheck[position]);
+            }
+        }
+    }
+
+
+
     // Now we can create the AnchorGraph for this connected component.
     // The constructor generates the vertices.
     AnchorGraph anchorGraph(anchorIds);
