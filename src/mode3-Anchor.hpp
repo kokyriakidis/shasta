@@ -185,10 +185,14 @@ private:
 
 public:
 
-    // For a given AnchorId, follow the read journeys forward by one step.
+    // For a given AnchorId, follow the read journeys forward/backward by one step.
     // Return a vector of the AnchorIds reached in this way.
     // The count vector is the number of oriented reads each of the AnchorIds.
     void findChildren(
+        AnchorId,
+        vector<AnchorId>&,
+        vector<uint64_t>& count) const;
+    void findParents(
         AnchorId,
         vector<AnchorId>&,
         vector<uint64_t>& count) const;

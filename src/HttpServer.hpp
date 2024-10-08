@@ -141,10 +141,12 @@ protected:
     static ostream& writeJQuery(ostream& html);
     static ostream& writeTableSorter(ostream& html);
 
+public:
+
     // This takes care of percent encoding in the url.
     // I adapted it from boost asio example http/server3.
     // This is necessary if we want to be able to accept form data that
-    // contain characters that are forbidden in an URL.
+    // contain characters that are forbidden in a URL.
     bool urlDecode(const string& in, string& out);
 
 

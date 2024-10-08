@@ -803,3 +803,29 @@ void Anchors::findChildren(
 
     deduplicateAndCount(children, count);
 }
+
+
+
+// For a given AnchorId, follow the read journeys backward by one step.
+// Return a vector of the AnchorIds reached in this way.
+// The count vector is the number of oriented reads each of the AnchorIds.
+void Anchors::findParents(
+    AnchorId anchorId,
+    vector<AnchorId>& parents,
+    vector<uint64_t>& count) const
+{
+    parents.clear();
+    for(const auto& markerInterval: anchorMarkerIntervals[anchorId]) {
+        const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+        const auto journey = journeys[orientedReadId.getValue()];
+        const uint64_t position = markerInterval.positionInJourney;
+        if(position > 0) {
+            const uint64_t previousPosition = position - 1;
+            const AnchorId previousAnchorId = journey[previousPosition];
+            parents.push_back(previousAnchorId);
+        }
+    }
+
+    deduplicateAndCount(parents, count);
+}
+

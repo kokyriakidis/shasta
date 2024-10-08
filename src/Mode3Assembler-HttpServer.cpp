@@ -46,6 +46,14 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
     const uint64_t coverage = markerIntervals.size();
     const auto sequence = anchors().anchorSequences[anchorId];
 
+    vector<AnchorId> parents;
+    vector<uint64_t> parentsCoverage;
+    anchors().findParents(anchorId, parents, parentsCoverage);
+
+    vector<AnchorId> children;
+    vector<uint64_t> childrenCoverage;
+    anchors().findChildren(anchorId, children, childrenCoverage);
+
     // Write a summary table.
     html <<
         "<table>"
@@ -53,6 +61,36 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
         "<tr><th class=left>Sequence length<td class=centered>" << sequence.size() <<
         "<tr><th class=left>Sequence<td class=centered style='font-family:courier'>";
     copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(html));
+
+    html <<
+        "<tr><th class=left>Parent anchors"
+        "<td>";
+    for(uint64_t i=0; i<parents.size(); i++) {
+        const string parentAnchorIdString = anchorIdToString(parents[i]);
+        if(i != 0) {
+            html << "<br>";
+        }
+        html <<
+            "<a href='exploreAnchor?anchorIdString=" << HttpServer::urlEncode(parentAnchorIdString) << "'>" <<
+            parentAnchorIdString << "</a> coverage " << parentsCoverage[i];
+
+    }
+
+    html <<
+        "<tr><th class=left>Children anchors"
+        "<td>";
+    for(uint64_t i=0; i<children.size(); i++) {
+        const string childAnchorIdString = anchorIdToString(children[i]);
+        if(i != 0) {
+            html << "<br>";
+        }
+        html <<
+            "<a href='exploreAnchor?anchorIdString=" << HttpServer::urlEncode(childAnchorIdString) << "'>" <<
+            childAnchorIdString << "</a> coverage " << childrenCoverage[i];
+
+    }
+
+
     html << "</table>";
 
 
