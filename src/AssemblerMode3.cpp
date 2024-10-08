@@ -541,7 +541,8 @@ void Assembler::exploreAnchorPair(const vector<string>& request, ostream& html)
 
 void Assembler::exploreLocalAssembly(const vector<string>& request, ostream& html)
 {
-    mode3Assembler->exploreLocalAssembly(request, html);
+    mode3Assembler->exploreLocalAssembly(request, html,
+        httpServerData.assemblerOptions->assemblyOptions.mode3Options.localAssemblyOptions);
 }
 
 

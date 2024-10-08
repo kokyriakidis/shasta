@@ -2,6 +2,7 @@
 
 // Shasta.
 #include "mode3-Anchor.hpp"
+#include "AssemblerOptions.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "MultithreadedObject.hpp"
 #include "ReadId.hpp"
@@ -128,6 +129,8 @@ public:
     // Http server functions for Mode 3 assembly.
     void exploreAnchor(const vector<string>&, ostream&);
     void exploreAnchorPair(const vector<string>&, ostream&);
-    void exploreLocalAssembly(const vector<string>&, ostream&);
+    void exploreLocalAssembly(
+        const vector<string>&, ostream&,
+        const Mode3AssemblyOptions::LocalAssemblyOptions&);
     void exploreLocalAnchorGraph(const vector<string>&, ostream&);
 };
