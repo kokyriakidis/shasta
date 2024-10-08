@@ -129,6 +129,7 @@ public:
 
     // Analyze the oriented read composition of two anchors.
     void analyzeAnchorPair(AnchorId, AnchorId, AnchorPairInfo&) const;
+    void writeHtml(AnchorId, AnchorId, AnchorPairInfo&, ostream&) const;
 
     // Return true if the second Anchor is adjacent to the first one.
     // For precise definition see the code.

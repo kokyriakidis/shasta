@@ -1,5 +1,6 @@
 #include "mode3-Anchor.hpp"
 #include "deduplicate.hpp"
+#include "html.hpp"
 #include "Marker.hpp"
 #include "orderPairs.hpp"
 #include "performanceLog.hpp"
@@ -290,6 +291,249 @@ void Anchors::analyzeAnchorPair(
     }
     SHASTA_ASSERT(onlyACheck == info.onlyA);
     SHASTA_ASSERT(onlyBCheck == info.onlyB);
+}
+
+
+
+void Anchors::writeHtml(
+    AnchorId anchorIdA,
+    AnchorId anchorIdB,
+    AnchorPairInfo& info,
+    ostream& html) const
+{
+    const Anchors& anchors = *this;
+
+    // Begin the summary table.
+    html <<
+        "<table>"
+        "<tr><th><th>On<br>anchor A<th>On<br>anchor B";
+
+    // Total.
+    html <<
+        "<tr><th class=left>Total ";
+    writeInformationIcon(html, "The total number of oriented reads on each of the two anchors.");
+    html << "<td class=centered>" << info.totalA << "<td class=centered>" << info.totalB;
+
+    // Common.
+    html << "<tr><th class=left>Common ";
+    writeInformationIcon(html, "The number of common oriented reads between the two anchors.");
+    html <<
+        "<td class=centered colspan = 2>" << info.common;
+
+    // Only.
+    html <<
+        "<tr><th class=left>Only ";
+    writeInformationIcon(html, "The number of oriented reads that appear in one anchor but not the other.");
+    html <<
+        "<td class=centered>" << info.onlyA << "<td class=centered>" << info.onlyB;
+
+    // The rest of the summary table can only be written if there are common reads.
+    if(info.common > 0) {
+
+        // Only, short.
+        html <<
+            "<tr><th class=left>Only, short ";
+        writeInformationIcon(html, "The number of oriented reads that appear in one anchor only "
+            " and are too short to appear on the other anchor, based on the estimated base offset.");
+        html <<
+            "<td class=centered>" << info.onlyAShort << "<td class=centered>" << info.onlyBShort;
+
+        // Only, missing.
+        html <<
+            "<tr><th class=left>Only, missing ";
+        writeInformationIcon(html, "The number of oriented reads that appear in one anchor only "
+            " and are not too short to appear on the other anchor, based on the estimated base offset.");
+        html <<
+            "<td class=centered>" << info.onlyA - info.onlyAShort << "<td class=centered>" << info.onlyB - info.onlyBShort;
+    }
+
+    // End the summary table.
+    html << "</table>";
+
+    // Only write out the rest if there are common reads.
+    if(info.common == 0) {
+        return;
+    }
+
+    // Write the table with Jaccard similarities and estimated offsets.
+    using std::fixed;
+    using std::setprecision;
+    html <<
+        "<br><table>"
+        "<tr><th class=left>Jaccard similarity<td class=centered>" <<
+        fixed << setprecision(2) << info.jaccard() <<
+        "<tr><th class=left>Corrected Jaccard similarity<td class=centered>" <<
+        fixed << setprecision(2) << info.correctedJaccard() <<
+        "<tr><th class=left>Estimated offset in markers<td class=centered>" << info.offsetInMarkers <<
+        "<tr><th class=left>Estimated offset in bases<td class=centered>" << info.offsetInBases <<
+        "</table>";
+
+
+
+    // Write the details table.
+    html <<
+        "<br>In the following table, positions in red are hypothetical, based on the above "
+        "estimated base offset."
+        "<p><table>";
+
+    // Header row.
+    html <<
+        "<tr>"
+        "<th class=centered rowspan=2>Oriented<br>read id"
+        "<th class=centered colspan=2>Length"
+        "<th colspan=4>Anchor A"
+        "<th colspan=4>Anchor B"
+        "<th rowspan=2>Ordinal offset"
+        "<th rowspan=2>Base offset"
+        "<th rowspan=2>Classification"
+        "<tr>"
+        "<th>Markers"
+        "<th>Bases"
+        "<th>Ordinal0"
+        "<th>Ordinal1"
+        "<th>Position0"
+        "<th>Position1"
+        "<th>Ordinal0"
+        "<th>Ordinal1"
+        "<th>Position0"
+        "<th>Position1";
+
+    // Prepare for the joint loop over OrientedReadIds of the two anchors.
+    const auto markerIntervalsA = anchors[anchorIdA];
+    const auto markerIntervalsB = anchors[anchorIdB];
+    const auto beginA = markerIntervalsA.begin();
+    const auto beginB = markerIntervalsB.begin();
+    const auto endA = markerIntervalsA.end();
+    const auto endB = markerIntervalsB.end();
+
+    // Joint loop over the AnchorMarkerIntervals of the two Anchors.
+    auto itA = beginA;
+    auto itB = beginB;
+    while(true) {
+        if(itA == endA and itB == endB) {
+            break;
+        }
+
+        else if(itB == endB or ((itA!=endA) and (itA->orientedReadId < itB->orientedReadId))) {
+            // This oriented read only appears in Anchor A.
+            const OrientedReadId orientedReadId = itA->orientedReadId;
+            const auto orientedReadMarkers = markers[orientedReadId.getValue()];
+            const int64_t lengthInBases = int64_t(reads.getReadRawSequenceLength(orientedReadId.getReadId()));
+
+            // Get the positions of Anchor A in this oriented read.
+            const uint32_t ordinalA0 = itA->ordinal0;
+            const uint32_t ordinalA1 = ordinalA0 + ordinalOffset(anchorIdA);
+            const int64_t positionA0 = int64_t(orientedReadMarkers[ordinalA0].position);
+            const int64_t positionA1 = int64_t(orientedReadMarkers[ordinalA1].position);
+
+            // Find the hypothetical positions of Anchor B, assuming the estimated base offset.
+            const int64_t positionB0 = positionA0 + info.offsetInBases;
+            const int64_t positionB1 = positionA1 + info.offsetInBases;
+            const bool isShort = positionB0<0 or positionB1 >= lengthInBases;
+
+            html <<
+                "<tr><td class=centered>"
+                "<a href='exploreRead?readId=" << orientedReadId.getReadId() <<
+                "&strand=" << orientedReadId.getStrand() << "'>" << orientedReadId << "</a>"
+                "<td class=centered>" << orientedReadMarkers.size() <<
+                "<td class=centered>" << lengthInBases <<
+                "<td class=centered>" << ordinalA0 <<
+                "<td class=centered>" << ordinalA1 <<
+                "<td class=centered>" << positionA0 <<
+                "<td class=centered>" << positionA1 <<
+                "<td><td>"
+                "<td class=centered style='color:Red'>" << positionB0 <<
+                "<td class=centered style='color:Red'>" << positionB1 << "<td><td>"
+                "<td class=centered>OnlyA, " << (isShort ? "short" : "missing");
+
+            ++itA;
+            continue;
+        }
+
+        else if(itA == endA or ((itB!=endB) and (itB->orientedReadId < itA->orientedReadId))) {
+            // This oriented read only appears in Anchor B.
+            const OrientedReadId orientedReadId = itB->orientedReadId;
+            const auto orientedReadMarkers = markers[orientedReadId.getValue()];
+            const int64_t lengthInBases = int64_t(reads.getReadRawSequenceLength(orientedReadId.getReadId()));
+
+            // Get the positions of Anchor B in this oriented read.
+            const uint32_t ordinalB0 = itB->ordinal0;
+            const uint32_t ordinalB1 = ordinalB0 + ordinalOffset(anchorIdB);
+            const int64_t positionB0 = int64_t(orientedReadMarkers[ordinalB0].position);
+            const int64_t positionB1 = int64_t(orientedReadMarkers[ordinalB1].position);
+
+            // Find the hypothetical positions of edge A, assuming the estimated base offset.
+            const int64_t positionA0 = positionB0 - info.offsetInBases;
+            const int64_t positionA1 = positionB1 - info.offsetInBases;
+            const bool isShort = positionA0<0 or positionA1 >= lengthInBases;
+
+            html <<
+                "<tr><td class=centered>"
+                "<a href='exploreRead?readId=" << orientedReadId.getReadId() <<
+                "&strand=" << orientedReadId.getStrand() << "'>" << orientedReadId << "</a>"
+                "<td class=centered>" << orientedReadMarkers.size() <<
+                "<td class=centered>" << lengthInBases <<
+                "<td><td>"
+                "<td class=centered style='color:Red'>" << positionA0 <<
+                "<td class=centered style='color:Red'>" << positionA1 <<
+                "<td class=centered>" << ordinalB0 <<
+                "<td class=centered>" << ordinalB1 <<
+                "<td class=centered>" << positionB0 <<
+                "<td class=centered>" << positionB1 << "<td><td>"
+                "<td class=centered>OnlyB, " << (isShort ? "short" : "missing");
+
+            ++itB;
+            continue;
+        }
+
+        else {
+            // This oriented read appears in both Anchors.
+            const OrientedReadId orientedReadId = itA->orientedReadId;
+            const auto orientedReadMarkers = markers[orientedReadId.getValue()];
+            const int64_t lengthInBases = int64_t(reads.getReadRawSequenceLength(orientedReadId.getReadId()));
+
+            // Get the positions of Anchor A in this oriented read.
+            const uint32_t ordinalA0 = itA->ordinal0;
+            const uint32_t ordinalA1 = ordinalA0 + ordinalOffset(anchorIdA);
+            const int64_t positionA0 = int64_t(orientedReadMarkers[ordinalA0].position);
+            const int64_t positionA1 = int64_t(orientedReadMarkers[ordinalA1].position);
+
+            // Get the positions of Anchor B in this oriented read.
+            const uint32_t ordinalB0 = itB->ordinal0;
+            const uint32_t ordinalB1 = ordinalB0 + ordinalOffset(anchorIdB);
+            const int64_t positionB0 = int64_t(orientedReadMarkers[ordinalB0].position);
+            const int64_t positionB1 = int64_t(orientedReadMarkers[ordinalB1].position);
+
+            // Compute estimated offsets.
+            const int64_t ordinalOffset = uint64_t(ordinalB1) - uint64_t(ordinalA0);
+            const int64_t baseOffset = positionB1 - positionA0;
+
+            html <<
+                "<tr><td class=centered>"
+                "<a href='exploreRead?readId=" << orientedReadId.getReadId() <<
+                "&strand=" << orientedReadId.getStrand() << "'>" << orientedReadId << "</a>"
+                "<td class=centered>" << orientedReadMarkers.size() <<
+                "<td class=centered>" << lengthInBases <<
+                "<td class=centered>" << ordinalA0 <<
+                "<td class=centered>" << ordinalA1 <<
+                "<td class=centered>" << positionA0 <<
+                "<td class=centered>" << positionA1 <<
+                "<td class=centered>" << ordinalB0 <<
+                "<td class=centered>" << ordinalB1 <<
+                "<td class=centered>" << positionB0 <<
+                "<td class=centered>" << positionB1 <<
+                "<td class=centered>" << ordinalOffset <<
+                "<td class=centered>" << baseOffset <<
+                "<td class=centered>Common";
+
+            ++itA;
+            ++itB;
+        }
+    }
+
+    // Finish the details table.
+    html << "</table>";
+
 }
 
 

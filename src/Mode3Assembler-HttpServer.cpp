@@ -95,9 +95,79 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
 
 
 
-void Mode3Assembler::exploreAnchorPair(const vector<string>& /* request */, ostream& html)
+void Mode3Assembler::exploreAnchorPair(const vector<string>& request, ostream& html)
 {
-    html << "Not implemented.";
+
+    // Get the parameters for the request
+    string anchorIdAString;
+    const bool anchorIdAStringIsPresent = HttpServer::getParameterValue(request, "anchorIdAString", anchorIdAString);
+    string anchorIdBString;
+    const bool anchorIdBStringIsPresent = HttpServer::getParameterValue(request, "anchorIdBString", anchorIdBString);
+
+    // Write the form.
+    html << "<form><table>";
+
+    html <<
+        "<tr><th class=left>Anchor A"
+        "<td class=centered><input type=text name=anchorIdAString required";
+    if(anchorIdAStringIsPresent) {
+        html << " value='" << anchorIdAString + "'";
+    }
+    html <<
+        " size=8 title='Enter an anchor id between 0 and " <<
+        anchors().size() / 2 - 1 << " followed by + or -.'><br>";
+
+    html <<
+        "<tr><th class=left>Anchor B"
+        "<td class=centered><input type=text name=anchorIdBString required";
+    if(anchorIdBStringIsPresent) {
+        html << " value='" << anchorIdBString + "'";
+    }
+    html <<
+        " size=8 title='Enter an anchor id between 0 and " <<
+        anchors().size() / 2 - 1 << " followed by + or -.'><br>";
+
+    html <<
+        "</table>"
+        "<input type=submit value='Analyze anchor pair'>"
+        "</form>";
+
+
+
+    // Check the AnchorIds
+    if(not (anchorIdAStringIsPresent and anchorIdBStringIsPresent)) {
+        return;
+    }
+    const AnchorId anchorIdA = anchorIdFromString(anchorIdAString);
+    const AnchorId anchorIdB = anchorIdFromString(anchorIdBString);
+
+    if((anchorIdA == invalid<AnchorId>) or (anchorIdA >= anchors().size())) {
+        html << "<p>Invalid anchor id " << anchorIdAString << ". Must be a number between 0 and " <<
+            anchors().size() / 2 - 1 << " followed by + or -.";
+        return;
+    }
+
+    if((anchorIdB == invalid<AnchorId>) or (anchorIdB >= anchors().size())) {
+        html << "<p>Invalid anchor id " << anchorIdBString << " .Must be a number between 0 and " <<
+            anchors().size() / 2 - 1 << " followed by + or -.";
+        return;
+    }
+
+    if(anchorIdA == anchorIdB) {
+        html << "Specify two distinct anchors.";
+        return;
+    }
+
+
+
+    // Write a header.
+    html << "<h1>Read composition analysis for anchors " << anchorIdToString(anchorIdA) <<
+        " and " << anchorIdToString(anchorIdB) << "</h1>";
+
+    // Analyze this anchor pair and write the result to html.
+    AnchorPairInfo info;
+    anchors().analyzeAnchorPair(anchorIdA, anchorIdB, info);
+    anchors().writeHtml(anchorIdA, anchorIdB, info, html);
 }
 
 
