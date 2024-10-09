@@ -1,10 +1,23 @@
 // Shasta.
 #include "Mode3Assembler.hpp"
+#include "deduplicate.hpp"
 #include "HttpServer.hpp"
 #include "Marker.hpp"
 #include "mode3-LocalAssembly.hpp"
+#include "mode3-LocalAnchorGraph.hpp"
+#include "platformDependent.hpp"
+#include "runCommandWithTimeout.hpp"
 using namespace shasta;
 using namespace mode3;
+
+// Boost libraries.
+#include <boost/tokenizer.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+
+// Standard library.
+#include "fstream.hpp"
 
 
 
@@ -381,7 +394,115 @@ void Mode3Assembler::exploreLocalAssembly(
 
 
 
-void Mode3Assembler::exploreLocalAnchorGraph(const vector<string>& /* request */, ostream& html)
+void Mode3Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostream& html)
 {
-    html << "Not implemented.";
+    // Get the request parameters.
+    string anchorIdsString;
+    HttpServer::getParameterValue(request, "anchorIdsString", anchorIdsString);
+
+    uint64_t distance = 2;
+    HttpServer::getParameterValue(request, "distance", distance);
+
+
+
+    // Write the form.
+    html << "<form><table>";
+
+    html <<
+        "<tr>"
+        "<th class=left>Anchor id"
+        "<td class=centered><input type=text name=anchorIdsString style='text-align:center' required";
+    if(not anchorIdsString.empty()) {
+        html << " value='" << anchorIdsString + "'";
+    }
+    html <<
+        " size=8 title='Enter comma separated anchor ids, each between 0 and " <<
+        anchors().size() / 2 - 1 << " followed by + or -.'>";
+
+    html << "<tr>"
+        "<th class=left>Distance"
+        "<td class=centered><input type=text name=distance style='text-align:center' required size=8 value=" << distance << ">";
+
+    html <<
+        "</table>"
+        "<input type=submit value='Create local anchor graph'>"
+        "</form>";
+
+
+
+    // If the anchor id missing or invalid, stop here.
+    if(anchorIdsString.empty()) {
+        return;
+    }
+
+
+    // Extract the AnchorIds.
+    vector<AnchorId> anchorIds;
+    boost::tokenizer< boost::char_separator<char> > tokenizer(anchorIdsString, boost::char_separator<char>(","));
+
+    for(const string& anchorIdString: tokenizer) {
+        const AnchorId anchorId = anchorIdFromString(anchorIdString);
+
+        if((anchorId == invalid<AnchorId>) or (anchorId >= anchors().size())) {
+            html << "<p>Invalid anchor id " << anchorIdString << ". Must be a number between 0 and " <<
+                anchors().size() / 2 - 1 << " followed by + or -.";
+            return;
+        }
+
+        anchorIds.push_back(anchorId);
+    }
+    deduplicate(anchorIds);
+
+
+
+    // Create the LocalAnchorGraph starting from these AnchorIds and moving
+    // away up to she specified distance.
+    LocalAnchorGraph graph(
+        anchors(),
+        anchorIds,
+        distance);
+
+    html << "<h1>Local anchor graph</h1>";
+    html << "The local anchor graph has " << num_vertices(graph) <<
+         " vertices and " << num_edges(graph) << " edges.";
+
+
+    // Write it out in graphviz format.
+    const string uuid = to_string(boost::uuids::random_generator()());
+    const string dotFileName = tmpDirectory() + uuid + ".dot";
+    graph.writeGraphviz(dotFileName);
+
+    // Use graphviz to compute the layout.
+    const string svgFileName = dotFileName + ".svg";
+    const string command = "sfdp -T svg " + dotFileName + " -o " + svgFileName +
+        " -Nshape=point -Gsize=10 -Gratio=expand ";
+    const int timeout = 30;
+    bool timeoutTriggered = false;
+    bool signalOccurred = false;
+    int returnCode = 0;
+    runCommandWithTimeout(command, timeout, timeoutTriggered, signalOccurred, returnCode);
+    std::filesystem::remove(dotFileName);
+    if(signalOccurred) {
+        html << "Error during graph layout." << endl;
+        return;
+    }
+    if(timeoutTriggered) {
+        html << "Timeout during graph layout." << endl;
+        return;
+    }
+    if(returnCode!=0 ) {
+        html << "Error during graph layout." << endl;
+        return;
+    }
+
+    // Remove the .dot file.
+    std::filesystem::remove(dotFileName);
+
+    // Write the svg to html.
+    ifstream svgFile(svgFileName);
+    html << svgFile.rdbuf();
+    svgFile.close();
+
+    // Remove the .svg file.
+    std::filesystem::remove(svgFileName);
 }

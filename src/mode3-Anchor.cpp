@@ -600,7 +600,10 @@ string shasta::mode3::anchorIdToString(AnchorId n)
 
 AnchorId shasta::mode3::anchorIdFromString(const string& s)
 {
-    SHASTA_ASSERT(s.size() >= 2);
+
+    if(s.size() < 2) {
+        return invalid<AnchorId>;
+    }
 
     const char cLast = s.back();
 
