@@ -1,5 +1,6 @@
 // Shasta.
 #include "mode3-LocalAnchorGraph.hpp"
+#include "HttpServer.hpp"
 using namespace shasta;
 using namespace mode3;
 
@@ -15,8 +16,9 @@ using namespace mode3;
 LocalAnchorGraph::LocalAnchorGraph(
     const Anchors& anchors,
     const vector<AnchorId>& anchorIds,
-    uint64_t distance) :
-    anchors(anchors)
+    uint64_t maxDistance) :
+    anchors(anchors),
+    maxDistance(maxDistance)
 {
     LocalAnchorGraph& graph = *this;
 
@@ -49,7 +51,7 @@ LocalAnchorGraph::LocalAnchorGraph(
             }
             const vertex_descriptor v1 = boost::add_vertex(LocalAnchorGraphVertex(anchorId1, distance1), graph);
             vertexMap.insert({anchorId1, v1});
-            if(distance1 < distance) {
+            if(distance1 < maxDistance) {
                 q.push(v1);
             }
         }
@@ -62,7 +64,7 @@ LocalAnchorGraph::LocalAnchorGraph(
             }
             const vertex_descriptor v1 = boost::add_vertex(LocalAnchorGraphVertex(anchorId1, distance1), graph);
             vertexMap.insert({anchorId1, v1});
-            if(distance1 < distance) {
+            if(distance1 < maxDistance) {
                 q.push(v1);
             }
         }
@@ -72,14 +74,21 @@ LocalAnchorGraph::LocalAnchorGraph(
 
     // Now add the edges.
     BGL_FORALL_VERTICES(v0, graph, LocalAnchorGraph) {
-        anchors.findChildren(graph[v0].anchorId, neighbors, coverage);
-        for(const AnchorId& anchorId1: neighbors) {
+        const AnchorId anchorId0 = graph[v0].anchorId;
+        anchors.findChildren(anchorId0, neighbors, coverage);
+        for(uint64_t i=0; i<neighbors.size(); i++) {
+            const AnchorId& anchorId1 = neighbors[i];
             auto it1 = vertexMap.find(anchorId1);
             if(it1 == vertexMap.end()) {
                 continue;
             }
             const vertex_descriptor v1 = it1->second;
-            add_edge(v0, v1, graph);
+
+            edge_descriptor e;
+            tie(e, ignore) = add_edge(v0, v1, graph);
+            LocalAnchorGraphEdge& edge = graph[e];
+            edge.coverage = coverage[i];
+            anchors.analyzeAnchorPair(anchorId0, anchorId1, edge.info);
         }
     }
 }
@@ -106,13 +115,33 @@ void LocalAnchorGraph::writeGraphviz(ostream& s) const
         const AnchorId anchorId = vertex.anchorId;
         const string anchorIdString = anchorIdToString(anchorId);
 
-        s << "\"" << anchorIdString << "\";\n";
+        // Vertex name.
+        s << "\"" << anchorIdString << "\"";
+
+        // Begin vertex attributes.
+        s << "[";
+
+        // URL
+        s << "URL=\"exploreAnchor?anchorIdString=" << HttpServer::urlEncode(anchorIdString) << "\"";
+
+        if(vertex.distance == 0) {
+            s << " color=lime";
+        } else if(vertex.distance == maxDistance) {
+            s << " color=cyan";
+        }
+
+        // End vertex attributes.
+        s << "]";
+
+        // End the line for this vertex.
+        s << ";\n";
     }
 
 
 
     // Write the edges.
     BGL_FORALL_EDGES(e, graph, LocalAnchorGraph) {
+        const LocalAnchorGraphEdge& edge = graph[e];
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
 
@@ -126,7 +155,29 @@ void LocalAnchorGraph::writeGraphviz(ostream& s) const
         const string anchorId1String = anchorIdToString(anchorId1);
 
         s << "\"" << anchorId0String << "\"->";
-        s << "\"" << anchorId1String << "\";\n";
+        s << "\"" << anchorId1String << "\"";
+
+        // Begin edge attributes.
+        s << " [";
+
+        // URL
+        s << "URL=\"exploreAnchorPair?"
+            "anchorIdAString=" << HttpServer::urlEncode(anchorId0String) << "&"
+            "anchorIdBString=" << HttpServer::urlEncode(anchorId1String) << "\"";
+
+        // Tooltip.
+        s << " tooltip="
+            "\"" << anchorId0String << " to "
+            << anchorId1String <<
+            " " << edge.coverage << "/" << edge.info.common <<
+            " " << edge.info.offsetInBases <<
+            "\"";
+
+        // End edge attributes.
+        s << "]";
+
+        // End the line for this edge.
+        s << ";\n";
     }
 
 

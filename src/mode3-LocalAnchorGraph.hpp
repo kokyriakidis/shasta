@@ -42,6 +42,8 @@ public:
 
 class shasta::mode3::LocalAnchorGraphEdge {
 public:
+    AnchorPairInfo info;
+    uint64_t coverage;
 };
 
 
@@ -51,9 +53,10 @@ public:
     LocalAnchorGraph(
         const Anchors&,
         const vector<AnchorId>&,
-        uint64_t distance);
+        uint64_t maxDistance);
 
     const Anchors& anchors;
+    uint64_t maxDistance;
     std::map<AnchorId, vertex_descriptor> vertexMap;
 
     void writeGraphviz(const string& fileName) const;
