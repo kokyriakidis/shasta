@@ -109,6 +109,10 @@ var yNew = 0;
 var ratio = width / svg.getBoundingClientRect().width;
 
 function onPointerDown(event) {
+    // If the CTRL key is not pressed, don't do anything.
+    if(!event.ctrlKey) {
+        return;
+    }
     event.stopPropagation();
     event.preventDefault();
     pointerIsDown = true;
@@ -119,6 +123,10 @@ function onPointerDown(event) {
 }
 
 function onPointerMove (event) {
+    // If the CTRL key is not pressed, don't do anything.
+    if(!event.ctrlKey) {
+        return;
+    }
     event.stopPropagation();
     event.preventDefault();
     if (!pointerIsDown) {
@@ -134,6 +142,10 @@ function onPointerMove (event) {
 }
 
 function onPointerUp(event) {
+    // If the CTRL key is not pressed, don't do anything.
+    if(!event.ctrlKey) {
+        return;
+    }
     event.stopPropagation();
     event.preventDefault();
     pointerIsDown = false;
@@ -144,6 +156,10 @@ function onPointerUp(event) {
 }
 
 function onPointerLeave(event) {
+    // If the CTRL key is not pressed, don't do anything.
+    if(!event.ctrlKey) {
+        return;
+    }
     event.stopPropagation();
     event.preventDefault();
     if(pointerIsDown) {
@@ -156,6 +172,10 @@ function onPointerLeave(event) {
 }
 
 function onMouseWheel(event) {
+    // If the CTRL key is not pressed, don't do anything.
+    if(!event.ctrlKey) {
+        return;
+    }
     event.stopPropagation();
     event.preventDefault();  
     var value = event.wheelDelta / 120.;
