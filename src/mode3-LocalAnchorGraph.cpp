@@ -129,17 +129,23 @@ LocalAnchorGraph::LocalAnchorGraph(
 
 void LocalAnchorGraph::writeGraphviz(
     const string& fileName,
-    const string& edgeColoring) const
+    const string& edgeColoring,
+    double edgeThickness,
+    bool edgeThicknessByCoverage,
+    double arrowSize) const
 {
     ofstream file(fileName);
-    writeGraphviz(file, edgeColoring);
+    writeGraphviz(file, edgeColoring, edgeThickness, edgeThicknessByCoverage, arrowSize);
 }
 
 
 
 void LocalAnchorGraph::writeGraphviz(
     ostream& s,
-    const string& edgeColoring) const
+    const string& edgeColoring,
+    double edgeThickness,
+    bool edgeThicknessByCoverage,
+    double arrowSize) const
 {
     const LocalAnchorGraph& graph = *this;
 
@@ -211,11 +217,23 @@ void LocalAnchorGraph::writeGraphviz(
             " loss " << std::fixed << std::setprecision(2) << loss <<
             " offset " << edge.info.offsetInBases << "\"";
 
-        // Edge color.
+        // Color.
         if(edgeColoring == "byCoverageLoss") {
             const double hue = (1. - loss) / 3.;
             s << " color=\"" << std::fixed << std::setprecision(2) << hue << " 1. 1.\"";
         }
+
+        // Thickness.
+        if(edgeThicknessByCoverage) {
+            s << " penwidth=" << 0.1 * edgeThickness * double(edge.coverage);
+        } else {
+            s << " penwidth=" << edgeThickness;
+        }
+
+        // Arrow size.
+        s << " arrowsize=" << arrowSize;
+
+
 
         // End edge attributes.
         s << "]";

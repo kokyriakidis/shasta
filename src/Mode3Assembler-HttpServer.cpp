@@ -423,6 +423,16 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     double maxCoverageLoss =  options.primaryGraphOptions.maxLoss;
     HttpServer::getParameterValue(request, "maxCoverageLoss", maxCoverageLoss);
 
+    double edgeThickness = 1.;
+    HttpServer::getParameterValue(request, "edgeThickness", edgeThickness);
+
+    string edgeThicknessByCoverageString;
+    const bool edgeThicknessByCoverage = HttpServer::getParameterValue(request,
+        "edgeThicknessByCoverage", edgeThicknessByCoverageString);
+
+    double arrowSize = 1.;
+    HttpServer::getParameterValue(request, "arrowSize", arrowSize);
+
 
 
     // Write the form.
@@ -472,22 +482,38 @@ void Mode3Assembler::exploreLocalAnchorGraph(
         (layoutMethod == "dot" ? " checked=on" : "") <<
         ">dot";
 
+
+
     html <<
         "<tr>"
         "<th>Edges"
         "<td class=left>"
-        "<b>Edge coloring</b>"
-        "<br><input type=radio required name=edgeColoring value='black'" <<
-        (edgeColoring == "black" ? " checked=on" : "") << ">Black"
-        "<br><input type=radio required name=edgeColoring value='byCoverageLoss'" <<
-        (edgeColoring == "byCoverageLoss" ? " checked=on" : "") << ">By coverage loss"
-        "<hr>"
+
         "<b>Edge filtering</b>"
         "<br><input type=checkbox name=filterEdgesByCoverageLoss" <<
         (filterEdgesByCoverageLoss ? " checked" : "") <<
         ">Filter edges by coverage loss"
         "<br><input type=text name=maxCoverageLoss style='text-align:center' required size=6 value=" <<
-        maxCoverageLoss << "> Maximum coverage loss";
+        maxCoverageLoss << "> Maximum coverage loss"
+        "<hr>"
+
+        "<b>Edge coloring</b>"
+        "<br><input type=radio required name=edgeColoring value='black'" <<
+        (edgeColoring == "black" ? " checked=on" : "") << ">Black"
+        "<br><input type=radio required name=edgeColoring value='byCoverageLoss'" <<
+        (edgeColoring == "byCoverageLoss" ? " checked=on" : "") << "> By coverage loss"
+        "<hr>"
+
+        "<b>Edge graphics</b>"
+        "<br><input type=text name=edgeThickness style='text-align:center' required size=6 value=" <<
+        edgeThickness << "> Thickness"
+        "<br><input type=checkbox name=edgeThicknessByCoverage" <<
+        (edgeThicknessByCoverage ? " checked" : "") <<
+        "> Thickness proportional to coverage"
+        "<br><input type=text name=arrowSize style='text-align:center' required size=6 value=" <<
+        arrowSize << "> Arrow size";
+
+
 
     html <<
         "</table>"
@@ -539,7 +565,8 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     // Write it out in graphviz format.
     const string uuid = to_string(boost::uuids::random_generator()());
     const string dotFileName = tmpDirectory() + uuid + ".dot";
-    graph.writeGraphviz(dotFileName, edgeColoring);
+    graph.writeGraphviz(dotFileName,
+        edgeColoring, edgeThickness, edgeThicknessByCoverage, arrowSize);
 
     // Use graphviz to compute the layout.
     const string svgFileName = dotFileName + ".svg";

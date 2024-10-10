@@ -68,8 +68,16 @@ public:
 
     void writeGraphviz(
         const string& fileName,
-        const string& edgeColoring) const;
+        const string& edgeColoring,
+        double edgeThickness,
+        bool edgeThicknessByCoverage,
+        double arrowSize
+        ) const;
     void writeGraphviz(
         ostream&,
-        const string& edgeColoring) const;
+        const string& edgeColoring,
+        double edgeThickness,
+        bool edgeThicknessByCoverage,
+        double arrowSize
+        ) const;
 };
