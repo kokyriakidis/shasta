@@ -129,19 +129,26 @@ LocalAnchorGraph::LocalAnchorGraph(
 
 void LocalAnchorGraph::writeGraphviz(
     const string& fileName,
+    double vertexSize,
+    bool vertexSizeByCoverage,
     const string& edgeColoring,
     double edgeThickness,
     bool edgeThicknessByCoverage,
     double arrowSize) const
 {
     ofstream file(fileName);
-    writeGraphviz(file, edgeColoring, edgeThickness, edgeThicknessByCoverage, arrowSize);
+    writeGraphviz(
+        file,
+        vertexSize, vertexSizeByCoverage,
+        edgeColoring, edgeThickness, edgeThicknessByCoverage, arrowSize);
 }
 
 
 
 void LocalAnchorGraph::writeGraphviz(
     ostream& s,
+    double vertexSize,
+    bool vertexSizeByCoverage,
     const string& edgeColoring,
     double edgeThickness,
     bool edgeThicknessByCoverage,
@@ -156,6 +163,7 @@ void LocalAnchorGraph::writeGraphviz(
         const LocalAnchorGraphVertex& vertex = graph[v];
         const AnchorId anchorId = vertex.anchorId;
         const string anchorIdString = anchorIdToString(anchorId);
+        const uint64_t coverage = anchors[anchorId].coverage();
 
         // Vertex name.
         s << "\"" << anchorIdString << "\"";
@@ -166,11 +174,23 @@ void LocalAnchorGraph::writeGraphviz(
         // URL
         s << "URL=\"exploreAnchor?anchorIdString=" << HttpServer::urlEncode(anchorIdString) << "\"";
 
+        // Tooltip.
+        s << " tooltip=\"" << anchorIdString << " " << coverage << "\"";
+
+        // Color.
         if(vertex.distance == 0) {
-            s << " color=lime";
+            s << " color=blue";
         } else if(vertex.distance == maxDistance) {
             s << " color=cyan";
         }
+
+        // Size.
+        const double displaySize =
+            vertexSizeByCoverage ?
+            0.1 * vertexSize * sqrt(0.1 * double(coverage)) :
+            0.1 * vertexSize;
+        s << " width=" << displaySize;
+        s << " penwidth=" << 0.5 * displaySize;
 
         // End vertex attributes.
         s << "]";

@@ -423,6 +423,13 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     double maxCoverageLoss =  options.primaryGraphOptions.maxLoss;
     HttpServer::getParameterValue(request, "maxCoverageLoss", maxCoverageLoss);
 
+    double vertexSize =  1.;
+    HttpServer::getParameterValue(request, "vertexSize", vertexSize);
+
+    string vertexSizeByCoverageString;
+    const bool vertexSizeByCoverage = HttpServer::getParameterValue(request,
+        "vertexSizeByCoverage", vertexSizeByCoverageString);
+
     double edgeThickness = 1.;
     HttpServer::getParameterValue(request, "edgeThickness", edgeThickness);
 
@@ -482,6 +489,15 @@ void Mode3Assembler::exploreLocalAnchorGraph(
         (layoutMethod == "dot" ? " checked=on" : "") <<
         ">dot";
 
+    html <<
+        "<tr>"
+        "<th>Vertices"
+        "<td class=left>"
+        "<input type=text name=vertexSize style='text-align:center' required size=6 value=" <<
+        vertexSize << "> Vertex size"
+        "<br><input type=checkbox name=vertexSizeByCoverage" <<
+        (vertexSizeByCoverage ? " checked" : "") <<
+        "> Size proportional to coverage";
 
 
     html <<
@@ -566,6 +582,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     const string uuid = to_string(boost::uuids::random_generator()());
     const string dotFileName = tmpDirectory() + uuid + ".dot";
     graph.writeGraphviz(dotFileName,
+        vertexSize, vertexSizeByCoverage,
         edgeColoring, edgeThickness, edgeThicknessByCoverage, arrowSize);
 
     // Use graphviz to compute the layout.

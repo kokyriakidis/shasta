@@ -68,6 +68,8 @@ public:
 
     void writeGraphviz(
         const string& fileName,
+        double vertexSize,
+        bool vertexSizeByCoverage,
         const string& edgeColoring,
         double edgeThickness,
         bool edgeThicknessByCoverage,
@@ -75,6 +77,8 @@ public:
         ) const;
     void writeGraphviz(
         ostream&,
+        double vertexSize,
+        bool vertexSizeByCoverage,
         const string& edgeColoring,
         double edgeThickness,
         bool edgeThicknessByCoverage,
