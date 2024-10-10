@@ -132,5 +132,7 @@ public:
     void exploreLocalAssembly(
         const vector<string>&, ostream&,
         const Mode3AssemblyOptions::LocalAssemblyOptions&);
-    void exploreLocalAnchorGraph(const vector<string>&, ostream&);
+    void exploreLocalAnchorGraph(
+        const vector<string>&, ostream&,
+        const Mode3AssemblyOptions&);
 };

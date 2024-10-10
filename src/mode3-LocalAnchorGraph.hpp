@@ -58,7 +58,9 @@ public:
     LocalAnchorGraph(
         const Anchors&,
         const vector<AnchorId>&,
-        uint64_t maxDistance);
+        uint64_t maxDistance,
+        bool filterEdgesByCoverageLoss,
+        double maxCoverageLoss);
 
     const Anchors& anchors;
     uint64_t maxDistance;

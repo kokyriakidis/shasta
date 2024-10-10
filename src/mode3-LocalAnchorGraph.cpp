@@ -16,7 +16,9 @@ using namespace mode3;
 LocalAnchorGraph::LocalAnchorGraph(
     const Anchors& anchors,
     const vector<AnchorId>& anchorIds,
-    uint64_t maxDistance) :
+    uint64_t maxDistance,
+    bool filterEdgesByCoverageLoss,
+    double maxCoverageLoss) :
     anchors(anchors),
     maxDistance(maxDistance)
 {
@@ -44,11 +46,23 @@ LocalAnchorGraph::LocalAnchorGraph(
         const uint64_t distance1 = distance0 + 1;
 
         anchors.findChildren(anchorId0, neighbors, coverage);
-        for(const AnchorId anchorId1: neighbors) {
+        for(uint64_t i=0; i<neighbors.size(); i++) {
+            const AnchorId anchorId1 = neighbors[i];
             auto it1 = vertexMap.find(anchorId1);
             if(it1 != vertexMap.end()) {
                 continue;
             }
+
+            // Filter by coverage loss, if requested.
+            if(filterEdgesByCoverageLoss) {
+                LocalAnchorGraphEdge edge;
+                edge.coverage = coverage[i];
+                anchors.analyzeAnchorPair(anchorId0, anchorId1, edge.info);
+                if(edge.coverageLoss() > maxCoverageLoss) {
+                    continue;
+                }
+            }
+
             const vertex_descriptor v1 = boost::add_vertex(LocalAnchorGraphVertex(anchorId1, distance1), graph);
             vertexMap.insert({anchorId1, v1});
             if(distance1 < maxDistance) {
@@ -57,11 +71,23 @@ LocalAnchorGraph::LocalAnchorGraph(
         }
 
         anchors.findParents(anchorId0, neighbors, coverage);
-        for(const AnchorId anchorId1: neighbors) {
+        for(uint64_t i=0; i<neighbors.size(); i++) {
+            const AnchorId anchorId1 = neighbors[i];
             auto it1 = vertexMap.find(anchorId1);
             if(it1 != vertexMap.end()) {
                 continue;
             }
+
+            // Filter by coverage loss, if requested.
+            if(filterEdgesByCoverageLoss) {
+                LocalAnchorGraphEdge edge;
+                edge.coverage = coverage[i];
+                anchors.analyzeAnchorPair(anchorId0, anchorId1, edge.info);
+                if(edge.coverageLoss() > maxCoverageLoss) {
+                    continue;
+                }
+            }
+
             const vertex_descriptor v1 = boost::add_vertex(LocalAnchorGraphVertex(anchorId1, distance1), graph);
             vertexMap.insert({anchorId1, v1});
             if(distance1 < maxDistance) {
@@ -84,11 +110,17 @@ LocalAnchorGraph::LocalAnchorGraph(
             }
             const vertex_descriptor v1 = it1->second;
 
-            edge_descriptor e;
-            tie(e, ignore) = add_edge(v0, v1, graph);
-            LocalAnchorGraphEdge& edge = graph[e];
+            // Create the tentative edge.
+            LocalAnchorGraphEdge edge;
             edge.coverage = coverage[i];
             anchors.analyzeAnchorPair(anchorId0, anchorId1, edge.info);
+
+            // Add it if requested.
+            if((not filterEdgesByCoverageLoss) or
+                (edge.coverageLoss() <= maxCoverageLoss)) {
+                edge_descriptor e;
+                tie(e, ignore) = add_edge(v0, v1, edge, graph);
+            }
         }
     }
 }

@@ -549,5 +549,7 @@ void Assembler::exploreLocalAssembly(const vector<string>& request, ostream& htm
 
 void Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostream& html)
 {
-    mode3Assembler->exploreLocalAnchorGraph(request, html);
+    mode3Assembler->exploreLocalAnchorGraph(
+        request, html,
+        httpServerData.assemblerOptions->assemblyOptions.mode3Options);
 }

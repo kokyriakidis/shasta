@@ -395,7 +395,10 @@ void Mode3Assembler::exploreLocalAssembly(
 
 
 
-void Mode3Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostream& html)
+void Mode3Assembler::exploreLocalAnchorGraph(
+    const vector<string>& request,
+    ostream& html,
+    const Mode3AssemblyOptions& options)
 {
     // Get the request parameters.
     string anchorIdsString;
@@ -412,6 +415,13 @@ void Mode3Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostr
 
     string edgeColoring = "black";
     HttpServer::getParameterValue(request, "edgeColoring", edgeColoring);
+
+    string filterEdgesByCoverageLossString;
+    const bool filterEdgesByCoverageLoss = HttpServer::getParameterValue(request,
+        "filterEdgesByCoverageLoss", filterEdgesByCoverageLossString);
+
+    double maxCoverageLoss =  options.primaryGraphOptions.maxLoss;
+    HttpServer::getParameterValue(request, "maxCoverageLoss", maxCoverageLoss);
 
 
 
@@ -436,10 +446,11 @@ void Mode3Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostr
         distance << ">";
 
     html <<
+        "<tr>"
         "<th title='Graphics size in pixels. "
         "Changing this works better than zooming. Make it larger if the graph is too crowded."
         " Ok to make it much larger than screen size.'>"
-        "<td>Graphics size in pixels"
+        "Graphics size in pixels"
         "<td class=centered><input type=text required name=sizePixels size=8 style='text-align:center'" <<
         " value='" << sizePixels <<
         "'>";
@@ -465,11 +476,18 @@ void Mode3Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostr
         "<tr>"
         "<th>Edges"
         "<td class=left>"
-        "Coloring"
+        "<b>Edge coloring</b>"
         "<br><input type=radio required name=edgeColoring value='black'" <<
         (edgeColoring == "black" ? " checked=on" : "") << ">Black"
         "<br><input type=radio required name=edgeColoring value='byCoverageLoss'" <<
-        (edgeColoring == "byCoverageLoss" ? " checked=on" : "") << ">By coverage loss";
+        (edgeColoring == "byCoverageLoss" ? " checked=on" : "") << ">By coverage loss"
+        "<hr>"
+        "<b>Edge filtering</b>"
+        "<br><input type=checkbox name=filterEdgesByCoverageLoss" <<
+        (filterEdgesByCoverageLoss ? " checked" : "") <<
+        ">Filter edges by coverage loss"
+        "<br><input type=text name=maxCoverageLoss style='text-align:center' required size=6 value=" <<
+        maxCoverageLoss << "> Maximum coverage loss";
 
     html <<
         "</table>"
@@ -508,7 +526,10 @@ void Mode3Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostr
     LocalAnchorGraph graph(
         anchors(),
         anchorIds,
-        distance);
+        distance,
+        filterEdgesByCoverageLoss,
+        maxCoverageLoss
+        );
 
     html << "<h1>Local anchor graph</h1>";
     html << "The local anchor graph has " << num_vertices(graph) <<
