@@ -136,8 +136,22 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
 
         html <<
             "<tr>"
-            "<td class=centered>" << i <<
-            "<td class=centered>" << orientedReadId <<
+            "<td class=centered>" << i;
+
+        // The OrientedReadId is written with an hyperlink that will
+        // display the portion of the oriented read around this Anchor.
+        const string url =
+            "exploreReadSequence?"
+            "readId=" + to_string(orientedReadId.getReadId()) +
+            "&strand=" + to_string(orientedReadId.getStrand()) +
+            "&beginPosition=" + to_string((position0 > 2 * k) ? (position0 - 2 * k) : 0) +
+            "&endPosition=" + to_string(position1 + 3 * k - 1);
+        html <<
+            "<td class=centered>" <<
+            "<a href='" << url << "'>" <<
+            orientedReadId << "</a>";
+
+       html <<
             "<td class=centered>" << markerInterval.positionInJourney <<
             "<td class=centered>" << ordinal0 <<
             "<td class=centered>" << ordinal1 <<

@@ -304,6 +304,11 @@ void Assembler::processRequest(
         writeHtmlBegin(html);
         writeNavigation(html);
         html << "Unsupported keyword " << keyword;
+        cout << "Valid keywords are:";
+        for(const auto& p: httpServerData.functionTable) {
+            cout << " " << p.first;
+        }
+        cout << endl;
         writeHtmlEnd(html);
         return;
     }
