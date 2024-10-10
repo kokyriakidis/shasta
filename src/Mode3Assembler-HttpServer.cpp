@@ -410,6 +410,9 @@ void Mode3Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostr
     string layoutMethod = "sfdp";
     HttpServer::getParameterValue(request, "layoutMethod", layoutMethod);
 
+    string edgeColoring = "black";
+    HttpServer::getParameterValue(request, "edgeColoring", edgeColoring);
+
 
 
     // Write the form.
@@ -433,7 +436,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostr
         distance << ">";
 
     html <<
-        "<tr title='Graphics size in pixels. "
+        "<th title='Graphics size in pixels. "
         "Changing this works better than zooming. Make it larger if the graph is too crowded."
         " Ok to make it much larger than screen size.'>"
         "<td>Graphics size in pixels"
@@ -443,7 +446,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostr
 
     html <<
         "<tr>"
-        "<td>Layout method"
+        "<th>Layout method"
         "<td class=left>"
         "<input type=radio required name=layoutMethod value='sfdp'" <<
         (layoutMethod == "sfdp" ? " checked=on" : "") <<
@@ -457,6 +460,16 @@ void Mode3Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostr
         "<br><input type=radio required name=layoutMethod value='dot'" <<
         (layoutMethod == "dot" ? " checked=on" : "") <<
         ">dot";
+
+    html <<
+        "<tr>"
+        "<th>Edges"
+        "<td class=left>"
+        "Coloring"
+        "<br><input type=radio required name=edgeColoring value='black'" <<
+        (edgeColoring == "black" ? " checked=on" : "") << ">Black"
+        "<br><input type=radio required name=edgeColoring value='byCoverageLoss'" <<
+        (edgeColoring == "byCoverageLoss" ? " checked=on" : "") << ">By coverage loss";
 
     html <<
         "</table>"
@@ -505,7 +518,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostr
     // Write it out in graphviz format.
     const string uuid = to_string(boost::uuids::random_generator()());
     const string dotFileName = tmpDirectory() + uuid + ".dot";
-    graph.writeGraphviz(dotFileName);
+    graph.writeGraphviz(dotFileName, edgeColoring);
 
     // Use graphviz to compute the layout.
     const string svgFileName = dotFileName + ".svg";

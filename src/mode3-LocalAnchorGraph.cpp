@@ -95,15 +95,19 @@ LocalAnchorGraph::LocalAnchorGraph(
 
 
 
-void LocalAnchorGraph::writeGraphviz(const string& fileName) const
+void LocalAnchorGraph::writeGraphviz(
+    const string& fileName,
+    const string& edgeColoring) const
 {
     ofstream file(fileName);
-    writeGraphviz(file);
+    writeGraphviz(file, edgeColoring);
 }
 
 
 
-void LocalAnchorGraph::writeGraphviz(ostream& s) const
+void LocalAnchorGraph::writeGraphviz(
+    ostream& s,
+    const string& edgeColoring) const
 {
     const LocalAnchorGraph& graph = *this;
 
@@ -142,6 +146,8 @@ void LocalAnchorGraph::writeGraphviz(ostream& s) const
     // Write the edges.
     BGL_FORALL_EDGES(e, graph, LocalAnchorGraph) {
         const LocalAnchorGraphEdge& edge = graph[e];
+        const double loss = edge.coverageLoss();
+
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
 
@@ -170,8 +176,14 @@ void LocalAnchorGraph::writeGraphviz(ostream& s) const
             "\"" << anchorId0String << " to "
             << anchorId1String <<
             " " << edge.coverage << "/" << edge.info.common <<
-            " " << edge.info.offsetInBases <<
-            "\"";
+            " loss " << std::fixed << std::setprecision(2) << loss <<
+            " offset " << edge.info.offsetInBases << "\"";
+
+        // Edge color.
+        if(edgeColoring == "byCoverageLoss") {
+            const double hue = (1. - loss) / 3.;
+            s << " color=\"" << std::fixed << std::setprecision(2) << hue << " 1. 1.\"";
+        }
 
         // End edge attributes.
         s << "]";
