@@ -526,7 +526,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     string command =
         displayOptions.layoutMethod +
         " -T svg " + dotFileName + " -o " + svgFileName +
-        " -Nshape=" + shape;
+        " -Nshape=" + shape +
         " -Gsize=" + to_string(displayOptions.sizePixels/72) + " -Gratio=expand ";
     if(displayOptions.vertexLabels) {
         command += " -Goverlap=false";
