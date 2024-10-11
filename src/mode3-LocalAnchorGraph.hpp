@@ -33,14 +33,20 @@ class shasta::mode3::LocalAnchorGraphDisplayOptions {
 public:
     uint64_t sizePixels;
     string layoutMethod;
+
+    // Vertices.
     double vertexSize;
     bool vertexSizeByCoverage;
+    bool vertexLabels;
+
+    // Edges.
     string edgeColoring;
     double edgeThickness;
     bool edgeThicknessByCoverage;
     double minimumEdgeLength;
     double additionalEdgeLengthPerKb;
     double arrowSize;
+    bool edgeLabels;
 
     // Construct from an html request.
     LocalAnchorGraphDisplayOptions(const vector<string>& request);

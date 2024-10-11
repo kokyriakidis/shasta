@@ -164,6 +164,11 @@ void LocalAnchorGraph::writeGraphviz(
         // Tooltip.
         s << " tooltip=\"" << anchorIdString << " " << coverage << "\"";
 
+        // Label.
+        if(options.vertexLabels) {
+            s << " label=\"" << anchorIdString << "\\n" << coverage << "\"";
+        }
+
         // Color.
         if(vertex.distance == 0) {
             s << " color=blue";
@@ -172,13 +177,15 @@ void LocalAnchorGraph::writeGraphviz(
         }
 
         // Size.
-        const double displaySize =
-            (options.vertexSizeByCoverage ?
-            options.vertexSize * sqrt(0.1 * double(coverage)) :
-            options.vertexSize
-            ) / 72.;
-        s << " width=" << displaySize ;
-        s << " penwidth=" << 0.5 * displaySize;
+        if(not options.vertexLabels) {
+            const double displaySize =
+                (options.vertexSizeByCoverage ?
+                options.vertexSize * sqrt(0.1 * double(coverage)) :
+                options.vertexSize
+                ) / 72.;
+            s << " width=" << displaySize ;
+            s << " penwidth=" << 0.5 * displaySize;
+        }
 
         // End vertex attributes.
         s << "]";
@@ -224,6 +231,14 @@ void LocalAnchorGraph::writeGraphviz(
             " " << edge.coverage << "/" << edge.info.common <<
             " loss " << std::fixed << std::setprecision(2) << loss <<
             " offset " << edge.info.offsetInBases << "\"";
+
+        // Label.
+        if(options.edgeLabels) {
+            s << " label=\"" <<
+                edge.coverage << "/" << edge.info.common <<
+                "\\nLoss " << std::fixed << std::setprecision(2) << loss <<
+                "\\nOffset " << edge.info.offsetInBases << "\"";
+        }
 
         // Color.
         if(options.edgeColoring == "byCoverageLoss") {
@@ -281,6 +296,10 @@ LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<stri
     vertexSizeByCoverage = HttpServer::getParameterValue(request,
         "vertexSizeByCoverage", vertexSizeByCoverageString);
 
+    string vertexLabelsString;
+    vertexLabels = HttpServer::getParameterValue(request,
+        "vertexLabels", vertexLabelsString);
+
     minimumEdgeLength = 5.;
     HttpServer::getParameterValue(request, "minimumEdgeLength", minimumEdgeLength);
 
@@ -297,6 +316,9 @@ LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<stri
     arrowSize = 1.;
     HttpServer::getParameterValue(request, "arrowSize", arrowSize);
 
+    string edgeLabelsString;
+    edgeLabels = HttpServer::getParameterValue(request,
+        "edgeLabels", edgeLabelsString);
 }
 
 
@@ -338,7 +360,12 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
         vertexSize << "> Vertex size"
         "<br><input type=checkbox name=vertexSizeByCoverage" <<
         (vertexSizeByCoverage ? " checked" : "") <<
-        "> Size proportional to coverage";
+        "> Size proportional to coverage"
+
+        "<hr>"
+        "<input type=checkbox name=vertexLabels" <<
+        (vertexLabels ? " checked" : "") <<
+        "> Labels";
 
 
     html <<
@@ -369,6 +396,11 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
         additionalEdgeLengthPerKb << "> Additional edge length per Kb"
 
         "<br><input type=text name=arrowSize style='text-align:center' required size=6 value=" <<
-        arrowSize << "> Arrow size";
+        arrowSize << "> Arrow size"
+
+        "<hr>"
+        "<input type=checkbox name=edgeLabels" <<
+        (edgeLabels ? " checked" : "") <<
+        "> Labels";
 
 }

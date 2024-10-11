@@ -522,15 +522,21 @@ void Mode3Assembler::exploreLocalAnchorGraph(
 
     // Use graphviz to compute the layout.
     const string svgFileName = dotFileName + ".svg";
-    const string command =
-        displayOptions.layoutMethod + " -T svg " + dotFileName + " -o " + svgFileName +
-        " -Nshape=point -Gsize=" + to_string(displayOptions.sizePixels/72) + " -Gratio=expand ";
+    const string shape = displayOptions.vertexLabels ? "rectangle" : "point";
+    string command =
+        displayOptions.layoutMethod +
+        " -T svg " + dotFileName + " -o " + svgFileName +
+        " -Nshape=" + shape;
+        " -Gsize=" + to_string(displayOptions.sizePixels/72) + " -Gratio=expand ";
+    if(displayOptions.vertexLabels) {
+        command += " -Goverlap=false";
+    }
+    // cout << "Running command: " << command << endl;
     const int timeout = 30;
     bool timeoutTriggered = false;
     bool signalOccurred = false;
     int returnCode = 0;
     runCommandWithTimeout(command, timeout, timeoutTriggered, signalOccurred, returnCode);
-    std::filesystem::remove(dotFileName);
     if(signalOccurred) {
         html << "Error during graph layout. Command was<br>" << endl;
         html << command;
@@ -538,7 +544,6 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     }
     if(timeoutTriggered) {
         html << "Timeout during graph layout." << endl;
-        std::filesystem::remove(dotFileName);
         return;
     }
     if(returnCode!=0 ) {
@@ -546,9 +551,9 @@ void Mode3Assembler::exploreLocalAnchorGraph(
         html << command;
         return;
     }
-
-    // Remove the .dot file.
     std::filesystem::remove(dotFileName);
+
+
 
     // Write the svg to html.
     html << "<p><div style='border:solid;display:inline-block'>";
