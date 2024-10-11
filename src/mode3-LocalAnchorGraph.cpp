@@ -134,13 +134,18 @@ void LocalAnchorGraph::writeGraphviz(
     const string& edgeColoring,
     double edgeThickness,
     bool edgeThicknessByCoverage,
+    double minimumEdgeLength,
+    double additionalEdgeLengthPerKb,
     double arrowSize) const
 {
     ofstream file(fileName);
     writeGraphviz(
         file,
         vertexSize, vertexSizeByCoverage,
-        edgeColoring, edgeThickness, edgeThicknessByCoverage, arrowSize);
+        edgeColoring,
+        edgeThickness, edgeThicknessByCoverage,
+        minimumEdgeLength, additionalEdgeLengthPerKb,
+        arrowSize);
 }
 
 
@@ -152,6 +157,8 @@ void LocalAnchorGraph::writeGraphviz(
     const string& edgeColoring,
     double edgeThickness,
     bool edgeThicknessByCoverage,
+    double minimumEdgeLength,
+    double additionalEdgeLengthPerKb,
     double arrowSize) const
 {
     const LocalAnchorGraph& graph = *this;
@@ -186,10 +193,11 @@ void LocalAnchorGraph::writeGraphviz(
 
         // Size.
         const double displaySize =
-            vertexSizeByCoverage ?
-            0.1 * vertexSize * sqrt(0.1 * double(coverage)) :
-            0.1 * vertexSize;
-        s << " width=" << displaySize;
+            (vertexSizeByCoverage ?
+            vertexSize * sqrt(0.1 * double(coverage)) :
+            vertexSize
+            ) / 72.;
+        s << " width=" << displaySize ;
         s << " penwidth=" << 0.5 * displaySize;
 
         // End vertex attributes.
@@ -252,6 +260,12 @@ void LocalAnchorGraph::writeGraphviz(
 
         // Arrow size.
         s << " arrowsize=" << arrowSize;
+
+        // Length. Only use by fdp and neato layouts.
+        const double displayLength =
+            (minimumEdgeLength +
+            additionalEdgeLengthPerKb * 0.001 * double(edge.info.offsetInBases)) / 72.;
+        s << " len=" << displayLength;
 
 
 

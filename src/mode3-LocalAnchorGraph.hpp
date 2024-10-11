@@ -73,6 +73,8 @@ public:
         const string& edgeColoring,
         double edgeThickness,
         bool edgeThicknessByCoverage,
+        double minimumEdgeLength,
+        double additionalEdgeLengthPerKb,
         double arrowSize
         ) const;
     void writeGraphviz(
@@ -82,6 +84,8 @@ public:
         const string& edgeColoring,
         double edgeThickness,
         bool edgeThicknessByCoverage,
+        double minimumEdgeLength,
+        double additionalEdgeLengthPerKb,
         double arrowSize
         ) const;
 };

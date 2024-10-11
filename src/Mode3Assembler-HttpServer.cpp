@@ -437,12 +437,18 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     double maxCoverageLoss =  options.primaryGraphOptions.maxLoss;
     HttpServer::getParameterValue(request, "maxCoverageLoss", maxCoverageLoss);
 
-    double vertexSize =  1.;
+    double vertexSize =  5.;
     HttpServer::getParameterValue(request, "vertexSize", vertexSize);
 
     string vertexSizeByCoverageString;
     const bool vertexSizeByCoverage = HttpServer::getParameterValue(request,
         "vertexSizeByCoverage", vertexSizeByCoverageString);
+
+    double minimumEdgeLength = 5.;
+    HttpServer::getParameterValue(request, "minimumEdgeLength", minimumEdgeLength);
+
+    double additionalEdgeLengthPerKb = 5.;
+    HttpServer::getParameterValue(request, "additionalEdgeLengthPerKb", additionalEdgeLengthPerKb);
 
     double edgeThickness = 1.;
     HttpServer::getParameterValue(request, "edgeThickness", edgeThickness);
@@ -535,11 +541,20 @@ void Mode3Assembler::exploreLocalAnchorGraph(
         "<hr>"
 
         "<b>Edge graphics</b>"
+
         "<br><input type=text name=edgeThickness style='text-align:center' required size=6 value=" <<
         edgeThickness << "> Thickness"
+
         "<br><input type=checkbox name=edgeThicknessByCoverage" <<
         (edgeThicknessByCoverage ? " checked" : "") <<
         "> Thickness proportional to coverage"
+
+        "<br><input type=text name=minimumEdgeLength style='text-align:center' required size=6 value=" <<
+        minimumEdgeLength << "> Minimum edge length"
+
+        "<br><input type=text name=additionalEdgeLengthPerKb style='text-align:center' required size=6 value=" <<
+        additionalEdgeLengthPerKb << "> Additional edge length per Kb"
+
         "<br><input type=text name=arrowSize style='text-align:center' required size=6 value=" <<
         arrowSize << "> Arrow size";
 
@@ -597,7 +612,10 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     const string dotFileName = tmpDirectory() + uuid + ".dot";
     graph.writeGraphviz(dotFileName,
         vertexSize, vertexSizeByCoverage,
-        edgeColoring, edgeThickness, edgeThicknessByCoverage, arrowSize);
+        edgeColoring,
+        edgeThickness, edgeThicknessByCoverage,
+        minimumEdgeLength, additionalEdgeLengthPerKb,
+        arrowSize);
 
     // Use graphviz to compute the layout.
     const string svgFileName = dotFileName + ".svg";
