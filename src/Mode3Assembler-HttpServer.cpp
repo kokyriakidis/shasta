@@ -421,15 +421,6 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     uint64_t distance = 2;
     HttpServer::getParameterValue(request, "distance", distance);
 
-    uint32_t sizePixels = 800;
-    HttpServer::getParameterValue(request, "sizePixels", sizePixels);
-
-    string layoutMethod = "sfdp";
-    HttpServer::getParameterValue(request, "layoutMethod", layoutMethod);
-
-    string edgeColoring = "black";
-    HttpServer::getParameterValue(request, "edgeColoring", edgeColoring);
-
     string filterEdgesByCoverageLossString;
     const bool filterEdgesByCoverageLoss = HttpServer::getParameterValue(request,
         "filterEdgesByCoverageLoss", filterEdgesByCoverageLossString);
@@ -437,34 +428,16 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     double maxCoverageLoss =  options.primaryGraphOptions.maxLoss;
     HttpServer::getParameterValue(request, "maxCoverageLoss", maxCoverageLoss);
 
-    double vertexSize =  5.;
-    HttpServer::getParameterValue(request, "vertexSize", vertexSize);
-
-    string vertexSizeByCoverageString;
-    const bool vertexSizeByCoverage = HttpServer::getParameterValue(request,
-        "vertexSizeByCoverage", vertexSizeByCoverageString);
-
-    double minimumEdgeLength = 5.;
-    HttpServer::getParameterValue(request, "minimumEdgeLength", minimumEdgeLength);
-
-    double additionalEdgeLengthPerKb = 5.;
-    HttpServer::getParameterValue(request, "additionalEdgeLengthPerKb", additionalEdgeLengthPerKb);
-
-    double edgeThickness = 1.;
-    HttpServer::getParameterValue(request, "edgeThickness", edgeThickness);
-
-    string edgeThicknessByCoverageString;
-    const bool edgeThicknessByCoverage = HttpServer::getParameterValue(request,
-        "edgeThicknessByCoverage", edgeThicknessByCoverageString);
-
-    double arrowSize = 1.;
-    HttpServer::getParameterValue(request, "arrowSize", arrowSize);
+    const LocalAnchorGraphDisplayOptions displayOptions(request);
 
 
 
-    // Write the form.
+    // Start the form.
     html << "<form><table>";
 
+
+
+    // Options that control the creation of the LocalAnchorGraph.
     html <<
         "<tr>"
         "<th class=left>Anchor id"
@@ -483,83 +456,18 @@ void Mode3Assembler::exploreLocalAnchorGraph(
         distance << ">";
 
     html <<
-        "<tr>"
-        "<th title='Graphics size in pixels. "
-        "Changing this works better than zooming. Make it larger if the graph is too crowded."
-        " Ok to make it much larger than screen size.'>"
-        "Graphics size in pixels"
-        "<td class=centered><input type=text required name=sizePixels size=8 style='text-align:center'" <<
-        " value='" << sizePixels <<
-        "'>";
-
-    html <<
-        "<tr>"
-        "<th>Layout method"
-        "<td class=left>"
-        "<input type=radio required name=layoutMethod value='sfdp'" <<
-        (layoutMethod == "sfdp" ? " checked=on" : "") <<
-        ">sfdp"
-        "<br><input type=radio required name=layoutMethod value='fdp'" <<
-        (layoutMethod == "fdp" ? " checked=on" : "") <<
-        ">fdp"
-        "<br><input type=radio required name=layoutMethod value='neato'" <<
-        (layoutMethod == "neato" ? " checked=on" : "") <<
-        ">neato"
-        "<br><input type=radio required name=layoutMethod value='dot'" <<
-        (layoutMethod == "dot" ? " checked=on" : "") <<
-        ">dot";
-
-    html <<
-        "<tr>"
-        "<th>Vertices"
-        "<td class=left>"
-        "<input type=text name=vertexSize style='text-align:center' required size=6 value=" <<
-        vertexSize << "> Vertex size"
-        "<br><input type=checkbox name=vertexSizeByCoverage" <<
-        (vertexSizeByCoverage ? " checked" : "") <<
-        "> Size proportional to coverage";
-
-
-    html <<
-        "<tr>"
-        "<th>Edges"
-        "<td class=left>"
-
-        "<b>Edge filtering</b>"
-        "<br><input type=checkbox name=filterEdgesByCoverageLoss" <<
+        "<tr><th>Edge filtering"
+        "<td><input type=checkbox name=filterEdgesByCoverageLoss" <<
         (filterEdgesByCoverageLoss ? " checked" : "") <<
         ">Filter edges by coverage loss"
         "<br><input type=text name=maxCoverageLoss style='text-align:center' required size=6 value=" <<
         maxCoverageLoss << "> Maximum coverage loss"
-        "<hr>"
+        "<hr>";
 
-        "<b>Edge coloring</b>"
-        "<br><input type=radio required name=edgeColoring value='black'" <<
-        (edgeColoring == "black" ? " checked=on" : "") << ">Black"
-        "<br><input type=radio required name=edgeColoring value='byCoverageLoss'" <<
-        (edgeColoring == "byCoverageLoss" ? " checked=on" : "") << "> By coverage loss"
-        "<hr>"
+    // Options that control the display of the LocalAnchorGraph.
+    displayOptions.writeForm(html);
 
-        "<b>Edge graphics</b>"
-
-        "<br><input type=text name=edgeThickness style='text-align:center' required size=6 value=" <<
-        edgeThickness << "> Thickness"
-
-        "<br><input type=checkbox name=edgeThicknessByCoverage" <<
-        (edgeThicknessByCoverage ? " checked" : "") <<
-        "> Thickness proportional to coverage"
-
-        "<br><input type=text name=minimumEdgeLength style='text-align:center' required size=6 value=" <<
-        minimumEdgeLength << "> Minimum edge length"
-
-        "<br><input type=text name=additionalEdgeLengthPerKb style='text-align:center' required size=6 value=" <<
-        additionalEdgeLengthPerKb << "> Additional edge length per Kb"
-
-        "<br><input type=text name=arrowSize style='text-align:center' required size=6 value=" <<
-        arrowSize << "> Arrow size";
-
-
-
+    // End the form.
     html <<
         "</table>"
         "<input type=submit value='Create local anchor graph'>"
@@ -610,17 +518,13 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     // Write it out in graphviz format.
     const string uuid = to_string(boost::uuids::random_generator()());
     const string dotFileName = tmpDirectory() + uuid + ".dot";
-    graph.writeGraphviz(dotFileName,
-        vertexSize, vertexSizeByCoverage,
-        edgeColoring,
-        edgeThickness, edgeThicknessByCoverage,
-        minimumEdgeLength, additionalEdgeLengthPerKb,
-        arrowSize);
+    graph.writeGraphviz(dotFileName, displayOptions);
 
     // Use graphviz to compute the layout.
     const string svgFileName = dotFileName + ".svg";
-    const string command = layoutMethod + " -T svg " + dotFileName + " -o " + svgFileName +
-        " -Nshape=point -Gsize=" + to_string(sizePixels/72) + " -Gratio=expand ";
+    const string command =
+        displayOptions.layoutMethod + " -T svg " + dotFileName + " -o " + svgFileName +
+        " -Nshape=point -Gsize=" + to_string(displayOptions.sizePixels/72) + " -Gratio=expand ";
     const int timeout = 30;
     bool timeoutTriggered = false;
     bool signalOccurred = false;

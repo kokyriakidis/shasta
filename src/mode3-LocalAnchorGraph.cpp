@@ -129,37 +129,17 @@ LocalAnchorGraph::LocalAnchorGraph(
 
 void LocalAnchorGraph::writeGraphviz(
     const string& fileName,
-    double vertexSize,
-    bool vertexSizeByCoverage,
-    const string& edgeColoring,
-    double edgeThickness,
-    bool edgeThicknessByCoverage,
-    double minimumEdgeLength,
-    double additionalEdgeLengthPerKb,
-    double arrowSize) const
+    const LocalAnchorGraphDisplayOptions& options) const
 {
     ofstream file(fileName);
-    writeGraphviz(
-        file,
-        vertexSize, vertexSizeByCoverage,
-        edgeColoring,
-        edgeThickness, edgeThicknessByCoverage,
-        minimumEdgeLength, additionalEdgeLengthPerKb,
-        arrowSize);
+    writeGraphviz(file, options);
 }
 
 
 
 void LocalAnchorGraph::writeGraphviz(
     ostream& s,
-    double vertexSize,
-    bool vertexSizeByCoverage,
-    const string& edgeColoring,
-    double edgeThickness,
-    bool edgeThicknessByCoverage,
-    double minimumEdgeLength,
-    double additionalEdgeLengthPerKb,
-    double arrowSize) const
+    const LocalAnchorGraphDisplayOptions& options) const
 {
     const LocalAnchorGraph& graph = *this;
 
@@ -193,9 +173,9 @@ void LocalAnchorGraph::writeGraphviz(
 
         // Size.
         const double displaySize =
-            (vertexSizeByCoverage ?
-            vertexSize * sqrt(0.1 * double(coverage)) :
-            vertexSize
+            (options.vertexSizeByCoverage ?
+            options.vertexSize * sqrt(0.1 * double(coverage)) :
+            options.vertexSize
             ) / 72.;
         s << " width=" << displaySize ;
         s << " penwidth=" << 0.5 * displaySize;
@@ -246,25 +226,25 @@ void LocalAnchorGraph::writeGraphviz(
             " offset " << edge.info.offsetInBases << "\"";
 
         // Color.
-        if(edgeColoring == "byCoverageLoss") {
+        if(options.edgeColoring == "byCoverageLoss") {
             const double hue = (1. - loss) / 3.;
             s << " color=\"" << std::fixed << std::setprecision(2) << hue << " 1. 1.\"";
         }
 
         // Thickness.
-        if(edgeThicknessByCoverage) {
-            s << " penwidth=" << 0.1 * edgeThickness * double(edge.coverage);
+        if(options.edgeThicknessByCoverage) {
+            s << " penwidth=" << 0.1 * options.edgeThickness * double(edge.coverage);
         } else {
-            s << " penwidth=" << edgeThickness;
+            s << " penwidth=" << options.edgeThickness;
         }
 
         // Arrow size.
-        s << " arrowsize=" << arrowSize;
+        s << " arrowsize=" << options.arrowSize;
 
         // Length. Only use by fdp and neato layouts.
         const double displayLength =
-            (minimumEdgeLength +
-            additionalEdgeLengthPerKb * 0.001 * double(edge.info.offsetInBases)) / 72.;
+            (options.minimumEdgeLength +
+                options.additionalEdgeLengthPerKb * 0.001 * double(edge.info.offsetInBases)) / 72.;
         s << " len=" << displayLength;
 
 
@@ -278,4 +258,117 @@ void LocalAnchorGraph::writeGraphviz(
 
 
     s << "}\n";
+}
+
+
+
+LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<string>& request)
+{
+
+    sizePixels = 800;
+    HttpServer::getParameterValue(request, "sizePixels", sizePixels);
+
+    layoutMethod = "sfdp";
+    HttpServer::getParameterValue(request, "layoutMethod", layoutMethod);
+
+    edgeColoring = "black";
+    HttpServer::getParameterValue(request, "edgeColoring", edgeColoring);
+
+    vertexSize =  5.;
+    HttpServer::getParameterValue(request, "vertexSize", vertexSize);
+
+    string vertexSizeByCoverageString;
+    vertexSizeByCoverage = HttpServer::getParameterValue(request,
+        "vertexSizeByCoverage", vertexSizeByCoverageString);
+
+    minimumEdgeLength = 5.;
+    HttpServer::getParameterValue(request, "minimumEdgeLength", minimumEdgeLength);
+
+    additionalEdgeLengthPerKb = 5.;
+    HttpServer::getParameterValue(request, "additionalEdgeLengthPerKb", additionalEdgeLengthPerKb);
+
+    edgeThickness = 1.;
+    HttpServer::getParameterValue(request, "edgeThickness", edgeThickness);
+
+    string edgeThicknessByCoverageString;
+    edgeThicknessByCoverage = HttpServer::getParameterValue(request,
+        "edgeThicknessByCoverage", edgeThicknessByCoverageString);
+
+    arrowSize = 1.;
+    HttpServer::getParameterValue(request, "arrowSize", arrowSize);
+
+}
+
+
+
+void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
+{
+    html <<
+        "<tr>"
+        "<th title='Graphics size in pixels. "
+        "Changing this works better than zooming. Make it larger if the graph is too crowded."
+        " Ok to make it much larger than screen size.'>"
+        "Graphics size in pixels"
+        "<td class=centered><input type=text required name=sizePixels size=8 style='text-align:center'" <<
+        " value='" << sizePixels <<
+        "'>";
+
+    html <<
+        "<tr>"
+        "<th>Layout method"
+        "<td class=left>"
+        "<input type=radio required name=layoutMethod value='sfdp'" <<
+        (layoutMethod == "sfdp" ? " checked=on" : "") <<
+        ">sfdp"
+        "<br><input type=radio required name=layoutMethod value='fdp'" <<
+        (layoutMethod == "fdp" ? " checked=on" : "") <<
+        ">fdp"
+        "<br><input type=radio required name=layoutMethod value='neato'" <<
+        (layoutMethod == "neato" ? " checked=on" : "") <<
+        ">neato"
+        "<br><input type=radio required name=layoutMethod value='dot'" <<
+        (layoutMethod == "dot" ? " checked=on" : "") <<
+        ">dot";
+
+    html <<
+        "<tr>"
+        "<th>Vertices"
+        "<td class=left>"
+        "<input type=text name=vertexSize style='text-align:center' required size=6 value=" <<
+        vertexSize << "> Vertex size"
+        "<br><input type=checkbox name=vertexSizeByCoverage" <<
+        (vertexSizeByCoverage ? " checked" : "") <<
+        "> Size proportional to coverage";
+
+
+    html <<
+        "<tr>"
+        "<th>Edges"
+        "<td class=left>"
+
+        "<b>Edge coloring</b>"
+        "<br><input type=radio required name=edgeColoring value='black'" <<
+        (edgeColoring == "black" ? " checked=on" : "") << ">Black"
+        "<br><input type=radio required name=edgeColoring value='byCoverageLoss'" <<
+        (edgeColoring == "byCoverageLoss" ? " checked=on" : "") << "> By coverage loss"
+        "<hr>"
+
+        "<b>Edge graphics</b>"
+
+        "<br><input type=text name=edgeThickness style='text-align:center' required size=6 value=" <<
+        edgeThickness << "> Thickness"
+
+        "<br><input type=checkbox name=edgeThicknessByCoverage" <<
+        (edgeThicknessByCoverage ? " checked" : "") <<
+        "> Thickness proportional to coverage"
+
+        "<br><input type=text name=minimumEdgeLength style='text-align:center' required size=6 value=" <<
+        minimumEdgeLength << "> Minimum edge length"
+
+        "<br><input type=text name=additionalEdgeLengthPerKb style='text-align:center' required size=6 value=" <<
+        additionalEdgeLengthPerKb << "> Additional edge length per Kb"
+
+        "<br><input type=text name=arrowSize style='text-align:center' required size=6 value=" <<
+        arrowSize << "> Arrow size";
+
 }

@@ -22,8 +22,32 @@ namespace shasta {
             boost::bidirectionalS,
             LocalAnchorGraphVertex,
             LocalAnchorGraphEdge>;
+
+        class LocalAnchorGraphDisplayOptions;
     }
 }
+
+
+
+class shasta::mode3::LocalAnchorGraphDisplayOptions {
+public:
+    uint64_t sizePixels;
+    string layoutMethod;
+    double vertexSize;
+    bool vertexSizeByCoverage;
+    string edgeColoring;
+    double edgeThickness;
+    bool edgeThicknessByCoverage;
+    double minimumEdgeLength;
+    double additionalEdgeLengthPerKb;
+    double arrowSize;
+
+    // Construct from an html request.
+    LocalAnchorGraphDisplayOptions(const vector<string>& request);
+
+    // Write the form.
+    void writeForm(ostream& html) const;
+};
 
 
 
@@ -68,24 +92,10 @@ public:
 
     void writeGraphviz(
         const string& fileName,
-        double vertexSize,
-        bool vertexSizeByCoverage,
-        const string& edgeColoring,
-        double edgeThickness,
-        bool edgeThicknessByCoverage,
-        double minimumEdgeLength,
-        double additionalEdgeLengthPerKb,
-        double arrowSize
+        const LocalAnchorGraphDisplayOptions&
         ) const;
     void writeGraphviz(
         ostream&,
-        double vertexSize,
-        bool vertexSizeByCoverage,
-        const string& edgeColoring,
-        double edgeThickness,
-        bool edgeThicknessByCoverage,
-        double minimumEdgeLength,
-        double additionalEdgeLengthPerKb,
-        double arrowSize
+        const LocalAnchorGraphDisplayOptions&
         ) const;
 };
