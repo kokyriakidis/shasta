@@ -1,11 +1,17 @@
 // Shasta.
 #include "mode3-LocalAnchorGraph.hpp"
+#include "html.hpp"
 #include "HttpServer.hpp"
+#include "platformDependent.hpp"
+#include "runCommandWithTimeout.hpp"
 using namespace shasta;
 using namespace mode3;
 
 // Boost libraries.
 #include <boost/graph/iteration_macros.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 // Standard library.
 #include "fstream.hpp"
@@ -481,4 +487,97 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
         (edgeLabels ? " checked" : "") <<
         "> Labels";
 
+}
+
+
+
+void LocalAnchorGraph::writeHtml(
+    ostream& html,
+    const LocalAnchorGraphDisplayOptions& options) const
+{
+    if(true /* (options.layoutMethod == "dot") and options.vertexLabels */) {
+
+        // Use svg output from graphviz.
+        writeHtml1(html, options);
+
+    } else {
+
+        // Compute graph layout and use it to generate svg.
+        writeHtml2(html, options);
+
+    }
+}
+
+
+
+// This is the code that uses svg output from graphviz.
+void LocalAnchorGraph::writeHtml1(
+    ostream& html,
+    const LocalAnchorGraphDisplayOptions& options) const
+{
+
+
+        // Write it out in graphviz format.
+        const string uuid = to_string(boost::uuids::random_generator()());
+        const string dotFileName = tmpDirectory() + uuid + ".dot";
+        writeGraphviz(dotFileName, options);
+
+        // Use graphviz to compute the layout.
+        const string svgFileName = dotFileName + ".svg";
+        const string shape = options.vertexLabels ? "rectangle" : "point";
+        string command =
+            options.layoutMethod +
+            " -T svg " + dotFileName + " -o " + svgFileName +
+            " -Nshape=" + shape +
+            " -Gsize=" + to_string(options.sizePixels/72) + " -Gratio=expand ";
+        if(options.vertexLabels) {
+            command += " -Goverlap=false";
+        }
+        // cout << "Running command: " << command << endl;
+        const int timeout = 30;
+        bool timeoutTriggered = false;
+        bool signalOccurred = false;
+        int returnCode = 0;
+        runCommandWithTimeout(command, timeout, timeoutTriggered, signalOccurred, returnCode);
+        if(signalOccurred) {
+            html << "Error during graph layout. Command was<br>" << endl;
+            html << command;
+            return;
+        }
+        if(timeoutTriggered) {
+            html << "Timeout during graph layout." << endl;
+            return;
+        }
+        if(returnCode!=0 ) {
+            html << "Error during graph layout. Command was<br>" << endl;
+            html << command;
+            return;
+        }
+        std::filesystem::remove(dotFileName);
+
+
+
+        // Write the svg to html.
+        html << "<p><div style='border:solid;display:inline-block'>";
+        ifstream svgFile(svgFileName);
+        html << svgFile.rdbuf();
+        svgFile.close();
+        html << "</div>";
+
+        // Remove the .svg file.
+        std::filesystem::remove(svgFileName);
+
+        // Add drag and zoom.
+        addSvgDragAndZoom(html);
+    }
+
+
+
+// This is the code that computes the graph layout,
+// then creates the svg.
+void LocalAnchorGraph::writeHtml2(
+    ostream& html,
+    const LocalAnchorGraphDisplayOptions& /* options */) const
+{
+    html << "<p>Not implemented.";
 }

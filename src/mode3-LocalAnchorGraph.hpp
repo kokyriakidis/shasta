@@ -99,6 +99,17 @@ public:
     uint64_t maxDistance;
     std::map<AnchorId, vertex_descriptor> vertexMap;
 
+    void writeHtml(
+        ostream& html,
+        const LocalAnchorGraphDisplayOptions&) const;
+    void writeHtml1(
+        ostream& html,
+        const LocalAnchorGraphDisplayOptions&) const;
+    void writeHtml2(
+        ostream& html,
+        const LocalAnchorGraphDisplayOptions&) const;
+
+
     void writeGraphviz(
         const string& fileName,
         const LocalAnchorGraphDisplayOptions&
