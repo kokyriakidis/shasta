@@ -143,6 +143,17 @@ void LocalAnchorGraph::writeGraphviz(
 {
     const LocalAnchorGraph& graph = *this;
 
+    AnchorId referenceAnchorId = invalid<AnchorId>;
+    if(options.vertexColoring == "byReadComposition") {
+        referenceAnchorId = anchorIdFromString(options.referenceAnchorIdString);
+        if((referenceAnchorId == invalid<AnchorId>) or (referenceAnchorId >= anchors.size())) {
+            throw runtime_error("Invalid reference anchor id " + options.referenceAnchorIdString +
+                ". Must be a number between 0 and " +
+                to_string(anchors.size() / 2 - 1) + " followed by + or -.");
+        }
+    }
+    const uint64_t referenceAnchorIdCoverage = anchors[referenceAnchorId].coverage();
+
     s << "digraph LocalAnchorGraph {\n";
 
     // Write the vertices.
@@ -169,12 +180,44 @@ void LocalAnchorGraph::writeGraphviz(
             s << " label=\"" << anchorIdString << "\\n" << coverage << "\"";
         }
 
+
+
         // Color.
         if(vertex.distance == 0) {
             s << " color=blue";
         } else if(vertex.distance == maxDistance) {
             s << " color=cyan";
+        } else {
+
+            // Color by similarity of read composition with the reference Anchor.
+            if(options.vertexColoring == "byReadComposition") {
+                AnchorPairInfo info;
+                anchors.analyzeAnchorPair(referenceAnchorId, anchorId, info);
+
+                double hue = 1.;    // 0=red, 1=green.
+                if(options.similarityMeasure == "commonCount") {
+                    // By common count.
+                    hue = double(info.common) / double(referenceAnchorIdCoverage);
+
+                } else if(options.similarityMeasure == "jaccard") {
+                    // By Jaccard similarity.
+                    hue = info.jaccard();
+                } else {
+                    // By corrected Jaccard similarity.
+                    hue = info.correctedJaccard();
+                 }
+
+                const string colorString = "\"" + to_string(hue / 3.) + " 1. 1.\"";
+                if(options.vertexLabels) {
+                    s << " color=" << colorString;
+                } else {
+                    s << " color=" << colorString;
+                    s << " fillcolor=" << colorString;
+                }
+             }
         }
+
+
 
         // Size.
         if(not options.vertexLabels) {
@@ -286,6 +329,16 @@ LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<stri
     layoutMethod = "sfdp";
     HttpServer::getParameterValue(request, "layoutMethod", layoutMethod);
 
+
+    vertexColoring = "black";
+    HttpServer::getParameterValue(request, "vertexColoring", vertexColoring);
+
+    similarityMeasure = "commonCount";
+    HttpServer::getParameterValue(request, "similarityMeasure", similarityMeasure);
+
+    referenceAnchorIdString = "";
+    HttpServer::getParameterValue(request, "referenceAnchorId", referenceAnchorIdString);
+
     edgeColoring = "black";
     HttpServer::getParameterValue(request, "edgeColoring", edgeColoring);
 
@@ -365,7 +418,32 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
         "<hr>"
         "<input type=checkbox name=vertexLabels" <<
         (vertexLabels ? " checked" : "") <<
-        "> Labels";
+        "> Labels"
+
+        "<hr>"
+        "<b>Vertex coloring</b>"
+
+        "<br><input type=radio required name=vertexColoring value='black'" <<
+        (vertexColoring == "black" ? " checked=on" : "") << ">Black"
+        "<br><input type=radio required name=vertexColoring value='byReadComposition'" <<
+        (vertexColoring == "byReadComposition" ? " checked=on" : "") <<
+        "> By similarity of read composition using similarity measure:"
+
+        "<div style='padding-left:50px'>"
+        "<input type=radio required name=similarityMeasure value='commonCount'" <<
+        (similarityMeasure == "commonCount" ? " checked=on" : "") << ">Number of common oriented reads"
+        "<br><input type=radio required name=similarityMeasure value='jaccard'" <<
+        (similarityMeasure == "jaccard" ? " checked=on" : "") << ">Jaccard similarity"
+        "<br><input type=radio required name=similarityMeasure value='correctedJaccard'" <<
+        (similarityMeasure == "correctedJaccard" ? " checked=on" : "") << ">Corrected Jaccard similarity"
+        "</div>"
+
+        "<input type=text name=referenceAnchorId size=6 style='text-align:center'";
+        if(not referenceAnchorIdString.empty()) {
+            html << " value='" << referenceAnchorIdString + "'";
+        }
+        html << "> Reference anchor id";
+
 
 
     html <<

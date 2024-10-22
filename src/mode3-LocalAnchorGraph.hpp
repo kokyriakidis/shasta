@@ -38,6 +38,9 @@ public:
     double vertexSize;
     bool vertexSizeByCoverage;
     bool vertexLabels;
+    string vertexColoring;
+    string similarityMeasure;
+    string referenceAnchorIdString;
 
     // Edges.
     string edgeColoring;
