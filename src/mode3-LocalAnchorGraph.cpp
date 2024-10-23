@@ -786,7 +786,9 @@ void LocalAnchorGraph::writeVertices(
             "' x2='" << x << "' y2='" << y <<
             "' stroke='" << color <<
             "' stroke-width='" << options.vertexSize * (double(coverage) / 10) <<
-            "' />";
+            "' >"
+            "<title>" << anchorIdString << ", coverage " << coverage << "</title>"
+            "</line>";
 
         // End the hyperlink.
         html << "</a>";
@@ -806,7 +808,8 @@ void LocalAnchorGraph::writeEdges(
     html << "\n<g id=edges>";
 
     BGL_FORALL_EDGES(e, graph, LocalAnchorGraph) {
-        const uint64_t coverage = graph[e].coverage;
+        const LocalAnchorGraphEdge& edge = graph[e];
+        const uint64_t coverage = edge.coverage;
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
 
@@ -822,20 +825,44 @@ void LocalAnchorGraph::writeEdges(
         const double x1 = p1[0];
         const double y1 = p1[1];
 
+        const LocalAnchorGraphVertex& vertex0 = graph[v0];
+        const AnchorId anchorId0 = vertex0.anchorId;
+        const string anchorIdString0 = anchorIdToString(anchorId0);
+        const LocalAnchorGraphVertex& vertex1 = graph[v1];
+        const AnchorId anchorId1 = vertex1.anchorId;
+        const string anchorIdString1 = anchorIdToString(anchorId1);
+
         // To decide the color, hash the AnchorIds.
         // This way we always get the same color for the same edge.
-        const auto p = make_pair(graph[v0].anchorId, graph[v1].anchorId);
+        const auto p = make_pair(anchorId0, anchorId1);
         const uint32_t hashValue = MurmurHash2(&p, sizeof(p), 759);
         const uint32_t hue = hashValue % 360;
         const string color = "hsl(" + to_string(hue) + ",50%,50%)";
+
+        // Hyperlink.
+        html << "\n<a href='exploreAnchorPair?"
+            "anchorIdAString=" << HttpServer::urlEncode(anchorIdString0) << "&"
+            "anchorIdBString=" << HttpServer::urlEncode(anchorIdString1) << "'>";
 
         html <<
             "\n<line x1='" << x0 << "' y1='" << y0 <<
             "' x2='" << x1 << "' y2='" << y1 <<
             "' stroke='" << color <<
             "' stroke-width='" << options.edgeThickness * double(coverage) <<
-            "' />";
+            "'>"
+            "<title>" <<
+            anchorIdString0 << " to " << anchorIdString1 <<
+            ", coverage " << coverage << "/" << edge.info.common <<
+            ", loss ";
+        const auto oldPrecision = html.precision(2);
+        const auto oldFlags = html.setf(std::ios_base::fixed, std::ios_base::floatfield);
+        html << edge.coverageLoss();
+        html.precision(oldPrecision);
+        html.flags(oldFlags);
+        html << "</title>""</line>";
 
+        // End the hyperlink.
+        html << "</a>";
     }
     html << "</g>";
 
