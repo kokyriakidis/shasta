@@ -330,11 +330,17 @@ void LocalAnchorGraph::writeGraphviz(
 
 LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<string>& request)
 {
+    // Figure out if command "customLayout" is available.
+    const int commandStatus = std::system("which customLayout > /dev/null");
+    SHASTA_ASSERT(WIFEXITED(commandStatus));
+    const int returnCode = WEXITSTATUS(commandStatus);
+    const bool customLayoutIsAvailable = (returnCode == 0);
 
-    sizePixels = 800;
+
+    sizePixels = 600;
     HttpServer::getParameterValue(request, "sizePixels", sizePixels);
 
-    layoutMethod = "sfdp";
+    layoutMethod = (customLayoutIsAvailable ? "custom" : "sfdp");
     HttpServer::getParameterValue(request, "layoutMethod", layoutMethod);
 
     vertexColoring = "black";
@@ -349,7 +355,7 @@ LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<stri
     edgeColoring = "black";
     HttpServer::getParameterValue(request, "edgeColoring", edgeColoring);
 
-    vertexSize =  1.;
+    vertexSize =  0.01;
     HttpServer::getParameterValue(request, "vertexSize", vertexSize);
 
     string vertexSizeByCoverageString;
@@ -366,7 +372,7 @@ LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<stri
     additionalEdgeLengthPerKb = 1.;
     HttpServer::getParameterValue(request, "additionalEdgeLengthPerKb", additionalEdgeLengthPerKb);
 
-    edgeThickness = 1.;
+    edgeThickness = 0.01;
     HttpServer::getParameterValue(request, "edgeThickness", edgeThickness);
 
     string edgeThicknessByCoverageString;
@@ -385,6 +391,12 @@ LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<stri
 
 void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
 {
+    // Figure out if command "customLayout" is available.
+    const int commandStatus = std::system("which customLayout > /dev/null");
+    SHASTA_ASSERT(WIFEXITED(commandStatus));
+    const int returnCode = WEXITSTATUS(commandStatus);
+    const bool customLayoutIsAvailable = (returnCode == 0);
+
     html <<
         "<tr>"
         "<th title='Graphics size in pixels. "
@@ -413,10 +425,7 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
         ">dot";
 
     // If command "customLayout" is available, add an option for that.
-    const int commandStatus = std::system("which customLayout > /dev/null");
-    SHASTA_ASSERT(WIFEXITED(commandStatus));
-    const int returnCode = WEXITSTATUS(commandStatus);
-    if(returnCode == 0) {
+    if(customLayoutIsAvailable) {
         html <<
             "<br><input type=radio required name=layoutMethod value='custom'" <<
             (layoutMethod == "custom" ? " checked=on" : "") <<
@@ -794,9 +803,10 @@ void LocalAnchorGraph::writeEdges(
 {
     const LocalAnchorGraph& graph = *this;
 
-    html << "\n<g id=edges stroke-width='" << options.edgeThickness << "'>";
+    html << "\n<g id=edges>";
 
     BGL_FORALL_EDGES(e, graph, LocalAnchorGraph) {
+        const uint64_t coverage = graph[e].coverage;
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
 
@@ -822,7 +832,9 @@ void LocalAnchorGraph::writeEdges(
         html <<
             "\n<line x1='" << x0 << "' y1='" << y0 <<
             "' x2='" << x1 << "' y2='" << y1 <<
-            "' stroke='" << color << "' />";
+            "' stroke='" << color <<
+            "' stroke-width='" << options.edgeThickness * double(coverage) <<
+            "' />";
 
     }
     html << "</g>";
@@ -832,8 +844,9 @@ void LocalAnchorGraph::writeEdges(
 
     // Write the "arrows" to show edge directions.
     // They are just short lines near the target vertex of each edge.
-    html << "\n<g id=arrows stroke-width='" << 0.2* options.edgeThickness << "'>";
+    html << "\n<g id=arrows>";
     BGL_FORALL_EDGES(e, graph, LocalAnchorGraph) {
+        const uint64_t coverage = graph[e].coverage;
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
 
@@ -858,7 +871,9 @@ void LocalAnchorGraph::writeEdges(
         html <<
             "\n<line x1='" << x1 << "' y1='" << y1 <<
             "' x2='" << x2 << "' y2='" << y2 <<
-            "' stroke='" << color << "' />";
+            "' stroke='" << color <<
+            "' stroke-width='" << 0.2 * options.edgeThickness * double(coverage) <<
+            "' />";
 
     }
     html << "</g>";

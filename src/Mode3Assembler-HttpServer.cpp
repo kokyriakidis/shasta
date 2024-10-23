@@ -412,7 +412,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     string anchorIdsString;
     HttpServer::getParameterValue(request, "anchorIdsString", anchorIdsString);
 
-    uint64_t distance = 2;
+    uint64_t distance = 10;
     HttpServer::getParameterValue(request, "distance", distance);
 
     string filterEdgesByCoverageLossString;
