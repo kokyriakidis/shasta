@@ -360,13 +360,13 @@ LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<stri
     vertexLabels = HttpServer::getParameterValue(request,
         "vertexLabels", vertexLabelsString);
 
-    minimumEdgeLength = 5.;
+    minimumEdgeLength = 1.;
     HttpServer::getParameterValue(request, "minimumEdgeLength", minimumEdgeLength);
 
-    additionalEdgeLengthPerKb = 5.;
+    additionalEdgeLengthPerKb = 1.;
     HttpServer::getParameterValue(request, "additionalEdgeLengthPerKb", additionalEdgeLengthPerKb);
 
-    edgeThickness = 0.5;
+    edgeThickness = 1.;
     HttpServer::getParameterValue(request, "edgeThickness", edgeThickness);
 
     string edgeThicknessByCoverageString;
@@ -428,7 +428,7 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
         "<th>Vertices"
         "<td class=left>"
         "<input type=text name=vertexSize style='text-align:center' required size=6 value=" <<
-        vertexSize << "> Vertex size"
+        vertexSize << "> Vertex size (arbitrary units)"
         "<br><input type=checkbox name=vertexSizeByCoverage" <<
         (vertexSizeByCoverage ? " checked" : "") <<
         "> Size proportional to coverage"
@@ -479,20 +479,20 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
         "<b>Edge graphics</b>"
 
         "<br><input type=text name=edgeThickness style='text-align:center' required size=6 value=" <<
-        edgeThickness << "> Thickness"
+        edgeThickness << "> Thickness (arbitrary units)"
 
         "<br><input type=checkbox name=edgeThicknessByCoverage" <<
         (edgeThicknessByCoverage ? " checked" : "") <<
         "> Thickness proportional to coverage"
 
         "<br><input type=text name=minimumEdgeLength style='text-align:center' required size=6 value=" <<
-        minimumEdgeLength << "> Minimum edge length"
+        minimumEdgeLength << "> Minimum edge length (arbitrary units)"
 
         "<br><input type=text name=additionalEdgeLengthPerKb style='text-align:center' required size=6 value=" <<
-        additionalEdgeLengthPerKb << "> Additional edge length per Kb"
+        additionalEdgeLengthPerKb << "> Additional edge length per Kb (arbitrary units)"
 
         "<br><input type=text name=arrowSize style='text-align:center' required size=6 value=" <<
-        arrowSize << "> Arrow size"
+        arrowSize << "> Arrow size (arbitrary units)"
 
         "<hr>"
         "<input type=checkbox name=edgeLabels" <<
@@ -605,14 +605,14 @@ void LocalAnchorGraph::writeHtml2(
     // Begin the svg.
     const string svgId = "LocalAnchorGraph";
     html <<
-        "\n<br><div style='display:inline-block;vertical-align:top;border-style:solid;border-color:Black'>"
-        "\n<br><svg id='" << svgId <<
+        "\n<br><div style='display:inline-block;vertical-align:top;'>"
+        "<svg id='" << svgId <<
         "' width='" <<  options.sizePixels <<
         "' height='" << options.sizePixels <<
         "' viewbox='" << viewportBox.xMin << " " << viewportBox.yMin << " " <<
         viewportBox.xSize() << " " <<
         viewportBox.ySize() << "'"
-        " style='stroke-linecap:round'"
+        " style='border-style:solid;border-color:Black;stroke-linecap:round'"
         ">\n";
 
     // Write the edges first so they don't obscure the vertices.
@@ -622,7 +622,7 @@ void LocalAnchorGraph::writeHtml2(
     writeVertices(html, options);
 
     // Finish the svg.
-    html << "\n</svg></div>";
+    html << "</svg></div>";
 
     // Add drag and zoom.
     addSvgDragAndZoom(html);
@@ -743,12 +743,13 @@ void LocalAnchorGraph::writeVertices(
 {
     const LocalAnchorGraph& graph = *this;
 
-    html << "\n<g id='vertices' stroke-width='" << options.vertexSize << "'>";
+    html << "\n<g id='vertices'>";
 
     BGL_FORALL_VERTICES(v, graph, LocalAnchorGraph) {
         const LocalAnchorGraphVertex& vertex = graph[v];
         const AnchorId anchorId = vertex.anchorId;
         const string anchorIdString = anchorIdToString(anchorId);
+        const uint64_t coverage = anchors[anchorId].coverage();
 
         // Get the position of this vertex in the computed layout.
         const auto it = layout.find(v);
@@ -773,7 +774,10 @@ void LocalAnchorGraph::writeVertices(
 
         // Write the vertex.
         html << "<line x1='" << x << "' y1='" << y <<
-            "' x2='" << x << "' y2='" << y << "' stroke='" << color << "' />";
+            "' x2='" << x << "' y2='" << y <<
+            "' stroke='" << color <<
+            "' stroke-width='" << options.vertexSize * (double(coverage) / 10) <<
+            "' />";
 
         // End the hyperlink.
         html << "</a>";
