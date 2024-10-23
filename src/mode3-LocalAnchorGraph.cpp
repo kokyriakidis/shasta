@@ -1,5 +1,6 @@
 // Shasta.
 #include "mode3-LocalAnchorGraph.hpp"
+#include "computeLayout.hpp"
 #include "html.hpp"
 #include "HttpServer.hpp"
 #include "platformDependent.hpp"
@@ -335,7 +336,6 @@ LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<stri
     layoutMethod = "sfdp";
     HttpServer::getParameterValue(request, "layoutMethod", layoutMethod);
 
-
     vertexColoring = "black";
     HttpServer::getParameterValue(request, "vertexColoring", vertexColoring);
 
@@ -348,7 +348,7 @@ LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<stri
     edgeColoring = "black";
     HttpServer::getParameterValue(request, "edgeColoring", edgeColoring);
 
-    vertexSize =  5.;
+    vertexSize =  1.;
     HttpServer::getParameterValue(request, "vertexSize", vertexSize);
 
     string vertexSizeByCoverageString;
@@ -410,6 +410,17 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
         "<br><input type=radio required name=layoutMethod value='dot'" <<
         (layoutMethod == "dot" ? " checked=on" : "") <<
         ">dot";
+
+    // If command "customLayout" is available, add an option for that.
+    const int commandStatus = std::system("which customLayout > /dev/null");
+    SHASTA_ASSERT(WIFEXITED(commandStatus));
+    const int returnCode = WEXITSTATUS(commandStatus);
+    if(returnCode == 0) {
+        html <<
+            "<br><input type=radio required name=layoutMethod value='custom'" <<
+            (layoutMethod == "custom" ? " checked=on" : "") <<
+            ">custom";
+    }
 
     html <<
         "<tr>"
@@ -493,9 +504,9 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
 
 void LocalAnchorGraph::writeHtml(
     ostream& html,
-    const LocalAnchorGraphDisplayOptions& options) const
+    const LocalAnchorGraphDisplayOptions& options)
 {
-    if(true /* (options.layoutMethod == "dot") and options.vertexLabels */) {
+    if((options.layoutMethod == "dot") and options.vertexLabels) {
 
         // Use svg output from graphviz.
         writeHtml1(html, options);
@@ -577,7 +588,194 @@ void LocalAnchorGraph::writeHtml1(
 // then creates the svg.
 void LocalAnchorGraph::writeHtml2(
     ostream& html,
-    const LocalAnchorGraphDisplayOptions& /* options */) const
+    const LocalAnchorGraphDisplayOptions& options)
 {
+    // Use scientific notation because svg does not accept floating points
+    // ending with a decimal point.
+    html << std::scientific;
+
+    computeLayout(options);
+    computeLayoutBoundingBox();
+
+    Box viewportBox = boundingBox;
+    viewportBox.extend(0.05);
+    viewportBox.makeSquare();
+
+    // Begin the svg.
+    const string svgId = "LocalAnchorGraph";
+    html <<
+        "\n<br><div style='display:inline-block;vertical-align:top;border-style:solid;border-color:Black'>"
+        "\n<br><svg id='" << svgId <<
+        "' width='" <<  options.sizePixels <<
+        "' height='" << options.sizePixels <<
+        "' viewbox='" << viewportBox.xMin << " " << viewportBox.yMin << " " <<
+        viewportBox.xSize() << " " <<
+        viewportBox.ySize() << "'"
+        " style='stroke-linecap:round'"
+        ">\n";
+
+    // Write the vertices.
+    writeVertices(html, options);
+
+    // Finish the svg.
+    html << "\n</svg></div>";
+
+    // Add drag and zoom.
+    addSvgDragAndZoom(html);
+
+    // Side panel.
+    html << "<div style='display: inline-block'>";
+
+    html << "<p>Side panel here";
+
+    // End the side panel.
+    html << "</table></div>";
+
     html << "<p>Not implemented.";
+
+    html <<
+        "<script>"
+        "document.getElementById('" << svgId << "').scrollIntoView();"
+        "</script>";
 }
+
+
+
+void LocalAnchorGraph::computeLayout(const LocalAnchorGraphDisplayOptions& options)
+{
+    const LocalAnchorGraph& graph = *this;
+
+
+    // Create a map containing the desired length for each edge.
+    std::map<edge_descriptor, double> edgeLengthMap;
+    BGL_FORALL_EDGES(e, graph, LocalAnchorGraph) {
+        const double displayLength =
+            options.minimumEdgeLength +
+            options.additionalEdgeLengthPerKb * 0.001 * double(graph[e].info.offsetInBases);
+        edgeLengthMap.insert({e, displayLength});
+    }
+
+    // Compute the graph layout.
+    layout.clear();
+    const double timeout = 30.;
+    if(options.layoutMethod == "custom") {
+        const int quality = 2;
+        computeLayoutCustom(
+            graph,
+            edgeLengthMap,
+            layout,
+            quality,
+            timeout);
+    } else {
+        const string additionalOptions = "";
+        computeLayoutGraphviz(
+            graph,
+            options.layoutMethod,
+            timeout,
+            layout,
+            additionalOptions,
+            &edgeLengthMap);
+    }
+}
+
+
+
+void LocalAnchorGraph::computeLayoutBoundingBox()
+{
+
+    boundingBox.xMin = std::numeric_limits<double>::max();
+    boundingBox.xMax = std::numeric_limits<double>::min();
+    boundingBox.yMin = boundingBox.xMin;
+    boundingBox.yMax = boundingBox.xMax;
+    for(const auto& p: layout) {
+        const array<double, 2>& xy = p.second;
+        const double x = xy[0];
+        const double y = xy[1];
+        boundingBox.xMin = min(boundingBox.xMin, x);
+        boundingBox.xMax = max(boundingBox.xMax, x);
+        boundingBox.yMin = min(boundingBox.yMin, y);
+        boundingBox.yMax = max(boundingBox.yMax, y);
+    }
+
+}
+
+
+
+void LocalAnchorGraph::Box::makeSquare()
+{
+    if(xSize() > ySize()) {
+        const double delta = (xSize() - ySize()) / 2.;
+        yMin -= delta;
+        yMax += delta;
+    } else {
+        const double delta = (ySize() - xSize()) / 2.;
+        xMin -= delta;
+        xMax += delta;
+    }
+}
+
+
+
+void LocalAnchorGraph::Box::extend(double factor)
+{
+    const double extend = factor * max(xSize(), ySize());
+    xMin -= extend;
+    xMax += extend;
+    yMin -= extend;
+    yMax += extend;
+}
+
+
+
+void LocalAnchorGraph::writeVertices(
+    ostream& html,
+    const LocalAnchorGraphDisplayOptions& options) const
+{
+    const LocalAnchorGraph& graph = *this;
+
+    // If the layout ignores the desired edge length, use a standard vertex size.
+    const double vertexSize =
+        ((options.layoutMethod == "neato") or
+         (options.layoutMethod == "fdp") or
+         (options.layoutMethod == "custom")) ?
+        options.vertexSize :
+        0.1;
+
+    html << "\n<g id='vertices' stroke-width='" << vertexSize << "'>";
+
+    BGL_FORALL_VERTICES(v, graph, LocalAnchorGraph) {
+        const LocalAnchorGraphVertex& vertex = graph[v];
+        const AnchorId anchorId = vertex.anchorId;
+        const string anchorIdString = anchorIdToString(anchorId);
+
+        // Get the position of this vertex in the computed layout.
+        auto it = layout.find(v);
+        SHASTA_ASSERT(it != layout.end());
+        const auto& p = it->second;
+        const double x = p[0];
+        const double y = p[1];
+
+        // Choose the color for this vertex.
+        string color;
+        if(vertex.distance == maxDistance) {
+            color = "Cyan";
+        } else if(vertex.distance == 0) {
+            color = "Blue";
+        } else {
+            color = "Black";
+        }
+
+        // Hyperlink.
+        html << "\n<a href='exploreAnchor?anchorIdString=" <<
+            HttpServer::urlEncode(anchorIdString) << "'>";
+
+        // Write the vertex.
+        html << "<line x1='" << x << "' y1='" << y <<
+            "' x2='" << x << "' y2='" << y << "' stroke='" << color << "' />";
+
+        // End the hyperlink.
+        html << "</a>";
+    }
+    html << "\n</g>";
+}
+
