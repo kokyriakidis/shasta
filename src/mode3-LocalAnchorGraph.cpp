@@ -217,7 +217,7 @@ void LocalAnchorGraph::writeGraphviz(
 
                 const string colorString = "\"" + to_string(hue / 3.) + " 1. 1.\"";
                 if(options.vertexLabels) {
-                    s << " color=" << colorString;
+                    s << " style=filled fillcolor=" << colorString;
                 } else {
                     s << " color=" << colorString;
                     s << " fillcolor=" << colorString;
@@ -294,6 +294,13 @@ void LocalAnchorGraph::writeGraphviz(
         // Color.
         if(options.edgeColoring == "byCoverageLoss") {
             const double hue = (1. - loss) / 3.;
+            s << " color=\"" << std::fixed << std::setprecision(2) << hue << " 1. 1.\"";
+        } else if(options.edgeColoring == "random") {
+            // To decide the color, hash the AnchorIds.
+            // This way we always get the same color for the same edge.
+            const auto p = make_pair(anchorId0, anchorId1);
+            const uint32_t hashValue = MurmurHash2(&p, sizeof(p), 759);
+            const double hue = double(hashValue % 360) / 360.;
             s << " color=\"" << std::fixed << std::setprecision(2) << hue << " 1. 1.\"";
         }
 
@@ -445,7 +452,7 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
         "<hr>"
         "<input type=checkbox name=vertexLabels" <<
         (vertexLabels ? " checked" : "") <<
-        "> Labels"
+        "> Labels (dot layout only)"
 
         "<hr>"
         "<b>Vertex coloring</b>"
@@ -481,8 +488,10 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
         "<b>Edge coloring</b>"
         "<br><input type=radio required name=edgeColoring value='black'" <<
         (edgeColoring == "black" ? " checked=on" : "") << ">Black"
+        "<br><input type=radio required name=edgeColoring value='random'" <<
+        (edgeColoring == "random" ? " checked=on" : "") << ">Random"
         "<br><input type=radio required name=edgeColoring value='byCoverageLoss'" <<
-        (edgeColoring == "byCoverageLoss" ? " checked=on" : "") << "> By coverage loss"
+        (edgeColoring == "byCoverageLoss" ? " checked=on" : "") << ">By coverage loss"
         "<hr>"
 
         "<b>Edge graphics</b>"
@@ -752,6 +761,18 @@ void LocalAnchorGraph::writeVertices(
 {
     const LocalAnchorGraph& graph = *this;
 
+    // Get the reference anchor, if needed.
+    AnchorId referenceAnchorId = invalid<AnchorId>;
+    if(options.vertexColoring == "byReadComposition") {
+        referenceAnchorId = anchorIdFromString(options.referenceAnchorIdString);
+        if((referenceAnchorId == invalid<AnchorId>) or (referenceAnchorId >= anchors.size())) {
+            throw runtime_error("Invalid reference anchor id " + options.referenceAnchorIdString +
+                ". Must be a number between 0 and " +
+                to_string(anchors.size() / 2 - 1) + " followed by + or -.");
+        }
+    }
+    const uint64_t referenceAnchorIdCoverage = anchors[referenceAnchorId].coverage();
+
     html << "\n<g id='vertices'>";
 
     BGL_FORALL_VERTICES(v, graph, LocalAnchorGraph) {
@@ -774,7 +795,31 @@ void LocalAnchorGraph::writeVertices(
         } else if(vertex.distance == 0) {
             color = "Blue";
         } else {
-            color = "Black";
+
+            // Color by similarity of read composition with the reference Anchor.
+            if(options.vertexColoring == "byReadComposition") {
+                AnchorPairInfo info;
+                anchors.analyzeAnchorPair(referenceAnchorId, anchorId, info);
+
+                double hue = 1.;    // 0=red, 1=green.
+                if(options.similarityMeasure == "commonCount") {
+                    // By common count.
+                    hue = double(info.common) / double(referenceAnchorIdCoverage);
+
+                } else if(options.similarityMeasure == "jaccard") {
+                    // By Jaccard similarity.
+                    hue = info.jaccard();
+                } else {
+                    // By corrected Jaccard similarity.
+                    hue = info.correctedJaccard();
+                }
+                color = "hsl(" + to_string(uint32_t(std::round(hue * 120.))) +
+                    ",100%,50%)";
+
+            } else {
+
+                color = "Black";
+            }
         }
 
         // Hyperlink.
@@ -832,12 +877,16 @@ void LocalAnchorGraph::writeEdges(
         const AnchorId anchorId1 = vertex1.anchorId;
         const string anchorIdString1 = anchorIdToString(anchorId1);
 
-        // To decide the color, hash the AnchorIds.
-        // This way we always get the same color for the same edge.
-        const auto p = make_pair(anchorId0, anchorId1);
-        const uint32_t hashValue = MurmurHash2(&p, sizeof(p), 759);
-        const uint32_t hue = hashValue % 360;
-        const string color = "hsl(" + to_string(hue) + ",50%,50%)";
+        string color = "Black";
+
+        if(options.edgeColoring == "random") {
+            // To decide the color, hash the AnchorIds.
+            // This way we always get the same color for the same edge.
+            const auto p = make_pair(anchorId0, anchorId1);
+            const uint32_t hashValue = MurmurHash2(&p, sizeof(p), 759);
+            const uint32_t hue = hashValue % 360;
+            color = "hsl(" + to_string(hue) + ",50%,50%)";
+        }
 
         // Hyperlink.
         html << "\n<a href='exploreAnchorPair?"
