@@ -95,6 +95,7 @@ template<class Graph> shasta::ComputeLayoutReturnCode shasta::computeLayoutGraph
     const std::map<typename Graph::edge_descriptor, double>* edgeLengthMap)
 {
     using vertex_descriptor = typename Graph::vertex_descriptor;
+    const bool isDirected = boost::detail::is_directed(typename boost::graph_traits<Graph>::directed_category());
 
     // Create a vector of vertex descriptors and
     // a map from vertex descriptors to vertex indices.
@@ -112,7 +113,8 @@ template<class Graph> shasta::ComputeLayoutReturnCode shasta::computeLayoutGraph
     const string dotFileName = tmpDirectory() + uuid + ".dot";
     ofstream dotFile(dotFileName);
     dotFile <<
-        "graph G {\n"
+        (isDirected ? "digraph" : "graph") <<
+        " G {\n"
         "layout=" << layoutMethod << ";\n"
         "smoothing=triangle;\n"
         "node [shape=point];\n";
@@ -126,7 +128,7 @@ template<class Graph> shasta::ComputeLayoutReturnCode shasta::computeLayoutGraph
     BGL_FORALL_EDGES_T(e, graph, Graph) {
         const vertex_descriptor v0 = source(e, graph);
         const vertex_descriptor v1 = target(e, graph);
-        dotFile << vertexIndexMap[v0] << "--" << vertexIndexMap[v1];
+        dotFile << vertexIndexMap[v0] << (isDirected ? "->" : "--") << vertexIndexMap[v1];
         if(edgeLengthMap) {
             const auto it = edgeLengthMap->find(e);
             if(it != edgeLengthMap->end()) {

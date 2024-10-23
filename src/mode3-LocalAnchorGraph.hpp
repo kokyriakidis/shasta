@@ -145,4 +145,8 @@ private:
     void writeVertices(
         ostream& html,
         const LocalAnchorGraphDisplayOptions&) const;
+
+    void writeEdges(
+        ostream& html,
+        const LocalAnchorGraphDisplayOptions&) const;
 };

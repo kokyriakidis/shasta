@@ -3,6 +3,7 @@
 #include "computeLayout.hpp"
 #include "html.hpp"
 #include "HttpServer.hpp"
+#include "MurmurHash2.hpp"
 #include "platformDependent.hpp"
 #include "runCommandWithTimeout.hpp"
 using namespace shasta;
@@ -365,7 +366,7 @@ LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<stri
     additionalEdgeLengthPerKb = 5.;
     HttpServer::getParameterValue(request, "additionalEdgeLengthPerKb", additionalEdgeLengthPerKb);
 
-    edgeThickness = 1.;
+    edgeThickness = 0.5;
     HttpServer::getParameterValue(request, "edgeThickness", edgeThickness);
 
     string edgeThicknessByCoverageString;
@@ -614,6 +615,9 @@ void LocalAnchorGraph::writeHtml2(
         " style='stroke-linecap:round'"
         ">\n";
 
+    // Write the edges first so they don't obscure the vertices.
+    writeEdges(html, options);
+
     // Write the vertices.
     writeVertices(html, options);
 
@@ -631,8 +635,7 @@ void LocalAnchorGraph::writeHtml2(
     // End the side panel.
     html << "</table></div>";
 
-    html << "<p>Not implemented.";
-
+    // Scroll down to the svg.
     html <<
         "<script>"
         "document.getElementById('" << svgId << "').scrollIntoView();"
@@ -675,6 +678,13 @@ void LocalAnchorGraph::computeLayout(const LocalAnchorGraphDisplayOptions& optio
             layout,
             additionalOptions,
             &edgeLengthMap);
+        // If the layout is dot, reverse the y coordinates so the arrows point down.
+        if(options.layoutMethod == "dot") {
+            for(auto& p: layout) {
+                auto& y = p.second[1];
+                y = -y;
+            }
+        }
     }
 }
 
@@ -733,15 +743,7 @@ void LocalAnchorGraph::writeVertices(
 {
     const LocalAnchorGraph& graph = *this;
 
-    // If the layout ignores the desired edge length, use a standard vertex size.
-    const double vertexSize =
-        ((options.layoutMethod == "neato") or
-         (options.layoutMethod == "fdp") or
-         (options.layoutMethod == "custom")) ?
-        options.vertexSize :
-        0.1;
-
-    html << "\n<g id='vertices' stroke-width='" << vertexSize << "'>";
+    html << "\n<g id='vertices' stroke-width='" << options.vertexSize << "'>";
 
     BGL_FORALL_VERTICES(v, graph, LocalAnchorGraph) {
         const LocalAnchorGraphVertex& vertex = graph[v];
@@ -749,7 +751,7 @@ void LocalAnchorGraph::writeVertices(
         const string anchorIdString = anchorIdToString(anchorId);
 
         // Get the position of this vertex in the computed layout.
-        auto it = layout.find(v);
+        const auto it = layout.find(v);
         SHASTA_ASSERT(it != layout.end());
         const auto& p = it->second;
         const double x = p[0];
@@ -779,3 +781,81 @@ void LocalAnchorGraph::writeVertices(
     html << "\n</g>";
 }
 
+
+
+
+void LocalAnchorGraph::writeEdges(
+    ostream& html,
+    const LocalAnchorGraphDisplayOptions& options) const
+{
+    const LocalAnchorGraph& graph = *this;
+
+    html << "\n<g id=edges stroke-width='" << options.edgeThickness << "'>";
+
+    BGL_FORALL_EDGES(e, graph, LocalAnchorGraph) {
+        const vertex_descriptor v0 = source(e, graph);
+        const vertex_descriptor v1 = target(e, graph);
+
+        // Get the position of these vertices in the computed layout.
+        const auto it0 = layout.find(v0);
+        SHASTA_ASSERT(it0 != layout.end());
+        const auto& p0 = it0->second;
+        const double x0 = p0[0];
+        const double y0 = p0[1];
+        const auto it1 = layout.find(v1);
+        SHASTA_ASSERT(it1 != layout.end());
+        const auto& p1 = it1->second;
+        const double x1 = p1[0];
+        const double y1 = p1[1];
+
+        // To decide the color, hash the AnchorIds.
+        // This way we always get the same color for the same edge.
+        const auto p = make_pair(graph[v0].anchorId, graph[v1].anchorId);
+        const uint32_t hashValue = MurmurHash2(&p, sizeof(p), 759);
+        const uint32_t hue = hashValue % 360;
+        const string color = "hsl(" + to_string(hue) + ",50%,50%)";
+
+        html <<
+            "\n<line x1='" << x0 << "' y1='" << y0 <<
+            "' x2='" << x1 << "' y2='" << y1 <<
+            "' stroke='" << color << "' />";
+
+    }
+    html << "</g>";
+
+
+
+
+    // Write the "arrows" to show edge directions.
+    // They are just short lines near the target vertex of each edge.
+    html << "\n<g id=arrows stroke-width='" << 0.2* options.edgeThickness << "'>";
+    BGL_FORALL_EDGES(e, graph, LocalAnchorGraph) {
+        const vertex_descriptor v0 = source(e, graph);
+        const vertex_descriptor v1 = target(e, graph);
+
+        // Get the position of these vertices in the computed layout.
+        const auto it0 = layout.find(v0);
+        SHASTA_ASSERT(it0 != layout.end());
+        const auto& p0 = it0->second;
+        const double x0 = p0[0];
+        const double y0 = p0[1];
+        const auto it1 = layout.find(v1);
+        SHASTA_ASSERT(it1 != layout.end());
+        const auto& p1 = it1->second;
+        const double x1 = p1[0];
+        const double y1 = p1[1];
+
+        const double relativeArrowLength = 0.3;
+        const double x2 = (1. - relativeArrowLength) * x1 + relativeArrowLength * x0;
+        const double y2 = (1. - relativeArrowLength) * y1 + relativeArrowLength * y0;
+
+        const string color = "Black";
+
+        html <<
+            "\n<line x1='" << x1 << "' y1='" << y1 <<
+            "' x2='" << x2 << "' y2='" << y2 <<
+            "' stroke='" << color << "' />";
+
+    }
+    html << "</g>";
+}
