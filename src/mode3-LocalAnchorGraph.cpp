@@ -776,6 +776,11 @@ void LocalAnchorGraph::writeVertices(
         const double x = p[0];
         const double y = p[1];
 
+        AnchorPairInfo info;
+        if(options.vertexColoring == "byReadComposition") {
+            anchors.analyzeAnchorPair(referenceAnchorId, anchorId, info);
+        }
+
         // Choose the color for this vertex.
         string color;
         if(vertex.distance == maxDistance) {
@@ -786,8 +791,6 @@ void LocalAnchorGraph::writeVertices(
 
             // Color by similarity of read composition with the reference Anchor.
             if(options.vertexColoring == "byReadComposition") {
-                AnchorPairInfo info;
-                anchors.analyzeAnchorPair(referenceAnchorId, anchorId, info);
 
                 double hue = 1.;    // 0=red, 1=green.
                 if(options.similarityMeasure == "commonCount") {
@@ -820,8 +823,16 @@ void LocalAnchorGraph::writeVertices(
             "' stroke='" << color <<
             "' stroke-width='" << options.vertexSize * (double(coverage) / 10) <<
             "' id='" << anchorIdString << "'>"
-            "<title>" << anchorIdString << ", coverage " << coverage << "</title>"
-            "</line>";
+            "<title>" << anchorIdString << ", coverage " << coverage;
+        if(options.vertexColoring == "byReadComposition") {
+            html << ", common " << info.common << ", J " <<
+                std::fixed << std::setprecision(2) << info.jaccard() <<
+                ", J' " << info.correctedJaccard();
+            if(info.common > 0) {
+                html << ", offset " << info.offsetInBases;
+            }
+        }
+        html << "</title></line>";
 
         // End the hyperlink.
         html << "</a>";
