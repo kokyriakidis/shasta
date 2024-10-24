@@ -819,7 +819,7 @@ void LocalAnchorGraph::writeVertices(
             "' x2='" << x << "' y2='" << y <<
             "' stroke='" << color <<
             "' stroke-width='" << options.vertexSize * (double(coverage) / 10) <<
-            "' >"
+            "' id='" << anchorIdString << "'>"
             "<title>" << anchorIdString << ", coverage " << coverage << "</title>"
             "</line>";
 
@@ -908,7 +908,13 @@ void LocalAnchorGraph::writeEdges(
 
     // Write the "arrows" to show edge directions.
     // They are just short lines near the target vertex of each edge.
-    html << "\n<g id=arrows>";
+    html << "\n<g id=arrows";
+    if(options.edgeColoring == "black") {
+        html << " stroke=white";
+    } else {
+        html << " stroke=black";
+    }
+    html << ">";
     BGL_FORALL_EDGES(e, graph, LocalAnchorGraph) {
         const uint64_t coverage = graph[e].coverage;
         const vertex_descriptor v0 = source(e, graph);
@@ -930,12 +936,9 @@ void LocalAnchorGraph::writeEdges(
         const double x2 = (1. - relativeArrowLength) * x1 + relativeArrowLength * x0;
         const double y2 = (1. - relativeArrowLength) * y1 + relativeArrowLength * y0;
 
-        const string color = "Black";
-
         html <<
             "\n<line x1='" << x1 << "' y1='" << y1 <<
             "' x2='" << x2 << "' y2='" << y2 <<
-            "' stroke='" << color <<
             "' stroke-width='" << 0.2 * options.edgeThickness * double(coverage) <<
             "' />";
 
@@ -999,6 +1002,13 @@ void LocalAnchorGraph::writeSvgControls(
                 e = edges[i];
                 e.setAttribute('stroke-width', factor * e.getAttribute('stroke-width'));
             }
+
+            var arrowsGroup = document.getElementById('arrows');
+            var arrows = arrowsGroup.getElementsByTagName('line');
+            for(i=0; i<arrows.length; i++) {
+                a = arrows[i];
+                a.setAttribute('stroke-width', factor * a.getAttribute('stroke-width'));
+            }
         }
         </script>
         )stringDelimiter";
@@ -1016,6 +1026,55 @@ void LocalAnchorGraph::writeSvgControls(
         <button type='button' onClick='zoomSvg(10.)' style='width:3em'>+++</button>
     )stringDelimiter";
 
+
+
+    // Buttons to highlight an anchor and zoom to an anchor.
+    html << R"stringDelimiter(
+        <tr><td colspan=2>
+        <button onClick='highlightAnchor()'>Highlight</button>
+        <button onClick='zoomToAnchor()'>Zoom to</button>anchor
+        <input id=selectedAnchorId type=text size=10 style='text-align:center'>
+    <script>
+    function zoomToAnchor()
+    {
+        // Get the anchor id from the input field.
+        var anchorId = document.getElementById("selectedAnchorId").value;
+        zoomToGivenAnchor(anchorId);
+    }
+    function zoomToGivenAnchor(anchorId)
+    {
+        var element = document.getElementById(anchorId);
+        var elementSize = element.getAttribute("stroke-width");
+
+        // Find the bounding box and its center.
+        // But the bounding box has size 0 because of how we draw the vertex.
+        var box = element.getBBox();
+        var xCenter = box.x + 0.5 * box.width;
+        var yCenter = box.y + 0.5 * box.height;
+
+        // Change the viewbox of the svg to be a bit larger than a square
+        // containing the bounding box.
+        var enlargeFactor = 5.;
+        var size = enlargeFactor * elementSize;
+        var factor = size / width;
+        width = size;
+        height = size;
+        x = xCenter - 0.5 * size;
+        y = yCenter - 0.5 * size;
+        var svg = document.querySelector('svg');
+        svg.setAttribute('viewBox', `${x} ${y} ${size} ${size}`);
+        ratio = size / svg.getBoundingClientRect().width;
+    }
+    function highlightAnchor()
+    {
+        // Get the anchor id  from the input field.
+        var anchorId = document.getElementById("selectedAnchorId").value;
+        var element = document.getElementById(anchorId);
+
+        element.style.stroke = "Magenta";
+    }
+    </script>
+    )stringDelimiter";
 
 
     html << "</table>";
