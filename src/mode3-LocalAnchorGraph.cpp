@@ -642,22 +642,10 @@ void LocalAnchorGraph::writeHtml2(
     // Finish the svg.
     html << "</svg></div>";
 
-    // Add drag and zoom.
-    addSvgDragAndZoom(html);
-
     // Side panel.
-    html << "<div style='display: inline-block'>";
-
-    html << "<p>Side panel here";
-
-    // End the side panel.
-    html << "</table></div>";
-
-    // Scroll down to the svg.
-    html <<
-        "<script>"
-        "document.getElementById('" << svgId << "').scrollIntoView();"
-        "</script>";
+    html << "<div style='display:inline-block;margin-left:20px'>";
+    writeSvgControls(html, options);
+    html << "</div>";
 }
 
 
@@ -953,4 +941,93 @@ void LocalAnchorGraph::writeEdges(
 
     }
     html << "</g>";
+}
+
+
+
+void LocalAnchorGraph::writeSvgControls(
+    ostream& html,
+    const LocalAnchorGraphDisplayOptions& /* options */) const
+{
+    html <<
+        "<p><table>";
+
+    // Add drag and zoom.
+    addSvgDragAndZoom(html);
+
+
+
+    // Buttons to change vertex size.
+    html << R"stringDelimiter(
+    <tr><th class=left>Vertex size<td>
+    <button type='button' onClick='changeVertexSize(0.1)' style='width:3em'>---</button>
+    <button type='button' onClick='changeVertexSize(0.5)' style='width:3em'>--</button>
+    <button type='button' onClick='changeVertexSize(0.8)' style='width:3em'>-</button>
+    <button type='button' onClick='changeVertexSize(1.25)' style='width:3em'>+</button>
+    <button type='button' onClick='changeVertexSize(2.)' style='width:3em'>++</button>
+    <button type='button' onClick='changeVertexSize(10.)' style='width:3em'>+++</button>
+        <script>
+        function changeVertexSize(factor)
+        {
+            var vertexGroup = document.getElementById('vertices');
+            var vertices = vertexGroup.getElementsByTagName('line');
+            for(i=0; i<vertices.length; i++) {
+                v = vertices[i];
+                v.setAttribute('stroke-width', factor * v.getAttribute('stroke-width'));
+            }
+        }
+        </script>
+        )stringDelimiter";
+
+
+
+    // Buttons to change edge thickness.
+    html << R"stringDelimiter(
+    <tr><th class=left>Edge thickness<td>
+    <button type='button' onClick='changeThickness(0.1)' style='width:3em'>---</button>
+    <button type='button' onClick='changeThickness(0.5)' style='width:3em'>--</button>
+    <button type='button' onClick='changeThickness(0.8)' style='width:3em'>-</button>
+    <button type='button' onClick='changeThickness(1.25)' style='width:3em'>+</button>
+    <button type='button' onClick='changeThickness(2.)' style='width:3em'>++</button>
+    <button type='button' onClick='changeThickness(10.)' style='width:3em'>+++</button>
+        <script>
+        function changeThickness(factor)
+        {
+            var edgeGroup = document.getElementById('edges');
+            var edges = edgeGroup.getElementsByTagName('line');
+            for(i=0; i<edges.length; i++) {
+                e = edges[i];
+                e.setAttribute('stroke-width', factor * e.getAttribute('stroke-width'));
+            }
+        }
+        </script>
+        )stringDelimiter";
+
+
+
+    // Zoom buttons.
+    html << R"stringDelimiter(
+        <tr title='Or use the mouse wheel.'><th class=left>Zoom<td>
+        <button type='button' onClick='zoomSvg(0.1)' style='width:3em'>---</button>
+        <button type='button' onClick='zoomSvg(0.5)' style='width:3em'>--</button>
+        <button type='button' onClick='zoomSvg(0.8)' style='width:3em'>-</button>
+        <button type='button' onClick='zoomSvg(1.25)' style='width:3em'>+</button>
+        <button type='button' onClick='zoomSvg(2.)' style='width:3em'>++</button>
+        <button type='button' onClick='zoomSvg(10.)' style='width:3em'>+++</button>
+    )stringDelimiter";
+
+
+
+    html << "</table>";
+
+    // Scroll down to the svg.
+    const string svgId = "LocalAnchorGraph";
+    html <<
+        "<script>"
+        "document.getElementById('" << svgId << "').scrollIntoView();"
+        "</script>";
+
+    html <<
+        "<p>Use Ctrl+Click to pan."
+        "<p>Use Ctrl-Wheel or the above buttons to zoom.";
 }

@@ -123,7 +123,7 @@ private:
         ostream& html,
         const LocalAnchorGraphDisplayOptions&);
 
-    // The position of eahc vertex in the computed layout.
+    // The position of each vertex in the computed layout.
     std::map<vertex_descriptor, array<double, 2> > layout;
     void computeLayout(const LocalAnchorGraphDisplayOptions&);
 
@@ -147,6 +147,10 @@ private:
         const LocalAnchorGraphDisplayOptions&) const;
 
     void writeEdges(
+        ostream& html,
+        const LocalAnchorGraphDisplayOptions&) const;
+
+    void writeSvgControls(
         ostream& html,
         const LocalAnchorGraphDisplayOptions&) const;
 };
