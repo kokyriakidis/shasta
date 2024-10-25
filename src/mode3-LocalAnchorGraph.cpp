@@ -1047,10 +1047,7 @@ void LocalAnchorGraph::writeSvgControls(
     function zoomToGivenAnchor(anchorId)
     {
         var element = document.getElementById(anchorId);
-        var elementSize = element.getAttribute("stroke-width");
-
         // Find the bounding box and its center.
-        // But the bounding box has size 0 because of how we draw the vertex.
         var box = element.getBBox();
         var xCenter = box.x + 0.5 * box.width;
         var yCenter = box.y + 0.5 * box.height;
@@ -1058,7 +1055,7 @@ void LocalAnchorGraph::writeSvgControls(
         // Change the viewbox of the svg to be a bit larger than a square
         // containing the bounding box.
         var enlargeFactor = 5.;
-        var size = enlargeFactor * elementSize;
+        var size = enlargeFactor * Math.max(box.width, box.height);
         var factor = size / width;
         width = size;
         height = size;
@@ -1067,6 +1064,7 @@ void LocalAnchorGraph::writeSvgControls(
         var svg = document.querySelector('svg');
         svg.setAttribute('viewBox', `${x} ${y} ${size} ${size}`);
         ratio = size / svg.getBoundingClientRect().width;
+        svg.setAttribute('font-size', svg.getAttribute('font-size') * factor);
     }
     function highlightAnchor()
     {
@@ -1074,7 +1072,7 @@ void LocalAnchorGraph::writeSvgControls(
         var anchorId = document.getElementById("selectedAnchorId").value;
         var element = document.getElementById(anchorId);
 
-        element.style.stroke = "Magenta";
+        element.style.fill = "Magenta";
     }
     </script>
     )stringDelimiter";
