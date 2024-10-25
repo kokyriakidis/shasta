@@ -5,6 +5,7 @@
 #include "invalid.hpp"
 #include "mode3-Anchor.hpp"
 #include "mode3-PhasedComponent.hpp"
+#include "MappedMemoryOwner.hpp"
 #include "MultithreadedObject.hpp"
 #include "ReadId.hpp"
 #include "shastaTypes.hpp"
@@ -284,7 +285,8 @@ public:
 
 class shasta::mode3::AssemblyGraph:
     public AssemblyGraphBaseClass,
-    public MultithreadedObject<shasta::mode3::AssemblyGraph> {
+    public MultithreadedObject<shasta::mode3::AssemblyGraph>,
+    public MappedMemoryOwner {
 public:
 
     // Create from a connected component of the AnchorGraph, then call run.

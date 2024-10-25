@@ -49,6 +49,7 @@ AssemblyGraph::AssemblyGraph(
     bool assembleSequence,
     bool debug) :
     MultithreadedObject<AssemblyGraph>(*this),
+    MappedMemoryOwner(anchors),
     componentId(componentId),
     anchors(anchors),
     k(k),
