@@ -305,14 +305,10 @@ void LocalAnchorGraph::writeGraphviz(
         }
 
         // Thickness.
-        if(options.edgeThicknessByCoverage) {
-            s << " penwidth=" << 0.1 * options.edgeThickness * double(edge.coverage);
-        } else {
-            s << " penwidth=" << options.edgeThickness;
-        }
+        s << " penwidth=" << 0.5 * options.edgeThickness * double(edge.coverage);
 
         // Arrow size.
-        s << " arrowsize=" << options.arrowSize;
+        s << " arrowsize=" << 0.5 * options.arrowSize;
 
         // Length. Only use by fdp and neato layouts.
         const double displayLength =
@@ -359,10 +355,10 @@ LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<stri
     referenceAnchorIdString = "";
     HttpServer::getParameterValue(request, "referenceAnchorId", referenceAnchorIdString);
 
-    edgeColoring = "black";
+    edgeColoring = "random";
     HttpServer::getParameterValue(request, "edgeColoring", edgeColoring);
 
-    vertexSize =  0.01;
+    vertexSize =  1.;
     HttpServer::getParameterValue(request, "vertexSize", vertexSize);
 
     string vertexSizeByCoverageString;
@@ -379,12 +375,8 @@ LocalAnchorGraphDisplayOptions::LocalAnchorGraphDisplayOptions(const vector<stri
     additionalEdgeLengthPerKb = 1.;
     HttpServer::getParameterValue(request, "additionalEdgeLengthPerKb", additionalEdgeLengthPerKb);
 
-    edgeThickness = 0.01;
+    edgeThickness = 1.;
     HttpServer::getParameterValue(request, "edgeThickness", edgeThickness);
-
-    string edgeThicknessByCoverageString;
-    edgeThicknessByCoverage = HttpServer::getParameterValue(request,
-        "edgeThicknessByCoverage", edgeThicknessByCoverageString);
 
     arrowSize = 1.;
     HttpServer::getParameterValue(request, "arrowSize", arrowSize);
@@ -498,10 +490,6 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
 
         "<br><input type=text name=edgeThickness style='text-align:center' required size=6 value=" <<
         edgeThickness << "> Thickness (arbitrary units)"
-
-        "<br><input type=checkbox name=edgeThicknessByCoverage" <<
-        (edgeThicknessByCoverage ? " checked" : "") <<
-        "> Thickness proportional to coverage"
 
         "<br><input type=text name=minimumEdgeLength style='text-align:center' required size=6 value=" <<
         minimumEdgeLength << "> Minimum edge length (arbitrary units)"
@@ -630,7 +618,7 @@ void LocalAnchorGraph::writeHtml2(
         "' viewbox='" << viewportBox.xMin << " " << viewportBox.yMin << " " <<
         viewportBox.xSize() << " " <<
         viewportBox.ySize() << "'"
-        " style='border-style:solid;border-color:Black;stroke-linecap:round'"
+        " style='background-color:#f0f0f0'"
         ">\n";
 
     // Write the edges first so they don't obscure the vertices.
@@ -749,6 +737,9 @@ void LocalAnchorGraph::writeVertices(
 {
     const LocalAnchorGraph& graph = *this;
 
+    const double scalingFactor =
+        (options.layoutMethod == "sfdp") ? 0.002 : 0.01;
+
     // Get the reference anchor, if needed.
     AnchorId referenceAnchorId = invalid<AnchorId>;
     if(options.vertexColoring == "byReadComposition") {
@@ -761,7 +752,7 @@ void LocalAnchorGraph::writeVertices(
     }
     const uint64_t referenceAnchorIdCoverage = anchors[referenceAnchorId].coverage();
 
-    html << "\n<g id='vertices'>";
+    html << "\n<g id='vertices' style='stroke:none'>";
 
     BGL_FORALL_VERTICES(v, graph, LocalAnchorGraph) {
         const LocalAnchorGraphVertex& vertex = graph[v];
@@ -818,10 +809,9 @@ void LocalAnchorGraph::writeVertices(
             HttpServer::urlEncode(anchorIdString) << "'>";
 
         // Write the vertex.
-        html << "<line x1='" << x << "' y1='" << y <<
-            "' x2='" << x << "' y2='" << y <<
-            "' stroke='" << color <<
-            "' stroke-width='" << options.vertexSize * (double(coverage) / 10) <<
+        html << "<circle cx='" << x << "' cy='" << y <<
+            "' fill='" << color <<
+            "' r='" << options.vertexSize * (scalingFactor * double(coverage)) <<
             "' id='" << anchorIdString << "'>"
             "<title>" << anchorIdString << ", coverage " << coverage;
         if(options.vertexColoring == "byReadComposition") {
@@ -832,7 +822,7 @@ void LocalAnchorGraph::writeVertices(
                 html << ", offset " << info.offsetInBases;
             }
         }
-        html << "</title></line>";
+        html << "</title></circle>";
 
         // End the hyperlink.
         html << "</a>";
@@ -848,6 +838,9 @@ void LocalAnchorGraph::writeEdges(
     const LocalAnchorGraphDisplayOptions& options) const
 {
     const LocalAnchorGraph& graph = *this;
+
+    const double scalingFactor =
+        (options.layoutMethod == "sfdp") ? 0.001 : 0.005;
 
     html << "\n<g id=edges>";
 
@@ -896,7 +889,7 @@ void LocalAnchorGraph::writeEdges(
             "\n<line x1='" << x0 << "' y1='" << y0 <<
             "' x2='" << x1 << "' y2='" << y1 <<
             "' stroke='" << color <<
-            "' stroke-width='" << options.edgeThickness * double(coverage) <<
+            "' stroke-width='" << scalingFactor * options.edgeThickness * double(coverage) <<
             "'>"
             "<title>" <<
             anchorIdString0 << " to " << anchorIdString1 <<
@@ -913,7 +906,6 @@ void LocalAnchorGraph::writeEdges(
         html << "</a>";
     }
     html << "</g>";
-
 
 
 
@@ -950,7 +942,7 @@ void LocalAnchorGraph::writeEdges(
         html <<
             "\n<line x1='" << x1 << "' y1='" << y1 <<
             "' x2='" << x2 << "' y2='" << y2 <<
-            "' stroke-width='" << 0.2 * options.edgeThickness * double(coverage) <<
+            "' stroke-width='" << 0.2 * scalingFactor * options.edgeThickness * double(coverage) <<
             "' />";
 
     }
@@ -984,10 +976,10 @@ void LocalAnchorGraph::writeSvgControls(
         function changeVertexSize(factor)
         {
             var vertexGroup = document.getElementById('vertices');
-            var vertices = vertexGroup.getElementsByTagName('line');
+            var vertices = vertexGroup.getElementsByTagName('circle');
             for(i=0; i<vertices.length; i++) {
                 v = vertices[i];
-                v.setAttribute('stroke-width', factor * v.getAttribute('stroke-width'));
+                v.setAttribute('r', factor * v.getAttribute('r'));
             }
         }
         </script>
@@ -1094,7 +1086,7 @@ void LocalAnchorGraph::writeSvgControls(
     const string svgId = "LocalAnchorGraph";
     html <<
         "<script>"
-        "document.getElementById('" << svgId << "').scrollIntoView();"
+        "document.getElementById('" << svgId << "').scrollIntoView({block:'center'});"
         "</script>";
 
     html <<

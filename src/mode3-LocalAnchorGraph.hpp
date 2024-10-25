@@ -45,7 +45,6 @@ public:
     // Edges.
     string edgeColoring;
     double edgeThickness;
-    bool edgeThicknessByCoverage;
     double minimumEdgeLength;
     double additionalEdgeLengthPerKb;
     double arrowSize;
