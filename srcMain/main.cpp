@@ -685,8 +685,10 @@ void shasta::main::assemble(
 
 
     // Compute alignments.
+    const bool computeProjectedAlignmentMetrics = assemblerOptions.readGraphOptions.creationMethod == 4;
     assembler.computeAlignments(
         assemblerOptions.alignOptions,
+        computeProjectedAlignmentMetrics,
         threadCount);
 
     // Marker KmerIds are freed here.

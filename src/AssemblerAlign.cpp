@@ -10,6 +10,7 @@
 #include "AssemblerOptions.hpp"
 #include "compressAlignment.hpp"
 #include "performanceLog.hpp"
+#include "ProjectedAlignment.hpp"
 #include "Reads.hpp"
 #include "span.hpp"
 #include "timestamp.hpp"
@@ -210,6 +211,7 @@ void Assembler::alignOverlappingOrientedReads(
 void Assembler::computeAlignments(
 
     const AlignOptions& alignOptions,
+    bool computeProjectedAlignmentMetrics,
 
     // Number of threads. If zero, a number of threads equal to
     // the number of virtual processors is used.
@@ -230,6 +232,7 @@ void Assembler::computeAlignments(
     // Store parameters so they are accessible to the threads.
     auto& data = computeAlignmentsData;
     data.alignOptions = &alignOptions;
+    data.computeProjectedAlignmentMetrics = computeProjectedAlignmentMetrics;
 
     // Adjust the numbers of threads, if necessary.
     if(threadCount == 0) {
@@ -357,6 +360,7 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
     const bool suppressContainments = data.alignOptions->suppressContainments;
     const double align5DriftRateTolerance = data.alignOptions->align5DriftRateTolerance;
     const uint64_t align5MinBandExtend = data.alignOptions->align5MinBandExtend;
+    const bool computeProjectedAlignmentMetrics = data.computeProjectedAlignmentMetrics;
 
 
     // Align4-specific items.
@@ -539,6 +543,17 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
             }
 
             // If getting here, this is a good alignment.
+
+            // Compute projected alignment metrics, if requested.
+            if(computeProjectedAlignmentMetrics) {
+                const ProjectedAlignment projectedAlignment(
+                    *this,
+                    orientedReadIds,
+                    alignment,
+                    true);
+                alignmentInfo.errorRateRle = float(projectedAlignment.errorRateRle());
+            }
+
             // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " good." << endl;
             threadAlignmentData.push_back(AlignmentData(candidate, alignmentInfo));
 
