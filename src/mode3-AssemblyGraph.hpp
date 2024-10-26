@@ -5,6 +5,7 @@
 #include "invalid.hpp"
 #include "mode3-Anchor.hpp"
 #include "mode3-PhasedComponent.hpp"
+#include "MappedMemoryOwner.hpp"
 #include "MultithreadedObject.hpp"
 #include "ReadId.hpp"
 #include "shastaTypes.hpp"
@@ -12,6 +13,7 @@
 
 // Boost libraries.
 #include <boost/graph/adjacency_list.hpp>
+#include <boost/serialization/vector.hpp>
 
 // Standard library
 #include "algorithm.hpp"
@@ -96,6 +98,13 @@ public:
         return (*this)[size() - 2];
     }
 
+    template<class Archive> void serialize(Archive& ar, unsigned int /* version */)
+    {
+        ar & boost::serialization::base_object< vector<AnchorId> >(*this);
+        ar & shouldBeAssembled;
+        ar & wasAssembled;
+        ar & sequence;
+    }
 };
 
 
@@ -113,6 +122,11 @@ public:
 
     // Remove duplicate chains.
     void deduplicate();
+
+    template<class Archive> void serialize(Archive& ar, unsigned int /* version */)
+    {
+        ar & boost::serialization::base_object< vector<Chain> >(*this);
+    }
 };
 
 
@@ -218,6 +232,10 @@ public:
     // Return the total lenght of this bubble chain.
     uint64_t totalLength() const;
 
+    template<class Archive> void serialize(Archive& ar, unsigned int /* version */)
+    {
+        ar & boost::serialization::base_object< vector<Bubble> >(*this);
+    }
 
 };
 
@@ -241,6 +259,11 @@ public:
     // Stored by class Superbubbles.
     uint64_t superbubbleId = invalid<uint64_t>;
 
+    template<class Archive> void serialize(Archive & ar, unsigned int /* version */)
+    {
+        ar & anchorId;
+    }
+
 private:
     AnchorId anchorId;
 };
@@ -250,13 +273,20 @@ private:
 class shasta::mode3::AssemblyGraphEdge : public BubbleChain {
 public:
     uint64_t id = invalid<uint64_t>;
+
+    template<class Archive> void serialize(Archive& ar, unsigned int /* version */)
+    {
+        ar & boost::serialization::base_object<BubbleChain>(*this);
+        ar & id;
+    }
 };
 
 
 
 class shasta::mode3::AssemblyGraph:
     public AssemblyGraphBaseClass,
-    public MultithreadedObject<shasta::mode3::AssemblyGraph> {
+    public MultithreadedObject<shasta::mode3::AssemblyGraph>,
+    public MappedMemoryOwner {
 public:
 
     // Create from a connected component of the AnchorGraph, then call run.
@@ -884,5 +914,17 @@ private:
         bool debug,
         uint64_t pruneLength
         );
+
+    // Serialization.
+    friend class boost::serialization::access;
+    template<class Archive> void serialize(Archive& ar, unsigned int /* version */)
+    {
+        ar & boost::serialization::base_object<AssemblyGraphBaseClass>(*this);
+        ar & componentId;
+        ar & nextEdgeId;
+    }
+    void save(ostream&) const;
+    void load(istream&);
+
 };
 

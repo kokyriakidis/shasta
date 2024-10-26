@@ -1,21 +1,15 @@
 // Shasta.
 #include "Mode3Assembler.hpp"
 #include "deduplicate.hpp"
-#include "html.hpp"
 #include "HttpServer.hpp"
 #include "Marker.hpp"
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-LocalAnchorGraph.hpp"
-#include "platformDependent.hpp"
-#include "runCommandWithTimeout.hpp"
 using namespace shasta;
 using namespace mode3;
 
 // Boost libraries.
 #include <boost/tokenizer.hpp>
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
 
 // Standard library.
 #include "fstream.hpp"
@@ -414,11 +408,11 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     ostream& html,
     const Mode3AssemblyOptions& options)
 {
-    // Get the request parameters.
+    // Get the options that control graph creation.
     string anchorIdsString;
     HttpServer::getParameterValue(request, "anchorIdsString", anchorIdsString);
 
-    uint64_t distance = 2;
+    uint64_t distance = 10;
     HttpServer::getParameterValue(request, "distance", distance);
 
     string filterEdgesByCoverageLossString;
@@ -428,6 +422,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     double maxCoverageLoss =  options.primaryGraphOptions.maxLoss;
     HttpServer::getParameterValue(request, "maxCoverageLoss", maxCoverageLoss);
 
+    // Get the options that control graph display.
     const LocalAnchorGraphDisplayOptions displayOptions(request);
 
 
@@ -435,9 +430,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     // Start the form.
     html << "<form><table>";
 
-
-
-    // Options that control the creation of the LocalAnchorGraph.
+    // Form items for options that control graph creation.
     html <<
         "<tr>"
         "<th class=left>Anchor id"
@@ -464,7 +457,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(
         maxCoverageLoss << "> Maximum coverage loss"
         "<hr>";
 
-    // Options that control the display of the LocalAnchorGraph.
+    // Form items for options that control graph display.
     displayOptions.writeForm(html);
 
     // End the form.
@@ -475,7 +468,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(
 
 
 
-    // If the anchor id missing or invalid, stop here.
+    // If the anchor id are missing, stop here.
     if(anchorIdsString.empty()) {
         return;
     }
@@ -501,7 +494,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(
 
 
     // Create the LocalAnchorGraph starting from these AnchorIds and moving
-    // away up to she specified distance.
+    // away up to the specified distance.
     LocalAnchorGraph graph(
         anchors(),
         anchorIds,
@@ -514,57 +507,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     html << "The local anchor graph has " << num_vertices(graph) <<
          " vertices and " << num_edges(graph) << " edges.";
 
+    // Write it to html.
+    graph.writeHtml(html, displayOptions);
 
-    // Write it out in graphviz format.
-    const string uuid = to_string(boost::uuids::random_generator()());
-    const string dotFileName = tmpDirectory() + uuid + ".dot";
-    graph.writeGraphviz(dotFileName, displayOptions);
-
-    // Use graphviz to compute the layout.
-    const string svgFileName = dotFileName + ".svg";
-    const string shape = displayOptions.vertexLabels ? "rectangle" : "point";
-    string command =
-        displayOptions.layoutMethod +
-        " -T svg " + dotFileName + " -o " + svgFileName +
-        " -Nshape=" + shape +
-        " -Gsize=" + to_string(displayOptions.sizePixels/72) + " -Gratio=expand ";
-    if(displayOptions.vertexLabels) {
-        command += " -Goverlap=false";
-    }
-    // cout << "Running command: " << command << endl;
-    const int timeout = 30;
-    bool timeoutTriggered = false;
-    bool signalOccurred = false;
-    int returnCode = 0;
-    runCommandWithTimeout(command, timeout, timeoutTriggered, signalOccurred, returnCode);
-    if(signalOccurred) {
-        html << "Error during graph layout. Command was<br>" << endl;
-        html << command;
-        return;
-    }
-    if(timeoutTriggered) {
-        html << "Timeout during graph layout." << endl;
-        return;
-    }
-    if(returnCode!=0 ) {
-        html << "Error during graph layout. Command was<br>" << endl;
-        html << command;
-        return;
-    }
-    std::filesystem::remove(dotFileName);
-
-
-
-    // Write the svg to html.
-    html << "<p><div style='border:solid;display:inline-block'>";
-    ifstream svgFile(svgFileName);
-    html << svgFile.rdbuf();
-    svgFile.close();
-    html << "</div>";
-
-    // Remove the .svg file.
-    std::filesystem::remove(svgFileName);
-
-    // Add drag and zoom.
-    addSvgDragAndZoom(html);
 }

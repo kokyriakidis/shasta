@@ -197,6 +197,10 @@ public:
     // See Assembler::alignOrientedReads5.
     float uniquenessMetric = std::numeric_limits<float>::signaling_NaN();
 
+    // ProjectedAlignment metrics.
+    // Only computed for read graph creation method 4.
+    float errorRateRle = 0.;
+
     void clearFlags()
     {
         isInReadGraph = 0;

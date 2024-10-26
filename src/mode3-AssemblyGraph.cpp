@@ -18,6 +18,9 @@ using namespace shasta;
 using namespace mode3;
 
 // Boost libraries.
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/graph/adj_list_serialize.hpp>
 #include <boost/graph/filtered_graph.hpp>
 #include <boost/pending/disjoint_sets.hpp>
 #include <boost/graph/reverse_graph.hpp>
@@ -46,6 +49,7 @@ AssemblyGraph::AssemblyGraph(
     bool assembleSequence,
     bool debug) :
     MultithreadedObject<AssemblyGraph>(*this),
+    MappedMemoryOwner(anchors),
     componentId(componentId),
     anchors(anchors),
     k(k),
@@ -7795,4 +7799,19 @@ uint64_t AssemblyGraph::getAnchorIndex(AnchorId anchorId) const
     SHASTA_ASSERT(*it == anchorId);
     return it - anchorIds.begin();
 
+}
+
+
+void AssemblyGraph::save(ostream& s) const
+{
+    boost::archive::binary_oarchive archive(s);
+    archive << *this;
+}
+
+
+
+void AssemblyGraph::load(istream& s)
+{
+    boost::archive::binary_iarchive archive(s);
+    archive >> *this;
 }

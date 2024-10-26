@@ -283,6 +283,7 @@ public:
     // without storing details of the alignment.
     void computeAlignments(
         const AlignOptions&,
+        bool computeProjectedAlignmentMetrics,
 
         // Number of threads. If zero, a number of threads equal to
         // the number of virtual processors is used.
@@ -960,6 +961,7 @@ private:
 
         // Not owned.
         const AlignOptions* alignOptions = 0;
+        bool computeProjectedAlignmentMetrics = false;
 
         // The AlignmentInfo found by each thread.
         vector< vector<AlignmentData> > threadAlignmentData;

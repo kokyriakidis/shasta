@@ -38,11 +38,13 @@ public:
     double vertexSize;
     bool vertexSizeByCoverage;
     bool vertexLabels;
+    string vertexColoring;
+    string similarityMeasure;
+    string referenceAnchorIdString;
 
     // Edges.
     string edgeColoring;
     double edgeThickness;
-    bool edgeThicknessByCoverage;
     double minimumEdgeLength;
     double additionalEdgeLengthPerKb;
     double arrowSize;
@@ -96,6 +98,14 @@ public:
     uint64_t maxDistance;
     std::map<AnchorId, vertex_descriptor> vertexMap;
 
+    void writeHtml(
+        ostream& html,
+        const LocalAnchorGraphDisplayOptions&);
+    void writeHtml1(
+        ostream& html,
+        const LocalAnchorGraphDisplayOptions&) const;
+
+
     void writeGraphviz(
         const string& fileName,
         const LocalAnchorGraphDisplayOptions&
@@ -104,4 +114,42 @@ public:
         ostream&,
         const LocalAnchorGraphDisplayOptions&
         ) const;
+
+private:
+
+    // Html/svg output without using svg output created by Graphviz.
+    void writeHtml2(
+        ostream& html,
+        const LocalAnchorGraphDisplayOptions&);
+
+    // The position of each vertex in the computed layout.
+    std::map<vertex_descriptor, array<double, 2> > layout;
+    void computeLayout(const LocalAnchorGraphDisplayOptions&);
+
+    // The bounding box of the computed layout.
+    class Box {
+    public:
+        double xMin;
+        double xMax;
+        double yMin;
+        double yMax;
+        double xSize() {return xMax - xMin;}
+        double ySize() {return yMax - yMin;}
+        void makeSquare();
+        void extend(double factor);
+    };
+    Box boundingBox;
+    void computeLayoutBoundingBox();
+
+    void writeVertices(
+        ostream& html,
+        const LocalAnchorGraphDisplayOptions&) const;
+
+    void writeEdges(
+        ostream& html,
+        const LocalAnchorGraphDisplayOptions&) const;
+
+    void writeSvgControls(
+        ostream& html,
+        const LocalAnchorGraphDisplayOptions&) const;
 };
