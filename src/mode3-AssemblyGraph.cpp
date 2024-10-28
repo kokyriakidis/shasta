@@ -6625,6 +6625,7 @@ void AssemblyGraph::assembleAllChainsMultithreaded(
     }
 
     assembleChainsMultithreaded(chainTerminalCommonThreshold, threadCount);
+    sequenceWasAssembled = true;
 }
 
 
@@ -6646,6 +6647,31 @@ void AssemblyGraph::clearAllShouldBeAssembledFlags()
             for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
                 Chain& chain = bubble[indexInBubble];
                 chain.shouldBeAssembled = false;
+            }
+        }
+    }
+
+}
+
+
+
+void AssemblyGraph::cleanupSequence()
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // Loop over all bubble chains.
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        BubbleChain& bubbleChain = assemblyGraph[e];
+
+        // Loop over Bubbles in this BubbleChain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+            // Loop over Chains in this Bubble.
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                Chain& chain = bubble[indexInBubble];
+                chain.sequence.clear();
+                chain.sequence.shrink_to_fit();
             }
         }
     }
@@ -7650,6 +7676,7 @@ uint64_t AssemblyGraph::cleanupBubbles(
     BGL_FORALL_EDGES(ce, graph, AssemblyGraph) {
         removedCount += cleanupBubbles(debug, ce, maxOffset, chainTerminalCommonThreshold);
     }
+    cleanupSequence();
 
     performanceLog << timestamp << "AssemblyGraph::cleanupBubbles ends." << endl;
     return removedCount;

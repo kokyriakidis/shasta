@@ -329,6 +329,8 @@ public:
     // Get the index of a AnchorId in the anchorIds vector.
     uint64_t getAnchorIndex(AnchorId) const;
 
+    bool sequenceWasAssembled = false;
+
 private:
     // void computeJourneys(bool debug);
 
@@ -780,6 +782,7 @@ private:
         uint64_t threadCount);
     // This clears the shouldBeAssembled flag from all Chains.
     void clearAllShouldBeAssembledFlags();
+    void cleanupSequence();
 
     void assembleChainsMultithreadedTheadFunction(uint64_t threadId);
     void combineStepSequences(Chain&);
@@ -921,6 +924,7 @@ private:
     {
         ar & boost::serialization::base_object<AssemblyGraphBaseClass>(*this);
         ar & componentId;
+        ar & sequenceWasAssembled;
         ar & nextEdgeId;
     }
     void save(ostream&) const;
