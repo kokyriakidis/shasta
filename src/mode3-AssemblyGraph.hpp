@@ -309,14 +309,12 @@ public:
         uint64_t componentId,
         const Anchors&,
         const Mode3AssemblyOptions&);
-private:
 
     // Hide Base defined by the base class.
     using Base = shasta::Base;
 
     // Information stored by the constructor.
     uint64_t componentId;
-public:
     const Anchors& anchors;
     uint64_t k;
     const Mode3AssemblyOptions& options;

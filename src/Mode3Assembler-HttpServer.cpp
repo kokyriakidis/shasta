@@ -592,7 +592,7 @@ void Mode3Assembler::exploreSegment(
     if(not assemblyStage.empty()) {
         html << " value='" << assemblyStage + "'";
     }
-    html << " size=8>";
+    html << " size=30>";
 
     html <<
         "<tr>"
@@ -601,7 +601,7 @@ void Mode3Assembler::exploreSegment(
     if(not segmentName.empty()) {
         html << " value='" << segmentName + "'";
     }
-    html << " title='Enter a segment name of the form a-b-c-d-Pn' size=8>";
+    html << " title='Enter a segment name of the form a-b-c-d-Pn' size=30>";
 
 
 
@@ -616,10 +616,46 @@ void Mode3Assembler::exploreSegment(
         return;
     }
 
+    // Parse the segment name.
+    uint64_t componentId;
+    uint64_t bubbleChainId;
+    uint64_t positionInBubbleChain;
+    uint64_t indexInBubble;
+    uint64_t bubblePloidy;
+    AssemblyGraphPostprocessor::parseChainStringId(
+        segmentName,
+        componentId,
+        bubbleChainId,
+        positionInBubbleChain,
+        indexInBubble,
+        bubblePloidy);
+
+    // Get the AssemblyGraph for this component.
+    const AssemblyGraphPostprocessor& assemblyGraph = getAssemblyGraph(assemblyStage, componentId);
+
+    // Extract the Chain (Segment) we want.
+    const Chain& chain = assemblyGraph.getChain(segmentName);
 
     html << "<h2>Assembly graph segment (chain) " << segmentName <<
         " at assembly stage " << assemblyStage <<
         "</h2>";
+
+
+    html <<
+        "<table>"
+        "<tr><th class=left>Name<td class=centered>" << segmentName <<
+        "<tr><th class=left>Component<td class=centered>" << componentId <<
+        "<tr><th class=left>Bubble chain<td class=centered>" << bubbleChainId <<
+        "<tr><th class=left>Bubble position in bubble chain<td class=centered>" << positionInBubbleChain <<
+        "<tr><th class=left>Index in bubble<td class=centered>" << indexInBubble <<
+        "<tr><th class=left>Bubble ploidy<td class=centered>" << bubblePloidy <<
+        "<tr><th class=left>Number of anchors<td class=centered>" << chain.size();
+    if(assemblyGraph.sequenceWasAssembled) {
+        html << "<tr><th class=left>Sequence length<td class=centered>" << chain.sequence.size();
+
+    }
+
+    html << "</table>";
 
 }
 
@@ -646,11 +682,14 @@ const AssemblyGraphPostprocessor& Mode3Assembler::getAssemblyGraph(
         cout << timestamp << "Done loading assembly graph for stage " << assemblyStage <<
             " component " << componentId << endl;
         assemblyGraphsMap.insert({{assemblyStage, componentId}, assemblyGraphPointer});
+        SHASTA_ASSERT(assemblyGraphPointer->componentId == componentId);
         return *assemblyGraphPointer;
 
     } else {
 
         // This AssemblyGraph is among the ones we already loaded. Return a reference to it.
-        return (*(it->second));
+        const auto assemblyGraphPointer = it->second;
+        SHASTA_ASSERT(assemblyGraphPointer->componentId == componentId);
+        return *assemblyGraphPointer;
     }
 }
