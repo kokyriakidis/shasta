@@ -918,6 +918,8 @@ private:
         uint64_t pruneLength
         );
 
+
+
     // Serialization.
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive& ar, unsigned int /* version */)
@@ -929,6 +931,11 @@ private:
     }
     void save(ostream&) const;
     void load(istream&);
+
+    // These do save/load to/from mapped memory.
+    // The file name is AssemblyGraph-Stage-ComponentId.
+    void save(const string& stage) const;
+    void load(const string& stage);
 
 };
 

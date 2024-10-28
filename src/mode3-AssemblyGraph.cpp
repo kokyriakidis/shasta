@@ -212,7 +212,11 @@ void AssemblyGraph::run(
             threadCount);
         writeAssemblyDetails();
 
-        if(debug) write("I", true);
+        if(debug) {
+            write("Final", true);
+        } else {
+            save("Final");
+        }
 
     } else {
 
@@ -614,6 +618,8 @@ void AssemblyGraph::write(const string& name, bool writeSequence) const
     if(writeSequence) {
         writeFastaExpanded(name);
     }
+
+    save(name);
 }
 
 
@@ -7841,4 +7847,36 @@ void AssemblyGraph::load(istream& s)
 {
     boost::archive::binary_iarchive archive(s);
     archive >> *this;
+}
+
+
+
+void AssemblyGraph::save(const string& stage) const
+{
+    // If not using persistent binary data, do nothing.
+    if(largeDataFileNamePrefix.empty()) {
+        return;
+    }
+
+    // First save to a string.
+    std::ostringstream s;
+    save(s);
+    const string dataString = s.str();
+    cout << "***abc " << dataString.size() << endl;
+
+    // Now save the string to binary data.
+    const string name = largeDataName("AssemblyGraph-" + stage + "-" + to_string(componentId));
+    MemoryMapped::Vector<char> data;
+    data.createNew(name, largeDataPageSize);
+    data.resize(dataString.size());
+    const char* begin = dataString.data();
+    const char* end = begin + dataString.size();
+    copy(begin, end, data.begin());
+}
+
+
+
+void AssemblyGraph::load(const string& /* stage */)
+{
+    SHASTA_ASSERT(0);
 }
