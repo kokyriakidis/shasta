@@ -3,6 +3,7 @@
 #include "deduplicate.hpp"
 #include "HttpServer.hpp"
 #include "Marker.hpp"
+#include "mode3-AssemblyGraphPostprocessor.hpp"
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-LocalAnchorGraph.hpp"
 using namespace shasta;
@@ -517,7 +518,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(
 void Mode3Assembler::exploreAssemblyGraph(
     const vector<string>& request,
     ostream& html,
-    const Mode3AssemblyOptions& /* options */)
+    const Mode3AssemblyOptions& options)
 {
     // Get the options from the request.
     string assemblyStage;
@@ -538,6 +539,12 @@ void Mode3Assembler::exploreAssemblyGraph(
     }
     html << " size=8>";
 
+    html <<
+        "<tr>"
+        "<th class=left>Component"
+        "<td class=centered><input type=text name=componentId style='text-align:center' required"
+        " value='" << componentId + "' size=8>";
+
     // End the form.
     html <<
         "</table>"
@@ -550,7 +557,17 @@ void Mode3Assembler::exploreAssemblyGraph(
     }
 
 
-    html << "<h2>Assembly graph at assembly stage " << assemblyStage << "</h2>";
+    html << "<h2>Assembly graph at assembly stage " << assemblyStage <<
+        " for component " << componentId <<
+        "</h2>";
+
+    AssemblyGraphPostprocessor assemblyGraph(
+        assemblyStage,
+        componentId,
+        anchors(),
+        options);
+    html << "<p>This assembly graph has " << num_vertices(assemblyGraph) <<
+        " vertices and " << num_edges(assemblyGraph) << " edges." << endl;
 
     html << "<p>Not implemented: Mode3Assembler::exploreAssemblyGraph.";
 }

@@ -302,6 +302,13 @@ public:
         bool assembleSequence,
         bool debug);
 
+    // Constructor from binary data, for postprocessing.
+    // Uxsed by AssemblyGraphPostprocessor in the http server.
+    AssemblyGraph(
+        const string& assemblyStage,
+        uint64_t componentId,
+        const Anchors&,
+        const Mode3AssemblyOptions&);
 private:
 
     // Hide Base defined by the base class.
@@ -926,8 +933,11 @@ private:
     {
         ar & boost::serialization::base_object<AssemblyGraphBaseClass>(*this);
         ar & componentId;
+        ar & k;
         ar & sequenceWasAssembled;
         ar & nextEdgeId;
+        ar & anchorIds;
+        ar & orientedReadIds;
     }
     void save(ostream&) const;
     void load(istream&);
@@ -935,7 +945,7 @@ private:
     // These do save/load to/from mapped memory.
     // The file name is AssemblyGraph-Stage-ComponentId.
     void save(const string& stage) const;
-    void load(const string& stage);
+    void load(const string& stage, uint64_t componentId);
 
 };
 

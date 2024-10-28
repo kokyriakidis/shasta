@@ -72,6 +72,23 @@ AssemblyGraph::AssemblyGraph(
 
 
 
+// Create from binary data
+AssemblyGraph::AssemblyGraph(
+    const string& assemblyStage,
+    uint64_t componentIdArgument,
+    const Anchors& anchors,
+    const Mode3AssemblyOptions& options) :
+    MultithreadedObject<AssemblyGraph>(*this),
+    MappedMemoryOwner(anchors),
+    anchors(anchors),
+    options(options)
+{
+    load(assemblyStage, componentIdArgument);
+    SHASTA_ASSERT(componentId == componentIdArgument);
+}
+
+
+
 void AssemblyGraph::run(
     uint64_t threadCount,
     bool assembleSequence,
@@ -7862,7 +7879,6 @@ void AssemblyGraph::save(const string& stage) const
     std::ostringstream s;
     save(s);
     const string dataString = s.str();
-    cout << "***abc " << dataString.size() << endl;
 
     // Now save the string to binary data.
     const string name = largeDataName("AssemblyGraph-" + stage + "-" + to_string(componentId));
@@ -7876,7 +7892,30 @@ void AssemblyGraph::save(const string& stage) const
 
 
 
-void AssemblyGraph::load(const string& /* stage */)
+void AssemblyGraph::load(const string& assemblyStage, uint64_t componentIdArgument)
 {
-    SHASTA_ASSERT(0);
+    // Access the binary data.
+    MemoryMapped::Vector<char> data;
+    try {
+        const string name = largeDataName("AssemblyGraph-" + assemblyStage + "-" + to_string(componentIdArgument));
+        data.accessExistingReadOnly(name);
+    } catch (std::exception&) {
+        throw runtime_error("Assembly graph at stage " + assemblyStage +
+            " for component " + to_string(componentIdArgument) +
+            " is not available.");
+    }
+    const string dataString(data.begin(), data.size());
+
+    // Load it from here.
+    std::istringstream s(dataString);
+    try {
+        load(s);
+    } catch(std::exception& e) {
+        throw runtime_error("Error reading assembly graph at stage " + assemblyStage +
+            " for component " + to_string(componentIdArgument) +
+            ": " + e.what());
+    }
+
+    // Sanity check.
+    SHASTA_ASSERT(componentIdArgument == componentId);
 }
