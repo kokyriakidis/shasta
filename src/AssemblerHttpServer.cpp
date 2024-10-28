@@ -253,6 +253,8 @@ void Assembler::fillServerFunctionTable()
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreAnchorPair);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreLocalAssembly);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreLocalAnchorGraph);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3AssemblyGraph);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreSegment);
 }
 #undef SHASTA_ADD_TO_FUNCTION_TABLE
 
@@ -496,6 +498,8 @@ void Assembler::writeNavigation(ostream& html) const
             {"Anchor pair", "exploreAnchorPair"},
             {"Local assembly", "exploreLocalAssembly"},
             {"Local anchor graph", "exploreLocalAnchorGraph"},
+            {"Assembly graph", "exploreMode3AssemblyGraph"},
+            {"Segment", "exploreSegment"},
             });
     }
 

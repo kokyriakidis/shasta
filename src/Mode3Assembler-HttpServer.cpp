@@ -511,3 +511,103 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     graph.writeHtml(html, displayOptions);
 
 }
+
+
+
+void Mode3Assembler::exploreAssemblyGraph(
+    const vector<string>& request,
+    ostream& html,
+    const Mode3AssemblyOptions& /* options */)
+{
+    // Get the options from the request.
+    string assemblyStage;
+    HttpServer::getParameterValue(request, "assemblyStage", assemblyStage);
+
+    uint64_t componentId = 0;
+    HttpServer::getParameterValue(request, "componentId", componentId);
+
+    // Start the form.
+    html << "<h2>Assembly graph</h2><form><table>";
+
+    html <<
+        "<tr>"
+        "<th class=left>Assembly stage"
+        "<td class=centered><input type=text name=assemblyStage style='text-align:center' required";
+    if(not assemblyStage.empty()) {
+        html << " value='" << assemblyStage + "'";
+    }
+    html << " size=8>";
+
+    // End the form.
+    html <<
+        "</table>"
+        "<input type=submit value='Show assembly graph'>"
+        "</form>";
+
+
+    if(assemblyStage.empty()) {
+        return;
+    }
+
+
+    html << "<h2>Assembly graph at assembly stage " << assemblyStage << "</h2>";
+
+    html << "<p>Not implemented: Mode3Assembler::exploreAssemblyGraph.";
+}
+
+
+
+void Mode3Assembler::exploreSegment(
+    const vector<string>& request,
+    ostream& html,
+    const Mode3AssemblyOptions& /* options */)
+{
+    // Get the options from the request.
+    string assemblyStage;
+    HttpServer::getParameterValue(request, "assemblyStage", assemblyStage);
+
+    string segmentName;
+    HttpServer::getParameterValue(request, "segmentName", segmentName);
+
+
+
+    // Start the form.
+    html << "<h2>Assembly graph segment</h2><form><table>";
+
+    html <<
+        "<tr>"
+        "<th class=left>Assembly stage"
+        "<td class=centered><input type=text name=assemblyStage style='text-align:center' required";
+    if(not assemblyStage.empty()) {
+        html << " value='" << assemblyStage + "'";
+    }
+    html << " size=8>";
+
+    html <<
+        "<tr>"
+        "<th class=left>Segment name"
+        "<td class=centered><input type=text name=segmentName style='text-align:center' required";
+    if(not segmentName.empty()) {
+        html << " value='" << segmentName + "'";
+    }
+    html << " title='Enter a segment name of the form a-b-c-d-Pn' size=8>";
+
+
+
+    // End the form.
+    html <<
+        "</table>"
+        "<input type=submit value='Get segment information'>"
+        "</form>";
+
+
+    if(segmentName.empty()) {
+        return;
+    }
+
+
+    html << "<h2>Assembly graph segment (chain) " << segmentName <<
+        " at assembly stage " << assemblyStage <<
+        "</h2>";
+
+}

@@ -135,4 +135,10 @@ public:
     void exploreLocalAnchorGraph(
         const vector<string>&, ostream&,
         const Mode3AssemblyOptions&);
+    void exploreAssemblyGraph(
+        const vector<string>&, ostream&,
+        const Mode3AssemblyOptions&);
+    void exploreSegment(
+        const vector<string>&, ostream&,
+        const Mode3AssemblyOptions&);
 };

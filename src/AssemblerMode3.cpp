@@ -553,3 +553,22 @@ void Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostream& 
         request, html,
         httpServerData.assemblerOptions->assemblyOptions.mode3Options);
 }
+
+
+
+void Assembler::exploreMode3AssemblyGraph(const vector<string>& request, ostream& html)
+{
+    mode3Assembler->exploreAssemblyGraph(
+        request, html,
+        httpServerData.assemblerOptions->assemblyOptions.mode3Options);
+}
+
+
+
+void Assembler::exploreSegment(const vector<string>& request, ostream& html)
+{
+    mode3Assembler->exploreSegment(
+        request, html,
+        httpServerData.assemblerOptions->assemblyOptions.mode3Options);
+}
+
