@@ -22,6 +22,7 @@ namespace shasta {
 
     namespace mode3 {
         class AssemblyGraph;
+        class AssemblyGraphPostprocessor;
     }
 
     namespace MemoryMapped {
@@ -41,7 +42,7 @@ public:
         uint64_t k,
         const Reads&,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
-        shared_ptr<mode3::Anchors> anchorsPointer,
+        shared_ptr<mode3::Anchors>,
         uint64_t threadCount,
         const Mode3AssemblyOptions&,
         bool debug);
@@ -52,7 +53,8 @@ public:
         uint64_t k,
         const Reads&,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
-        shared_ptr<mode3::Anchors> anchorsPointer);
+        shared_ptr<mode3::Anchors>,
+        const Mode3AssemblyOptions&);
 
 private:
     uint64_t k;
@@ -79,6 +81,8 @@ public:
     {
         return *anchorsPointer;
     }
+
+    const Mode3AssemblyOptions& options;
 private:
 
     // The oriented reads present in each anchor
@@ -115,12 +119,10 @@ private:
 
     void assembleConnectedComponents(
         uint64_t threadCount,
-        const Mode3AssemblyOptions&,
         bool debug);
     shared_ptr<mode3::AssemblyGraph> assembleConnectedComponent(
         uint64_t componentId,
         uint64_t threadCount,
-        const Mode3AssemblyOptions&,
         bool assembleSequence,
         ostream& orientedReadsCsv,
         bool debug);
@@ -130,15 +132,20 @@ public:
     void exploreAnchor(const vector<string>&, ostream&);
     void exploreAnchorPair(const vector<string>&, ostream&);
     void exploreLocalAssembly(
-        const vector<string>&, ostream&,
-        const Mode3AssemblyOptions::LocalAssemblyOptions&);
+        const vector<string>&, ostream&);
     void exploreLocalAnchorGraph(
-        const vector<string>&, ostream&,
-        const Mode3AssemblyOptions&);
+        const vector<string>&, ostream&);
     void exploreAssemblyGraph(
-        const vector<string>&, ostream&,
-        const Mode3AssemblyOptions&);
+        const vector<string>&, ostream&);
     void exploreSegment(
-        const vector<string>&, ostream&,
-        const Mode3AssemblyOptions&);
+        const vector<string>&, ostream&);
+
+    // During postprocessing, we maintain a table of currently loaded versions
+    // of the AssemblyGraph, keyed by assembly stage and componentId.
+    std::map< pair<string, uint64_t>, shared_ptr<const mode3::AssemblyGraphPostprocessor> >
+        assemblyGraphsMap;
+    const mode3::AssemblyGraphPostprocessor& getAssemblyGraph(
+        const string& assemblyStage,
+        uint64_t componentId
+        );
 };

@@ -6,6 +6,7 @@
 #include "mode3-AssemblyGraphPostprocessor.hpp"
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-LocalAnchorGraph.hpp"
+#include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3;
 
@@ -236,9 +237,9 @@ void Mode3Assembler::exploreAnchorPair(const vector<string>& request, ostream& h
 
 void Mode3Assembler::exploreLocalAssembly(
     const vector<string>& request,
-    ostream& html,
-    const Mode3AssemblyOptions::LocalAssemblyOptions& localAssemblyOptions)
+    ostream& html)
 {
+    const Mode3AssemblyOptions::LocalAssemblyOptions& localAssemblyOptions = options.localAssemblyOptions;
     LocalAssemblyDisplayOptions options(html);
 
     // Get the parameters for the request.
@@ -406,8 +407,7 @@ void Mode3Assembler::exploreLocalAssembly(
 
 void Mode3Assembler::exploreLocalAnchorGraph(
     const vector<string>& request,
-    ostream& html,
-    const Mode3AssemblyOptions& options)
+    ostream& html)
 {
     // Get the options that control graph creation.
     string anchorIdsString;
@@ -517,8 +517,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(
 
 void Mode3Assembler::exploreAssemblyGraph(
     const vector<string>& request,
-    ostream& html,
-    const Mode3AssemblyOptions& options)
+    ostream& html)
 {
     // Get the options from the request.
     string assemblyStage;
@@ -543,7 +542,7 @@ void Mode3Assembler::exploreAssemblyGraph(
         "<tr>"
         "<th class=left>Component"
         "<td class=centered><input type=text name=componentId style='text-align:center' required"
-        " value='" << componentId + "' size=8>";
+        " value='" << componentId << "' size=8>";
 
     // End the form.
     html <<
@@ -556,18 +555,14 @@ void Mode3Assembler::exploreAssemblyGraph(
         return;
     }
 
+    const AssemblyGraphPostprocessor& assemblyGraph = getAssemblyGraph(assemblyStage, componentId);
 
     html << "<h2>Assembly graph at assembly stage " << assemblyStage <<
         " for component " << componentId <<
         "</h2>";
-
-    AssemblyGraphPostprocessor assemblyGraph(
-        assemblyStage,
-        componentId,
-        anchors(),
-        options);
     html << "<p>This assembly graph has " << num_vertices(assemblyGraph) <<
         " vertices and " << num_edges(assemblyGraph) << " edges." << endl;
+
 
     html << "<p>Not implemented: Mode3Assembler::exploreAssemblyGraph.";
 }
@@ -576,8 +571,7 @@ void Mode3Assembler::exploreAssemblyGraph(
 
 void Mode3Assembler::exploreSegment(
     const vector<string>& request,
-    ostream& html,
-    const Mode3AssemblyOptions& /* options */)
+    ostream& html)
 {
     // Get the options from the request.
     string assemblyStage;
@@ -627,4 +621,36 @@ void Mode3Assembler::exploreSegment(
         " at assembly stage " << assemblyStage <<
         "</h2>";
 
+}
+
+
+
+const AssemblyGraphPostprocessor& Mode3Assembler::getAssemblyGraph(
+    const string& assemblyStage,
+    uint64_t componentId
+    )
+{
+    auto it = assemblyGraphsMap.find({assemblyStage, componentId});
+
+    if(it == assemblyGraphsMap.end()) {
+
+        // This AssemblyGraph is not among the ones we already loaded. Load it now.
+        cout << timestamp << "Loading assembly graph for stage " << assemblyStage <<
+            " component " << componentId << endl;
+        shared_ptr<const AssemblyGraphPostprocessor> assemblyGraphPointer =
+            make_shared<const AssemblyGraphPostprocessor>(
+            assemblyStage,
+            componentId,
+            anchors(),
+            options);
+        cout << timestamp << "Done loading assembly graph for stage " << assemblyStage <<
+            " component " << componentId << endl;
+        assemblyGraphsMap.insert({{assemblyStage, componentId}, assemblyGraphPointer});
+        return *assemblyGraphPointer;
+
+    } else {
+
+        // This AssemblyGraph is among the ones we already loaded. Return a reference to it.
+        return (*(it->second));
+    }
 }

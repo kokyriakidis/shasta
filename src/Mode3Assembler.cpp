@@ -36,7 +36,8 @@ Mode3Assembler::Mode3Assembler(
     reads(reads),
     markers(markers),
     debug(debug),
-    anchorsPointer(anchorsPointer)
+    anchorsPointer(anchorsPointer),
+    options(options)
 {
     SHASTA_ASSERT(anchorsPointer);
 
@@ -46,7 +47,7 @@ Mode3Assembler::Mode3Assembler(
     if(debug) {
         writeConnectedComponents();
     }
-    assembleConnectedComponents(threadCount, options, debug);
+    assembleConnectedComponents(threadCount, debug);
 
     performanceLog << timestamp << "Mode 3 assembly ends." << endl;
 }
@@ -58,13 +59,15 @@ Mode3Assembler::Mode3Assembler(
     uint64_t k,
     const Reads& reads,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
-    shared_ptr<mode3::Anchors> anchorsPointer) :
+    shared_ptr<mode3::Anchors> anchorsPointer,
+    const Mode3AssemblyOptions& options) :
     MultithreadedObject<Mode3Assembler>(*this),
     MappedMemoryOwner(mappedMemoryOwner),
     k(k),
     reads(reads),
     markers(markers),
-    anchorsPointer(anchorsPointer)
+    anchorsPointer(anchorsPointer),
+    options(options)
 {
     SHASTA_ASSERT(anchorsPointer);
 }
@@ -170,7 +173,6 @@ void Mode3Assembler::computeConnectedComponents()
 
 void Mode3Assembler::assembleConnectedComponents(
     uint64_t threadCount,
-    const Mode3AssemblyOptions& options,
     bool debug)
 {
     performanceLog << timestamp << "Mode3Assembler::assembleConnectedComponents begins." << endl;
@@ -187,7 +189,7 @@ void Mode3Assembler::assembleConnectedComponents(
     vector< shared_ptr<mode3::AssemblyGraph> > assemblyGraphs;
     for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
         const shared_ptr<AssemblyGraph> assemblyGraph =
-            assembleConnectedComponent(componentId, threadCount, options, true, orientedReadsCsv, debug);
+            assembleConnectedComponent(componentId, threadCount, true, orientedReadsCsv, debug);
         assemblyGraphs.push_back(assemblyGraph);
 
         // Chain length statistics.
@@ -369,7 +371,6 @@ void Mode3Assembler::ConnectedComponent::checkIsValid() const
 shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     uint64_t componentId,
     uint64_t threadCount,
-    const Mode3AssemblyOptions& options,
     bool assembleSequence,
     ostream& orientedReadsCsv,
     bool debug)
