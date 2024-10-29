@@ -638,7 +638,6 @@ void Assembler::accessAllSoft()
 
     try {
         accessKmerCounts();
-        cout << "Marker k-mer counts are available." << endl;
     } catch(const exception& e) {
     }
 
@@ -682,40 +681,41 @@ void Assembler::accessAllSoft()
     }
 
 
+    if(assemblerInfo->assemblyMode != 3) {
+        try {
+            accessMarkerGraphVertices();
+        } catch(const exception& e) {
+            cout << "Marker graph vertices are not accessible." << endl;
+            allDataAreAvailable = false;
+        }
 
-    try {
-        accessMarkerGraphVertices();
-    } catch(const exception& e) {
-        cout << "Marker graph vertices are not accessible." << endl;
-        allDataAreAvailable = false;
-    }
+        try {
+            accessMarkerGraphReverseComplementVertex();
+        } catch(const exception& e) {
+            cout << "Marker graph reverse complement vertices are not accessible." << endl;
+            allDataAreAvailable = false;
+        }
 
-    try {
-        accessMarkerGraphReverseComplementVertex();
-    } catch(const exception& e) {
-        cout << "Marker graph reverse complement vertices are not accessible." << endl;
-        allDataAreAvailable = false;
-    }
+        try {
+            accessMarkerGraphEdges(false);
+        } catch(const exception& e) {
+            cout << "Marker graph edges are not accessible." << endl;
+            allDataAreAvailable = false;
+        }
 
-    try {
-        accessMarkerGraphEdges(false);
-    } catch(const exception& e) {
-        cout << "Marker graph edges are not accessible." << endl;
-        allDataAreAvailable = false;
-    }
+        try {
+            accessMarkerGraphReverseComplementEdge();
+        } catch(const exception& e) {
+            cout << "Marker graph reverse complement edges are not accessible." << endl;
+            allDataAreAvailable = false;
+        }
 
-    try {
-        accessMarkerGraphReverseComplementEdge();
-    } catch(const exception& e) {
-        cout << "Marker graph reverse complement edges are not accessible." << endl;
-        allDataAreAvailable = false;
-    }
-
-    try {
-        accessMarkerGraphConsensus();
-    } catch(const exception& e) {
-        cout << "MarkerGraph graph consensus is not accessible." << endl;
-        allDataAreAvailable = false;
+        try {
+            accessMarkerGraphConsensus();
+        } catch(const exception& e) {
+            cout << "MarkerGraph graph consensus is not accessible." << endl;
+            allDataAreAvailable = false;
+        }
     }
 
     try {
