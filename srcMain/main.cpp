@@ -1325,6 +1325,7 @@ void shasta::main::explore(
     assembler.setupConsensusCaller(assemblerOptions.assemblyOptions.consensusCaller);
 
     // Access all available binary data.
+    assembler.httpServerData.assemblerOptions = &assemblerOptions;
     assembler.accessAllSoft();
 
     string executablePath = filesystem::executablePath();
@@ -1347,7 +1348,6 @@ void shasta::main::explore(
     }
 
     // Start the http server.
-    assembler.httpServerData.assemblerOptions = &assemblerOptions;
     bool localOnly;
     bool sameUserOnly;
     if(assemblerOptions.commandLineOnlyOptions.exploreAccess == "user") {
