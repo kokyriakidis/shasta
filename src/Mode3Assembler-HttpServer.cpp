@@ -433,8 +433,9 @@ void Mode3Assembler::exploreLocalAnchorGraph(
 
     // Form items for options that control graph creation.
     html <<
-        "<tr>"
-        "<th class=left>Anchor id"
+        "<tr title='Enter comma separated anchor ids, each a number between 0 and " <<
+        anchors().size() / 2 - 1 << " followed by + or -.'>"
+        "<th class=left>Starting anchor ids"
         "<td class=centered><input type=text name=anchorIdsString style='text-align:center' required";
     if(not anchorIdsString.empty()) {
         html << " value='" << anchorIdsString + "'";
@@ -760,9 +761,25 @@ void Mode3Assembler::exploreSegment(
         }
         SHASTA_ASSERT(end > begin);
 
+        html << "<h3>Anchors</h3>";
+
+        // Link to a local anchor graph with these anchors.
+        {
+            string anchorIds;
+            for(uint64_t positionInChain=begin; positionInChain!=end; positionInChain++) {
+                const AnchorId anchorId = chain[positionInChain];
+                const string anchorIdString = anchorIdToString(anchorId);
+                anchorIds += anchorIdString;
+                anchorIds += ",";
+            }
+            anchorIds.pop_back();
+
+            html << "<p><a href='exploreLocalAnchorGraph?anchorIdsString=" << HttpServer::urlEncode(anchorIds) <<
+                "&filterEdgesByCoverageLoss=on'>See these anchors in a local anchor graph</a>";
+        }
+
         // Write a table with the requested anchors.
         html <<
-            "<h3>Anchors</h3>"
             "<p><table>"
             "<tr>"
             "<th>Position<br>in segment"
