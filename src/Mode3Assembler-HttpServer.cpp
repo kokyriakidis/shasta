@@ -574,12 +574,26 @@ void Mode3Assembler::exploreSegment(
     ostream& html)
 {
     // Get the options from the request.
-    string assemblyStage;
+    string assemblyStage = "Final";
     HttpServer::getParameterValue(request, "assemblyStage", assemblyStage);
 
     string segmentName;
     HttpServer::getParameterValue(request, "segmentName", segmentName);
 
+    string displayAnchors = "none";
+    HttpServer::getParameterValue(request, "displayAnchors", displayAnchors);
+
+    string beginString;
+    HttpServer::getParameterValue(request, "begin", beginString);
+
+    string endString;
+    HttpServer::getParameterValue(request, "end", endString);
+
+    string firstAnchorsCountString;
+    HttpServer::getParameterValue(request, "firstAnchorsCount", firstAnchorsCountString);
+
+    string lastAnchorsCountString;
+    HttpServer::getParameterValue(request, "lastAnchorsCount", lastAnchorsCountString);
 
 
     // Start the form.
@@ -603,6 +617,35 @@ void Mode3Assembler::exploreSegment(
     }
     html << " title='Enter a segment name of the form a-b-c-d-Pn' size=30>";
 
+
+
+    // Options to control which anchors are shown.
+    html <<
+        "<tr>"
+        "<th class=left>Show anchors"
+        "<td class=left>"
+
+        "<input type=radio required name=displayAnchors value='none'" <<
+        (displayAnchors == "none" ? " checked=on" : "") << "> None"
+
+        "<br><input type=radio required name=displayAnchors value='all'" <<
+        (displayAnchors == "all" ? " checked=on" : "") << "> All"
+
+        "<br><input type=radio required name=displayAnchors value='range'" <<
+        (displayAnchors == "range" ? " checked=on" : "") << "> Anchors in position range "
+        "<input type=text name=begin size=8 style='text-align:center' value='" << beginString << "'> to "
+        "<input type=text name=end size=8 style='text-align:center' value='" << endString << "'>"
+
+        "<br><input type=radio required name=displayAnchors value='first'" <<
+        (displayAnchors == "first" ? " checked=on" : "") << "> First "
+        "<input type=text name=firstAnchorsCount size=8 style='text-align:center' value='" << firstAnchorsCountString << "'>"
+        " anchors"
+
+        "<br><input type=radio required name=displayAnchors value='last'" <<
+        (displayAnchors == "last" ? " checked=on" : "") << "> Last "
+        "<input type=text name=lastAnchorsCount size=8 style='text-align:center' value='" << lastAnchorsCountString << "'>"
+        " anchors"
+        ;
 
 
     // End the form.
@@ -641,6 +684,8 @@ void Mode3Assembler::exploreSegment(
         "</h2>";
 
 
+
+    // Write a summary table for this chain.
     html <<
         "<table>"
         "<tr><th class=left>Name<td class=centered>" << segmentName <<
@@ -654,8 +699,98 @@ void Mode3Assembler::exploreSegment(
         html << "<tr><th class=left>Sequence length<td class=centered>" << chain.sequence.size();
 
     }
-
     html << "</table>";
+
+
+
+    // Write the anchors.
+    if(displayAnchors != "none") {
+
+        // Figure out the anchor position range to use.
+        uint64_t begin = invalid<uint64_t>;
+        uint64_t end = invalid<uint64_t>;
+        if(displayAnchors == "all") {
+            begin = 0;
+            end = chain.size();
+        } else if(displayAnchors == "range") {
+            try {
+                begin = atoul(beginString);
+            } catch(std::exception& e) {
+                throw runtime_error("Begin string " + beginString + " is not valid. Must be a number.");
+            }
+            try {
+                end = atoul(endString);
+            } catch(std::exception& e) {
+                throw runtime_error("End string " + endString + " is notvalid. Must be a number.");
+            }
+            if(begin > chain.size()) {
+                begin = chain.size() - 1;
+            }
+            if(end > chain.size()) {
+                end = chain.size();
+            }
+            if(end < begin) {
+                end = begin + 1;
+            }
+        } else if(displayAnchors == "first") {
+            begin = 0;
+            try {
+                end = atoul(firstAnchorsCountString);
+            } catch(std::exception& e) {
+                throw runtime_error("First anchors count string " + firstAnchorsCountString + " is not valid. Must be a number.");
+            }
+            if(end > chain.size()) {
+                end = chain.size();
+            }
+        } else if(displayAnchors == "last") {
+            end = chain.size();
+            uint64_t count = invalid<uint64_t>;
+            try {
+                count = atoul(lastAnchorsCountString);
+            } catch(std::exception& e) {
+                throw runtime_error("Last anchors count string " + lastAnchorsCountString + " is not valid. Must be a number.");
+            }
+            if(count > chain.size()) {
+                begin = 0;
+            } else {
+                begin = end - count;
+            }
+        } else {
+            SHASTA_ASSERT(0);
+        }
+        SHASTA_ASSERT(end > begin);
+
+        // Write a table with the requested anchors.
+        html <<
+            "<h3>Anchors</h3>"
+            "<p><table>"
+            "<tr>"
+            "<th>Position<br>in segment"
+            "<th>Anchor<br>id"
+            "<th>Link<br>to<br>anchor<br>graph"
+            "<th>Coverage";
+        for(uint64_t positionInChain=begin; positionInChain!=end; positionInChain++) {
+            const AnchorId anchorId = chain[positionInChain];
+            const auto markerIntervals = anchors()[anchorId];
+            const uint64_t coverage = markerIntervals.size();
+            const string anchorIdString = anchorIdToString(anchorId);
+
+            html <<
+                "<tr><td class=centered>" << positionInChain <<
+                "<td class=centered>" <<
+                "<a href='exploreAnchor?anchorIdString=" << HttpServer::urlEncode(anchorIdString) << "'>" <<
+                anchorIdString << "</a>"
+                "<td class=centered>" <<
+                "<a href='exploreLocalAnchorGraph?anchorIdsString=" << HttpServer::urlEncode(anchorIdString) <<
+                "&filterEdgesByCoverageLoss=on'>" <<
+                "&#x22B6;</a>"
+                "<td class=centered>" << coverage;
+        }
+
+        html << "</table>";
+
+    }
+
 
 }
 
