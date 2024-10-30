@@ -28,22 +28,6 @@ void Assembler::createReadGraph4(
     // Flag all alignments as not to be kept.
     vector<bool> keepAlignment(alignmentCount, false);
 
-    Alignment alignment;
-
-    uint32_t alignmentsWithSNPsGreaterThan100 = 0;
-    uint32_t alignmentsWithSNPsGreaterThan90 = 0;
-    uint32_t alignmentsWithSNPsGreaterThan80 = 0;
-    uint32_t alignmentsWithSNPsGreaterThan70 = 0;
-    uint32_t alignmentsWithSNPsGreaterThan60 = 0;
-    uint32_t alignmentsWithSNPsGreaterThan50 = 0;
-    uint32_t alignmentsWithSNPsGreaterThan40 = 0;
-    uint32_t alignmentsWithSNPsGreaterThan30 = 0;
-    uint32_t alignmentsWithSNPsGreaterThan20 = 0;
-    uint32_t alignmentsWithSNPsGreaterThan10 = 0;
-    uint32_t alignmentsWithSNPsGreaterThan05 = 0;
-    uint32_t alignmentsWithSNPsGreaterThan01 = 0;
-    uint32_t alignmentsWithSNPs = 0;
-
     // Loop over all alignments.
     for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
         if((alignmentId % 1000) == 0) {
@@ -65,109 +49,8 @@ void Assembler::createReadGraph4(
         const OrientedReadId orientedReadId0(readId0, 0);   // On strand 0.
         const OrientedReadId orientedReadId1(readId1, isSameStrand ? 0 : 1);   // On strand 0 or 1.
 
-        // The alignment is stored in compressed form as a string,
-        // so we have to decompress it.
-        span<const char> compressedAlignment = compressedAlignments[alignmentId];
-        shasta::decompress(compressedAlignment, alignment);
+        const double errorRateRle = thisAlignmentData.info.errorRateRle;
 
-        // Project this alignment to base space.
-        const ProjectedAlignment projectedAlignment(
-            *this,
-            {orientedReadId0, orientedReadId1},
-            alignment,
-            true);
-
-        const double errorRateRle = projectedAlignment.errorRateRle();
-
-        uint32_t totalAlignmentSnpEditDistanceRle = 0;
-        uint32_t totalAlignmentInsertionEditDistanceRle = 0;
-        uint32_t totalAlignmentDeletionEditDistanceRle = 0;
-
-        for(const ProjectedAlignmentSegment& segment: projectedAlignment.segments) {
-            const vector<Base>& sequence0 = segment.rleSequences[0];
-            const vector<Base>& sequence1 = segment.rleSequences[1];
-
-            uint64_t position0 = 0;
-            uint64_t position1 = 0;
-            vector<AlignedBase> alignment0;
-            vector<AlignedBase> alignment1;
-            
-            for(const pair<bool, bool>& p: segment.rleAlignment) {
-                const bool hasBase0 = p.first;
-                const bool hasBase1 = p.second;
-
-                if(hasBase0) {
-                    alignment0.push_back(AlignedBase(sequence0[position0++]));
-                } else {
-                    alignment0.push_back(AlignedBase::gap());
-                    totalAlignmentInsertionEditDistanceRle++;
-                }
-
-                if(hasBase1) {
-                    alignment1.push_back(AlignedBase(sequence1[position1++]));
-                } else {
-                    alignment1.push_back(AlignedBase::gap());
-                    totalAlignmentDeletionEditDistanceRle++;
-                }
-
-            }
-
-            SHASTA_ASSERT(alignment0.size() == alignment0.size());
-
-
-            for(uint32_t i=0; i<alignment0.size(); i++) {
-                const bool isSnp = ((alignment0[i].value != alignment1[i].value) and (alignment0[i].value != '-') and (alignment1[i].value != '-'));
-
-                if(isSnp) {
-                    totalAlignmentSnpEditDistanceRle++;
-                }
-            }
-
-        }
-
-        // print for checking
-        if (totalAlignmentSnpEditDistanceRle >= 100) {
-            alignmentsWithSNPsGreaterThan100 += 1;
-        } else if (totalAlignmentSnpEditDistanceRle >= 90 and totalAlignmentSnpEditDistanceRle < 100) {
-            alignmentsWithSNPsGreaterThan90 += 1;
-        } else if (totalAlignmentSnpEditDistanceRle >= 80 and totalAlignmentSnpEditDistanceRle < 90) {
-            alignmentsWithSNPsGreaterThan80 += 1;
-        } else if (totalAlignmentSnpEditDistanceRle >= 70 and totalAlignmentSnpEditDistanceRle < 80) {
-            alignmentsWithSNPsGreaterThan70 += 1;
-        } else if (totalAlignmentSnpEditDistanceRle >= 60 and totalAlignmentSnpEditDistanceRle < 70) {
-            alignmentsWithSNPsGreaterThan60 += 1;
-        } else if (totalAlignmentSnpEditDistanceRle >= 50 and totalAlignmentSnpEditDistanceRle < 60) {
-            alignmentsWithSNPsGreaterThan50 += 1;
-        } else if (totalAlignmentSnpEditDistanceRle >= 40 and totalAlignmentSnpEditDistanceRle < 50) {
-            alignmentsWithSNPsGreaterThan40 += 1;
-        } else if (totalAlignmentSnpEditDistanceRle >= 30 and totalAlignmentSnpEditDistanceRle < 40) {
-            alignmentsWithSNPsGreaterThan30 += 1;
-        } else if (totalAlignmentSnpEditDistanceRle >= 20 and totalAlignmentSnpEditDistanceRle < 30) {
-            alignmentsWithSNPsGreaterThan20 += 1;
-        } else if (totalAlignmentSnpEditDistanceRle >= 10 and totalAlignmentSnpEditDistanceRle < 20) {
-            alignmentsWithSNPsGreaterThan10 += 1;
-        } else if (totalAlignmentSnpEditDistanceRle >= 5 and totalAlignmentSnpEditDistanceRle < 10) {
-            alignmentsWithSNPsGreaterThan05 += 1;
-        } else if (totalAlignmentSnpEditDistanceRle >= 1 and totalAlignmentSnpEditDistanceRle < 5) {
-            alignmentsWithSNPsGreaterThan01 += 1;
-        }
-
-        if(totalAlignmentSnpEditDistanceRle > 1) {
-            alignmentsWithSNPs += 1;
-            // cout << "totalAlignmentSnpEditDistanceRle: " << totalAlignmentSnpEditDistanceRle << endl;
-            // cout << "totalSequenceRleLength: " << projectedAlignment.totalLengthRle[0] << endl;
-        }
-
-        // and totalAlignmentInsertionEditDistanceRle < 25
-        
-        // If the RLE Q is large enough, flag thus alignment as to be kept.
-        // if((errorRateRle <= maxErrorRateRle) and totalAlignmentSnpEditDistanceRle < 10) {
-        //     keepAlignment[alignmentId] = true;
-        //     thisAlignmentData.info.isInReadGraph = 1;
-        // } else {
-        //     keepAlignment[alignmentId] = false;
-        //     thisAlignmentData.info.isInReadGraph = 0;
-        // }
         // If the RLE Q is large enough, flag thus alignment as to be kept.
         if((errorRateRle <= maxErrorRateRle)) {
             keepAlignment[alignmentId] = true;
@@ -179,22 +62,6 @@ void Assembler::createReadGraph4(
 
     }
 
-    cout << "----------------------------------------------------------"<< endl;
-    cout << "alignmentsWithSNPsGreaterThan100: " << alignmentsWithSNPsGreaterThan100 << endl;
-    cout << "alignmentsWithSNPs90-100: " << alignmentsWithSNPsGreaterThan90 << endl;
-    cout << "alignmentsWithSNPs80-90: " << alignmentsWithSNPsGreaterThan80 << endl;
-    cout << "alignmentsWithSNPs70-80: " << alignmentsWithSNPsGreaterThan70 << endl;
-    cout << "alignmentsWithSNPs60-70: " << alignmentsWithSNPsGreaterThan60 << endl;
-    cout << "alignmentsWithSNPs50-60: " << alignmentsWithSNPsGreaterThan50 << endl;
-    cout << "alignmentsWithSNPs40-50: " << alignmentsWithSNPsGreaterThan40 << endl;
-    cout << "alignmentsWithSNPs30-40: " << alignmentsWithSNPsGreaterThan30 << endl;
-    cout << "alignmentsWithSNPs20-30: " << alignmentsWithSNPsGreaterThan20 << endl;
-    cout << "alignmentsWithSNPs10-20: " << alignmentsWithSNPsGreaterThan10 << endl;
-    cout << "alignmentsWithSNPs05-10: " << alignmentsWithSNPsGreaterThan05 << endl;
-    cout << "alignmentsWithSNPs01-05: " << alignmentsWithSNPsGreaterThan01 << endl;
-    cout << "alignmentsWithSNPsGreaterThan01: " << alignmentsWithSNPs << endl;
-    cout << "----------------------------------------------------------"<< endl;
-
     cout << timestamp << "Done processing alignments." << endl;
 
     const size_t keepCount = count(keepAlignment.begin(), keepAlignment.end(), true);
@@ -204,6 +71,8 @@ void Assembler::createReadGraph4(
     createReadGraphUsingSelectedAlignments(keepAlignment);
 
     cout << timestamp << "createReadGraph4 ends." << endl;
+
+    removeReadGraphBridges(10);
 
 }
 

@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<link rel=stylesheet href=style.css />
+<link rel=icon href=CZI-new-logo.png />
+</head>
+
+<body>
+<main>
+<div class="goto-index"><a href="index.html">Table of contents</a></div>
+
+<h1>Command line options</h1>
+
+<p>
+This page summarizes command line options for the Shasta executable.
+We will make an effort to keep this page consistent with the code,
+but discrepancies may temporarily appear
+as we add new features. In that case, the list of command line options
+obtained by invoking the Shasta executable with 
+<code>--help</code> is more authoritative than the contents
+of this page.
+
+
+
+<h2 id=bashCompletion>Saving some typing</h2>
+<p>Many option names are long and descriptive. To make it easier to type them
+Shasta provides the ability to create a <code>bash</code> completion script.
+If you are using the <code>bash</code> shell 
+(the default shell in most modern Linux distributions),
+you can use the commands below to save yourself some typing.
+This assumes that the <code>shasta</code> executable is
+named just like this - <code>shasta</code> - and is 
+accessible via your
+<code>PATH</code> environment variable
+(if it is not, you have to invoke <code>shasta</code> using
+an absolute or relative path):
+
+<pre>
+shasta --command createBashCompletionScript
+source shastaCompletion.sh
+</pre>
+
+The first command creates a script named
+<code>shastaCompletion.sh</code>.
+The second command runs that script in the current shell
+(this is important - running the script without the <code>source</code>
+command will not work).
+Now, while typing a <code>shasta</code> option or keyword, you can press <code>TAB</code>, and the
+option name will be completed as much as can be done
+without ambiguity. You can also press <code>TAB</code>
+a second time to get suggestions for what could be allowed next.
+
+<p>The command that generates the script can be run only once, but
+you will need to rerun the <code>source</code> command above
+every time you start a new shell. Alternatively, you can put the 
+<code>source</code> command in your <code>.bashrc</code> file 
+or in one of the standard locations used to store <code>bash</code>
+completion scripts.
+
+
+
+<h2>Options allowed only on the command line</h2> 
+
+<table style='word-break:break-word'>
+<col style='width:200px'>
+<col style='width:200px'>
+
+<tr><th>Option<th>Default<br>value<th>Description
+
+<tr id='help'><td><code>--help</code> or <code>-h</code><td><td>
+Use this option to obtain a summary of allowed command line options.
+
+<tr id='version'><td><code>--version</code> or <code>-v</code><td><td>
+Identify the Shasta version.
+
+<tr id='config'><td><code>--config</code><td><td>
+Specifies the name of a pre-built configuration or a configuration file.
+This option has no default and is <b>mandatory</b> when running an assembly.
+<a class=qm href='Configurations.html'/>
+
+<tr id='input'><td><code>--input</code><td><td>
+Specifies the names of the input files for the assembly.
+This option is mandatory. At least one input file
+must be specified. To specify multiple input files,
+enter them separated by space after <code>--input</code>.
+<a class=qm href='Running.html#InputFiles'/>
+
+
+
+<tr id='assemblyDirectory'><td><code>--assemblyDirectory</code><td class=centered><code>ShastaRun</code><td>
+Specifies the name of the directory where assembly
+output is stored. If <code>--command</code> is <code>assemble</code> (the default), this directory must not exist and is automatically created.
+For most other commands, this directory must exist.
+See <a href='Running.html#OutputFiles'>here</a>
+for more information on the output files
+created by Shasta.
+
+
+
+<tr id='command'><td><code>--command</code><td class=centered><code>assemble</code><td>
+Specifies the Shasta command to be run. <a class=qm href='Commands.html'/>
+
+
+
+<tr id='memoryMode'><td><code>--memoryMode<br></code>(not supported on MacOS)<td class=centered><code>anonymous</code><td>
+<ul>
+<li>Can be <code>anonymous</code> or <code>filesystem</code>.
+<li>For best performance use 
+<code>--memoryMode filesystem --memoryBacking 2M</code>.
+However, using these options require root access via <code>sudo</code>.
+Depending on <code>sudo</code> setup, this may 
+result in prompting for a password.
+<li>Not supported on MacOS. On MacOS, Shasta operates as if 
+<code>--memoryMode filesystem --memoryBacking disk</code>
+was specified.
+</ul>
+<a class=qm href='Running.html#MemoryModes'/>
+
+<tr id='memoryBacking'><td><code>--memoryBacking</code><br>(not supported on MacOS)<td class=centered><code>4K</code><td>
+<ul>
+<li>Can be <code>disk</code>, <code>4K</code>,  or <code>2M</code>.
+<li>For best performance use 
+<code>--memoryMode filesystem --memoryBacking 2M</code>.
+However, using these options requires root access via <code>sudo</code>.
+Depending on <code>sudo</code> setup, this may 
+result in prompting for a password.
+<li>Not supported on MacOS. On MacOS, Shasta operates as if 
+<code>--memoryMode filesystem --memoryBacking disk</code>
+was specified.
+</ul>
+<a class=qm href='Running.html#MemoryModes'/>
+</dl>
+
+
+
+<tr id='threads'><td><code>--threads</code><td class=centered><code>0</code><td>
+Specifies the number of threads to be used, or 0
+to request one thread per virtual processor.
+
+<tr id='suppressStdoutLog'><td><code>--suppressStdoutLog</code><td class=centered><code>false</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+Normally, Shasta duplicates output to <code>stdout</code>
+by sending a copy to <code>stdout.log</code>
+in the assembly directory.
+If this option is used, this behavior is suppressed, and
+<code>stdout.log</code> is not created.
+
+
+<tr><td><code>--exploreAccess</code><td class=centered><code>user</code><td>
+Specifies access control for <code>--command explore</code>.
+<a class=qm href='InspectingResults.html#AccessControl'/>
+
+<tr><td><code>--port</code><td class=centered><code>17100</code><td>
+The TCP port to be used for <code>--command explore</code>.
+If the specified port is not available,
+Shasta will try again after incrementing the port number a few times.
+
+<tr><td><code>--alignmentsPafFile</code><td class=centered><code>""</code><td>
+The name of a PAF file containing alignments of reads to 
+a reference. Only used for <code>--command explore</code>, 
+for display of the alignment candidate graph. Experimental.
+</table>
+
+
+
+<h2>Options allowed on the command line and in a configuration file</h2> 
+
+<p>
+See <a href='Configurations.html#ConfigFile'>here</a> for the format required to
+enter these options in a configuration file. 
+
+
+
+<table style='word-break:break-word'>
+<col style='width:400px'>
+<col style='width:150px'>
+<tr><th>Option<th>Default<br>value<th>Description
+
+<tr id='Reads.representation'>
+<td><code>--Reads.representation</code><td class=centered><code>1</code><td>
+Read representation: 0 = raw sequence, 1  = Run-Length Encoded (RLE) sequence.
+Experimental. Do not use.
+
+<tr id='Reads.minReadLength'>
+<td><code>--Reads.minReadLength</code><td class=centered><code>10000</code><td>
+Read length cutoff. Reads shorter than this number of bases are discarded
+on input and not used in the assembly.
+<a class=qm href='Running.html#InputFiles'></a>   
+<a class=qm href='ComputationalMethods.html#InitialAssemblySteps'></a>
+
+<tr id='Reads.desiredCoverage'>
+<td><code>--Reads.desiredCoverage</code><td class=centered><code>0</code><td>
+Specifies a desired value for total coverage, in bases.
+If not zero, the read length cutoff specified via
+<code>--Reads.minReadLength</code> is increased to reduce coverage
+to the specified value.
+This value can be specified as a number of bases,
+or using power of 10 multipliers immediately following the numeric value.
+The powers of ten can be abbreviated as
+<code>G</code>, <code>Gb</code>, or <code>Gbp</code> for 10<sup>9</sup> bases,
+<code>M</code>, <code>Mb</code>, or <code>Mbp</code> for 10<sup>6</sup> bases,
+<code>K</code>, <code>Kb</code>, or <code>Kbp</code> for 10<sup>3</sup> bases.
+For example, a desired coverage of 120&times;10<sup>9</sup> bases
+can be requested specifying
+<code>120G</code>, <code>120Gb</code>, <code>120Gbp</code>, or <code>120000000000</code>.
+If coverage available using only reads longer than <code>Reads.minReadLength</code>
+is less than the value specified for <code>--Reads.desiredCoverage</code>,
+the assembly terminates with an error message.
+<a class=qm href='Running.html#InputFiles'></a>
+<a class=qm href='ComputationalMethods.html#InitialAssemblySteps'></a>
+
+<tr><td><code>--Reads.noCache</code><td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+If set, requests skipping the Linux cache when loading reads.
+Implemented for Linux only (uses the <a href='http://man7.org/linux/man-pages/man2/open.2.html'>O_DIRECT flag</a>).
+Can help performance, but only use it if you know you will not 
+need to access the input files again soon.
+
+
+<tr id='Reads.handleDuplicates'>
+<td><code>--Reads.handleDuplicates</code><td class=centered><code>useOneCopy</code><td>
+Specifies how to handle reads with duplicate names (the name of a read is its
+id in an input fasta or fastq file). 
+These can occasionally occur, typically due to glitches in the basecalling or subsequent
+pipelines before assembly starts.
+Can be one of the following:
+<ul>
+<li><code>useAllCopies</code>:
+All copies of reads with duplicate names are used in the assembly.
+This can cause artifacts in some cases.
+This was the Shasta behavior before this option was introduced.
+<li><code>useOneCopy</code>:
+For each set of reads with duplicate names, only one read is used in the assembly.
+This is the default.
+<li><code>useNone</code>:
+None of the reads with duplicate names are used in the assembly.
+<li><code>forbid</code>:
+If any reads with duplicate names are found, the assembly stops.
+</ul>
+In all cases, a message is written with the number of reads with duplicate names
+found, and the number of reads that were discarded for that reason. 
+A file <code>DuplicateReads.csv</code> ,
+listing details for all reads wth duplicate names, 
+is also written to the assembly directory.
+
+<tr id='Reads.palindromicReads.skipFlagging'>
+<td><code>--Reads.palindromicReads.skipFlagging</code><td class=centered><code>False</code><td>
+Skip flagging palindromic reads. Oxford Nanopore reads should be flagged for better results.
+<a class=qm href='ComputationalMethods.html#InitialAssemblySteps'></a>
+
+<tr id='Reads.palindromicReads.maxSkip'>
+<td><code>--Reads.palindromicReads.maxSkip</code><td class=centered><code>100</code><td>
+Same as Align.maxSkip but applied only to self reverse-complement alignments for the
+purpose of detecting palindromes.
+<a class=qm href='ComputationalMethods.html#InitialAssemblySteps'></a>
+
+<tr id='Reads.palindromicReads.maxMarkerFrequency'>
+<td><code>--Reads.palindromicReads.maxMarkerFrequency</code><td class=centered><code>10</code><td>
+Same as Align.maxMarkerFrequency but applied only to self reverse-complement alignments for the
+purpose of detecting palindromes.
+<a class=qm href='ComputationalMethods.html#InitialAssemblySteps'></a>
+
+<tr id='Reads.palindromicReads.alignedFractionThreshold'>
+<td><code>--Reads.palindromicReads.alignedFractionThreshold</code><td class=centered><code>0.1</code><td>
+Same as Align.maxMarkerFrequency but applied only to  self reverse-complement alignments for the
+purpose of detecting palindromes.
+<a class=qm href='ComputationalMethods.html#InitialAssemblySteps'></a>
+
+<tr id='Reads.palindromicReads.nearDiagonalFractionThreshold'>
+<td><code>--Reads.palindromicReads.nearDiagonalFractionThreshold</code><td class=centered><code>0.1</code><td>
+Count the fraction of markers within <code>deltaThreshold</code> (distance in markers)
+from the diagonal and only flag reads above this fraction as palindromic.
+<a class=qm href='ComputationalMethods.html#InitialAssemblySteps'></a>
+
+<tr id='Reads.palindromicReads.deltaThreshold'>
+<td><code>--Reads.palindromicReads.deltaThreshold</code><td class=centered><code>100</code><td>
+Used in combination with <code>nearDiagonalFraction</code>. This value defines how far from the diagonal
+markers must be to be counted towards the <code>nearDiagonalFraction</code>. Unit is in markers.
+<a class=qm href='ComputationalMethods.html#InitialAssemblySteps'></a>
+
+<tr id='Kmers.generationMethod'>
+<td><code>--Kmers.generationMethod</code><td class=centered><code>0</code><td>
+Used to select how k-mers to be used as markers are generated.
+Can be one of the following:
+<ul>
+<li>0: Random selection.
+<li>1: Random selection, excluding k-mers that are globally overenriched,
+as defined by their global frequency in input reads, and by
+the value specified as <code>--Kmers.enrichmentThreshold</code>.
+Only supported when <code>--Kmers.k</code> is less than 16.
+<li>2: Random selection, excluding k-mers that are overenriched
+even in a single read, 
+as defined by 
+the value specified as <code>--Kmers.enrichmentThreshold</code>.
+Only supported when <code>--Kmers.k</code> is less than 16.
+<li>3: Read from file. Use <code>--Kmers.file</code>
+to specify the file.
+Only supported when <code>--Kmers.k</code> is less than 16.
+<li>4: Random selection, excluding k-mers that appear 
+in two copies close to each other, even in a single read.
+The two k-mer copies are considered close if they occur at a distance from each other less than
+<code>--Kmers.distanceThreshold</code> RLE bases.
+Only supported when <code>--Kmers.k</code> is less than 16.
+</ul>
+
+<tr id='Kmers.k'>
+<td><code>--Kmers.k</code><td class=centered><code>10</code><td>
+Length of marker <i>k</i>-mers (in run-length representation).
+Can be up to 31 for Mode 0 assembly, 30 for Mode 2 assembly.
+<a class=qm href='ComputationalMethods.html#Markers'/>
+
+<tr id='Kmers.probability'>
+<td><code>--Kmers.probability</code><td class=centered><code>0.1</code><td>
+Probability that a k-mer is selected to be used as a marker.
+<a class=qm href='ComputationalMethods.html#Markers'/>
+
+<tr id='Kmers.enrichmentThreshold'>
+<td><code>--Kmers.enrichmentThreshold</code><td class=centered><code>100.</code><td>
+This controls the enrichment threshold above which k-mers
+are considered overenriched.
+Enrichment is ratio of k-mer frequency in reads to random.
+Only used if <code>--Kmers.generationMethod</code> is 1 or 2.
+
+<tr id='Kmers.distanceThreshold'>
+<td><code>--Kmers.distanceThreshold</code><td class=centered><code>1000</code><td>
+Distance threshold, in RLE bases, for <code>--Kmers.generationMethod 4</code>.
+Only used if <code>--Kmers.generationMethod</code> is 4.
+
+<tr id='Kmers.file'>
+<td><code>--Kmers.file</code><td class=centered><td>
+The absolute path of a file containing the k-mers
+to be used as markers, one per line. 
+Only used if <code>--Kmers.generationMethod</code> is 3.
+
+<tr id='MinHash.version'>
+<td><code>--MinHash.version</code><td class=centered><code>0</code><td>
+The version of the MinHash/LowHash algorithm to be used.
+Must be 0 (default).
+
+<tr id='MinHash.m'>
+<td><code>--MinHash.m</code><td class=centered><code>4</code><td>
+The number of consecutive markers that define a MinHash/LowHash feature.
+<a class=qm href='ComputationalMethods.html#FindingOverlappingReads'/>
+
+<tr id='MinHash.hashFraction'>
+<td><code>--MinHash.hashFraction</code><td class=centered><code>0.01</code><td>
+Defines how low a hash has to be to be used with the LowHash algorithm.
+<a class=qm href='ComputationalMethods.html#FindingOverlappingReads'/>
+
+<tr id='MinHash.minHashIterationCount'>
+<td><code>--MinHash.minHashIterationCount</code><td class=centered><code>10</code><td>
+The number of MinHash/LowHash iterations, or 0 to let
+--MinHash.alignmentCandidatesPerRead control the number of iterations.
+<a class=qm href='ComputationalMethods.html#FindingOverlappingReads'/>
+
+<tr id='MinHash.alignmentCandidatesPerRead'>
+<td><code>--MinHash.alignmentCandidatesPerRead</code><td class=centered><code>20</code><td>
+If <code>--MinHash.minHashIterationCount</code> is 0, 
+MinHash iteration is stopped when the average number of alignment candidates 
+that each read is involved in reaches this value. 
+If <code>--MinHash.minHashIterationCount</code> is not 0, this is not used.
+<a class=qm href='ComputationalMethods.html#FindingOverlappingReads'/>
+
+<tr id='MinHash.minBucketSize'>
+<td><code>--MinHash.minBucketSize</code><td class=centered><code>0</code><td>
+The minimum size for a bucket to be used by the MinHash/LowHash algoritm.
+If minBucketSize and maxBucketSize are both 0, they are adjusted automatically
+at each iteration using simple heuristics.
+<a class=qm href='ComputationalMethods.html#FindingOverlappingReads'/>
+
+<tr id='MinHash.maxBucketSize'>
+<td><code>--MinHash.maxBucketSize</code><td class=centered><code>10</code><td>
+The maximum size for a bucket to be used by the MinHash/LowHash algoritm.
+If minBucketSize and maxBucketSize are both 0, they are adjusted automatically
+at each iteration using simple heuristics.
+<a class=qm href='ComputationalMethods.html#FindingOverlappingReads'/>
+
+<tr id='MinHash.minFrequency'>
+<td><code>--MinHash.minFrequency</code><td class=centered><code>2</code><td>
+The minimum number of times a pair of reads must be found by the 
+MinHash/LowHash algorithm in order to be considered a candidate alignment.
+<a class=qm href='ComputationalMethods.html#FindingOverlappingReads'/>
+
+<tr id='MinHash.allPairs'>
+<td><code>--MinHash.allPairs</code><td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>
+that causes the MinHash process to be skipped. 
+Instead, all possible read pairs are marked as alignment candidates, on both 
+relative orientations. This should only be used for very small test
+assemblies as it can become prohibitively slow for large assemblies.
+
+<tr id='Align.alignMethod'>
+<td><code>--Align.alignMethod</code><td class=centered><code>3</code><td>
+The alignment method to be used to compute marker alignments between reads:
+<ul>
+<li>0 = Old Shasta alignment method. Use this to reproduce Shasta behavior before release 0.5.0.
+<li>1 = SeqAn. This gives the best alignment results but it is slow and should only be used for testing.
+<li>3 = Banded SeqAn.
+<li>4 and 5 = experimental.
+</ul>
+<a class=qm href='ComputationalMethods.html#OptimalAlignments'/>
+
+
+<tr id='Align.maxSkip'>
+<td><code>--Align.maxSkip</code><td class=centered><code>30</code><td>
+The maximum number of markers that an alignment is allowed to skip.
+<a class=qm href='ComputationalMethods.html#AlignmentMetrics'/>
+
+<tr id='Align.maxDrift'>
+<td><code>--Align.maxSkip</code><td class=centered><code>30</code><td>
+The maximum amount of marker drift that an alignment is allowed to tolerate 
+between successive markers.
+<a class=qm href='ComputationalMethods.html#AlignmentMetrics'/>
+
+<tr id='Align.maxTrim'>
+<td><code>--Align.maxTrim</code><td class=centered><code>30</code><td>
+The maximum number of skipped markers tolerated in an alignment 
+at the beginning and end of a read.
+<a class=qm href='ComputationalMethods.html#AlignmentMetrics'/>
+
+<tr id='Align.maxMarkerFrequency'>
+<td><code>--Align.maxMarkerFrequency</code><td class=centered><code>10</code><td>
+Marker frequency threshold when computing alignments.
+Markers that occur more than this number of times
+in either of the two reads to be aligned are ignored.
+<a class=qm href='ComputationalMethods.html#FindingOverlappingReads'/>
+
+<tr id='Align.minAlignedMarkerCount'>
+<td><code>--Align.minAlignedMarkerCount</code><td class=centered><code>100</code><td>
+The minimum number of aligned markers for an alignment to be used.
+<a class=qm href='ComputationalMethods.html#AlignmentMetrics'/>
+
+<tr id='Align.minAlignedFraction'>
+<td><code>--Align.minAlignedFraction</code><td class=centered><code>0</code><td>
+The minimum fraction of aligned markers for an alignment to be used.
+<a class=qm href='ComputationalMethods.html#AlignmentMetrics'/>
+
+<tr id='Align.matchScore'>
+<td><code>--Align.matchScore</code><td class=centered><code>6</code><td>
+Match score for marker alignments (only for alignment methods 1 and 3).
+
+<tr id='Align.mismatchScore'>
+<td><code>--Align.mismatchScore</code><td class=centered><code>-1</code><td>
+Mismatch score for marker alignments (only for alignment methods 1 and 3).
+<a class=qm href='ComputationalMethods.html#OptimalAlignments'/>
+
+<tr id='Align.gapScore'>
+<td><code>--Align.gapScore</code><td class=centered><code>-1</code><td>
+Gap score for marker alignments (only for alignment methods 1 and 3).
+<a class=qm href='ComputationalMethods.html#OptimalAlignments'/>
+
+<tr id='Align.downsamplingFactor'>
+<td><code>--Align.downsamplingFactor</code><td class=centered><code>0.1</code><td>
+Downsampling factor for downsampled marker alignments 
+(only for alignment method 3).
+<a class=qm href='ComputationalMethods.html#OptimalAlignments'/>
+
+<tr id='Align.bandExtend'>
+<td><code>--Align.bandExtend</code><td class=centered><code>10</code><td>
+Amount to extend the alignment band, in markers (only used for alignment method 3).
+<a class=qm href='ComputationalMethods.html#OptimalAlignments'/>
+
+<tr id='Align.maxBand'>
+<td><code>--Align.maxBand</code><td class=centered><code>1000</code><td>
+Maximum band width, in markers, 
+for banded marker alignments (only used for alignment method 3).
+<a class=qm href='ComputationalMethods.html#OptimalAlignments'/>
+
+<tr id='Align.sameChannelReadAlignment.suppressDeltaThreshold'>
+<td><code>--Align.sameChannelReadAlignment.suppressDeltaThreshold</code><td class=centered><code>0</code><td>
+If not zero, alignments between reads from the same nanopore channel
+and close in time are suppressed. The <code>read</code> meta data fields
+from the FASTA or FASTQ header are checked. If their difference, in
+absolute value, is less than the value of this option, the alignment
+is suppressed. This can help avoid assembly artifact.
+This check is only done if the two reads have identical metadata fields
+<code>runid</code>, <code>sampleid</code>, and <code>ch</code>. 
+If any of these metadata fields are missing, this check is suppressed and this
+option has no effect.
+
+<tr id='Align.suppressContainments'>
+<td><code>--Align.suppressContainments</code><td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+If set, containment alignments are suppressed.
+Containment alignments are alignments in which
+one read is entirely contained in another read,
+except possibly for up to <a href="#Align.maxTrim">maxTrim</a> markers at the beginning and end.
+
+<tr id='Align.align4.deltaX'>
+<td><code>--Align.align4.deltaX</code><td class=centered><code>200</code><td>
+Only used for alignment method 4 (experimental).
+
+<tr id='Align.align4.deltaY'>
+<td><code>--Align.align4.deltaY</code><td class=centered><code>10</code><td>
+Only used for alignment method 4 (experimental).
+
+<tr id='Align.align4.minEntryCountPerCell'>
+<td><code>--Align.align4.minEntryCountPerCell</code><td class=centered><code>10</code><td>
+Only used for alignment method 4 (experimental).
+
+<tr id='Align.align4.maxDistanceFromBoundary'>
+<td><code>--Align.align4.maxDistanceFromBoundary</code><td class=centered><code>100</code><td>
+Only used for alignment method 4 (experimental).
+
+<tr id='Align.align5.driftRateTolerance'>
+<td><code>--Align.align5.driftRateTolerance</code><td class=centered><code>0.02</code><td>
+Maximum allowed drift rate for alignment method 5.
+
+<tr id='Align.align5.minBandExtend'>
+<td><code>--Align.align5.minBandExtend</code><td class=centered><code>10</code><td>
+Minimum band extension, in markers, for alignment method 5.
+
+<tr id='ReadGraph.creationMethod'>
+<td><code>--ReadGraph.creationMethod</code><td class=centered><code>0</code><td>
+The method used to create the read graph (0 or 2).
+<a class=qm href='ComputationalMethods.html#ReadGraph'/>
+
+<tr id='ReadGraph.maxAlignmentCount'>
+<td><code>--ReadGraph.maxAlignmentCount</code><td class=centered><code>6</code><td>
+The maximum alignments to be kept in the read graph for each read.
+<a class=qm href='ComputationalMethods.html#ReadGraph'/>
+
+<tr id='ReadGraph.preferAlignedFraction'>
+<td><code>--ReadGraph.preferAlignedFraction</code><td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+Prefer alignments with a higher aligned fraction, rather than higher number of aligned markers.
+
+<tr id='ReadGraph.maxChimericReadDistance'>
+<td><code>--ReadGraph.maxChimericReadDistance</code><td class=centered><code>2</code><td>
+Used for chimeric read detection.
+<a class=qm href='ComputationalMethods.html#ReadGraph'/>
+
+<tr id='ReadGraph.strandSeparationMethod'>
+<td><code>--ReadGraph.strandSeparationMethod</code><td class=centered><code>1</code><td>
+Strand separation method. Spwecify one of the following values:
+<ul>
+<li>0 = No strand separation.
+<li>1 = Limited strand separation (default).
+<li>2 = Strict strand separation.
+</ul>        
+
+<tr id='ReadGraph.crossStrandMaxDistance'>
+<td><code>--ReadGraph.crossStrandMaxDistance</code><td class=centered><code>False</code><td>
+Maximum distance (edges) for strand separation method 1.
+
+
+<tr id='ReadGraph.removeConflicts'>
+<td><code>--ReadGraph.removeConflicts</code><td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+Remove conflicts from the read graph. Experimental - do not use.
+
+
+
+<tr id='ReadGraph.markerCountPercentile'>
+<td><code>--ReadGraph.markerCountPercentile</code>
+<td class=centered><code>0.015</code><td>
+Percentile for adaptive selection of <code>--ReadGraph. markerCount</code> 
+(only used when <code>--ReadGraph.creationMethod</code> is 2).
+
+<tr id='ReadGraph.alignedFractionPercentile'>
+<td><code>--ReadGraph.alignedFractionPercentile</code>
+<td class=centered><code>0.12</code><td>
+Percentile for adaptive selection of <code>--ReadGraph.alignedFraction</code> 
+(only used when <code>--ReadGraph.creationMethod</code> is 2).
+
+<tr id='ReadGraph.maxSkipPercentile'>
+<td><code>--ReadGraph.maxSkipPercentile</code>
+<td class=centered><code>0.12</code><td>
+Percentile for adaptive selection of <code>--ReadGraph.maxSkip</code> 
+(only used when <code>--ReadGraph.creationMethod</code> is 2).
+
+<tr id='ReadGraph.maxDriftPercentile'>
+<td><code>--ReadGraph.maxDriftPercentile</code>
+<td class=centered><code>0.12</code><td>
+Percentile for adaptive selection of <code>--ReadGraph.maxDrift</code> 
+(only used when <code>--ReadGraph.creationMethod</code> is 2).
+
+<tr id='ReadGraph.maxTrimPercentile'>
+<td><code>--ReadGraph.maxTrimPercentile</code>
+<td class=centered><code>0.015</code><td>
+Percentile for adaptive selection of <code>--ReadGraph.maxTrim</code> 
+(only used when <code>--ReadGraph.creationMethod</code> is 2).
+
+
+
+<tr id='ReadGraph.flagInconsistentAlignments'>
+<td><code>--ReadGraph.flagInconsistentAlignments</code><td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+Flag inconsistent alignments. Experimental.
+
+<tr id='ReadGraph.flagInconsistentAlignments.triangleErrorThreshold'>
+<td><code>--ReadGraph.flagInconsistentAlignments.triangleErrorThreshold</code><td class=centered><code>200</code><td>
+Triangle error threshold, in markers, for flagging inconsistent alignments. 
+Only used if <code>--ReadGraph.flagInconsistentAlignments</code> is set. Experimental.
+
+<tr id='ReadGraph.flagInconsistentAlignments.leastSquareErrorThreshold'>
+<td><code>--ReadGraph.flagInconsistentAlignments.leastSquareErrorThreshold</code><td class=centered><code>200</code><td>
+Least square error threshold, in markers, for flagging inconsistent alignments. 
+Only used if <code>--ReadGraph.flagInconsistentAlignments</code> is set. Experimental.
+
+<tr id='ReadGraph.flagInconsistentAlignments.leastSquareMaxDistance'>
+<td><code>--ReadGraph.flagInconsistentAlignments.leastSquareMaxDistance</code><td class=centered><code>1</code><td>
+Least square max distance for flagging inconsistent alignments. 
+Only used if <code>--ReadGraph.flagInconsistentAlignments</code> is set. Experimental.
+
+<tr id='MarkerGraph.minCoverage'>
+<td><code>--MarkerGraph.minCoverage</code><td class=centered><code>10</code><td>
+The minimum coverage for a marker graph vertex.
+Vertices with lower coverage are not generated.
+Specifying 0 causes a suitable value of this parameter
+to be selected automatically.
+<a class=qm href='ComputationalMethods.html#MarkerGraph'/>
+
+<tr id='MarkerGraph.maxCoverage'>
+<td><code>--MarkerGraph.maxCoverage</code><td class=centered><code>100</code><td>
+The maximum coverage for a marker graph vertex.
+Vertices with higher coverage are not generated.
+<a class=qm href='ComputationalMethods.html#MarkerGraph'/>
+
+<tr id='MarkerGraph.minCoveragePerStrand'>
+<td><code>--MarkerGraph.minCoveragePerStrand</code><td class=centered><code>0</code><td>
+The minimum coverage per strand for a marker graph vertex.
+Vertices with lower coverage on either strand are not generated.
+
+<tr id='MarkerGraph.minEdgeCoverage'>
+<td><code>--MarkerGraph.minEdgeCoverage</code><td class=centered><code>6</code><td>
+Minimum edge coverage (number of supporting oriented reads)
+for a marker graph edge to be created.
+Only used with <code>--Assembly.mode 2</code>.
+
+<tr id='MarkerGraph.minEdgeCoveragePerStrand'>
+<td><code>--MarkerGraph.minEdgeCoveragePerStrand</code><td class=centered><code>2</code><td>
+Minimum edge coverage (number of supporting oriented reads)
+on each strand for a marker graph edge to be created.
+Experimental. Only used with <code>--Assembly.mode 2</code>.
+
+<tr id='MarkerGraph.allowDuplicateMarkers'>
+<td><code>--MarkerGraph.allowDuplicateMarkers</code><td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+It specifies whether to allow more than one marker on the
+same oriented read on a single marker graph vertex. Experimental.
+
+<tr id='MarkerGraph.cleanupDuplicateMarkers'>
+<td><code>--MarkerGraph.cleanupDuplicateMarkers</code><td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+It specifies whether to clean up marker graph vertices with 
+more than one marker on the same oriented read. Experimental.
+
+<tr id='MarkerGraph.duplicateMarkersPattern1Threshold'>
+<td><code>--MarkerGraph.duplicateMarkersPattern1Threshold</code><td class=centered><code>0.5</code><td>
+Used when cleaning up marker graph vertices with 
+more than one marker on the same oriented read. Experimental.
+
+<tr id='MarkerGraph.lowCoverageThreshold'>
+<td><code>--MarkerGraph.lowCoverageThreshold</code><td class=centered><code>0</code><td>
+Used during approximate transitive reduction.
+Edges with coverage less than or equal to this value
+are unconditionally removed from the marker graph,
+even at the cost of breaking reachability.
+This never happens with the default value 0.
+<a class=qm href='ComputationalMethods.html#TransitiveReduction'/>
+
+<tr id='MarkerGraph.highCoverageThreshold'>
+<td><code>--MarkerGraph.highCoverageThreshold</code><td class=centered><code>256</code><td>
+Used during approximate transitive reduction.
+Edges with coverage greater than or equal to this value
+are unconditionally kept in the marker graph,
+even if they could be removed without breaking reachability.
+This never happens with the default value 256,
+because marker graph edge coverage is stored in one byte and
+saturates at 255.
+<a class=qm href='ComputationalMethods.html#TransitiveReduction'/>
+
+<tr id='MarkerGraph.maxDistance'>
+<td><code>--MarkerGraph.maxDistance</code><td class=centered><code>30</code><td>
+Used during approximate transitive reduction of the marker graph.
+It controls the length of each Breadth First Search (BFS)
+used to determine reachability. 
+This length is expressed in marker graph edges.
+<a class=qm href='ComputationalMethods.html#TransitiveReduction'/>
+
+<tr id='MarkerGraph.edgeMarkerSkipThreshold'>
+<td><code>--MarkerGraph.edgeMarkerSkipThreshold</code><td class=centered><code>100</code><td>
+Used during approximate transitive reduction of the marker graph.
+Edges with coverage 1 are unconditionally removed from the marker graph
+if the only supporting read has a marker skip 
+of more than  this number of markers on that edge.
+Large marker skips are indicative of artifacts or errors.
+<a class=qm href='ComputationalMethods.html#TransitiveReduction'/>
+                                        
+<tr id='MarkerGraph.pruneIterationCount'>
+<td><code>--MarkerGraph.pruneIterationCount</code><td class=centered><code>6</code><td>
+The number of marker graph prune iterations.
+This equals the maximum length of dead branches that are removed.
+<a class=qm href='ComputationalMethods.html#Pruning'/>
+
+<tr id='MarkerGraph.simplifyMaxLength'>
+<td><code>--MarkerGraph.simplifyMaxLength</code><td class=centered><code>10,100,1000</code><td>
+Used for bubble removal.
+<a class=qm href='ComputationalMethods.html#BubbleRemoval'/>
+
+<tr id='MarkerGraph.crossEdgeCoverageThreshold'>
+<td><code>--MarkerGraph.crossEdgeCoverageThreshold</code><td class=centered><code>0.</code><td>
+Experimental. Cross edge coverage threshold. 
+If this is not zero, assembly graph cross-edges 
+with average edge coverage less than this value are removed, together with the
+corresponding marker graph edges. A cross edge is defined as an edge v0->v1 
+with out-degree(v0)>1, in-degree(v1)>1.
+
+<tr id='MarkerGraph.peakFinder.minAreaFraction'>
+<td><code>--MarkerGraph.peakFinder.minAreaFraction</code><td class=centered><code>0.08</code><td>
+Used in the automatic selection of 
+<code>--MarkerGraph.minCoverage</code> when <code>--MarkerGraph.minCoverage</code> is set to 0.
+
+<tr id='MarkerGraph.peakFinder.areaStartIndex'>
+<td><code>--MarkerGraph.peakFinder.areaStartIndex</code><td class=centered><code>2</code><td>
+Used in the automatic selection of 
+<code>--MarkerGraph.minCoverage</code> when <code>--MarkerGraph.minCoverage</code> is set to 0.
+
+<tr id='MarkerGraph.secondaryEdges.maxSkip'>
+<td><code>--MarkerGraph.secondaryEdges.maxSkip</code><td class=centered><code>1000000</code><td>
+Maximum number of markers skipped by a secondary edge (mode 2 assembly only).
+
+<tr id='MarkerGraph.secondaryEdges.split.errorRateThreshold'>
+<td><code>--MarkerGraph.secondaryEdges.split.errorRateThreshold</code><td class=centered><code>0.25</code><td>
+Error rate threshold used for splitting secondary edges (mode 2 assembly only).
+
+<tr id='MarkerGraph.secondaryEdges.split.minCoverage'>
+<td><code>--MarkerGraph.secondaryEdges.split.minCoverage</code><td class=centered><code>4</code><td>
+Minimum coverage for secondary edges generated during splitting (mode 2 assembly only).
+
+<tr id='Assembly.mode'>
+<td><code>--Assembly.mode</code>
+<td class=centered><code>0</code><td>
+Assembly mode (0 = haploid assembly, 2 = phased diploid assembly).
+
+<tr id='Assembly.markerGraphEdgeLengthThresholdForConsensus'>
+<td><code>--Assembly.markerGraphEdgeLengthThresholdForConsensus</code>
+<td class=centered><code>0</code><td>
+Controls assembly of long marker graph edges.
+
+<tr id='Assembly.consensusCaller'>
+<td><code>--Assembly.consensusCaller</code>
+<td class=centered><code>Modal</code><td>
+Used to select the consensus caller for repeat counts. <a class=qm href='ComputationalMethods.html#RepeatCounts'/>
+
+<tr id='Assembly.storeCoverageData'>
+<td><code>--Assembly.storeCoverageData</code><td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>
+used to request storing of coverage data (only useful in conjunction with <code>--memoryMode filesystem</code>).
+
+<tr id='Assembly.writeReadsByAssembledSegment'>
+<td><code>--Assembly.writeReadsByAssembledSegment</code><td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>
+used to request writing a csv file containing all the reads that were used
+to assemble each segment).
+
+<tr id='Assembly.pruneLength'>
+<td><code>--Assembly.pruneLength</code><td class=centered><code>0</code><td>
+Prune length (in markers) for pruning of the assembly graph. 
+Assembly graph leaves shorter than this number of markers are iteratively pruned.
+Set to zero to suppress pruning of the assembly graph. 
+Assembly graph pruning takes place separately and in addition to marker graph pruning.
+
+<tr id='Assembly.detangleMethod'>
+<td><code>--Assembly.detangleMethod</code><td class=centered><code>0</code><td>
+ Method used to detangle the assembly graph. Valid values:
+<ul>
+<li>0 = no detangling.
+<li>1 = strict detangling.
+<li>2 = less strict detangling, controlled by 
+<code>Assembly.detangle.* options</code>.
+</ul>
+<a class=qm href='ComputationalMethods.html#Detangle'/>
+
+<tr id='Assembly.detangle.diagonalReadCountMin'>
+<td><code>--Assembly.detangle.diagonalReadCountMin</code><td class=centered><code>1</code><td>
+Experimental. Minimum number of reads on detangle matrix diagonal elements required for detangling. Only used with
+<code>--Assembly.detangleMethod 2</code>.
+<a class=qm href='ComputationalMethods.html#Detangle'/>
+
+<tr id='Assembly.detangle.offDiagonalReadCountMax'>
+<td><code>--Assembly.detangle.offDiagonalReadCountMax</code><td class=centered><code>2</code><td>
+Experimental. Maximum number of reads on detangle matrix off-diagonal elements allowed for detangling. Only used with
+<code>--Assembly.detangleMethod 2</code>.
+<a class=qm href='ComputationalMethods.html#Detangle'/>
+
+<tr id='Assembly.detangle.offDiagonalRatio'>
+<td><code>--Assembly.detangle.offDiagonalRatio</code><td class=centered><code>0.3</code><td>
+Experimental. Maximum ratio of total off-diagonal elements over diagonal element allowed for detangling. Only used with
+<code>--Assembly.detangleMethod 2</code>.
+<a class=qm href='ComputationalMethods.html#Detangle'/>
+
+<tr id='Assembly.iterative'>
+<td><code>--Assembly.iterative</code><td class=centered><code>False</code><td>
+This is a
+<a href="#BooleanSwitches">Boolean switch</a>
+used to request iterative assembly (experimental).
+<a class=qm href='ComputationalMethods.html#IterativeAssembly'/>
+
+<tr id='Assembly.iterative.iterationCount'>
+<td><code>--Assembly.iterative.iterationCount</code><td class=centered><code>3</code><td>
+Number of iterations for iterative assembly (experimental).
+<a class=qm href='ComputationalMethods.html#IterativeAssembly'/>
+
+<tr id='Assembly.iterative.pseudoPathAlignMatchScore'>
+<td><code>--Assembly.iterative.pseudoPathAlignMatchScore</code><td class=centered><code>1</code><td>
+Pseudopath alignment match score for iterative assembly (experimental).
+<a class=qm href='ComputationalMethods.html#IterativeAssembly'/>
+
+<tr id='Assembly.iterative.pseudoPathAlignMismatchScore'>
+<td><code>--Assembly.iterative.pseudoPathAlignMismatchScore</code><td class=centered><code>-1</code><td>
+Pseudopath alignment mismatch score for iterative assembly (experimental).
+<a class=qm href='ComputationalMethods.html#IterativeAssembly'/>
+
+<tr id='Assembly.iterative.pseudoPathAlignGapScore'>
+<td><code>--Assembly.iterative.pseudoPathAlignGapScore</code><td class=centered><code>-1</code><td>
+Pseudopath alignment gap score for iterative assembly (experimental).
+<a class=qm href='ComputationalMethods.html#IterativeAssembly'/>
+
+<tr id='Assembly.iterative.mismatchSquareFactor'>
+<td><code>--Assembly.iterative.mismatchSquareFactor</code><td class=centered><code>3.</code><td>
+Mismatch square factor for iterative assembly (experimental).
+<a class=qm href='ComputationalMethods.html#IterativeAssembly'/>
+
+<tr id='Assembly.iterative.minScore'>
+<td><code>--Assembly.iterative.minScore</code><td class=centered><code>0.</code><td>
+Minimum pseudo-alignment score for iterative assembly (experimental).
+<a class=qm href='ComputationalMethods.html#IterativeAssembly'/>
+
+<tr id='Assembly.iterative.maxAlignmentCount'>
+<td><code>--Assembly.iterative.maxAlignmentCount</code><td class=centered><code>6</code><td>
+Maximum number of read graph neighbors for iterative assembly (experimental).
+
+<tr id='Assembly.iterative.bridgeRemovalIterationCount'>
+<td><code>--Assembly.iterative.bridgeRemovalIterationCount</code><td class=centered><code>3</code><td>
+Number of read graph bridge removal iterations for iterative assembly
+(experimental).
+<a class=qm href='ComputationalMethods.html#IterativeAssembly'/>
+
+<tr id='Assembly.iterative.bridgeRemovalMaxDistance'>
+<td><code>--Assembly.iterative.bridgeRemovalMaxDistance</code><td class=centered><code>2</code><td>
+Maximum distance for read graph bridge removal for iterative assembly
+(experimental).
+<a class=qm href='ComputationalMethods.html#IterativeAssembly'/>
+
+<tr id='Assembly.mode2.strongBranchThreshold'>
+<td><code>--Assembly.mode2.strongBranchThreshold</code>
+<td class=centered><code>2</code><td>
+Minimum number of supporting reads required for a strong branch. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.epsilon'>
+<td><code>--Assembly.mode2.epsilon</code>
+<td class=centered><code>0.1</code><td>
+Epsilon for the Bayesian model used for phasing and bubble removal.
+This is the probability that a read appears on the wrong branch 
+of a diploid bubble. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.bubbleRemoval.minConcordantReadCount'>
+<td><code>--Assembly.mode2.bubbleRemoval.minConcordantReadCount</code>
+<td class=centered><code>3</code><td>
+Minimum number of concordant reads for bubble removal. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.bubbleRemoval.maxDiscordantReadCount'>
+<td><code>--Assembly.mode2.bubbleRemoval.maxDiscordantReadCount</code>
+<td class=centered><code>6</code><td>
+Maximum number of discordant reads for bubble removal. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.bubbleRemoval.minLogP'>
+<td><code>--Assembly.mode2.bubbleRemoval.minLogP</code>
+<td class=centered><code>30</code><td>
+Minimum log(P) (in decibels) for bubble removal. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.bubbleRemoval.componentSizeThreshold'>
+<td><code>--Assembly.mode2.bubbleRemoval.componentSizeThreshold</code>
+<td class=centered><code>10</code><td>
+Component size threshold for bubble removal. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.phasing.minConcordantReadCount'>
+<td><code>--Assembly.mode2.phasing.minConcordantReadCount</code>
+<td class=centered><code>2</code><td>
+Minimum number of concordant reads for phasing. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.phasing.maxDiscordantReadCount'>
+<td><code>--Assembly.mode2.phasing.maxDiscordantReadCount</code>
+<td class=centered><code>1</code><td>
+Maximum number of discordant reads for phasing. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.phasing.minLogP'>
+<td><code>--Assembly.mode2.phasing.minLogP</code><td class=centered><code>10</code><td>
+Minimum log(P) (in decibels) for phasing. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.superbubble.maxSize'>
+<td><code>--Assembly.mode2.superbubble.maxSize</code>
+<td class=centered><code>50</code><td>
+Maximum size (number of edges) of a superbubble to be processed. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.superbubble.maxChunkSize'>
+<td><code>--Assembly.mode2.superbubble.maxChunkSize</code>
+<td class=centered><code>20</code><td>
+Maximum size (number of edges) of a superbubble chunk to be processed. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.superbubble.edgeLengthThreshold'>
+<td><code>--Assembly.mode2.superbubble.edgeLengthThreshold</code>
+<td class=centered><code>6</code><td>
+Edge length threshold in markers for superbubble removal. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.suppressGfaOutput'>
+<td><code>--Assembly.mode2.suppressGfaOutput</code>
+<td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+If set, all GFA output is suppressed. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.suppressFastaOutput'>
+<td><code>--Assembly.mode2.suppressFastaOutput</code>
+<td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+If set, all FASTA output is suppressed. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.suppressDetailedOutput'>
+<td><code>--Assembly.mode2.suppressDetailedOutput</code>
+<td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+If set, output of the detailed representation 
+of the assembly is suppressed. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode2.suppressPhasedOutput'>
+<td><code>--Assembly.mode2.suppressPhasedOutput</code>
+<td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+If set, output of the phased representation of the assembly is suppressed. Mode 2 assembly only.
+
+<tr id='Assembly.mode2.suppressHaploidOutput'>
+<td><code>--Assembly.mode2.suppressHaploidOutput</code>
+<td class=centered><code>False</code><td>
+This is a 
+<a href="#BooleanSwitches">Boolean switch</a>.
+If set, output of the haploid representation of the assembly is suppressed. Mode 2 assembly only.
+<a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
+
+<tr id='Assembly.mode3.minPrimaryCoverage'>
+<td><code>--Assembly.mode3.minPrimaryCoverage</code><td class=centered><code>0</code><td>
+Minimum primary coverage.
+If <code>minPrimaryCoverage</code> and <code>maxPrimaryCoverage</code> are both 0, 
+they are set automatically to appropriate values using a simple heuristic.
+Only used with <code>--Assembly.mode 3</code>.
+
+<tr id='Assembly.mode3.maxPrimaryCoverage'>
+<td><code>--Assembly.mode3.maxPrimaryCoverage</code><td class=centered><code>0</code><td>
+Maximum primary coverage.
+If <code>minPrimaryCoverage</code> and <code>maxPrimaryCoverage</code> are both 0, 
+they are set automatically to appropriate values using a simple heuristic.
+Only used with <code>--Assembly.mode 3</code>.
+
+<tr id='Assembly.mode3.primaryGraph.maxLoss'>
+<td><code>--Assembly.mode3.primaryGraph.maxLoss</code>
+<td class=centered><code>0.1</code><td>
+Used for weak edge removal in the primary graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.primaryGraph.crossEdgesLowCoverageThreshold'>
+<td><code>--Assembly.mode3.primaryGraph.crossEdgesLowCoverageThreshold</code>
+<td class=centered><code>1</code><td>
+Low coverage threshold for cross edge removal in the primary graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.primaryGraph.crossEdgesHighCoverageThreshold'>
+<td><code>--Assembly.mode3.primaryGraph.crossEdgesHighCoverageThreshold</code>
+<td class=centered><code>3</code><td>
+High coverage threshold for cross edge removal in the primary graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.detangleToleranceLow'>
+<td><code>--Assembly.mode3.assemblyGraph.detangleToleranceLow</code>
+<td class=centered><code>0</code><td>
+Used for detangling of the assembly graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.detangleToleranceHigh'>
+<td><code>--Assembly.mode3.assemblyGraph.detangleToleranceHigh</code>
+<td class=centered><code>2</code><td>
+Used for detangling of the assembly graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.epsilon'>
+<td><code>--Assembly.mode3.assemblyGraph.epsilon</code>
+<td class=centered><code>0.1</code><td>
+&epsilon; value for the Bayesian model used for detangling the assembly graph. 
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.minLogP'>
+<td><code>--Assembly.mode3.assemblyGraph.minLogP</code>
+<td class=centered><code>20</code><td>
+<code>MinLogP</code> value (in dB) for the Bayesian model used for detangling the assembly graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.longBubbleThreshold'>
+<td><code>--Assembly.mode3.assemblyGraph.longBubbleThreshold</code>
+<td class=centered><code>5000</code><td>
+Long bubble threshold . 
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.phaseErrorThreshold'>
+<td><code>--Assembly.mode3.assemblyGraph.phaseErrorThreshold</code>
+<td class=centered><code>0.1</code><td>
+Phase error threshold for phasing.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.bubbleErrorThreshold'>
+<td><code>--Assembly.mode3.assemblyGraph.bubbleErrorThreshold</code>
+<td class=centered><code>0.03</code><td>
+Bubble error threshold for bubble cleanup.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.bubbleCleanupMaxOffset'>
+<td><code>--Assembly.mode3.assemblyGraph.bubbleCleanupMaxOffset</code>
+<td class=centered><code>1000</code><td>
+Maximum bubble offset for bubble cleanup.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.chainTerminalCommonThreshold'>
+<td><code>--Assembly.mode3.assemblyGraph.chainTerminalCommonThreshold</code>
+<td class=centered><code>3</code><td>
+Used for bubble cleanup.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.superbubbleLengthThreshold1'>
+<td><code>--Assembly.mode3.assemblyGraph.superbubbleLengthThreshold1</code>
+<td class=centered><code>30000</code><td>
+Length threshold used for superbubble cleanup.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.superbubbleLengthThreshold2'>
+<td><code>--Assembly.mode3.assemblyGraph.superbubbleLengthThreshold2</code>
+<td class=centered><code>10000</code><td>
+Low length threshold used for superbubble removal.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.superbubbleLengthThreshold3'>
+<td><code>--Assembly.mode3.assemblyGraph.superbubbleLengthThreshold3</code>
+<td class=centered><code>30000</code><td>
+High length threshold used for superbubble removal.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.superbubbleLengthThreshold4'>
+<td><code>--Assembly.mode3.assemblyGraph.superbubbleLengthThreshold4</code>
+<td class=centered><code>30000</code><td>
+Length threshold used for superbubble detangling.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.pruneLength'>
+<td><code>--Assembly.mode3.assemblyGraph.pruneLength</code>
+<td class=centered><code>100000</code><td>
+Length threshold used for pruning of the assembly graph.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.estimatedOffsetRatio'>
+<td><code>--Assembly.mode3.localAssembly.estimatedOffsetRatio</code>
+<td class=centered><code>1.1</code><td>
+For local assembly, the estimated offset between the left and right gets
+extended by this ratio to decide how much to extend reads that only appear on one side only.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.vertexSamplingRate'>
+<td><code>--Assembly.mode3.localAssembly.vertexSamplingRate</code>
+<td class=centered><code>0.8</code><td>
+Vertex sampling rate for local assembly, used to set minVertexCoverage.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.matchScore'>
+<td><code>--Assembly.mode3.localAssembly.matchScore</code>
+<td class=centered><code>6</code><td>
+Match score for alignment computation in local assembly.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.mismatchScore'>
+<td><code>--Assembly.mode3.localAssembly.mismatchScore</code>
+<td class=centered><code>-1</code><td>
+Mismatch score for alignment computation in local assembly.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.gapScore'>
+<td><code>--Assembly.mode3.localAssembly.gapScore</code>
+<td class=centered><code>-1</code><td>
+Gap score for alignment computation in local assembly.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.maxSkipBases'>
+<td><code>--Assembly.mode3.localAssembly.maxSkipBases</code>
+<td class=centered><code>500</code><td>
+Number of bases (not markers) that can be skipped by an alignment in local assembly.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.maxDrift'>
+<td><code>--Assembly.mode3.localAssembly.maxDrift</code>
+<td class=centered><code>0.005</code><td>
+The maximum tolerated length drift of each read. 
+Used to compute the band for banded alignments in local assembly. 
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.minHalfBand'>
+<td><code>--Assembly.mode3.localAssembly.minHalfBand</code>
+<td class=centered><code>100</code><td>
+Minimum half band, in markers, for alignment computations in local assembly.
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.minScoreRatio'>
+<td><code>--Assembly.mode3.localAssembly.minScoreRatio</code>
+<td class=centered><code>0.7</code><td>
+Score threshold for discarding alignments in for local assembly. 
+Mode 3 assembly only.
+
+<tr id='Assembly.mode3.localAssembly.maxMsaLength'>
+<td><code>--Assembly.mode3.localAssembly.maxMsaLength</code>
+<td class=centered><code>5000</code><td>
+Maximum allowed length of a multiple sequence alignment computation for local assembly.
+Mode 3 assembly only.
+
+</table>
+
+
+<div class="goto-index"><a href="index.html">Table of contents</a></div>
+
+</main>
+</body>
+</html>

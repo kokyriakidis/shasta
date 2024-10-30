@@ -1,0 +1,1 @@
+/usr/bin/c++ -static CMakeFiles/shastaStaticExecutable.dir/__/srcMain/main.cpp.o -o shasta  ../staticLibrary/shasta.a -latomic -lboost_system -lboost_program_options -lboost_chrono -lboost_serialization -lspoa -lpng -lz -llapack -lblas -lgfortran -lquadmath -Wl,--whole-archive -lpthread -Wl,--no-whole-archive 

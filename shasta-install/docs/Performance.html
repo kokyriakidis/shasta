@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<link rel=stylesheet href=style.css />
+<link rel=icon href=CZI-new-logo.png />
+</head>
+
+<body>
+<main>
+<div class="goto-index"><a href="index.html">Table of contents</a></div>
+<h1>Maximizing assembly performance</h1>
+
+<p>
+Use the following tips to obtain the best performance
+from the Shasta assembler.
+
+<ul>
+
+<li>
+If you are using the Shasta executable (the simplest and recommended option), 
+use the following options to allocate memory
+on 2MB huge pages mapped to the <code>hugetlbfs</code> filesystem.
+However, this requires root privilege to be obtained via <code>sudo</code>.
+Depending on your <code>sudo</code> set up, this may ask for your password,
+or fail.
+<pre>--memoryMode filesystem --memoryBacking 2M</pre>
+
+<li>
+Don't use macOS or Windows. Use a 64-bit Linux system instead. 
+The Shasta executable runs on most current 64-bit Linux distributions
+and requires no set up or installation.
+
+</ul>
+
+<div class="goto-index"><a href="index.html">Table of contents</a></div>
+</main>
+</body>
+</html>
+
