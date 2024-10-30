@@ -302,14 +302,19 @@ public:
         bool assembleSequence,
         bool debug);
 
-private:
+    // Constructor from binary data, for postprocessing.
+    // Uxsed by AssemblyGraphPostprocessor in the http server.
+    AssemblyGraph(
+        const string& assemblyStage,
+        uint64_t componentId,
+        const Anchors&,
+        const Mode3AssemblyOptions&);
 
     // Hide Base defined by the base class.
     using Base = shasta::Base;
 
     // Information stored by the constructor.
     uint64_t componentId;
-public:
     const Anchors& anchors;
     uint64_t k;
     const Mode3AssemblyOptions& options;
@@ -328,6 +333,8 @@ public:
 
     // Get the index of a AnchorId in the anchorIds vector.
     uint64_t getAnchorIndex(AnchorId) const;
+
+    bool sequenceWasAssembled = false;
 
 private:
     // void computeJourneys(bool debug);
@@ -780,6 +787,7 @@ private:
         uint64_t threadCount);
     // This clears the shouldBeAssembled flag from all Chains.
     void clearAllShouldBeAssembledFlags();
+    void cleanupSequence();
 
     void assembleChainsMultithreadedTheadFunction(uint64_t threadId);
     void combineStepSequences(Chain&);
@@ -915,16 +923,27 @@ private:
         uint64_t pruneLength
         );
 
+
+
     // Serialization.
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive& ar, unsigned int /* version */)
     {
         ar & boost::serialization::base_object<AssemblyGraphBaseClass>(*this);
         ar & componentId;
+        ar & k;
+        ar & sequenceWasAssembled;
         ar & nextEdgeId;
+        ar & anchorIds;
+        ar & orientedReadIds;
     }
     void save(ostream&) const;
     void load(istream&);
+
+    // These do save/load to/from mapped memory.
+    // The file name is AssemblyGraph-Stage-ComponentId.
+    void save(const string& stage) const;
+    void load(const string& stage, uint64_t componentId);
 
 };
 

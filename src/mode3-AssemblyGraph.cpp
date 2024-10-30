@@ -72,6 +72,23 @@ AssemblyGraph::AssemblyGraph(
 
 
 
+// Create from binary data
+AssemblyGraph::AssemblyGraph(
+    const string& assemblyStage,
+    uint64_t componentIdArgument,
+    const Anchors& anchors,
+    const Mode3AssemblyOptions& options) :
+    MultithreadedObject<AssemblyGraph>(*this),
+    MappedMemoryOwner(anchors),
+    anchors(anchors),
+    options(options)
+{
+    load(assemblyStage, componentIdArgument);
+    SHASTA_ASSERT(componentId == componentIdArgument);
+}
+
+
+
 void AssemblyGraph::run(
     uint64_t threadCount,
     bool assembleSequence,
@@ -212,7 +229,11 @@ void AssemblyGraph::run(
             threadCount);
         writeAssemblyDetails();
 
-        if(debug) write("I", true);
+        if(debug) {
+            write("Final", true);
+        } else {
+            save("Final");
+        }
 
     } else {
 
@@ -614,6 +635,8 @@ void AssemblyGraph::write(const string& name, bool writeSequence) const
     if(writeSequence) {
         writeFastaExpanded(name);
     }
+
+    save(name);
 }
 
 
@@ -6625,6 +6648,7 @@ void AssemblyGraph::assembleAllChainsMultithreaded(
     }
 
     assembleChainsMultithreaded(chainTerminalCommonThreshold, threadCount);
+    sequenceWasAssembled = true;
 }
 
 
@@ -6646,6 +6670,31 @@ void AssemblyGraph::clearAllShouldBeAssembledFlags()
             for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
                 Chain& chain = bubble[indexInBubble];
                 chain.shouldBeAssembled = false;
+            }
+        }
+    }
+
+}
+
+
+
+void AssemblyGraph::cleanupSequence()
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // Loop over all bubble chains.
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        BubbleChain& bubbleChain = assemblyGraph[e];
+
+        // Loop over Bubbles in this BubbleChain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+            // Loop over Chains in this Bubble.
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                Chain& chain = bubble[indexInBubble];
+                chain.sequence.clear();
+                chain.sequence.shrink_to_fit();
             }
         }
     }
@@ -7650,6 +7699,7 @@ uint64_t AssemblyGraph::cleanupBubbles(
     BGL_FORALL_EDGES(ce, graph, AssemblyGraph) {
         removedCount += cleanupBubbles(debug, ce, maxOffset, chainTerminalCommonThreshold);
     }
+    cleanupSequence();
 
     performanceLog << timestamp << "AssemblyGraph::cleanupBubbles ends." << endl;
     return removedCount;
@@ -7814,4 +7864,58 @@ void AssemblyGraph::load(istream& s)
 {
     boost::archive::binary_iarchive archive(s);
     archive >> *this;
+}
+
+
+
+void AssemblyGraph::save(const string& stage) const
+{
+    // If not using persistent binary data, do nothing.
+    if(largeDataFileNamePrefix.empty()) {
+        return;
+    }
+
+    // First save to a string.
+    std::ostringstream s;
+    save(s);
+    const string dataString = s.str();
+
+    // Now save the string to binary data.
+    const string name = largeDataName("AssemblyGraph-" + stage + "-" + to_string(componentId));
+    MemoryMapped::Vector<char> data;
+    data.createNew(name, largeDataPageSize);
+    data.resize(dataString.size());
+    const char* begin = dataString.data();
+    const char* end = begin + dataString.size();
+    copy(begin, end, data.begin());
+}
+
+
+
+void AssemblyGraph::load(const string& assemblyStage, uint64_t componentIdArgument)
+{
+    // Access the binary data.
+    MemoryMapped::Vector<char> data;
+    try {
+        const string name = largeDataName("AssemblyGraph-" + assemblyStage + "-" + to_string(componentIdArgument));
+        data.accessExistingReadOnly(name);
+    } catch (std::exception&) {
+        throw runtime_error("Assembly graph at stage " + assemblyStage +
+            " for component " + to_string(componentIdArgument) +
+            " is not available.");
+    }
+    const string dataString(data.begin(), data.size());
+
+    // Load it from here.
+    std::istringstream s(dataString);
+    try {
+        load(s);
+    } catch(std::exception& e) {
+        throw runtime_error("Error reading assembly graph at stage " + assemblyStage +
+            " for component " + to_string(componentIdArgument) +
+            ": " + e.what());
+    }
+
+    // Sanity check.
+    SHASTA_ASSERT(componentIdArgument == componentId);
 }

@@ -253,6 +253,8 @@ void Assembler::fillServerFunctionTable()
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreAnchorPair);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreLocalAssembly);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreLocalAnchorGraph);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMode3AssemblyGraph);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreSegment);
 }
 #undef SHASTA_ADD_TO_FUNCTION_TABLE
 
@@ -465,21 +467,7 @@ void Assembler::writeNavigation(ostream& html) const
 
 
 
-    if(assemblerInfo->assemblyMode == 3) {
-        writeNavigation(html, "Marker graph", {
-            {"Local marker graph", "exploreMarkerGraph0?useBubbleReplacementEdges=on"},
-            {"Local marker graph for mode 3 assembly", "exploreMarkerGraph1"},
-            {"Marker graph vertices", "exploreMarkerGraphVertex"},
-            {"Marker graph edges", "exploreMarkerGraphEdge"},
-            {"Marker graph edge pairs", "exploreMarkerGraphEdgePair"},
-            {"Marker coverage", "exploreMarkerCoverage"},
-            {"Induced alignments", "exploreMarkerGraphInducedAlignment"},
-            {"Follow a read in the marker graph", "followReadInMarkerGraph"},
-            {"Marker connectivity", "exploreMarkerConnectivity"},
-            {"Assembly path step", "fillMode3AssemblyPathStep"},
-            {"Path graph", "exploreMode3PathGraph"},
-            });
-    } else {
+    if(assemblerInfo->assemblyMode != 3) {
         writeNavigation(html, "Marker graph", {
             {"Local marker graph", "exploreMarkerGraph0?useBubbleReplacementEdges=on"},
             {"Marker graph vertices", "exploreMarkerGraphVertex"},
@@ -510,6 +498,8 @@ void Assembler::writeNavigation(ostream& html) const
             {"Anchor pair", "exploreAnchorPair"},
             {"Local assembly", "exploreLocalAssembly"},
             {"Local anchor graph", "exploreLocalAnchorGraph"},
+            {"Assembly graph", "exploreMode3AssemblyGraph"},
+            {"Segment", "exploreSegment"},
             });
     }
 
@@ -648,7 +638,6 @@ void Assembler::accessAllSoft()
 
     try {
         accessKmerCounts();
-        cout << "Marker k-mer counts are available." << endl;
     } catch(const exception& e) {
     }
 
@@ -692,40 +681,41 @@ void Assembler::accessAllSoft()
     }
 
 
+    if(assemblerInfo->assemblyMode != 3) {
+        try {
+            accessMarkerGraphVertices();
+        } catch(const exception& e) {
+            cout << "Marker graph vertices are not accessible." << endl;
+            allDataAreAvailable = false;
+        }
 
-    try {
-        accessMarkerGraphVertices();
-    } catch(const exception& e) {
-        cout << "Marker graph vertices are not accessible." << endl;
-        allDataAreAvailable = false;
-    }
+        try {
+            accessMarkerGraphReverseComplementVertex();
+        } catch(const exception& e) {
+            cout << "Marker graph reverse complement vertices are not accessible." << endl;
+            allDataAreAvailable = false;
+        }
 
-    try {
-        accessMarkerGraphReverseComplementVertex();
-    } catch(const exception& e) {
-        cout << "Marker graph reverse complement vertices are not accessible." << endl;
-        allDataAreAvailable = false;
-    }
+        try {
+            accessMarkerGraphEdges(false);
+        } catch(const exception& e) {
+            cout << "Marker graph edges are not accessible." << endl;
+            allDataAreAvailable = false;
+        }
 
-    try {
-        accessMarkerGraphEdges(false);
-    } catch(const exception& e) {
-        cout << "Marker graph edges are not accessible." << endl;
-        allDataAreAvailable = false;
-    }
+        try {
+            accessMarkerGraphReverseComplementEdge();
+        } catch(const exception& e) {
+            cout << "Marker graph reverse complement edges are not accessible." << endl;
+            allDataAreAvailable = false;
+        }
 
-    try {
-        accessMarkerGraphReverseComplementEdge();
-    } catch(const exception& e) {
-        cout << "Marker graph reverse complement edges are not accessible." << endl;
-        allDataAreAvailable = false;
-    }
-
-    try {
-        accessMarkerGraphConsensus();
-    } catch(const exception& e) {
-        cout << "MarkerGraph graph consensus is not accessible." << endl;
-        allDataAreAvailable = false;
+        try {
+            accessMarkerGraphConsensus();
+        } catch(const exception& e) {
+            cout << "MarkerGraph graph consensus is not accessible." << endl;
+            allDataAreAvailable = false;
+        }
     }
 
     try {

@@ -3,8 +3,10 @@
 #include "deduplicate.hpp"
 #include "HttpServer.hpp"
 #include "Marker.hpp"
+#include "mode3-AssemblyGraphPostprocessor.hpp"
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-LocalAnchorGraph.hpp"
+#include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3;
 
@@ -235,9 +237,9 @@ void Mode3Assembler::exploreAnchorPair(const vector<string>& request, ostream& h
 
 void Mode3Assembler::exploreLocalAssembly(
     const vector<string>& request,
-    ostream& html,
-    const Mode3AssemblyOptions::LocalAssemblyOptions& localAssemblyOptions)
+    ostream& html)
 {
+    const Mode3AssemblyOptions::LocalAssemblyOptions& localAssemblyOptions = options.localAssemblyOptions;
     LocalAssemblyDisplayOptions options(html);
 
     // Get the parameters for the request.
@@ -405,8 +407,7 @@ void Mode3Assembler::exploreLocalAssembly(
 
 void Mode3Assembler::exploreLocalAnchorGraph(
     const vector<string>& request,
-    ostream& html,
-    const Mode3AssemblyOptions& options)
+    ostream& html)
 {
     // Get the options that control graph creation.
     string anchorIdsString;
@@ -432,8 +433,9 @@ void Mode3Assembler::exploreLocalAnchorGraph(
 
     // Form items for options that control graph creation.
     html <<
-        "<tr>"
-        "<th class=left>Anchor id"
+        "<tr title='Enter comma separated anchor ids, each a number between 0 and " <<
+        anchors().size() / 2 - 1 << " followed by + or -.'>"
+        "<th class=left>Starting anchor ids"
         "<td class=centered><input type=text name=anchorIdsString style='text-align:center' required";
     if(not anchorIdsString.empty()) {
         html << " value='" << anchorIdsString + "'";
@@ -510,4 +512,336 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     // Write it to html.
     graph.writeHtml(html, displayOptions);
 
+}
+
+
+
+void Mode3Assembler::exploreAssemblyGraph(
+    const vector<string>& request,
+    ostream& html)
+{
+    // Get the options from the request.
+    string assemblyStage;
+    HttpServer::getParameterValue(request, "assemblyStage", assemblyStage);
+
+    uint64_t componentId = 0;
+    HttpServer::getParameterValue(request, "componentId", componentId);
+
+    // Start the form.
+    html << "<h2>Assembly graph</h2><form><table>";
+
+    html <<
+        "<tr>"
+        "<th class=left>Assembly stage"
+        "<td class=centered><input type=text name=assemblyStage style='text-align:center' required";
+    if(not assemblyStage.empty()) {
+        html << " value='" << assemblyStage + "'";
+    }
+    html << " size=8>";
+
+    html <<
+        "<tr>"
+        "<th class=left>Component"
+        "<td class=centered><input type=text name=componentId style='text-align:center' required"
+        " value='" << componentId << "' size=8>";
+
+    // End the form.
+    html <<
+        "</table>"
+        "<input type=submit value='Show assembly graph'>"
+        "</form>";
+
+
+    if(assemblyStage.empty()) {
+        return;
+    }
+
+    const AssemblyGraphPostprocessor& assemblyGraph = getAssemblyGraph(assemblyStage, componentId);
+
+    html << "<h2>Assembly graph at assembly stage " << assemblyStage <<
+        " for component " << componentId <<
+        "</h2>";
+    html << "<p>This assembly graph has " << num_vertices(assemblyGraph) <<
+        " vertices and " << num_edges(assemblyGraph) << " edges." << endl;
+
+
+    html << "<p>Not implemented: Mode3Assembler::exploreAssemblyGraph.";
+}
+
+
+
+void Mode3Assembler::exploreSegment(
+    const vector<string>& request,
+    ostream& html)
+{
+    // Get the options from the request.
+    string assemblyStage = "Final";
+    HttpServer::getParameterValue(request, "assemblyStage", assemblyStage);
+
+    string segmentName;
+    HttpServer::getParameterValue(request, "segmentName", segmentName);
+
+    string displayAnchors = "none";
+    HttpServer::getParameterValue(request, "displayAnchors", displayAnchors);
+
+    string beginString;
+    HttpServer::getParameterValue(request, "begin", beginString);
+
+    string endString;
+    HttpServer::getParameterValue(request, "end", endString);
+
+    string firstAnchorsCountString;
+    HttpServer::getParameterValue(request, "firstAnchorsCount", firstAnchorsCountString);
+
+    string lastAnchorsCountString;
+    HttpServer::getParameterValue(request, "lastAnchorsCount", lastAnchorsCountString);
+
+
+    // Start the form.
+    html << "<h2>Assembly graph segment</h2><form><table>";
+
+    html <<
+        "<tr>"
+        "<th class=left>Assembly stage"
+        "<td class=centered><input type=text name=assemblyStage style='text-align:center' required";
+    if(not assemblyStage.empty()) {
+        html << " value='" << assemblyStage + "'";
+    }
+    html << " size=30>";
+
+    html <<
+        "<tr>"
+        "<th class=left>Segment name"
+        "<td class=centered><input type=text name=segmentName style='text-align:center' required";
+    if(not segmentName.empty()) {
+        html << " value='" << segmentName + "'";
+    }
+    html << " title='Enter a segment name of the form a-b-c-d-Pn' size=30>";
+
+
+
+    // Options to control which anchors are shown.
+    html <<
+        "<tr>"
+        "<th class=left>Show anchors"
+        "<td class=left>"
+
+        "<input type=radio required name=displayAnchors value='none'" <<
+        (displayAnchors == "none" ? " checked=on" : "") << "> None"
+
+        "<br><input type=radio required name=displayAnchors value='all'" <<
+        (displayAnchors == "all" ? " checked=on" : "") << "> All"
+
+        "<br><input type=radio required name=displayAnchors value='range'" <<
+        (displayAnchors == "range" ? " checked=on" : "") << "> Anchors in position range "
+        "<input type=text name=begin size=8 style='text-align:center' value='" << beginString << "'> to "
+        "<input type=text name=end size=8 style='text-align:center' value='" << endString << "'>"
+
+        "<br><input type=radio required name=displayAnchors value='first'" <<
+        (displayAnchors == "first" ? " checked=on" : "") << "> First "
+        "<input type=text name=firstAnchorsCount size=8 style='text-align:center' value='" << firstAnchorsCountString << "'>"
+        " anchors"
+
+        "<br><input type=radio required name=displayAnchors value='last'" <<
+        (displayAnchors == "last" ? " checked=on" : "") << "> Last "
+        "<input type=text name=lastAnchorsCount size=8 style='text-align:center' value='" << lastAnchorsCountString << "'>"
+        " anchors"
+        ;
+
+
+    // End the form.
+    html <<
+        "</table>"
+        "<input type=submit value='Get segment information'>"
+        "</form>";
+
+
+    if(segmentName.empty()) {
+        return;
+    }
+
+    // Parse the segment name.
+    uint64_t componentId;
+    uint64_t bubbleChainId;
+    uint64_t positionInBubbleChain;
+    uint64_t indexInBubble;
+    uint64_t bubblePloidy;
+    AssemblyGraphPostprocessor::parseChainStringId(
+        segmentName,
+        componentId,
+        bubbleChainId,
+        positionInBubbleChain,
+        indexInBubble,
+        bubblePloidy);
+
+    // Get the AssemblyGraph for this component.
+    const AssemblyGraphPostprocessor& assemblyGraph = getAssemblyGraph(assemblyStage, componentId);
+
+    // Extract the Chain (Segment) we want.
+    const Chain& chain = assemblyGraph.getChain(segmentName);
+
+    html << "<h2>Assembly graph segment (chain) " << segmentName <<
+        " at assembly stage " << assemblyStage <<
+        "</h2>";
+
+
+
+    // Write a summary table for this chain.
+    html <<
+        "<table>"
+        "<tr><th class=left>Name<td class=centered>" << segmentName <<
+        "<tr><th class=left>Component<td class=centered>" << componentId <<
+        "<tr><th class=left>Bubble chain<td class=centered>" << bubbleChainId <<
+        "<tr><th class=left>Bubble position in bubble chain<td class=centered>" << positionInBubbleChain <<
+        "<tr><th class=left>Index in bubble<td class=centered>" << indexInBubble <<
+        "<tr><th class=left>Bubble ploidy<td class=centered>" << bubblePloidy <<
+        "<tr><th class=left>Number of anchors<td class=centered>" << chain.size();
+    if(assemblyGraph.sequenceWasAssembled) {
+        html << "<tr><th class=left>Sequence length<td class=centered>" << chain.sequence.size();
+
+    }
+    html << "</table>";
+
+
+
+    // Write the anchors.
+    if(displayAnchors != "none") {
+
+        // Figure out the anchor position range to use.
+        uint64_t begin = invalid<uint64_t>;
+        uint64_t end = invalid<uint64_t>;
+        if(displayAnchors == "all") {
+            begin = 0;
+            end = chain.size();
+        } else if(displayAnchors == "range") {
+            try {
+                begin = atoul(beginString);
+            } catch(std::exception& e) {
+                throw runtime_error("Begin string " + beginString + " is not valid. Must be a number.");
+            }
+            try {
+                end = atoul(endString);
+            } catch(std::exception& e) {
+                throw runtime_error("End string " + endString + " is notvalid. Must be a number.");
+            }
+            if(begin > chain.size()) {
+                begin = chain.size() - 1;
+            }
+            if(end > chain.size()) {
+                end = chain.size();
+            }
+            if(end < begin) {
+                end = begin + 1;
+            }
+        } else if(displayAnchors == "first") {
+            begin = 0;
+            try {
+                end = atoul(firstAnchorsCountString);
+            } catch(std::exception& e) {
+                throw runtime_error("First anchors count string " + firstAnchorsCountString + " is not valid. Must be a number.");
+            }
+            if(end > chain.size()) {
+                end = chain.size();
+            }
+        } else if(displayAnchors == "last") {
+            end = chain.size();
+            uint64_t count = invalid<uint64_t>;
+            try {
+                count = atoul(lastAnchorsCountString);
+            } catch(std::exception& e) {
+                throw runtime_error("Last anchors count string " + lastAnchorsCountString + " is not valid. Must be a number.");
+            }
+            if(count > chain.size()) {
+                begin = 0;
+            } else {
+                begin = end - count;
+            }
+        } else {
+            SHASTA_ASSERT(0);
+        }
+        SHASTA_ASSERT(end > begin);
+
+        html << "<h3>Anchors</h3>";
+
+        // Link to a local anchor graph with these anchors.
+        {
+            string anchorIds;
+            for(uint64_t positionInChain=begin; positionInChain!=end; positionInChain++) {
+                const AnchorId anchorId = chain[positionInChain];
+                const string anchorIdString = anchorIdToString(anchorId);
+                anchorIds += anchorIdString;
+                anchorIds += ",";
+            }
+            anchorIds.pop_back();
+
+            html << "<p><a href='exploreLocalAnchorGraph?anchorIdsString=" << HttpServer::urlEncode(anchorIds) <<
+                "&filterEdgesByCoverageLoss=on'>See these anchors in a local anchor graph</a>";
+        }
+
+        // Write a table with the requested anchors.
+        html <<
+            "<p><table>"
+            "<tr>"
+            "<th>Position<br>in segment"
+            "<th>Anchor<br>id"
+            "<th>Link<br>to<br>anchor<br>graph"
+            "<th>Coverage";
+        for(uint64_t positionInChain=begin; positionInChain!=end; positionInChain++) {
+            const AnchorId anchorId = chain[positionInChain];
+            const auto markerIntervals = anchors()[anchorId];
+            const uint64_t coverage = markerIntervals.size();
+            const string anchorIdString = anchorIdToString(anchorId);
+
+            html <<
+                "<tr><td class=centered>" << positionInChain <<
+                "<td class=centered>" <<
+                "<a href='exploreAnchor?anchorIdString=" << HttpServer::urlEncode(anchorIdString) << "'>" <<
+                anchorIdString << "</a>"
+                "<td class=centered>" <<
+                "<a href='exploreLocalAnchorGraph?anchorIdsString=" << HttpServer::urlEncode(anchorIdString) <<
+                "&filterEdgesByCoverageLoss=on'>" <<
+                "&#x22B6;</a>"
+                "<td class=centered>" << coverage;
+        }
+
+        html << "</table>";
+
+    }
+
+
+}
+
+
+
+const AssemblyGraphPostprocessor& Mode3Assembler::getAssemblyGraph(
+    const string& assemblyStage,
+    uint64_t componentId
+    )
+{
+    auto it = assemblyGraphsMap.find({assemblyStage, componentId});
+
+    if(it == assemblyGraphsMap.end()) {
+
+        // This AssemblyGraph is not among the ones we already loaded. Load it now.
+        cout << timestamp << "Loading assembly graph for stage " << assemblyStage <<
+            " component " << componentId << endl;
+        shared_ptr<const AssemblyGraphPostprocessor> assemblyGraphPointer =
+            make_shared<const AssemblyGraphPostprocessor>(
+            assemblyStage,
+            componentId,
+            anchors(),
+            options);
+        cout << timestamp << "Done loading assembly graph for stage " << assemblyStage <<
+            " component " << componentId << endl;
+        assemblyGraphsMap.insert({{assemblyStage, componentId}, assemblyGraphPointer});
+        SHASTA_ASSERT(assemblyGraphPointer->componentId == componentId);
+        return *assemblyGraphPointer;
+
+    } else {
+
+        // This AssemblyGraph is among the ones we already loaded. Return a reference to it.
+        const auto assemblyGraphPointer = it->second;
+        SHASTA_ASSERT(assemblyGraphPointer->componentId == componentId);
+        return *assemblyGraphPointer;
+    }
 }

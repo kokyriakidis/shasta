@@ -107,7 +107,7 @@ void Assembler::accessMode3Assembler()
         make_shared<mode3::Anchors>(MappedMemoryOwner(*this), getReads(), assemblerInfo->k, markers);
     mode3Assembler = make_shared<Mode3Assembler>(*this,
         assemblerInfo->k, getReads(), markers,
-        anchorsPointer);
+        anchorsPointer, httpServerData.assemblerOptions->assemblyOptions.mode3Options);
 }
 
 
@@ -541,15 +541,27 @@ void Assembler::exploreAnchorPair(const vector<string>& request, ostream& html)
 
 void Assembler::exploreLocalAssembly(const vector<string>& request, ostream& html)
 {
-    mode3Assembler->exploreLocalAssembly(request, html,
-        httpServerData.assemblerOptions->assemblyOptions.mode3Options.localAssemblyOptions);
+    mode3Assembler->exploreLocalAssembly(request, html);
 }
 
 
 
 void Assembler::exploreLocalAnchorGraph(const vector<string>& request, ostream& html)
 {
-    mode3Assembler->exploreLocalAnchorGraph(
-        request, html,
-        httpServerData.assemblerOptions->assemblyOptions.mode3Options);
+    mode3Assembler->exploreLocalAnchorGraph(request, html);
 }
+
+
+
+void Assembler::exploreMode3AssemblyGraph(const vector<string>& request, ostream& html)
+{
+    mode3Assembler->exploreAssemblyGraph(request, html);
+}
+
+
+
+void Assembler::exploreSegment(const vector<string>& request, ostream& html)
+{
+    mode3Assembler->exploreSegment(request, html);
+}
+

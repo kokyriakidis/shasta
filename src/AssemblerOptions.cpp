@@ -79,6 +79,11 @@ AssemblerOptions::AssemblerOptions(int argumentCount, const char** arguments) :
         ::exit(0);
     }
 
+    // If the command is explore and the configuration is mnot specified, use the
+    // configuration file in the assembly directory.
+    if((commandLineOnlyOptions.command == "explore") and commandLineOnlyOptions.configName.empty()) {
+        commandLineOnlyOptions.configName = commandLineOnlyOptions.assemblyDirectory + "/shasta.conf";
+    }
 
 
     // Get options from the config file or built-in configuration, if one was specified.
