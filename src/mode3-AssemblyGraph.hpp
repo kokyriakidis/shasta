@@ -264,7 +264,6 @@ public:
         ar & anchorId;
     }
 
-private:
     AnchorId anchorId;
 };
 
@@ -866,7 +865,6 @@ public:
     void writeGfaLinksExpanded(ostream&) const;
     static void writeGfaHeader(ostream&);
     void writeFastaExpanded(ostream&) const;
-private:
     void writeFastaExpanded(const string& fileNamePrefix) const;
     void writeSnapshot(uint64_t& snapshotNumber) const;
 
@@ -874,6 +872,7 @@ private:
     string bubbleStringId(edge_descriptor, uint64_t positionInBubbleChain) const;
     string chainStringId(edge_descriptor, uint64_t positionInBubbleChain, uint64_t indexInBubble) const;
 
+private:
 
     // Return average coverage for the internal AnchorIds of a Chain.
     // For chain of length 2, this returns 0.

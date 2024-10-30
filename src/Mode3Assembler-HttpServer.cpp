@@ -6,6 +6,7 @@
 #include "mode3-AssemblyGraphPostprocessor.hpp"
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-LocalAnchorGraph.hpp"
+#include "mode3-LocalAssemblyGraph.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3;
@@ -521,14 +522,22 @@ void Mode3Assembler::exploreAssemblyGraph(
     ostream& html)
 {
     // Get the options from the request.
-    string assemblyStage;
+    string assemblyStage = "Final";
     HttpServer::getParameterValue(request, "assemblyStage", assemblyStage);
 
     uint64_t componentId = 0;
     HttpServer::getParameterValue(request, "componentId", componentId);
 
+    string chainStringIds;
+    HttpServer::getParameterValue(request, "chainStringIds", chainStringIds);
+
+    uint64_t distance = 10;
+    HttpServer::getParameterValue(request, "distance", distance);
+
+
+
     // Start the form.
-    html << "<h2>Assembly graph</h2><form><table>";
+    html << "<h2>Local assembly graph</h2><form><table>";
 
     html <<
         "<tr>"
@@ -545,10 +554,26 @@ void Mode3Assembler::exploreAssemblyGraph(
         "<td class=centered><input type=text name=componentId style='text-align:center' required"
         " value='" << componentId << "' size=8>";
 
+    // Form items for options that control graph creation.
+    html <<
+        "<tr title='Enter comma separated Chain (Segment) ids, each of the form a-b-c-d-Pn'>"
+        "<th class=left>Starting segments"
+        "<td class=centered><input type=text name=chainStringIds style='text-align:center' required";
+    if(not chainStringIds.empty()) {
+        html << " value='" << chainStringIds + "'";
+    }
+    html << " size=40>";
+
+    html << "<tr>"
+        "<th class=left>Distance"
+        "<td class=centered>"
+        "<input type=text name=distance style='text-align:center' required size=8 value=" <<
+        distance << ">";
+
     // End the form.
     html <<
         "</table>"
-        "<input type=submit value='Show assembly graph'>"
+        "<input type=submit value='Show local assembly graph'>"
         "</form>";
 
 
@@ -556,16 +581,31 @@ void Mode3Assembler::exploreAssemblyGraph(
         return;
     }
 
+    if(chainStringIds.empty()) {
+        return;
+    }
+
     const AssemblyGraphPostprocessor& assemblyGraph = getAssemblyGraph(assemblyStage, componentId);
 
-    html << "<h2>Assembly graph at assembly stage " << assemblyStage <<
-        " for component " << componentId <<
-        "</h2>";
-    html << "<p>This assembly graph has " << num_vertices(assemblyGraph) <<
-        " vertices and " << num_edges(assemblyGraph) << " edges." << endl;
+
+    // Extract the ChainIdentifiers for the starting chains.
+    vector<ChainIdentifier> startingChains;
+    boost::tokenizer< boost::char_separator<char> > tokenizer(chainStringIds, boost::char_separator<char>(","));
+    for(const string& chainStringId: tokenizer) {
+        startingChains.push_back(assemblyGraph.getChainIdentifier(chainStringId));
+    }
 
 
-    html << "<p>Not implemented: Mode3Assembler::exploreAssemblyGraph.";
+    // Create the LocalAssemblyGraph.
+    const LocalAssemblyGraph localAssemblyGraph(assemblyGraph, startingChains, distance);
+
+    html << "<p>The local assembly graph has " << num_vertices(localAssemblyGraph) <<
+        " vertices and " << num_edges(localAssemblyGraph) << " edges.";
+
+    html << "<pre>";
+    localAssemblyGraph.writeGraphviz(html);
+    html << "</pre>";
+
 }
 
 

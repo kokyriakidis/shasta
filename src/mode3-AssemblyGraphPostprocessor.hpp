@@ -6,8 +6,18 @@
 namespace shasta {
     namespace mode3 {
         class AssemblyGraphPostprocessor;
+        class ChainIdentifier;
     }
 }
+
+
+
+class shasta::mode3::ChainIdentifier {
+public:
+    AssemblyGraph::edge_descriptor e;
+    uint64_t positionInBubbleChain;
+    uint64_t indexInBubble;
+};
 
 
 
@@ -31,6 +41,9 @@ public:
         uint64_t indexInBubble,
         uint64_t& ploidy) const;
     const Chain& getChain(const string& chainStringId) const;
+    const Chain& getChain(const ChainIdentifier&) const;
+    ChainIdentifier getChainIdentifier(const string& chainStringId) const;
+    string getChainStringId(const ChainIdentifier&) const;
 
     static void parseChainStringId(
         const string&,
