@@ -521,7 +521,7 @@ void Mode3Assembler::exploreAssemblyGraph(
     const vector<string>& request,
     ostream& html)
 {
-    // Get the options from the request.
+    // Get the options that control graph creation.
     string assemblyStage = "Final";
     HttpServer::getParameterValue(request, "assemblyStage", assemblyStage);
 
@@ -534,11 +534,15 @@ void Mode3Assembler::exploreAssemblyGraph(
     uint64_t distance = 10;
     HttpServer::getParameterValue(request, "distance", distance);
 
+    // Get the options that control graph display.
+    const LocalAssemblyGraphDisplayOptions displayOptions(request);
+
 
 
     // Start the form.
     html << "<h2>Local assembly graph</h2><form><table>";
 
+    // Form items for options to choose the assembly graph to be used.
     html <<
         "<tr>"
         "<th class=left>Assembly stage"
@@ -570,6 +574,9 @@ void Mode3Assembler::exploreAssemblyGraph(
         "<input type=text name=distance style='text-align:center' required size=8 value=" <<
         distance << ">";
 
+    // Form items for options that control graph display.
+    displayOptions.writeForm(html);
+
     // End the form.
     html <<
         "</table>"
@@ -597,14 +604,15 @@ void Mode3Assembler::exploreAssemblyGraph(
 
 
     // Create the LocalAssemblyGraph.
-    const LocalAssemblyGraph localAssemblyGraph(assemblyGraph, startingChains, distance);
+    LocalAssemblyGraph graph(assemblyGraph, startingChains, distance);
 
-    html << "<p>The local assembly graph has " << num_vertices(localAssemblyGraph) <<
-        " vertices and " << num_edges(localAssemblyGraph) << " edges.";
+    html <<
+        "<h1>Local assembly graph</h1>"
+        "<p>The local assembly graph has " << num_vertices(graph) <<
+         " vertices and " << num_edges(graph) << " edges.";
 
-    html << "<pre>";
-    localAssemblyGraph.writeGraphviz(html);
-    html << "</pre>";
+    // Write it to html.
+    graph.writeHtml(html, displayOptions);
 
 }
 

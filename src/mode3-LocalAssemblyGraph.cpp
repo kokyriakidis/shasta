@@ -1,10 +1,17 @@
 // Shasta.
 #include "mode3-LocalAssemblyGraph.hpp"
+#include "html.hpp"
+#include "HttpServer.hpp"
+#include "platformDependent.hpp"
+#include "runCommandWithTimeout.hpp"
 using namespace shasta;
 using namespace mode3;
 
 // Boost libraries.
 #include <boost/graph/iteration_macros.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 // Standard library.
 #include <queue>
@@ -170,9 +177,11 @@ void LocalAssemblyGraph::addEdges()
 
         } else {
 
+            /*
             cout << "Adding edges with source vertex ";
             writeVertex(vertex0, cout);
             cout << endl;
+            */
 
             // Vertex0 does not correspond to a vertex of the assembly graph.
             // Loop over all outgoing chains.
@@ -183,20 +192,20 @@ void LocalAssemblyGraph::addEdges()
             for(uint64_t indexInBubble=0; indexInBubble<nextBubble.size(); indexInBubble++) {
                 const LocalAssemblyGraphEdge edge(ChainIdentifier(ae, vertex0.positionInBubbleChain + 1, indexInBubble));
                 if(vertex0.positionInBubbleChain == bubbleChain.size() - 2) {
-                    cout << "Case 1" << endl;
+                    // cout << "Case 1" << endl;
                     const LocalAssemblyGraphVertex& vertex1(target(ae, assemblyGraph));
                     auto it = vertexMap.find(vertex1);
                     if(it != vertexMap.end()) {
-                        cout << "Case 1 added" << endl;
+                        // cout << "Case 1 added" << endl;
                         const vertex_descriptor v1 = it->second;
                         add_edge(v0, v1, edge, localAssemblyGraph);
                     }
                 } else {
-                    cout << "Case 2" << endl;
+                    // cout << "Case 2" << endl;
                     const LocalAssemblyGraphVertex vertex1(ae, vertex0.positionInBubbleChain + 1);
                     auto it = vertexMap.find(vertex1);
                     if(it != vertexMap.end()) {
-                        cout << "Case 2 added." << endl;
+                        // cout << "Case 2 added." << endl;
                         const vertex_descriptor v1 = it->second;
                         add_edge(v0, v1, edge, localAssemblyGraph);
                     }
@@ -208,11 +217,13 @@ void LocalAssemblyGraph::addEdges()
     }
 
 
+    /*
     cout << " Edges:" << endl;
     BGL_FORALL_EDGES(e, localAssemblyGraph, LocalAssemblyGraph) {
         writeEdge(e, cout);
         cout << endl;
     }
+    */
 }
 
 
@@ -327,7 +338,7 @@ void LocalAssemblyGraph::getParents(
         cout << endl;
         */
     }
-    cout << "LocalAssemblyGraph::getParents ends" << endl;;
+    // cout << "LocalAssemblyGraph::getParents ends" << endl;;
 }
 
 
@@ -356,7 +367,19 @@ void LocalAssemblyGraph::writeEdge(edge_descriptor e, ostream& s) const
 
 
 
-void LocalAssemblyGraph::writeGraphviz(ostream& s) const
+void LocalAssemblyGraph::writeGraphviz(
+    const string& fileName,
+    const LocalAssemblyGraphDisplayOptions& options) const
+{
+    ofstream file(fileName);
+    writeGraphviz(file, options);
+}
+
+
+
+void LocalAssemblyGraph::writeGraphviz(
+    ostream& s,
+    const LocalAssemblyGraphDisplayOptions& /* options */) const
 {
     const LocalAssemblyGraph& localAssemblyGraph = *this;
 
@@ -385,3 +408,238 @@ void LocalAssemblyGraph::writeGraphviz(ostream& s) const
 }
 
 
+
+LocalAssemblyGraphDisplayOptions::LocalAssemblyGraphDisplayOptions(const vector<string>& request)
+{
+    // Figure out if command "customLayout" is available.
+    const int commandStatus = std::system("which customLayout > /dev/null");
+    SHASTA_ASSERT(WIFEXITED(commandStatus));
+    const int returnCode = WEXITSTATUS(commandStatus);
+    const bool customLayoutIsAvailable = (returnCode == 0);
+
+
+    sizePixels = 600;
+    HttpServer::getParameterValue(request, "sizePixels", sizePixels);
+
+    layoutMethod = (customLayoutIsAvailable ? "custom" : "sfdp");
+    HttpServer::getParameterValue(request, "layoutMethod", layoutMethod);
+
+    vertexSize =  1.;
+    HttpServer::getParameterValue(request, "vertexSize", vertexSize);
+
+    string vertexSizeByCoverageString;
+    vertexSizeByCoverage = HttpServer::getParameterValue(request,
+        "vertexSizeByCoverage", vertexSizeByCoverageString);
+
+    string vertexLabelsString;
+    vertexLabels = HttpServer::getParameterValue(request,
+        "vertexLabels", vertexLabelsString);
+
+    edgeColoring = "random";
+    HttpServer::getParameterValue(request, "edgeColoring", edgeColoring);
+
+    minimumEdgeLength = 1.;
+    HttpServer::getParameterValue(request, "minimumEdgeLength", minimumEdgeLength);
+
+    additionalEdgeLengthPerKb = 1.;
+    HttpServer::getParameterValue(request, "additionalEdgeLengthPerKb", additionalEdgeLengthPerKb);
+
+    edgeThickness = 1.;
+    HttpServer::getParameterValue(request, "edgeThickness", edgeThickness);
+
+    arrowSize = 1.;
+    HttpServer::getParameterValue(request, "arrowSize", arrowSize);
+
+    string edgeLabelsString;
+    edgeLabels = HttpServer::getParameterValue(request,
+        "edgeLabels", edgeLabelsString);
+}
+
+
+
+void LocalAssemblyGraphDisplayOptions::writeForm(ostream& html) const
+{
+    // Figure out if command "customLayout" is available.
+    const int commandStatus = std::system("which customLayout > /dev/null");
+    SHASTA_ASSERT(WIFEXITED(commandStatus));
+    const int returnCode = WEXITSTATUS(commandStatus);
+    const bool customLayoutIsAvailable = (returnCode == 0);
+
+    html <<
+        "<tr>"
+        "<th title='Graphics size in pixels. "
+        "Changing this works better than zooming. Make it larger if the graph is too crowded."
+        " Ok to make it much larger than screen size.'>"
+        "Graphics size in pixels"
+        "<td class=centered><input type=text required name=sizePixels size=8 style='text-align:center'" <<
+        " value='" << sizePixels <<
+        "'>";
+
+    html <<
+        "<tr>"
+        "<th>Layout method"
+        "<td class=left>"
+        "<input type=radio required name=layoutMethod value='sfdp'" <<
+        (layoutMethod == "sfdp" ? " checked=on" : "") <<
+        ">sfdp"
+        "<br><input type=radio required name=layoutMethod value='fdp'" <<
+        (layoutMethod == "fdp" ? " checked=on" : "") <<
+        ">fdp"
+        "<br><input type=radio required name=layoutMethod value='neato'" <<
+        (layoutMethod == "neato" ? " checked=on" : "") <<
+        ">neato"
+        "<br><input type=radio required name=layoutMethod value='dot'" <<
+        (layoutMethod == "dot" ? " checked=on" : "") <<
+        ">dot";
+
+    // If command "customLayout" is available, add an option for that.
+    if(customLayoutIsAvailable) {
+        html <<
+            "<br><input type=radio required name=layoutMethod value='custom'" <<
+            (layoutMethod == "custom" ? " checked=on" : "") <<
+            ">custom";
+    }
+
+    html <<
+        "<tr>"
+        "<th>Vertices"
+        "<td class=left>"
+        "<input type=text name=vertexSize style='text-align:center' required size=6 value=" <<
+        vertexSize << "> Vertex size (arbitrary units)"
+        "<br><input type=checkbox name=vertexSizeByCoverage" <<
+        (vertexSizeByCoverage ? " checked" : "") <<
+        "> Size proportional to coverage"
+
+        "<br><input type=checkbox name=vertexLabels" <<
+        (vertexLabels ? " checked" : "") <<
+        "> Labels (dot layout only)";
+
+
+
+    html <<
+        "<tr>"
+        "<th>Edges"
+        "<td class=left>"
+
+        "<b>Edge coloring</b>"
+        "<br><input type=radio required name=edgeColoring value='black'" <<
+        (edgeColoring == "black" ? " checked=on" : "") << ">Black"
+        "<br><input type=radio required name=edgeColoring value='random'" <<
+        (edgeColoring == "random" ? " checked=on" : "") << ">Random"
+        "<br><input type=radio required name=edgeColoring value='byCoverageLoss'" <<
+        (edgeColoring == "byCoverageLoss" ? " checked=on" : "") << ">By coverage loss"
+        "<hr>"
+
+        "<b>Edge graphics</b>"
+
+        "<br><input type=text name=edgeThickness style='text-align:center' required size=6 value=" <<
+        edgeThickness << "> Thickness (arbitrary units)"
+
+        "<br><input type=text name=minimumEdgeLength style='text-align:center' required size=6 value=" <<
+        minimumEdgeLength << "> Minimum edge length (arbitrary units)"
+
+        "<br><input type=text name=additionalEdgeLengthPerKb style='text-align:center' required size=6 value=" <<
+        additionalEdgeLengthPerKb << "> Additional edge length per Kb (arbitrary units)"
+
+        "<br><input type=text name=arrowSize style='text-align:center' required size=6 value=" <<
+        arrowSize << "> Arrow size (arbitrary units)"
+
+        "<hr>"
+        "<input type=checkbox name=edgeLabels" <<
+        (edgeLabels ? " checked" : "") <<
+        "> Labels (dot layout only)";
+
+}
+
+
+
+void LocalAssemblyGraph::writeHtml(
+    ostream& html,
+    const LocalAssemblyGraphDisplayOptions& options)
+{
+    if((options.layoutMethod == "dot") and (options.vertexLabels or options.edgeLabels)) {
+
+        // Use svg output from graphviz.
+        writeHtml1(html, options);
+
+    } else {
+
+        // Compute graph layout and use it to generate svg.
+        writeHtml2(html, options);
+
+    }
+}
+
+
+
+// This is the code that uses svg output from graphviz.
+void LocalAssemblyGraph::writeHtml1(
+    ostream& html,
+    const LocalAssemblyGraphDisplayOptions& options) const
+{
+
+
+    // Write it out in graphviz format.
+    const string uuid = to_string(boost::uuids::random_generator()());
+    const string dotFileName = tmpDirectory() + uuid + ".dot";
+    writeGraphviz(dotFileName, options);
+
+    // Use graphviz to compute the layout.
+    const string svgFileName = dotFileName + ".svg";
+    const string shape = options.vertexLabels ? "rectangle" : "point";
+    string command =
+        options.layoutMethod +
+        " -T svg " + dotFileName + " -o " + svgFileName +
+        " -Nshape=" + shape +
+        " -Gsize=" + to_string(options.sizePixels/72) + " -Gratio=expand ";
+    if(options.vertexLabels) {
+        command += " -Goverlap=false";
+    }
+    // cout << "Running command: " << command << endl;
+    const int timeout = 30;
+    bool timeoutTriggered = false;
+    bool signalOccurred = false;
+    int returnCode = 0;
+    runCommandWithTimeout(command, timeout, timeoutTriggered, signalOccurred, returnCode);
+    if(signalOccurred) {
+        html << "Error during graph layout. Command was<br>" << endl;
+        html << command;
+        return;
+    }
+    if(timeoutTriggered) {
+        html << "Timeout during graph layout." << endl;
+        return;
+    }
+    if(returnCode!=0 ) {
+        html << "Error during graph layout. Command was<br>" << endl;
+        html << command;
+        return;
+    }
+    std::filesystem::remove(dotFileName);
+
+
+
+    // Write the svg to html.
+    html << "<p><div style='border:solid;display:inline-block'>";
+    ifstream svgFile(svgFileName);
+    html << svgFile.rdbuf();
+    svgFile.close();
+    html << "</div>";
+
+    // Remove the .svg file.
+    std::filesystem::remove(svgFileName);
+
+    // Add drag and zoom.
+    addSvgDragAndZoom(html);
+}
+
+
+
+// This is the code that computes the graph layout,
+// then creates the svg.
+void LocalAssemblyGraph::writeHtml2(
+    ostream& /* html */,
+    const LocalAssemblyGraphDisplayOptions& /* options */)
+{
+    throw runtime_error("Not implemented. Use dot layout with labels.");
+}

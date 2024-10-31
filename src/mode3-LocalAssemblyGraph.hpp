@@ -30,8 +30,37 @@ namespace shasta {
             LocalAssemblyGraphVertex,
             LocalAssemblyGraphEdge>;
 
+        class LocalAssemblyGraphDisplayOptions;
     }
 }
+
+
+
+class shasta::mode3::LocalAssemblyGraphDisplayOptions {
+public:
+    uint64_t sizePixels;
+    string layoutMethod;
+
+    // Vertices.
+    double vertexSize;
+    bool vertexSizeByCoverage;
+    bool vertexLabels;
+
+    // Edges.
+    string edgeColoring;
+    double edgeThickness;
+    double minimumEdgeLength;
+    double additionalEdgeLengthPerKb;
+    double arrowSize;
+    bool edgeLabels;
+
+    // Construct from an html request.
+    LocalAssemblyGraphDisplayOptions(const vector<string>& request);
+
+    // Write the form.
+    void writeForm(ostream& html) const;
+};
+
 
 
 // A LocalAssemblyGraphVertex can be of two types, type A and type B.
@@ -97,9 +126,30 @@ public:
         const vector<ChainIdentifier>& startingChains,
         uint64_t maxDistance);
 
-    void writeGraphviz(ostream&) const;
+    void writeHtml(
+        ostream& html,
+        const LocalAssemblyGraphDisplayOptions&);
 
 private:
+
+    // Html/svg output using svg output created by Graphviz.
+    void writeHtml1(
+        ostream& html,
+        const LocalAssemblyGraphDisplayOptions&) const;
+    void writeGraphviz(
+        const string& fileName,
+        const LocalAssemblyGraphDisplayOptions&
+        ) const;
+    void writeGraphviz(
+        ostream&,
+        const LocalAssemblyGraphDisplayOptions&
+        ) const;
+
+    // Html/svg output without using svg output created by Graphviz.
+    void writeHtml2(
+        ostream& html,
+        const LocalAssemblyGraphDisplayOptions&);
+
     const AssemblyGraphPostprocessor& assemblyGraph;
     std::map<LocalAssemblyGraphVertex, vertex_descriptor> vertexMap;
 
