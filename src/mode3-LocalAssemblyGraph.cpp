@@ -2,6 +2,7 @@
 #include "mode3-LocalAssemblyGraph.hpp"
 #include "html.hpp"
 #include "HttpServer.hpp"
+#include "MurmurHash2.hpp"
 #include "platformDependent.hpp"
 #include "runCommandWithTimeout.hpp"
 using namespace shasta;
@@ -21,8 +22,11 @@ using namespace mode3;
 LocalAssemblyGraph::LocalAssemblyGraph(
     const AssemblyGraphPostprocessor& assemblyGraph,
     const vector<ChainIdentifier>& startingChains,
-    uint64_t maxDistance) :
-    assemblyGraph(assemblyGraph)
+    uint64_t maxDistance,
+    const string& assemblyStage) :
+    assemblyGraph(assemblyGraph),
+    maxDistance(maxDistance),
+    assemblyStage(assemblyStage)
 {
     addVertices(startingChains, maxDistance);
     addEdges();
@@ -379,28 +383,97 @@ void LocalAssemblyGraph::writeGraphviz(
 
 void LocalAssemblyGraph::writeGraphviz(
     ostream& s,
-    const LocalAssemblyGraphDisplayOptions& /* options */) const
+    const LocalAssemblyGraphDisplayOptions& options ) const
 {
     const LocalAssemblyGraph& localAssemblyGraph = *this;
 
     s << "digraph LocalAssemblyGraph {\n";
 
+    // Write the vertices.
+    BGL_FORALL_VERTICES(v, localAssemblyGraph, LocalAssemblyGraph) {
+        const LocalAssemblyGraphVertex& vertex = localAssemblyGraph[v];
+        const AnchorId anchorId = getAnchorId(v);
+        const string anchorIdString = anchorIdToString(anchorId);
+        const uint64_t coverage = assemblyGraph.anchors[anchorId].coverage();
+
+        // For the Graphviz vertex name we use the vertex id. It has no particular meaning.
+        // We cannot use the AnchorId because there is no guarantee that an AnchorId
+        // appears only once in the AssemblyGraph.
+        s << vertex.id;
+
+        // Begin vertex attributes.
+        s << " [";
+
+        // Label.
+        if(options.vertexLabels) {
+            s << "label=\"" << anchorIdString << "\\n" << coverage << "\"";
+        }
+
+        // URL
+        s << " URL=\"exploreAnchor?anchorIdString=" << HttpServer::urlEncode(anchorIdString) << "\"";
+
+        // Tooltip.
+        s << " tooltip=\"" << anchorIdString << " " << coverage << ", distance " << vertex.distance << "\"";
+
+        // Color.
+        if(vertex.distance == 0) {
+            s << " color=blue";
+        } else if(vertex.distance == maxDistance) {
+            s << " color=cyan";
+        }
+
+        // Size.
+        if(not options.vertexLabels) {
+            const double displaySize = 20. * (
+                (options.vertexSizeByCoverage ?
+                options.vertexSize * sqrt(0.1 * double(coverage)) :
+                options.vertexSize) / 72.);
+            s << " width=" << displaySize ;
+            s << " penwidth=" << 0.5 * displaySize;
+        }
+
+        // End vertex attributes.
+        s << "]";
+
+        // End the line for this vertex.
+        s << ";\n";
+    }
+
+
     BGL_FORALL_EDGES(e, localAssemblyGraph, LocalAssemblyGraph) {
+        const LocalAssemblyGraphEdge& edge = localAssemblyGraph[e];
         const vertex_descriptor v0 = source(e, localAssemblyGraph);
         const vertex_descriptor v1 = target(e, localAssemblyGraph);
+        const string chainStringId = assemblyGraph.getChainStringId(edge);
 
         s << localAssemblyGraph[v0].id << "->" << localAssemblyGraph[v1].id << " [";
 
-        // Label.
-        s << "label=\"";
-        writeEdge(e, s);
-        s << "\"";
-
         // Tooltip.
-        s << " tooltip=\"";
-        writeEdge(e, s);
-        s << "\"";
+        s << " tooltip=\"" << chainStringId << "\"";
 
+        // Label.
+        if(options.edgeLabels) {
+            s << " label=\"" << chainStringId << "\"";
+        }
+
+        // URL
+        s << "URL=\"exploreSegment?assemblyStage=" << assemblyStage << "&segmentName=" <<
+            HttpServer::urlEncode(chainStringId) << "\"";
+
+        // Color.
+        if(options.edgeColoring == "random") {
+            // To decide the color, hash the chainStringId.
+            // This way we always get the same color for the same chain.
+            const uint32_t hashValue = MurmurHash2(chainStringId.data(), int(chainStringId.size()), 759);
+            const double hue = double(hashValue % 360) / 360.;
+            s << " color=\"" << std::fixed << std::setprecision(2) << hue << " 0.66 0.75\"";
+        }
+
+        // Thickness.
+        s << " penwidth=" << 10.*options.edgeThickness;
+
+        // Arrow size.
+        s << " arrowsize=" << options.arrowSize;
         s << "];\n";
     }
 
@@ -642,4 +715,23 @@ void LocalAssemblyGraph::writeHtml2(
     const LocalAssemblyGraphDisplayOptions& /* options */)
 {
     throw runtime_error("Not implemented. Use dot layout with labels.");
+}
+
+
+
+AnchorId LocalAssemblyGraph::getAnchorId(vertex_descriptor v) const
+{
+    const LocalAssemblyGraph& localAssemblyGraph = *this;
+    const LocalAssemblyGraphVertex& vertex = localAssemblyGraph[v];
+
+    if(vertex.isTypeA()) {
+        const AssemblyGraph::vertex_descriptor av = vertex.v;
+        return assemblyGraph[av].anchorId;
+    } else {
+
+        const BubbleChain& bubbleChain = assemblyGraph[vertex.e];
+        const Bubble& bubble = bubbleChain[vertex.positionInBubbleChain];
+        const Chain& chain = bubble.front();
+        return chain.back();
+    }
 }

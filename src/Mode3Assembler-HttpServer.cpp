@@ -604,7 +604,7 @@ void Mode3Assembler::exploreAssemblyGraph(
 
 
     // Create the LocalAssemblyGraph.
-    LocalAssemblyGraph graph(assemblyGraph, startingChains, distance);
+    LocalAssemblyGraph graph(assemblyGraph, startingChains, distance, assemblyStage);
 
     html <<
         "<h1>Local assembly graph</h1>"

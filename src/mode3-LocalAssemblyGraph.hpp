@@ -124,7 +124,8 @@ public:
     LocalAssemblyGraph(
         const AssemblyGraphPostprocessor&,
         const vector<ChainIdentifier>& startingChains,
-        uint64_t maxDistance);
+        uint64_t maxDistance,
+        const string& assemblyStage);
 
     void writeHtml(
         ostream& html,
@@ -151,6 +152,9 @@ private:
         const LocalAssemblyGraphDisplayOptions&);
 
     const AssemblyGraphPostprocessor& assemblyGraph;
+    uint64_t maxDistance;
+    string assemblyStage;
+
     std::map<LocalAssemblyGraphVertex, vertex_descriptor> vertexMap;
 
     void addVertices(
@@ -168,5 +172,8 @@ private:
 
     void writeVertex(const LocalAssemblyGraphVertex&, ostream&) const;
     void writeEdge(edge_descriptor, ostream&) const;
+
+    // Get the AnchorId corresponding to a vertex.
+    AnchorId getAnchorId(vertex_descriptor) const;
 
 };
