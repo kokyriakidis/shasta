@@ -165,3 +165,76 @@ const Chain& AssemblyGraphPostprocessor::getChain(const string& chainStringId) c
 
     return chain;
 }
+
+
+
+const Chain& AssemblyGraphPostprocessor::getChain(const ChainIdentifier& chainIdentifier) const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+    const BubbleChain& bubbleChain = assemblyGraph[chainIdentifier.e];
+    const Bubble& bubble = bubbleChain[chainIdentifier.positionInBubbleChain];
+    return bubble[chainIdentifier.indexInBubble];
+}
+
+
+
+ChainIdentifier AssemblyGraphPostprocessor::getChainIdentifier(const string& chainStringId) const
+{
+    uint64_t chainComponentId;
+    uint64_t edgeId;
+    uint64_t positionInBubbleChain;
+    uint64_t indexInBubble;
+    uint64_t bubblePloidy;
+    parseChainStringId(
+        chainStringId,
+        chainComponentId,
+        edgeId,
+        positionInBubbleChain,
+        indexInBubble,
+        bubblePloidy);
+    SHASTA_ASSERT(chainComponentId == componentId);
+
+    uint64_t ploidy;
+    getChain(edgeId, positionInBubbleChain, indexInBubble, ploidy);
+
+    // Check the ploidy.
+    const BubbleChain& bubbleChain = getBubbleChain(edgeId);
+    const Bubble& bubble = getBubble(edgeId, positionInBubbleChain);
+    if((bubbleChain.size() == 1) and (bubble.size() == 1)) {
+        if(bubblePloidy != 0) {
+            throw runtime_error("Invalid chain " + chainStringId + ": ploidy should be 0.");
+        }
+    } else {
+        if(ploidy != bubblePloidy) {
+            throw runtime_error("Invalid chain " + chainStringId + ": ploidy should be " + to_string(ploidy));
+        }
+    }
+
+
+
+    // Now we can construct the ChainIdentifier.
+    ChainIdentifier chainIdentifier;
+    auto it = edgeIdMap.find(edgeId);
+    if(it == edgeIdMap.end()) {
+        throw runtime_error("Invalid chain " + chainStringId + ": bubble chain does nto exist.");
+    }
+    chainIdentifier.e = it->second;
+    chainIdentifier.positionInBubbleChain = positionInBubbleChain;
+    chainIdentifier.indexInBubble = indexInBubble;
+
+
+
+    return chainIdentifier;
+}
+
+
+
+string AssemblyGraphPostprocessor::getChainStringId(const ChainIdentifier& chainIdentifier) const
+{
+    return chainStringId(
+        chainIdentifier.e,
+        chainIdentifier.positionInBubbleChain,
+        chainIdentifier.indexInBubble
+        );
+}
+

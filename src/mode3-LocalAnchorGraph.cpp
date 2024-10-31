@@ -503,7 +503,7 @@ void LocalAnchorGraphDisplayOptions::writeForm(ostream& html) const
         "<hr>"
         "<input type=checkbox name=edgeLabels" <<
         (edgeLabels ? " checked" : "") <<
-        "> Labels";
+        "> Labels (dot layout only)";
 
 }
 
@@ -513,7 +513,7 @@ void LocalAnchorGraph::writeHtml(
     ostream& html,
     const LocalAnchorGraphDisplayOptions& options)
 {
-    if((options.layoutMethod == "dot") and options.vertexLabels) {
+    if((options.layoutMethod == "dot") and (options.vertexLabels or options.edgeLabels)) {
 
         // Use svg output from graphviz.
         writeHtml1(html, options);

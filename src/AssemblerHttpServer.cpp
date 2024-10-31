@@ -498,7 +498,7 @@ void Assembler::writeNavigation(ostream& html) const
             {"Anchor pair", "exploreAnchorPair"},
             {"Local assembly", "exploreLocalAssembly"},
             {"Local anchor graph", "exploreLocalAnchorGraph"},
-            {"Assembly graph", "exploreMode3AssemblyGraph"},
+            {"Local assembly graph", "exploreMode3AssemblyGraph"},
             {"Segment", "exploreSegment"},
             });
     }
