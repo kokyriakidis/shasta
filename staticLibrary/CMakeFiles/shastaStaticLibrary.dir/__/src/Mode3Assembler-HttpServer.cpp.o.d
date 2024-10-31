@@ -936,7 +936,9 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/Mode3Assembler-HttpServe
  /home/kokyriakidis/Downloads/shasta/src/bitReversal.hpp \
  /home/kokyriakidis/Downloads/shasta/src/IntegerBySize.hpp \
  /home/kokyriakidis/Downloads/shasta/src/Uint.hpp \
- /home/kokyriakidis/Downloads/shasta/src/mode3-LocalAssembly.hpp \
+ /home/kokyriakidis/Downloads/shasta/src/mode3-AssemblyGraphPostprocessor.hpp \
+ /home/kokyriakidis/Downloads/shasta/src/mode3-AssemblyGraph.hpp \
+ /home/kokyriakidis/Downloads/shasta/src/mode3-PhasedComponent.hpp \
  /usr/include/boost/graph/adjacency_list.hpp /usr/include/c++/11/list \
  /usr/include/c++/11/bits/stl_list.h /usr/include/c++/11/bits/list.tcc \
  /usr/include/boost/unordered_set.hpp \
@@ -1348,12 +1350,26 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/Mode3Assembler-HttpServe
  /usr/include/boost/typeof/decltype.hpp \
  /usr/include/boost/graph/detail/adj_list_edge_iterator.hpp \
  /usr/include/boost/graph/adjacency_iterator.hpp \
- /home/kokyriakidis/Downloads/shasta/src/mode3-LocalAnchorGraph.hpp \
- /usr/include/boost/tokenizer.hpp /usr/include/boost/token_iterator.hpp \
- /usr/include/boost/iterator/minimum_category.hpp \
- /usr/include/boost/token_functions.hpp \
+ /usr/include/boost/serialization/vector.hpp \
+ /usr/include/boost/serialization/library_version_type.hpp \
+ /usr/include/boost/serialization/item_version_type.hpp \
+ /usr/include/boost/serialization/collections_save_imp.hpp \
+ /usr/include/boost/serialization/collections_load_imp.hpp \
+ /usr/include/boost/serialization/detail/stack_constructor.hpp \
+ /usr/include/boost/aligned_storage.hpp \
+ /usr/include/boost/serialization/detail/is_default_constructible.hpp \
+ /usr/include/boost/serialization/array_wrapper.hpp \
+ /usr/include/boost/serialization/array_optimization.hpp \
+ /usr/include/boost/serialization/collection_traits.hpp \
  /home/kokyriakidis/Downloads/shasta/src/fstream.hpp \
  /usr/include/c++/11/fstream \
  /usr/include/x86_64-linux-gnu/c++/11/bits/basic_file.h \
  /usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h \
- /usr/include/c++/11/bits/fstream.tcc
+ /usr/include/c++/11/bits/fstream.tcc \
+ /home/kokyriakidis/Downloads/shasta/src/mode3-LocalAssembly.hpp \
+ /home/kokyriakidis/Downloads/shasta/src/mode3-LocalAnchorGraph.hpp \
+ /home/kokyriakidis/Downloads/shasta/src/mode3-LocalAssemblyGraph.hpp \
+ /home/kokyriakidis/Downloads/shasta/src/timestamp.hpp \
+ /usr/include/boost/tokenizer.hpp /usr/include/boost/token_iterator.hpp \
+ /usr/include/boost/iterator/minimum_category.hpp \
+ /usr/include/boost/token_functions.hpp

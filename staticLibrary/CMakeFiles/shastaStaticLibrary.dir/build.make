@@ -1623,10 +1623,24 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraph.cpp.
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraph.cpp.s"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/kokyriakidis/Downloads/shasta/src/mode3-AssemblyGraph.cpp -o CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraph.cpp.s
 
+staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
+staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.o: src/mode3-AssemblyGraphPostprocessor.cpp
+staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_112) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.o"
+	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/mode3-AssemblyGraphPostprocessor.cpp
+
+staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.i"
+	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/kokyriakidis/Downloads/shasta/src/mode3-AssemblyGraphPostprocessor.cpp > CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.i
+
+staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.s"
+	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/kokyriakidis/Downloads/shasta/src/mode3-AssemblyGraphPostprocessor.cpp -o CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.s
+
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAnchorGraph.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAnchorGraph.cpp.o: src/mode3-LocalAnchorGraph.cpp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAnchorGraph.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_112) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAnchorGraph.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_113) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAnchorGraph.cpp.o"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAnchorGraph.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAnchorGraph.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAnchorGraph.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/mode3-LocalAnchorGraph.cpp
 
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAnchorGraph.cpp.i: cmake_force
@@ -1640,7 +1654,7 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAnchorGraph.c
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.o: src/mode3-LocalAssembly.cpp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_113) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_114) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.o"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/mode3-LocalAssembly.cpp
 
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.i: cmake_force
@@ -1651,10 +1665,24 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.s"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/kokyriakidis/Downloads/shasta/src/mode3-LocalAssembly.cpp -o CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.s
 
+staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
+staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.o: src/mode3-LocalAssemblyGraph.cpp
+staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_115) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.o"
+	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/mode3-LocalAssemblyGraph.cpp
+
+staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.i"
+	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/kokyriakidis/Downloads/shasta/src/mode3-LocalAssemblyGraph.cpp > CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.i
+
+staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.s"
+	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/kokyriakidis/Downloads/shasta/src/mode3-LocalAssemblyGraph.cpp -o CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.s
+
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasedComponent.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasedComponent.cpp.o: src/mode3-PhasedComponent.cpp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasedComponent.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_114) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasedComponent.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_116) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasedComponent.cpp.o"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasedComponent.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasedComponent.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasedComponent.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/mode3-PhasedComponent.cpp
 
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasedComponent.cpp.i: cmake_force
@@ -1668,7 +1696,7 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasedComponent.cp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasingTable.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasingTable.cpp.o: src/mode3-PhasingTable.cpp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasingTable.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_115) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasingTable.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_117) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasingTable.cpp.o"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasingTable.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasingTable.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasingTable.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/mode3-PhasingTable.cpp
 
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasingTable.cpp.i: cmake_force
@@ -1682,7 +1710,7 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasingTable.cpp.s
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/performanceLog.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/performanceLog.cpp.o: src/performanceLog.cpp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/performanceLog.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_116) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/performanceLog.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_118) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/performanceLog.cpp.o"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/performanceLog.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/performanceLog.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/performanceLog.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/performanceLog.cpp
 
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/performanceLog.cpp.i: cmake_force
@@ -1696,7 +1724,7 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/performanceLog.cpp.s: cm
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/platformDependent.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/platformDependent.cpp.o: src/platformDependent.cpp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/platformDependent.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_117) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/platformDependent.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_119) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/platformDependent.cpp.o"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/platformDependent.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/platformDependent.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/platformDependent.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/platformDependent.cpp
 
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/platformDependent.cpp.i: cmake_force
@@ -1710,7 +1738,7 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/platformDependent.cpp.s:
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/runCommandWithTimeout.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/runCommandWithTimeout.cpp.o: src/runCommandWithTimeout.cpp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/runCommandWithTimeout.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_118) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/runCommandWithTimeout.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_120) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/runCommandWithTimeout.cpp.o"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/runCommandWithTimeout.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/runCommandWithTimeout.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/runCommandWithTimeout.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/runCommandWithTimeout.cpp
 
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/runCommandWithTimeout.cpp.i: cmake_force
@@ -1724,7 +1752,7 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/runCommandWithTimeout.cp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/shastaLapack.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/shastaLapack.cpp.o: src/shastaLapack.cpp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/shastaLapack.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_119) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/shastaLapack.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_121) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/shastaLapack.cpp.o"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/shastaLapack.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/shastaLapack.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/shastaLapack.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/shastaLapack.cpp
 
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/shastaLapack.cpp.i: cmake_force
@@ -1738,7 +1766,7 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/shastaLapack.cpp.s: cmak
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSpoa.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSpoa.cpp.o: src/testSpoa.cpp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSpoa.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_120) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSpoa.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_122) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSpoa.cpp.o"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSpoa.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/testSpoa.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/testSpoa.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/testSpoa.cpp
 
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSpoa.cpp.i: cmake_force
@@ -1752,7 +1780,7 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSpoa.cpp.s: cmake_fo
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSubsetGraph.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSubsetGraph.cpp.o: src/testSubsetGraph.cpp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSubsetGraph.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_121) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSubsetGraph.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_123) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSubsetGraph.cpp.o"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSubsetGraph.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/testSubsetGraph.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/testSubsetGraph.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/testSubsetGraph.cpp
 
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSubsetGraph.cpp.i: cmake_force
@@ -1766,7 +1794,7 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/testSubsetGraph.cpp.s: c
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/timestamp.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/timestamp.cpp.o: src/timestamp.cpp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/timestamp.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_122) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/timestamp.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_124) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/timestamp.cpp.o"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/timestamp.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/timestamp.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/timestamp.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/timestamp.cpp
 
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/timestamp.cpp.i: cmake_force
@@ -1780,7 +1808,7 @@ staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/timestamp.cpp.s: cmake_f
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/touchMemory.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/flags.make
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/touchMemory.cpp.o: src/touchMemory.cpp
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/touchMemory.cpp.o: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_123) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/touchMemory.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_125) "Building CXX object staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/touchMemory.cpp.o"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && /usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/touchMemory.cpp.o -MF CMakeFiles/shastaStaticLibrary.dir/__/src/touchMemory.cpp.o.d -o CMakeFiles/shastaStaticLibrary.dir/__/src/touchMemory.cpp.o -c /home/kokyriakidis/Downloads/shasta/src/touchMemory.cpp
 
 staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/touchMemory.cpp.i: cmake_force
@@ -1904,8 +1932,10 @@ shastaStaticLibrary_OBJECTS = \
 "CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AnchorGraph.cpp.o" \
 "CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraph-Test.cpp.o" \
 "CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraph.cpp.o" \
+"CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.o" \
 "CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAnchorGraph.cpp.o" \
 "CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.o" \
+"CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.o" \
 "CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasedComponent.cpp.o" \
 "CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasingTable.cpp.o" \
 "CMakeFiles/shastaStaticLibrary.dir/__/src/performanceLog.cpp.o" \
@@ -2031,8 +2061,10 @@ staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/
 staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AnchorGraph.cpp.o
 staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraph-Test.cpp.o
 staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraph.cpp.o
+staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.o
 staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAnchorGraph.cpp.o
 staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.o
+staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.o
 staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasedComponent.cpp.o
 staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-PhasingTable.cpp.o
 staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/performanceLog.cpp.o
@@ -2045,7 +2077,7 @@ staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/
 staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/touchMemory.cpp.o
 staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/build.make
 staticLibrary/shasta.a: staticLibrary/CMakeFiles/shastaStaticLibrary.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_124) "Linking CXX static library shasta.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/kokyriakidis/Downloads/shasta/CMakeFiles --progress-num=$(CMAKE_PROGRESS_126) "Linking CXX static library shasta.a"
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && $(CMAKE_COMMAND) -P CMakeFiles/shastaStaticLibrary.dir/cmake_clean_target.cmake
 	cd /home/kokyriakidis/Downloads/shasta/staticLibrary && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/shastaStaticLibrary.dir/link.txt --verbose=$(VERBOSE)
 

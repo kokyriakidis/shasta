@@ -2839,6 +2839,30 @@ __/src/mode3-AssemblyGraph.cpp.s:
 	cd /home/kokyriakidis/Downloads/shasta && $(MAKE) $(MAKESILENT) -f staticLibrary/CMakeFiles/shastaStaticLibrary.dir/build.make staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraph.cpp.s
 .PHONY : __/src/mode3-AssemblyGraph.cpp.s
 
+__/src/mode3-AssemblyGraphPostprocessor.o: __/src/mode3-AssemblyGraphPostprocessor.cpp.o
+.PHONY : __/src/mode3-AssemblyGraphPostprocessor.o
+
+# target to build an object file
+__/src/mode3-AssemblyGraphPostprocessor.cpp.o:
+	cd /home/kokyriakidis/Downloads/shasta && $(MAKE) $(MAKESILENT) -f staticLibrary/CMakeFiles/shastaStaticLibrary.dir/build.make staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.o
+.PHONY : __/src/mode3-AssemblyGraphPostprocessor.cpp.o
+
+__/src/mode3-AssemblyGraphPostprocessor.i: __/src/mode3-AssemblyGraphPostprocessor.cpp.i
+.PHONY : __/src/mode3-AssemblyGraphPostprocessor.i
+
+# target to preprocess a source file
+__/src/mode3-AssemblyGraphPostprocessor.cpp.i:
+	cd /home/kokyriakidis/Downloads/shasta && $(MAKE) $(MAKESILENT) -f staticLibrary/CMakeFiles/shastaStaticLibrary.dir/build.make staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.i
+.PHONY : __/src/mode3-AssemblyGraphPostprocessor.cpp.i
+
+__/src/mode3-AssemblyGraphPostprocessor.s: __/src/mode3-AssemblyGraphPostprocessor.cpp.s
+.PHONY : __/src/mode3-AssemblyGraphPostprocessor.s
+
+# target to generate assembly for a file
+__/src/mode3-AssemblyGraphPostprocessor.cpp.s:
+	cd /home/kokyriakidis/Downloads/shasta && $(MAKE) $(MAKESILENT) -f staticLibrary/CMakeFiles/shastaStaticLibrary.dir/build.make staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-AssemblyGraphPostprocessor.cpp.s
+.PHONY : __/src/mode3-AssemblyGraphPostprocessor.cpp.s
+
 __/src/mode3-LocalAnchorGraph.o: __/src/mode3-LocalAnchorGraph.cpp.o
 .PHONY : __/src/mode3-LocalAnchorGraph.o
 
@@ -2886,6 +2910,30 @@ __/src/mode3-LocalAssembly.s: __/src/mode3-LocalAssembly.cpp.s
 __/src/mode3-LocalAssembly.cpp.s:
 	cd /home/kokyriakidis/Downloads/shasta && $(MAKE) $(MAKESILENT) -f staticLibrary/CMakeFiles/shastaStaticLibrary.dir/build.make staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssembly.cpp.s
 .PHONY : __/src/mode3-LocalAssembly.cpp.s
+
+__/src/mode3-LocalAssemblyGraph.o: __/src/mode3-LocalAssemblyGraph.cpp.o
+.PHONY : __/src/mode3-LocalAssemblyGraph.o
+
+# target to build an object file
+__/src/mode3-LocalAssemblyGraph.cpp.o:
+	cd /home/kokyriakidis/Downloads/shasta && $(MAKE) $(MAKESILENT) -f staticLibrary/CMakeFiles/shastaStaticLibrary.dir/build.make staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.o
+.PHONY : __/src/mode3-LocalAssemblyGraph.cpp.o
+
+__/src/mode3-LocalAssemblyGraph.i: __/src/mode3-LocalAssemblyGraph.cpp.i
+.PHONY : __/src/mode3-LocalAssemblyGraph.i
+
+# target to preprocess a source file
+__/src/mode3-LocalAssemblyGraph.cpp.i:
+	cd /home/kokyriakidis/Downloads/shasta && $(MAKE) $(MAKESILENT) -f staticLibrary/CMakeFiles/shastaStaticLibrary.dir/build.make staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.i
+.PHONY : __/src/mode3-LocalAssemblyGraph.cpp.i
+
+__/src/mode3-LocalAssemblyGraph.s: __/src/mode3-LocalAssemblyGraph.cpp.s
+.PHONY : __/src/mode3-LocalAssemblyGraph.s
+
+# target to generate assembly for a file
+__/src/mode3-LocalAssemblyGraph.cpp.s:
+	cd /home/kokyriakidis/Downloads/shasta && $(MAKE) $(MAKESILENT) -f staticLibrary/CMakeFiles/shastaStaticLibrary.dir/build.make staticLibrary/CMakeFiles/shastaStaticLibrary.dir/__/src/mode3-LocalAssemblyGraph.cpp.s
+.PHONY : __/src/mode3-LocalAssemblyGraph.cpp.s
 
 __/src/mode3-PhasedComponent.o: __/src/mode3-PhasedComponent.cpp.o
 .PHONY : __/src/mode3-PhasedComponent.o
@@ -3473,12 +3521,18 @@ help:
 	@echo "... __/src/mode3-AssemblyGraph.o"
 	@echo "... __/src/mode3-AssemblyGraph.i"
 	@echo "... __/src/mode3-AssemblyGraph.s"
+	@echo "... __/src/mode3-AssemblyGraphPostprocessor.o"
+	@echo "... __/src/mode3-AssemblyGraphPostprocessor.i"
+	@echo "... __/src/mode3-AssemblyGraphPostprocessor.s"
 	@echo "... __/src/mode3-LocalAnchorGraph.o"
 	@echo "... __/src/mode3-LocalAnchorGraph.i"
 	@echo "... __/src/mode3-LocalAnchorGraph.s"
 	@echo "... __/src/mode3-LocalAssembly.o"
 	@echo "... __/src/mode3-LocalAssembly.i"
 	@echo "... __/src/mode3-LocalAssembly.s"
+	@echo "... __/src/mode3-LocalAssemblyGraph.o"
+	@echo "... __/src/mode3-LocalAssemblyGraph.i"
+	@echo "... __/src/mode3-LocalAssemblyGraph.s"
 	@echo "... __/src/mode3-PhasedComponent.o"
 	@echo "... __/src/mode3-PhasedComponent.i"
 	@echo "... __/src/mode3-PhasedComponent.s"

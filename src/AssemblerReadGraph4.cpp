@@ -3,10 +3,14 @@
 #include "ProjectedAlignment.hpp"
 #include "SHASTA_ASSERT.hpp"
 #include "timestamp.hpp"
+#include <queue>
+#include "orderPairs.hpp"
 using namespace shasta;
 
-//class AlignmentStats{public: double errorRateRle; uint32_t alignedRange; uint32_t rightUnaligned; uint32_t leftUnaligned; uint32_t alignmentId;};
+// Boost libraries.
+#include <boost/pending/disjoint_sets.hpp>
 
+//class AlignmentStats{public: double errorRateRle; uint32_t alignedRange; uint32_t rightUnaligned; uint32_t leftUnaligned; uint32_t alignmentId;};
 
 
 void Assembler::createReadGraph4(
@@ -70,9 +74,14 @@ void Assembler::createReadGraph4(
     // Create the read graph using the alignments we selected.
     createReadGraphUsingSelectedAlignments(keepAlignment);
 
+    cout << timestamp << "Initial createReadGraph4 ends." << endl;
+
+    // Remove bridges from the read graph.
+    removeReadGraphBridges(5);
+
     cout << timestamp << "createReadGraph4 ends." << endl;
 
-    removeReadGraphBridges(10);
+    
 
 }
 
