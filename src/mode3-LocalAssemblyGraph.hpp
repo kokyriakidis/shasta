@@ -25,7 +25,7 @@ namespace shasta {
 
         using LocalAssemblyGraphBaseClass = boost::adjacency_list<
             boost::listS,
-            boost::listS,
+            boost::vecS,
             boost::bidirectionalS,
             LocalAssemblyGraphVertex,
             LocalAssemblyGraphEdge>;
@@ -77,7 +77,7 @@ public:
     uint64_t positionInBubbleChain = invalid<uint64_t>;
 
     uint64_t distance = 0;
-    uint64_t id = invalid<uint64_t>;
+    array<double, 2> xy;
 
     bool isTypeA() const
     {
@@ -93,6 +93,9 @@ public:
         v(v)
     {
     }
+
+    // Default constructor.
+    LocalAssemblyGraphVertex() {}
 
     // Constructor for a type B LocalAssemblyGraphVertex.
     LocalAssemblyGraphVertex(
@@ -115,6 +118,7 @@ class shasta::mode3::LocalAssemblyGraphEdge : public ChainIdentifier {
 public:
     LocalAssemblyGraphEdge(const ChainIdentifier& chainIdentifier) :
         ChainIdentifier(chainIdentifier) {}
+    array<double, 2> xy = {0., 0.};
 };
 
 
@@ -133,23 +137,6 @@ public:
 
 private:
 
-    // Html/svg output using svg output created by Graphviz.
-    void writeHtml1(
-        ostream& html,
-        const LocalAssemblyGraphDisplayOptions&) const;
-    void writeGraphviz(
-        const string& fileName,
-        const LocalAssemblyGraphDisplayOptions&
-        ) const;
-    void writeGraphviz(
-        ostream&,
-        const LocalAssemblyGraphDisplayOptions&
-        ) const;
-
-    // Html/svg output without using svg output created by Graphviz.
-    void writeHtml2(
-        ostream& html,
-        const LocalAssemblyGraphDisplayOptions&);
 
     const AssemblyGraphPostprocessor& assemblyGraph;
     uint64_t maxDistance;
@@ -176,4 +163,39 @@ private:
     // Get the AnchorId corresponding to a vertex.
     AnchorId getAnchorId(vertex_descriptor) const;
 
+    // Return exact chain length, if available, or estimated value otherwise.
+    uint64_t getChainLength(edge_descriptor) const;
+
+    // Html/svg output using svg output created by Graphviz.
+    void writeHtml1(
+        ostream& html,
+        const LocalAssemblyGraphDisplayOptions&) const;
+    void writeGraphviz(
+        const string& fileName,
+        const LocalAssemblyGraphDisplayOptions&
+        ) const;
+    void writeGraphviz(
+        ostream&,
+        const LocalAssemblyGraphDisplayOptions&
+        ) const;
+
+    // Html/svg output without using svg output created by Graphviz.
+    void writeHtml2(
+        ostream& html,
+        const LocalAssemblyGraphDisplayOptions&);
+    void computeLayout(const LocalAssemblyGraphDisplayOptions&);
+    // The bounding box of the computed layout.
+    class Box {
+    public:
+        double xMin;
+        double xMax;
+        double yMin;
+        double yMax;
+        double xSize() {return xMax - xMin;}
+        double ySize() {return yMax - yMin;}
+        void makeSquare();
+        void extend(double factor);
+    };
+    Box boundingBox;
+    void computeLayoutBoundingBox();
 };
