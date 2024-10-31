@@ -872,7 +872,6 @@ public:
     string bubbleStringId(edge_descriptor, uint64_t positionInBubbleChain) const;
     string chainStringId(edge_descriptor, uint64_t positionInBubbleChain, uint64_t indexInBubble) const;
 
-private:
 
     // Return average coverage for the internal AnchorIds of a Chain.
     // For chain of length 2, this returns 0.
@@ -904,6 +903,7 @@ private:
         ) const;
 
 
+private:
     // Code in mode3-AssemblyGraph-test.cpp.
     void haplotizeWronglyPolyploidBubbles(
         bool debug

@@ -1,5 +1,6 @@
 // Shasta.
 #include "mode3-LocalAssemblyGraph.hpp"
+#include "computeLayout.hpp"
 #include "html.hpp"
 #include "HttpServer.hpp"
 #include "MurmurHash2.hpp"
@@ -124,11 +125,6 @@ void LocalAssemblyGraph::addVertices(
         }
     }
 
-    uint64_t id = 0;
-    BGL_FORALL_VERTICES(v, localAssemblyGraph, LocalAssemblyGraph) {
-        localAssemblyGraph[v].id = id++;
-    }
-
 
     /*
     cout << "Vertices: " << endl;
@@ -189,7 +185,7 @@ void LocalAssemblyGraph::addEdges()
 
             // Vertex0 does not correspond to a vertex of the assembly graph.
             // Loop over all outgoing chains.
-            const edge_descriptor ae = vertex0.e;
+            const AssemblyGraph::edge_descriptor ae = vertex0.e;
             const AssemblyGraphEdge& aEdge = assemblyGraph[ae];
             const BubbleChain& bubbleChain = aEdge;
             const Bubble& nextBubble = bubbleChain[vertex0.positionInBubbleChain + 1];
@@ -396,10 +392,11 @@ void LocalAssemblyGraph::writeGraphviz(
         const string anchorIdString = anchorIdToString(anchorId);
         const uint64_t coverage = assemblyGraph.anchors[anchorId].coverage();
 
-        // For the Graphviz vertex name we use the vertex id. It has no particular meaning.
+        // For the Graphviz vertex name we use the vertex descriptor (an integer).
+        // It has no particular meaning.
         // We cannot use the AnchorId because there is no guarantee that an AnchorId
         // appears only once in the AssemblyGraph.
-        s << vertex.id;
+        s << v;
 
         // Begin vertex attributes.
         s << " [";
@@ -446,7 +443,7 @@ void LocalAssemblyGraph::writeGraphviz(
         const vertex_descriptor v1 = target(e, localAssemblyGraph);
         const string chainStringId = assemblyGraph.getChainStringId(edge);
 
-        s << localAssemblyGraph[v0].id << "->" << localAssemblyGraph[v1].id << " [";
+        s << v0 << "->" << v1 << " [";
 
         // Tooltip.
         s << " tooltip=\"" << chainStringId << "\"";
@@ -711,9 +708,18 @@ void LocalAssemblyGraph::writeHtml1(
 // This is the code that computes the graph layout,
 // then creates the svg.
 void LocalAssemblyGraph::writeHtml2(
-    ostream& /* html */,
-    const LocalAssemblyGraphDisplayOptions& /* options */)
+    ostream& html,
+    const LocalAssemblyGraphDisplayOptions& options)
 {
+    // Use scientific notation because svg does not accept floating points
+    // ending with a decimal point.
+    html << std::scientific;
+
+    computeLayout(options);
+    computeLayoutBoundingBox();
+    html << "<p>Bounding box: " << boundingBox.xMin << " " << boundingBox.xMax << " " <<
+        boundingBox.yMin << " " << boundingBox.yMax;
+
     throw runtime_error("Not implemented. Use dot layout with labels.");
 }
 
@@ -734,4 +740,149 @@ AnchorId LocalAssemblyGraph::getAnchorId(vertex_descriptor v) const
         const Chain& chain = bubble.front();
         return chain.back();
     }
+}
+
+
+
+void LocalAssemblyGraph::computeLayout(const LocalAssemblyGraphDisplayOptions& options)
+{
+    LocalAssemblyGraph& localAssemblyGraph = *this;
+
+    // For readably display of bubbles, we want to add an auxiliary vertex in
+    // the middle of each vertex for the purpose of layout computation.
+    // For this purpose we need to create an auxiliary graph as follows:
+    // - The first num_vertices(localAssemblyGraph) correspond to the LocalAssemblyGraph vertices.
+    // - The next num_edges(localAssemblyGraph) correspond to the LocalAssemblyGraph edges.
+
+    using AuxiliaryGraph = boost::adjacency_list<
+        boost::listS,
+        boost::vecS,
+        boost::bidirectionalS>;
+    AuxiliaryGraph auxiliaryGraph(num_vertices(localAssemblyGraph) + num_edges(localAssemblyGraph));
+
+    // Vertex descriptors of the LocalAssemblyGraph are identical to vertex descriptors
+    // of the AuxiliaryGraph.
+    // We need to map edge descriptors of the localAssemblyGraph to vertex descriptors of
+    // the auxiliary graph.
+    std::map<edge_descriptor, AuxiliaryGraph::vertex_descriptor> edgeMap;
+    AuxiliaryGraph::vertex_descriptor i = num_vertices(localAssemblyGraph);
+    BGL_FORALL_EDGES(e, localAssemblyGraph, LocalAssemblyGraph) {
+        edgeMap.insert({e, i++});
+    }
+    SHASTA_ASSERT(i == num_vertices(auxiliaryGraph));
+
+    // Add edges of the AuxiliaryGraph.
+    // Each edge of the LocalAssemblyGraph generates two edges of the AuxiliaryGraph.
+    std::map<AuxiliaryGraph::edge_descriptor, double> edgeLengthMap;
+    BGL_FORALL_EDGES(e, localAssemblyGraph, LocalAssemblyGraph) {
+        const AuxiliaryGraph::vertex_descriptor v0 = source(e, localAssemblyGraph);
+        const AuxiliaryGraph::vertex_descriptor v1 = target(e, localAssemblyGraph);
+        const AuxiliaryGraph::vertex_descriptor vMiddle = edgeMap[e];
+        const double displayLength =
+            options.minimumEdgeLength +
+            options.additionalEdgeLengthPerKb * 0.001 * double(getChainLength(e));
+
+        AuxiliaryGraph::edge_descriptor e0;
+        tie(e0, ignore) = add_edge(v0, vMiddle, auxiliaryGraph);
+        edgeLengthMap.insert({e0, displayLength / 2.});
+
+        AuxiliaryGraph::edge_descriptor e1;
+        tie(e1, ignore) = add_edge(vMiddle, v1, auxiliaryGraph);
+        edgeLengthMap.insert({e1, displayLength / 2.});
+    }
+
+
+    // Compute the layout of the AuxiliaryGraph.
+    std::map<AuxiliaryGraph::vertex_descriptor, array<double, 2> > layout;
+    const double timeout = 30.;
+    if(options.layoutMethod == "custom") {
+        const int quality = 2;
+        computeLayoutCustom(
+            auxiliaryGraph,
+            edgeLengthMap,
+            layout,
+            quality,
+            timeout);
+    } else {
+        const string additionalOptions = "";
+        computeLayoutGraphviz(
+            auxiliaryGraph,
+            options.layoutMethod,
+            timeout,
+            layout,
+            additionalOptions,
+            &edgeLengthMap);
+        // If the layout is dot, reverse the y coordinates so the arrows point down.
+        if(options.layoutMethod == "dot") {
+            for(auto& p: layout) {
+                auto& y = p.second[1];
+                y = -y;
+            }
+        }
+    }
+
+    // Store the layout in the vertices.
+    BGL_FORALL_VERTICES(v, localAssemblyGraph, LocalAssemblyGraph) {
+        localAssemblyGraph[v].xy = layout[v];
+    }
+
+
+    // Store the layout in the edges.
+    BGL_FORALL_EDGES(e, localAssemblyGraph, LocalAssemblyGraph) {
+        const auto it = edgeMap.find(e);
+        SHASTA_ASSERT(it != edgeMap.end());
+        const AuxiliaryGraph::vertex_descriptor vAux = it->second;
+
+        const auto jt = layout.find(vAux);
+        SHASTA_ASSERT(jt != layout.end());
+        localAssemblyGraph[e].xy = jt->second;
+    }
+}
+
+
+
+uint64_t LocalAssemblyGraph::getChainLength(edge_descriptor e) const
+{
+    const LocalAssemblyGraph& localAssemblyGraph = *this;
+    const LocalAssemblyGraphEdge& edge = localAssemblyGraph[e];
+    const Chain& chain = assemblyGraph.getChain(edge);
+
+    if(assemblyGraph.sequenceWasAssembled) {
+        return chain.sequence.size();
+    } else {
+        return assemblyGraph.chainOffset(chain);
+    }
+}
+
+
+
+void LocalAssemblyGraph::computeLayoutBoundingBox()
+{
+    const LocalAssemblyGraph& localAssemblyGraph = *this;
+
+    boundingBox.xMin = std::numeric_limits<double>::max();
+    boundingBox.xMax = std::numeric_limits<double>::min();
+    boundingBox.yMin = boundingBox.xMin;
+    boundingBox.yMax = boundingBox.xMax;
+
+    BGL_FORALL_VERTICES(v, localAssemblyGraph, LocalAssemblyGraph) {
+        const array<double, 2>& xy = localAssemblyGraph[v].xy;
+        const double x = xy[0];
+        const double y = xy[1];
+        boundingBox.xMin = min(boundingBox.xMin, x);
+        boundingBox.xMax = max(boundingBox.xMax, x);
+        boundingBox.yMin = min(boundingBox.yMin, y);
+        boundingBox.yMax = max(boundingBox.yMax, y);
+    }
+
+    BGL_FORALL_EDGES(e, localAssemblyGraph, LocalAssemblyGraph) {
+        const array<double, 2>& xy = localAssemblyGraph[e].xy;
+        const double x = xy[0];
+        const double y = xy[1];
+        boundingBox.xMin = min(boundingBox.xMin, x);
+        boundingBox.xMax = max(boundingBox.xMax, x);
+        boundingBox.yMin = min(boundingBox.yMin, y);
+        boundingBox.yMax = max(boundingBox.yMax, y);
+    }
+
 }
