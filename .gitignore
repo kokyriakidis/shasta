@@ -12,3 +12,8 @@ dynamicLibrary/
 shasta-install/
 staticExecutable/
 staticLibrary/
+CMakeFiles/
+Makefile
+install_manifest.txt
+CMakeCache.txt
+cmake_install.cmake
