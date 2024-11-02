@@ -7,3 +7,8 @@ docs/doxygen/latex
 
 cmake-build-debug/
 build/
+.vscode/
+dynamicLibrary/
+shasta-install/
+staticExecutable/
+staticLibrary/

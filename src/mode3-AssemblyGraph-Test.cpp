@@ -59,342 +59,6 @@ void AssemblyGraph::prune(
 
 
 
-
-// This function fixes the bubbles that are haploid but appear as polyploid with low coverage.
-void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
-{
-
-    AssemblyGraph& assemblyGraph = *this;
-
-    // Loop over edges of the AssemblyGraph. Each edge corresponds to a
-    // BubbleChain (not just a single Chain).
-    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
-        // e is the edge descriptor for this edge (boost graph library).
-
-        if (debug) {
-            cout << "Working on BubbleChain " << bubbleChainStringId(e) << endl;
-        }
-
-        // Access the edge.
-        AssemblyGraphEdge& edge = assemblyGraph[e];
-
-        // Access the bubble chain.
-        BubbleChain& bubbleChain = edge;  // Because BubbleChain is derived from AssemblyGraphEdge
-
-        // If the bubble chain contains only one haploid bubble, skip it.
-        if(bubbleChain.isSimpleChain()) {
-            continue;
-        }
-
-        // Loop over all bubbles in the bubble chain.
-        for (uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
-
-            // Access the bubble at this position.
-            const Bubble& bubble = bubbleChain[positionInBubbleChain];
-
-            // Get its ploidy.
-            const uint64_t ploidy = bubble.size();
-
-            if(debug) {
-                cout << "Working on Bubble " << bubbleStringId(e, positionInBubbleChain) <<
-                    " with ploidy " << ploidy << endl;
-            }
-            
-            // If the bubble is haploid, skip it.
-            if(bubble.isHaploid()) {
-                if(debug) {
-                    cout << "Skipped it because it is a haploid bubble..." << endl;
-                }
-                continue;
-            }
-
-
-            // Check the first bubble of the bubble chain
-            bool firstBubbleIsPolyploidButHaploidLowCoverage = false;
-            if (positionInBubbleChain == 0) {
-                if(not bubble.isHaploid()) {
-                    uint64_t chainsWithAboveThresholdCoverage = 0;
-                    for(uint64_t indexInFirstBubble=0; indexInFirstBubble<bubble.size(); indexInFirstBubble++) {
-                        const Chain& chain = bubble[indexInFirstBubble];
-                        if (chain.size() > 2) {
-                            double firstPrimaryCoverage = primaryCoverage(chain);
-                            if (firstPrimaryCoverage > haploidCoverageThreshold) {
-                                chainsWithAboveThresholdCoverage++;
-                            }
-                            if (debug) {
-                                cout << "  Chain at index " << indexInFirstBubble << " has coverage" << primaryCoverage(chain) << endl;
-                            }
-                        }
-                    }
-                    if (chainsWithAboveThresholdCoverage <= 1) {
-                        firstBubbleIsPolyploidButHaploidLowCoverage = true;
-                    }
-                    continue;
-                }
-                continue;
-            }
-            
-
-            // Check coverage of previous bubble
-            bool previousBubbleIsHaploidLowCoverage = false;
-            bool previousBubbleIsPolyploidButHaploidLowCoverage = false;
-            if (positionInBubbleChain > 0) {
-                const Bubble& previousBubble = bubbleChain[positionInBubbleChain - 1];
-                
-                if(not previousBubble.isHaploid()) {
-                    if(debug) {
-                        cout << "Trying to find the coverage of the previous bubble but it is not haploid (TODO)" << endl;
-                    }
-                    uint64_t chainsWithAboveThresholdCoverage = 0;
-                    for(uint64_t indexInPreviousBubble=0; indexInPreviousBubble<previousBubble.size(); indexInPreviousBubble++) {
-                        const Chain& previousChain = previousBubble[indexInPreviousBubble];
-                        if (previousChain.size() > 2) {
-                            double previousPrimaryCoverage = primaryCoverage(previousChain);
-                            if (previousPrimaryCoverage > haploidCoverageThreshold) {
-                                chainsWithAboveThresholdCoverage++;
-                            }
-                            if (debug) {
-                                cout << "  Chain at index " << indexInPreviousBubble << " has coverage" << primaryCoverage(previousChain) << endl;
-                            }
-                        }
-                    }
-                    if (chainsWithAboveThresholdCoverage <= 1) {
-                        previousBubbleIsPolyploidButHaploidLowCoverage = true;
-                    }
-                    continue;
-                }
-                else {
-                    uint64_t indexInPreviousHaploidBubble = 0;
-                    const Chain& previousChain = previousBubble[indexInPreviousHaploidBubble];
-                    if (previousChain.size() > 2) {
-                        double previousPrimaryCoverage = primaryCoverage(previousChain);
-                        if (debug) {
-                            cout << "  Chain at index " << indexInPreviousHaploidBubble << " has coverage" << primaryCoverage(previousChain) << endl;
-                        }
-                        if (previousPrimaryCoverage <= haploidCoverageThreshold) {
-                            previousBubbleIsHaploidLowCoverage = true;
-                        }
-                        else {
-                            if (debug) {
-                                cout << "Coverage is bigger than the threshold.. Moving on. (" << previousPrimaryCoverage << ")" << endl;
-                            }
-                            continue;
-                        }
-                    } else {
-                        if (debug) {
-                            cout << "  Chain at index " << indexInPreviousHaploidBubble << " has only 2 anchors" << endl;
-                        }
-                        continue;
-                    }
-                }
-            }
-
-
-            // Check coverage of next bubble
-            bool nextBubbleIsHaploidLowCoverage = false;
-            bool nextBubbleIsPolyploidButHaploidLowCoverage = false;
-            if (positionInBubbleChain < bubbleChain.size() - 1) {
-                const Bubble& nextBubble = bubbleChain[positionInBubbleChain + 1];
-                
-                if(not nextBubble.isHaploid()) {
-                    if(debug) {
-                        cout << "Trying to find the coverage of the next bubble but it is not haploid (TODO)" << endl;
-                    }
-                    uint64_t chainsWithAboveThresholdCoverage = 0;
-                    for(uint64_t indexInNextBubble=0; indexInNextBubble<nextBubble.size(); indexInNextBubble++) {
-                        const Chain& nextChain = nextBubble[indexInNextBubble];
-                        if (nextChain.size() > 2) {
-                            double nextPrimaryCoverage = primaryCoverage(nextChain);
-                            if (nextPrimaryCoverage > haploidCoverageThreshold) {
-                                chainsWithAboveThresholdCoverage++;
-                            }
-                            if (debug) {
-                                cout << "  Chain at index " << indexInNextBubble << " has coverage" << primaryCoverage(nextChain) << endl;
-                            }
-                        }
-                    }
-                    if (chainsWithAboveThresholdCoverage <= 1) {
-                        nextBubbleIsPolyploidButHaploidLowCoverage = true;
-                    }
-                    continue;
-                }
-                else {
-                    uint64_t indexInNextHaploidBubble = 0;
-                    const Chain& nextChain = nextBubble[indexInNextHaploidBubble];
-                    if (nextChain.size() > 2) {
-                            double nextPrimaryCoverage = primaryCoverage(nextChain);
-                        if (debug) {
-                            cout << "  Chain at index " << indexInNextHaploidBubble << " has coverage" << primaryCoverage(nextChain) << endl;
-                        }
-                        if (nextPrimaryCoverage <= haploidCoverageThreshold) {
-                            nextBubbleIsHaploidLowCoverage = true;
-                        }
-                        else {
-                            if (debug) {
-                                cout << "Coverage is bigger than the threshold.. Moving on. (" << nextPrimaryCoverage << ")" << endl;
-                            }
-                            continue;
-                        }
-                    } else {
-                        if (debug) {
-                            cout << "  Chain at index " << indexInNextHaploidBubble << " has only 2 anchors" << endl;
-                        }
-                        continue;
-                    }
-                }
-            }
-
-            
-            // Check the last chain of the bubble
-            bool lastBubbleIsPolyploidButHaploidLowCoverage = false;
-            if (positionInBubbleChain == bubbleChain.size() - 1) {
-                const Bubble& lastBubble = bubbleChain[positionInBubbleChain];
-                if(not lastBubble.isHaploid()) {
-                    uint64_t chainsWithAboveThresholdCoverage = 0;
-                    for(uint64_t indexInLastBubble=0; indexInLastBubble<lastBubble.size(); indexInLastBubble++) {
-                        const Chain& lastChain = lastBubble[indexInLastBubble];
-                        if (lastChain.size() > 2) {
-                            double lastPrimaryCoverage = primaryCoverage(lastChain);
-                            if (lastPrimaryCoverage > haploidCoverageThreshold) {
-                                chainsWithAboveThresholdCoverage++;
-                            }
-                            if (debug) {
-                                cout << "  Chain at index " << indexInLastBubble << " has coverage" << primaryCoverage(lastChain) << endl;
-                            }
-                        }
-                    }
-                    if (chainsWithAboveThresholdCoverage <= 1) {
-                        lastBubbleIsPolyploidButHaploidLowCoverage = true;
-                    }
-                    continue;
-                }
-                continue;
-            }
-
-            if(not (firstBubbleIsPolyploidButHaploidLowCoverage or previousBubbleIsHaploidLowCoverage or nextBubbleIsHaploidLowCoverage or previousBubbleIsPolyploidButHaploidLowCoverage or nextBubbleIsPolyploidButHaploidLowCoverage or lastBubbleIsPolyploidButHaploidLowCoverage)) {
-                if (debug) {
-                    cout << "Criteria not met. Skipping..." << endl;
-                }
-                continue;
-            }
-
-            if (debug) {
-                cout << "This bubble can become haploid. Let's check if there are supporting reads between the start and end anchors" << endl;
-            }
-
-            // Remove the bubble by turning it into a trivial bubble chain with just two anchors
-            
-            // Access the first Chain of the bubble.
-            const Chain& firstChainInBubble = bubble.front();
-
-            // The Chain must have at least two "anchors", one at its beginning
-            // and one at its end.
-            SHASTA_ASSERT(firstChainInBubble.size() >= 2);
-
-            // Get the first and last anchor of the bubble.
-            const AnchorId firstAnchor = firstChainInBubble.front();
-            const AnchorId lastAnchor = firstChainInBubble.back();
-
-            // Check if there are common oriented reads between the first and last anchors.
-            const uint64_t commonCount = anchors.countCommon(firstAnchor, lastAnchor);
-
-            if (debug) {
-                cout << "Anchors " << firstAnchor << " " << lastAnchor <<
-                        ", common count " << commonCount << endl;
-                }
-
-            // If there are no supporting reads, we skip
-            if (commonCount == 0) {
-                if (debug) {
-                    cout << "No supporting reads found between the anchors." << endl;
-                }
-                continue;
-            }
-
-
-            // Create a new bubble with a single chain
-            Bubble newBubble;
-            Chain newChain;
-
-            // Add only the first and last anchors to the new chain
-            newChain.push_back(firstAnchor);
-            newChain.push_back(lastAnchor);
-
-            // Add the new chain to the new bubble
-            newBubble.push_back(newChain);
-
-            // Replace the original bubble in the bubble chain with the new bubble
-            bubbleChain[positionInBubbleChain] = newBubble;
-            
-        }
-    }
-    
-}
-
-
-
-
-
-void AssemblyGraph::removeSimpleBubbleChainsWithNoInternalAnchors(bool debug)
-{
-
-    AssemblyGraph& assemblyGraph = *this;
-
-    // Change the type to store edge descriptors instead of AssemblyGraphEdge
-    vector<edge_descriptor> edgesToRemove;
-
-    // Loop over edges of the AssemblyGraph. Each edge corresponds to a
-    // BubbleChain (not just a single Chain).
-    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
-        // e is the edge descriptor for this edge (boost graph library).
-
-        if (debug) {
-            cout << "Working on BubbleChain " << bubbleChainStringId(e) << endl;
-        }
-
-        // Access the edge.
-        AssemblyGraphEdge& edge = assemblyGraph[e];
-
-        // Access the bubble chain.
-        BubbleChain& bubbleChain = edge;  // Because BubbleChain is derived from AssemblyGraphEdge
-
-        // Process the bubble chain if it contains only one haploid bubble.
-        if(bubbleChain.isSimpleChain()) {
-            // Access the bubble at this position.
-            const Bubble& bubble = bubbleChain[0];
-
-            if(debug) {
-                cout << "Working on Bubble " << bubbleStringId(e, 0) <<
-                    " with ploidy " << 1 << endl;
-            }
-            
-            const Chain& chain = bubble[0];
-            if (chain.size() <= 2) {
-                if (debug) {
-                    cout << "  Chain at index " << 0 << " has only 2 anchors" << endl;
-                    cout << "  Removing haploid bubble chain " << bubbleChainStringId(e) << " due to no coverage" << endl;
-                }
-                // Store the edge descriptor instead of the edge itself
-                edgesToRemove.push_back(e);
-            }
-        }
-    }
-
-    // Remove the edges using the stored edge descriptors
-    for (const edge_descriptor& edgeToRemove : edgesToRemove) {
-        boost::remove_edge(edgeToRemove, assemblyGraph);
-    }
-}
-
-
-
-
-
-
-
-
-
-
 // This function removes the chains in the bubbles that have no coverage
 void AssemblyGraph::removeChainsInBubblesWithNoInternalAnchors(bool debug)
 {
@@ -462,11 +126,10 @@ void AssemblyGraph::removeChainsInBubblesWithNoInternalAnchors(bool debug)
                 }
             }
 
-            // If there are no chains with coverage, we remove the bubble
-            // TODO
+            // If there are no chains with coverage, we skip this bubble
             if (indexesToKeep.empty()) {
                 if (debug) {
-                    cout << "No chains with coverage found. We remove the bubble." << endl;
+                    cout << "No chains with coverage found. We skip this bubble." << endl;
                 }
                 continue;
             }
@@ -483,4 +146,326 @@ void AssemblyGraph::removeChainsInBubblesWithNoInternalAnchors(bool debug)
         }
     }
 }
+
+
+
+
+// This function fixes the bubbles that are haploid but appear as polyploid with low coverage.
+void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
+{
+
+    AssemblyGraph& assemblyGraph = *this;
+
+    // Loop over edges of the AssemblyGraph. Each edge corresponds to a
+    // BubbleChain (not just a single Chain).
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        // e is the edge descriptor for this edge (boost graph library).
+
+        if (debug) {
+            cout << "Working on BubbleChain " << bubbleChainStringId(e) << endl;
+        }
+
+        // Access the edge.
+        AssemblyGraphEdge& edge = assemblyGraph[e];
+
+        // Access the bubble chain.
+        BubbleChain& bubbleChain = edge;  // Because BubbleChain is derived from AssemblyGraphEdge
+
+        // If the bubble chain contains only one haploid bubble, skip it.
+        if(bubbleChain.isSimpleChain()) {
+            continue;
+        }
+
+        // Loop over all bubbles in the bubble chain.
+        for (uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+
+            // Access the bubble at this position.
+            const Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+            // Get its ploidy.
+            const uint64_t ploidy = bubble.size();
+
+            if(debug) {
+                cout << "Working on Bubble " << bubbleStringId(e, positionInBubbleChain) <<
+                    " with ploidy " << ploidy << endl;
+            }
+            
+            // If the bubble is haploid, skip it.
+            if(bubble.isHaploid()) {
+                continue;
+            }
+
+            // Check the first bubble of the bubble chain            
+            if (positionInBubbleChain == 0) {
+                // Check coverage of the next bubble only
+                bool nextBubbleIsHaploidAndLowCoverage = false;
+                if (positionInBubbleChain < bubbleChain.size() - 1) {
+                    const Bubble& nextBubble = bubbleChain[positionInBubbleChain + 1];
+                    if(nextBubble.isHaploid()) {
+                        uint64_t indexInNextHaploidBubble = 0;
+                        const Chain& nextChain = nextBubble[indexInNextHaploidBubble];
+                        if (nextChain.size() > 2) {
+                            double nextPrimaryCoverage = primaryCoverage(nextChain);
+                            if (nextPrimaryCoverage <= haploidCoverageThreshold) {
+                                nextBubbleIsHaploidAndLowCoverage = true;
+                            }
+                        }
+                    }
+                }
+
+                if(not nextBubbleIsHaploidAndLowCoverage) {
+                    continue;
+                }
+                
+                //
+                // Remove the bubble by turning it into a trivial bubble chain with just two anchors
+                //
+
+                // Access the first Chain of the bubble (it does not matter which one we choose).
+                const Chain& firstChainInBubble = bubble.front();
+
+                // The Chain must have at least two "anchors", one at its beginning
+                // and one at its end.
+                SHASTA_ASSERT(firstChainInBubble.size() >= 2);
+
+                // Get the first and last anchor of the bubble.
+                const AnchorId firstAnchor = firstChainInBubble.front();
+                const AnchorId lastAnchor = firstChainInBubble.back();
+
+                // Check if there are common oriented reads between the first and last anchors.
+                const uint64_t commonCount = anchors.countCommon(firstAnchor, lastAnchor);
+
+                if (debug) {
+                    cout << "Anchors " << firstAnchor << " " << lastAnchor <<
+                            ", common count " << commonCount << endl;
+                    }
+
+                // If there are no supporting reads, we skip
+                if (commonCount == 0) {
+                    if (debug) {
+                        cout << "No supporting reads found between the anchors." << endl;
+                    }
+                    continue;
+                }
+
+                // Create a new bubble with a single chain
+                Bubble newBubble;
+                Chain newChain;
+
+                // Add only the first and last anchors to the new chain
+                newChain.push_back(firstAnchor);
+                newChain.push_back(lastAnchor);
+
+                // Add the new chain to the new bubble
+                newBubble.push_back(newChain);
+
+                // Replace the original bubble in the bubble chain with the new bubble
+                bubbleChain[positionInBubbleChain] = newBubble;
+                
+            } else if (positionInBubbleChain == bubbleChain.size() - 1) {
+                // Check coverage of the previous bubble only
+                bool previousBubbleIsHaploidAndLowCoverage = false;
+                const Bubble& previousBubble = bubbleChain[positionInBubbleChain - 1];
+                if(previousBubble.isHaploid()) {
+                    uint64_t indexInPreviousHaploidBubble = 0;
+                    const Chain& previousChain = previousBubble[indexInPreviousHaploidBubble];
+                    if (previousChain.size() > 2) {
+                        double previousPrimaryCoverage = primaryCoverage(previousChain);
+                        if (previousPrimaryCoverage <= haploidCoverageThreshold) {
+                            previousBubbleIsHaploidAndLowCoverage = true;
+                        }
+                    }
+                }
+                
+
+                if(not previousBubbleIsHaploidAndLowCoverage) {
+                    continue;
+                }
+                
+                //
+                // Remove the bubble by turning it into a trivial bubble chain with just two anchors
+                //
+
+                // Access the first Chain of the bubble (it does not matter which one we choose).
+                const Chain& firstChainInBubble = bubble.front();
+
+                // The Chain must have at least two "anchors", one at its beginning
+                // and one at its end.
+                SHASTA_ASSERT(firstChainInBubble.size() >= 2);
+
+                // Get the first and last anchor of the bubble.
+                const AnchorId firstAnchor = firstChainInBubble.front();
+                const AnchorId lastAnchor = firstChainInBubble.back();
+
+                // Check if there are common oriented reads between the first and last anchors.
+                const uint64_t commonCount = anchors.countCommon(firstAnchor, lastAnchor);
+
+                if (debug) {
+                    cout << "Anchors " << firstAnchor << " " << lastAnchor <<
+                            ", common count " << commonCount << endl;
+                    }
+
+                // If there are no supporting reads, we skip
+                if (commonCount == 0) {
+                    if (debug) {
+                        cout << "No supporting reads found between the anchors." << endl;
+                    }
+                    continue;
+                }
+
+                // Create a new bubble with a single chain
+                Bubble newBubble;
+                Chain newChain;
+
+                // Add only the first and last anchors to the new chain
+                newChain.push_back(firstAnchor);
+                newChain.push_back(lastAnchor);
+
+                // Add the new chain to the new bubble
+                newBubble.push_back(newChain);
+
+                // Replace the original bubble in the bubble chain with the new bubble
+                bubbleChain[positionInBubbleChain] = newBubble;
+
+            } else {
+                //
+                // Check coverage in both previous and next bubble
+                //
+
+                // Check coverage of the next bubble
+                bool nextBubbleIsHaploidAndLowCoverage = false;
+                if (positionInBubbleChain < bubbleChain.size() - 1) {
+                    const Bubble& nextBubble = bubbleChain[positionInBubbleChain + 1];
+                    if(nextBubble.isHaploid()) {
+                        uint64_t indexInNextHaploidBubble = 0;
+                        const Chain& nextChain = nextBubble[indexInNextHaploidBubble];
+                        if (nextChain.size() > 2) {
+                            double nextPrimaryCoverage = primaryCoverage(nextChain);
+                            if (nextPrimaryCoverage <= haploidCoverageThreshold) {
+                                nextBubbleIsHaploidAndLowCoverage = true;
+                            }
+                        }
+                    }
+                }
+
+                // Check coverage of the previous bubble
+                bool previousBubbleIsHaploidAndLowCoverage = false;
+                const Bubble& previousBubble = bubbleChain[positionInBubbleChain - 1];
+                if(previousBubble.isHaploid()) {
+                    uint64_t indexInPreviousHaploidBubble = 0;
+                    const Chain& previousChain = previousBubble[indexInPreviousHaploidBubble];
+                    if (previousChain.size() > 2) {
+                        double previousPrimaryCoverage = primaryCoverage(previousChain);
+                        if (previousPrimaryCoverage <= haploidCoverageThreshold) {
+                            previousBubbleIsHaploidAndLowCoverage = true;
+                        }
+                    }
+                }
+                
+
+                if(not previousBubbleIsHaploidAndLowCoverage and not nextBubbleIsHaploidAndLowCoverage) {
+                    continue;
+                }
+
+                //
+                // Remove the bubble by turning it into a trivial bubble chain with just two anchors
+                //
+
+                // Access the first Chain of the bubble (it does not matter which one we choose).
+                const Chain& firstChainInBubble = bubble.front();
+
+                // The Chain must have at least two "anchors", one at its beginning
+                // and one at its end.
+                SHASTA_ASSERT(firstChainInBubble.size() >= 2);
+
+                // Get the first and last anchor of the bubble.
+                const AnchorId firstAnchor = firstChainInBubble.front();
+                const AnchorId lastAnchor = firstChainInBubble.back();
+
+                // Check if there are common oriented reads between the first and last anchors.
+                const uint64_t commonCount = anchors.countCommon(firstAnchor, lastAnchor);
+
+                if (debug) {
+                    cout << "Anchors " << firstAnchor << " " << lastAnchor <<
+                            ", common count " << commonCount << endl;
+                    }
+
+                // If there are no supporting reads, we skip
+                if (commonCount == 0) {
+                    if (debug) {
+                        cout << "No supporting reads found between the anchors." << endl;
+                    }
+                    continue;
+                }
+
+                // Create a new bubble with a single chain
+                Bubble newBubble;
+                Chain newChain;
+
+                // Add only the first and last anchors to the new chain
+                newChain.push_back(firstAnchor);
+                newChain.push_back(lastAnchor);
+
+                // Add the new chain to the new bubble
+                newBubble.push_back(newChain);
+
+                // Replace the original bubble in the bubble chain with the new bubble
+                bubbleChain[positionInBubbleChain] = newBubble;
+
+            }
+            
+        }
+    }
+}
+
+// void AssemblyGraph::removeSimpleBubbleChainsWithNoInternalAnchors(bool debug)
+// {
+
+//     AssemblyGraph& assemblyGraph = *this;
+
+//     // Change the type to store edge descriptors instead of AssemblyGraphEdge
+//     vector<edge_descriptor> edgesToRemove;
+
+//     // Loop over edges of the AssemblyGraph. Each edge corresponds to a
+//     // BubbleChain (not just a single Chain).
+//     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+//         // e is the edge descriptor for this edge (boost graph library).
+
+//         if (debug) {
+//             cout << "Working on BubbleChain " << bubbleChainStringId(e) << endl;
+//         }
+
+//         // Access the edge.
+//         AssemblyGraphEdge& edge = assemblyGraph[e];
+
+//         // Access the bubble chain.
+//         BubbleChain& bubbleChain = edge;  // Because BubbleChain is derived from AssemblyGraphEdge
+
+//         // Process the bubble chain if it contains only one haploid bubble.
+//         if(bubbleChain.isSimpleChain()) {
+//             // Access the bubble at this position.
+//             const Bubble& bubble = bubbleChain[0];
+
+//             if(debug) {
+//                 cout << "Working on Bubble " << bubbleStringId(e, 0) <<
+//                     " with ploidy " << 1 << endl;
+//             }
+            
+//             const Chain& chain = bubble[0];
+//             if (chain.size() <= 2) {
+//                 if (debug) {
+//                     cout << "  Chain at index " << 0 << " has only 2 anchors" << endl;
+//                     cout << "  Removing haploid bubble chain " << bubbleChainStringId(e) << " due to no coverage" << endl;
+//                 }
+//                 // Store the edge descriptor instead of the edge itself
+//                 edgesToRemove.push_back(e);
+//             }
+//         }
+//     }
+
+//     // Remove the edges using the stored edge descriptors
+//     for (const edge_descriptor& edgeToRemove : edgesToRemove) {
+//         boost::remove_edge(edgeToRemove, assemblyGraph);
+//     }
+// }
 

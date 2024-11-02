@@ -1241,12 +1241,75 @@ dynamicLibrary/CMakeFiles/shastaDynamicLibrary.dir/__/src/mode3-LocalAssemblyGra
  /usr/include/x86_64-linux-gnu/c++/11/bits/basic_file.h \
  /usr/include/x86_64-linux-gnu/c++/11/bits/c++io.h \
  /usr/include/c++/11/bits/fstream.tcc \
- /home/kokyriakidis/Downloads/shasta/src/html.hpp \
- /home/kokyriakidis/Downloads/shasta/src/iosfwd.hpp \
- /home/kokyriakidis/Downloads/shasta/src/HttpServer.hpp \
- /home/kokyriakidis/Downloads/shasta/src/MurmurHash2.hpp \
+ /home/kokyriakidis/Downloads/shasta/src/computeLayout.hpp \
  /home/kokyriakidis/Downloads/shasta/src/platformDependent.hpp \
  /home/kokyriakidis/Downloads/shasta/src/runCommandWithTimeout.hpp \
+ /usr/include/boost/algorithm/string.hpp \
+ /usr/include/boost/algorithm/string/std_containers_traits.hpp \
+ /usr/include/boost/algorithm/string/std/string_traits.hpp \
+ /usr/include/boost/algorithm/string/yes_no_type.hpp \
+ /usr/include/boost/algorithm/string/sequence_traits.hpp \
+ /usr/include/boost/algorithm/string/std/list_traits.hpp \
+ /usr/include/boost/algorithm/string/std/slist_traits.hpp \
+ /usr/include/boost/algorithm/string/config.hpp \
+ /usr/include/c++/11/ext/slist \
+ /usr/include/boost/algorithm/string/trim.hpp \
+ /usr/include/boost/range/as_literal.hpp \
+ /usr/include/boost/range/detail/str_types.hpp \
+ /usr/include/boost/algorithm/string/detail/trim.hpp \
+ /usr/include/boost/algorithm/string/classification.hpp \
+ /usr/include/boost/algorithm/string/detail/classification.hpp \
+ /usr/include/boost/algorithm/string/predicate_facade.hpp \
+ /usr/include/boost/algorithm/string/case_conv.hpp \
+ /usr/include/boost/iterator/transform_iterator.hpp \
+ /usr/include/boost/algorithm/string/detail/case_conv.hpp \
+ /usr/include/boost/algorithm/string/predicate.hpp \
+ /usr/include/boost/algorithm/string/compare.hpp \
+ /usr/include/boost/algorithm/string/find.hpp \
+ /usr/include/boost/algorithm/string/finder.hpp \
+ /usr/include/boost/algorithm/string/constants.hpp \
+ /usr/include/boost/algorithm/string/detail/finder.hpp \
+ /usr/include/boost/algorithm/string/detail/predicate.hpp \
+ /usr/include/boost/algorithm/string/split.hpp \
+ /usr/include/boost/algorithm/string/iter_find.hpp \
+ /usr/include/boost/algorithm/string/concept.hpp \
+ /usr/include/boost/algorithm/string/find_iterator.hpp \
+ /usr/include/boost/algorithm/string/detail/find_iterator.hpp \
+ /usr/include/boost/function.hpp \
+ /usr/include/boost/preprocessor/iterate.hpp \
+ /usr/include/boost/function/detail/prologue.hpp \
+ /usr/include/boost/config/no_tr1/functional.hpp \
+ /usr/include/boost/function/function_base.hpp \
+ /usr/include/boost/integer.hpp /usr/include/boost/type_index.hpp \
+ /usr/include/boost/type_index/stl_type_index.hpp \
+ /usr/include/boost/type_index/type_index_facade.hpp \
+ /usr/include/boost/core/demangle.hpp /usr/include/c++/11/cxxabi.h \
+ /usr/include/x86_64-linux-gnu/c++/11/bits/cxxabi_tweaks.h \
+ /usr/include/boost/type_traits/composite_traits.hpp \
+ /usr/include/boost/function_equal.hpp \
+ /usr/include/boost/function/function_fwd.hpp \
+ /usr/include/boost/mem_fn.hpp /usr/include/boost/bind/mem_fn.hpp \
+ /usr/include/boost/get_pointer.hpp \
+ /usr/include/boost/config/no_tr1/memory.hpp \
+ /usr/include/boost/bind/mem_fn_template.hpp \
+ /usr/include/boost/bind/mem_fn_cc.hpp \
+ /usr/include/boost/preprocessor/enum.hpp \
+ /usr/include/boost/preprocessor/enum_params.hpp \
+ /usr/include/boost/function/detail/function_iterate.hpp \
+ /usr/include/boost/function/detail/maybe_include.hpp \
+ /usr/include/boost/function/function_template.hpp \
+ /usr/include/boost/algorithm/string/detail/util.hpp \
+ /usr/include/boost/algorithm/string/join.hpp \
+ /usr/include/boost/algorithm/string/detail/sequence.hpp \
+ /usr/include/boost/algorithm/string/replace.hpp \
+ /usr/include/boost/algorithm/string/find_format.hpp \
+ /usr/include/boost/algorithm/string/detail/find_format.hpp \
+ /usr/include/boost/algorithm/string/detail/find_format_store.hpp \
+ /usr/include/boost/algorithm/string/detail/replace_storage.hpp \
+ /usr/include/boost/algorithm/string/detail/find_format_all.hpp \
+ /usr/include/boost/algorithm/string/formatter.hpp \
+ /usr/include/boost/algorithm/string/detail/formatter.hpp \
+ /usr/include/boost/algorithm/string/erase.hpp \
  /usr/include/boost/graph/iteration_macros.hpp \
  /usr/include/boost/uuid/uuid.hpp \
  /usr/include/boost/uuid/detail/config.hpp \
@@ -1265,7 +1328,6 @@ dynamicLibrary/CMakeFiles/shastaDynamicLibrary.dir/__/src/mode3-LocalAssemblyGra
  /usr/include/boost/uuid/random_generator.hpp \
  /usr/include/boost/random/mersenne_twister.hpp \
  /usr/include/boost/integer/integer_mask.hpp \
- /usr/include/boost/integer.hpp \
  /usr/include/boost/random/detail/config.hpp \
  /usr/include/boost/random/detail/ptr_helper.hpp \
  /usr/include/boost/random/detail/seed.hpp \
@@ -1350,5 +1412,9 @@ dynamicLibrary/CMakeFiles/shastaDynamicLibrary.dir/__/src/mode3-LocalAssemblyGra
  /usr/include/boost/uuid/detail/random_provider_getrandom.ipp \
  /usr/include/x86_64-linux-gnu/sys/random.h \
  /usr/include/boost/uuid/uuid_io.hpp /usr/include/boost/io/ios_state.hpp \
- /usr/include/boost/io_fwd.hpp /usr/include/c++/11/queue \
- /usr/include/c++/11/bits/stl_queue.h
+ /usr/include/boost/io_fwd.hpp \
+ /home/kokyriakidis/Downloads/shasta/src/html.hpp \
+ /home/kokyriakidis/Downloads/shasta/src/iosfwd.hpp \
+ /home/kokyriakidis/Downloads/shasta/src/HttpServer.hpp \
+ /home/kokyriakidis/Downloads/shasta/src/MurmurHash2.hpp \
+ /usr/include/c++/11/queue /usr/include/c++/11/bits/stl_queue.h
