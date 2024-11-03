@@ -202,18 +202,18 @@ void AssemblyGraph::run(
     compressBubbleChains();
     if(debug) write("F");
 
-    // Final cleanup. For now this just prunes the assembly graph.
-    prune(debug, options.assemblyGraphOptions.pruneLength);
+    removeChainsInBubblesWithNoInternalAnchors(debug);
     compress();
     compressBubbleChains();
     if(debug) write("G");
 
-    removeChainsInBubblesWithNoInternalAnchors(debug);
+    haplotizeWronglyPolyploidBubbles(debug);
     compress();
     compressBubbleChains();
     if(debug) write("H");
 
-    haplotizeWronglyPolyploidBubbles(debug);
+    // Final cleanup. For now this just prunes the assembly graph.
+    prune(debug, options.assemblyGraphOptions.pruneLength);
     compress();
     compressBubbleChains();
     if(debug) write("I");
