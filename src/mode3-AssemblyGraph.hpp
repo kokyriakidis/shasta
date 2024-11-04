@@ -922,6 +922,10 @@ private:
         uint64_t pruneLength
         );
 
+    void removeCrossEdgesInAssemblyGraph(
+        bool debug
+        );
+
 
 
     // Serialization.

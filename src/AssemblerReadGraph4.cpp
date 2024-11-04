@@ -19,7 +19,7 @@ void Assembler::createReadGraph4(
     const bool debug = false;
 
     // QRle threshold to use an alignment in the read graph.
-    const double minQRle = 44.;
+    const double minQRle = 37.;
 
     const double maxErrorRateRle = std::pow(10.0, - minQRle / 10.0);
 

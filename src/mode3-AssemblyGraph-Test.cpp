@@ -1,6 +1,10 @@
 // Shasta.
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-Anchor.hpp"
+#include "timestamp.hpp"
+// Standard library.
+#include <stack>
+
 using namespace shasta;
 using namespace mode3;
 
@@ -8,6 +12,8 @@ using namespace mode3;
 #include <boost/graph/iteration_macros.hpp>
 
 const uint64_t haploidCoverageThreshold = 18;
+
+
 
 
 // This function removes short hanging bubble chains
@@ -20,7 +26,7 @@ void AssemblyGraph::prune(
 
     // Variable to keep track of the edges to be removed. 
     // These edges are haploid bubble chains with no coverage.
-    vector<edge_descriptor> edgesToRemove;
+    std::stack<edge_descriptor> edgesToRemove;
 
     // Loop over edges of the AssemblyGraph. Each edge corresponds to a
     // BubbleChain (not just a single Chain).
@@ -33,24 +39,129 @@ void AssemblyGraph::prune(
         const uint64_t inDegree0 = in_degree(v0, assemblyGraph);
         const uint64_t outDegree1 = out_degree(v1, assemblyGraph);
 
-        if ((inDegree0 == 0 and outDegree1 == 1) or ((inDegree0 == 1 and outDegree1 == 0))) {
-            uint64_t averageOffset;
-            uint64_t minOffset;
-            uint64_t maxOffset;
-            assemblyGraph.bubbleChainOffset(assemblyGraph[e], averageOffset, minOffset, maxOffset);
-            
-            if (averageOffset <= pruneLength) {
-                if (debug) {
-                    cout << "Edge " << bubbleChainStringId(e) << " is a short hanging segment with total length " << averageOffset << ". Removing it." << endl;
-                }
-                edgesToRemove.push_back(e);
-            }
+        // If not a leaf, skip it.
+        const bool isLeaf = (inDegree0 == 0 and outDegree1 != 0) or (inDegree0 != 0 and outDegree1 == 0);
+        if(not isLeaf) {
+            continue;
+        }
+
+        uint64_t averageOffset;
+        uint64_t minOffset;
+        uint64_t maxOffset;
+        assemblyGraph.bubbleChainOffset(assemblyGraph[e], averageOffset, minOffset, maxOffset);
+        
+        if (averageOffset <= pruneLength) {
+            edgesToRemove.push(e);
         }
     }
 
-    // Remove the edges that we marked for removal
-    for (const edge_descriptor& edgeToRemove : edgesToRemove) {
-        boost::remove_edge(edgeToRemove, assemblyGraph);
+    // Remove the short leaves.
+    // Every time a short leaf is removed, check if any nearby short leaves
+    // appear and add them to the stack if they do.
+    uint64_t pruneCount = 0;
+    while(not edgesToRemove.empty()) {
+
+        // Get the next short leaf edge from the stack.
+        // This will be removed.
+        const edge_descriptor eA = edgesToRemove.top();
+        edgesToRemove.pop();
+
+        // Get the two vertices.
+        const vertex_descriptor vA0 = source(eA, assemblyGraph);
+        const vertex_descriptor vA1 = target(eA, assemblyGraph);
+
+        // Compute the degrees.
+        const uint64_t inDegree0 = in_degree(vA0, assemblyGraph);
+        const uint64_t outDegree1 = out_degree(vA1, assemblyGraph);
+
+        // Sanity checks that this is indeed a short leaf.
+        SHASTA_ASSERT((inDegree0 == 0 and outDegree1 != 0) or (inDegree0 != 0 and outDegree1 == 0));
+        uint64_t averageOffset;
+        uint64_t minOffset;
+        uint64_t maxOffset;
+        assemblyGraph.bubbleChainOffset(assemblyGraph[eA], averageOffset, minOffset, maxOffset);
+        SHASTA_ASSERT(averageOffset <= pruneLength);
+
+
+        // Add to the stack any short leaves that will be created when we remove eA.
+        if(inDegree0 == 0) {
+            if(outDegree1 == 0) {
+
+                // This edge is isolated, so removing it will not
+                // create any new leafs.
+
+            } else {
+
+                // There are no parents.
+                // If the inDegree of vA1 is 1, removing eA would turn
+                // all of its children into leaves.
+                if(in_degree(vA1, assemblyGraph) == 1) {
+
+                    // Loop over the children edges to see if any should
+                    // be added to the stack.
+                    BGL_FORALL_OUTEDGES(vA1, eB, assemblyGraph, AssemblyGraph) {
+                        if(eB == eA) {
+                            continue;
+                        }
+                        uint64_t averageOffset;
+                        uint64_t minOffset;
+                        uint64_t maxOffset;
+                        assemblyGraph.bubbleChainOffset(assemblyGraph[eB], averageOffset, minOffset, maxOffset);
+                        if(averageOffset >= pruneLength) {
+                            continue;
+                        }
+                        const vertex_descriptor vB1 = target(eB, assemblyGraph);
+                        if(out_degree(vB1, assemblyGraph) != 0) {
+                            edgesToRemove.push(eB);
+                        }
+                    }
+                }
+
+            }
+        } else {
+            if(outDegree1 == 0) {
+
+                // There are no children.
+                // If the outDegree of vA0 is 1, removing eA would turn
+                // all of its parents into leaves.
+                if(out_degree(vA0, assemblyGraph) == 1) {
+
+                    // Loop over the parent edges to see if any should
+                    // be added to the stack.
+                    BGL_FORALL_INEDGES(vA0, eB, assemblyGraph, AssemblyGraph) {
+                        if(eB == eA) {
+                            continue;
+                        }
+                        uint64_t averageOffset;
+                        uint64_t minOffset;
+                        uint64_t maxOffset;
+                        assemblyGraph.bubbleChainOffset(assemblyGraph[eB], averageOffset, minOffset, maxOffset);
+                        if(averageOffset >= pruneLength) {
+                            continue;
+                        }
+                        const vertex_descriptor vB1 = source(eB, assemblyGraph);
+                        if(in_degree(vB1, assemblyGraph) != 0) {
+                            edgesToRemove.push(eB);
+                        }
+                    }
+                }
+
+            } else {
+
+                // This edge is not a leaf!
+                SHASTA_ASSERT(0);
+            }
+
+        }
+
+        // Now we can remove eA.
+        boost::remove_edge(eA, assemblyGraph);
+        ++pruneCount;
+    }
+
+    if(pruneCount > 0) {
+        cout << "Pruned " << pruneCount << " edges." << endl;
+        cout << timestamp << "mode3-AssemblyGraph::prune ends" << endl;
     }
 
 }
@@ -417,6 +528,130 @@ void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
         }
     }
 }
+
+bool vertexHasOutgoingChainWithInternalAnchors(AssemblyGraph::vertex_descriptor v, AssemblyGraph& assemblyGraph) {
+    BGL_FORALL_OUTEDGES(v, e, assemblyGraph, AssemblyGraph) {
+        // Access the edge.
+        const AssemblyGraphEdge& edge = assemblyGraph[e];
+
+        // Access the bubble chain.
+        const BubbleChain& bubbleChain = edge;
+
+        // Access the first bubble of the bubble chain.
+        const Bubble& bubble = bubbleChain[0];
+
+        for(uint64_t indexInBubble = 0; indexInBubble < bubble.size(); indexInBubble++) {
+            const Chain& chain = bubble[indexInBubble];
+            if (chain.size() > 2) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool vertexHasIncomingChainWithInternalAnchors(AssemblyGraph::vertex_descriptor v, AssemblyGraph& assemblyGraph) {
+    BGL_FORALL_INEDGES(v, e, assemblyGraph, AssemblyGraph) {
+        // Access the edge.
+        const AssemblyGraphEdge& edge = assemblyGraph[e];
+
+        // Access the bubble chain.
+        const BubbleChain& bubbleChain = edge;
+        
+        // Access the last bubble of the bubble chain.
+        const Bubble& bubble = bubbleChain[bubbleChain.size() - 1];
+
+        for(uint64_t indexInBubble = 0; indexInBubble < bubble.size(); indexInBubble++) {
+            const Chain& chain = bubble[indexInBubble];
+            if (chain.size() > 2) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+
+bool isSimpleBubbleChainWithNoInternalAnchors(AssemblyGraph::edge_descriptor e, AssemblyGraph& assemblyGraph) {
+    // Access the edge.
+    const AssemblyGraphEdge& edge = assemblyGraph[e];
+
+    // Access the bubble chain.
+    const BubbleChain& bubbleChain = edge;
+
+    // If the bubble chain contains only one haploid bubble, skip it.
+    if(not bubbleChain.isSimpleChain()) {
+        return false;
+    }
+    
+    // Access the bubble of the simple bubble chain.
+    const Bubble& bubble = bubbleChain[0];
+
+    // Access the chain of the simple bubble chain.
+    const Chain& chain = bubble[0];
+
+    if (chain.size() == 2) {
+        return true;
+    }
+
+    return false;
+}
+
+
+
+// Remove cross-edges in the AssemblyGraph.
+// This removes an edge Z:v0->v1 if the following are all true:
+// 1. Z has no internal anchors. 
+// 2. v0 has at least one outgoing chain with internal anchors.
+// 3. v1 has at least one incoming chain with internal anchors.
+void AssemblyGraph::removeCrossEdgesInAssemblyGraph(
+    bool debug)
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // Find the edges we are going to remove.
+    vector<edge_descriptor> edgesToBeRemoved;
+
+    // Loop over edges of the AssemblyGraph. Each edge corresponds to a
+    // BubbleChain (not just a single Chain).
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        // e is the edge descriptor for this edge (boost graph library).
+
+        if (debug) {
+            cout << "Working on BubbleChain " << bubbleChainStringId(e) << endl;
+        }
+
+        bool isPotentialCrossEdge = isSimpleBubbleChainWithNoInternalAnchors(e, assemblyGraph);
+        if(not isPotentialCrossEdge) {
+            continue;
+        }
+
+        const vertex_descriptor v0 = source(e, assemblyGraph);
+        const vertex_descriptor v1 = target(e, assemblyGraph);
+
+        bool hasReliableOutEdge = vertexHasOutgoingChainWithInternalAnchors(v0, assemblyGraph);
+        bool hasReliableInEdge = vertexHasIncomingChainWithInternalAnchors(v1, assemblyGraph);
+
+        if(not hasReliableOutEdge and not hasReliableInEdge) {
+            continue;
+        }
+
+        edgesToBeRemoved.push_back(e);
+    }
+
+    // Remove the edges we found.
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, assemblyGraph);
+    }
+}
+
+
+
+
+
+
+
+
 
 // void AssemblyGraph::removeSimpleBubbleChainsWithNoInternalAnchors(bool debug)
 // {

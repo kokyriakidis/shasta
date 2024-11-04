@@ -212,11 +212,16 @@ void AssemblyGraph::run(
     compressBubbleChains();
     if(debug) write("H");
 
+    removeCrossEdgesInAssemblyGraph(debug);
+    compress();
+    compressBubbleChains();
+    if(debug) write("I");
+
     // Final cleanup. For now this just prunes the assembly graph.
     prune(debug, options.assemblyGraphOptions.pruneLength);
     compress();
     compressBubbleChains();
-    if(debug) write("I");
+    if(debug) write("J");
 
     
 
