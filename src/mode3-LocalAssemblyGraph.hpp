@@ -133,7 +133,8 @@ public:
 
     void writeHtml(
         ostream& html,
-        const LocalAssemblyGraphDisplayOptions&);
+        const LocalAssemblyGraphDisplayOptions&,
+        const string& assemblyStage);
 
 private:
 
@@ -182,7 +183,8 @@ private:
     // Html/svg output without using svg output created by Graphviz.
     void writeHtml2(
         ostream& html,
-        const LocalAssemblyGraphDisplayOptions&);
+        const LocalAssemblyGraphDisplayOptions&,
+        const string& assemblyStage);
     void computeLayout(const LocalAssemblyGraphDisplayOptions&);
     // The bounding box of the computed layout.
     class Box {
@@ -198,4 +200,17 @@ private:
     };
     Box boundingBox;
     void computeLayoutBoundingBox();
+
+    void writeVertices(
+        ostream& html,
+        const LocalAssemblyGraphDisplayOptions&) const;
+    double vertexRadius(vertex_descriptor, const LocalAssemblyGraphDisplayOptions&) const;
+
+    void writeEdges(
+        ostream& html,
+        const LocalAssemblyGraphDisplayOptions&,
+        const string& assemblyStage) const;
+    void writeSvgControls(
+        ostream& html,
+        const LocalAssemblyGraphDisplayOptions&) const;
 };

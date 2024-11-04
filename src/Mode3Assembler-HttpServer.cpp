@@ -612,7 +612,7 @@ void Mode3Assembler::exploreAssemblyGraph(
          " vertices and " << num_edges(graph) << " edges.";
 
     // Write it to html.
-    graph.writeHtml(html, displayOptions);
+    graph.writeHtml(html, displayOptions, assemblyStage);
 
 }
 

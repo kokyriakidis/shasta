@@ -511,7 +511,7 @@ LocalAssemblyGraphDisplayOptions::LocalAssemblyGraphDisplayOptions(const vector<
     minimumEdgeLength = 1.;
     HttpServer::getParameterValue(request, "minimumEdgeLength", minimumEdgeLength);
 
-    additionalEdgeLengthPerKb = 1.;
+    additionalEdgeLengthPerKb = 0.001;
     HttpServer::getParameterValue(request, "additionalEdgeLengthPerKb", additionalEdgeLengthPerKb);
 
     edgeThickness = 1.;
@@ -596,8 +596,6 @@ void LocalAssemblyGraphDisplayOptions::writeForm(ostream& html) const
         (edgeColoring == "black" ? " checked=on" : "") << ">Black"
         "<br><input type=radio required name=edgeColoring value='random'" <<
         (edgeColoring == "random" ? " checked=on" : "") << ">Random"
-        "<br><input type=radio required name=edgeColoring value='byCoverageLoss'" <<
-        (edgeColoring == "byCoverageLoss" ? " checked=on" : "") << ">By coverage loss"
         "<hr>"
 
         "<b>Edge graphics</b>"
@@ -625,7 +623,8 @@ void LocalAssemblyGraphDisplayOptions::writeForm(ostream& html) const
 
 void LocalAssemblyGraph::writeHtml(
     ostream& html,
-    const LocalAssemblyGraphDisplayOptions& options)
+    const LocalAssemblyGraphDisplayOptions& options,
+    const string& assemblyStage)
 {
     if((options.layoutMethod == "dot") and (options.vertexLabels or options.edgeLabels)) {
 
@@ -635,7 +634,7 @@ void LocalAssemblyGraph::writeHtml(
     } else {
 
         // Compute graph layout and use it to generate svg.
-        writeHtml2(html, options);
+        writeHtml2(html, options, assemblyStage);
 
     }
 }
@@ -709,7 +708,8 @@ void LocalAssemblyGraph::writeHtml1(
 // then creates the svg.
 void LocalAssemblyGraph::writeHtml2(
     ostream& html,
-    const LocalAssemblyGraphDisplayOptions& options)
+    const LocalAssemblyGraphDisplayOptions& options,
+    const string& assemblyStage)
 {
     // Use scientific notation because svg does not accept floating points
     // ending with a decimal point.
@@ -717,10 +717,381 @@ void LocalAssemblyGraph::writeHtml2(
 
     computeLayout(options);
     computeLayoutBoundingBox();
-    html << "<p>Bounding box: " << boundingBox.xMin << " " << boundingBox.xMax << " " <<
-        boundingBox.yMin << " " << boundingBox.yMax;
 
-    throw runtime_error("Not implemented. Use dot layout with labels.");
+    Box viewportBox = boundingBox;
+    viewportBox.extend(0.05);
+    viewportBox.makeSquare();
+
+    // Begin the svg.
+    const string svgId = "LocalssemblyGraph";
+    html <<
+        "\n<br><div style='display:inline-block;vertical-align:top;'>"
+        "<svg id='" << svgId <<
+        "' width='" <<  options.sizePixels <<
+        "' height='" << options.sizePixels <<
+        "' viewbox='" << viewportBox.xMin << " " << viewportBox.yMin << " " <<
+        viewportBox.xSize() << " " <<
+        viewportBox.ySize() << "'"
+        " style='background-color:#f0f0f0'"
+        ">\n";
+
+    // Write the edges first so they don't obscure the vertices.
+    writeEdges(html, options, assemblyStage);
+
+    // Write the vertices.
+    writeVertices(html, options);
+
+    // Finish the svg.
+    html << "</svg></div>";
+
+    // Side panel.
+    html << "<div style='display:inline-block;margin-left:20px'>";
+    writeSvgControls(html, options);
+    html << "</div>";
+
+}
+
+
+
+void LocalAssemblyGraph::writeSvgControls(
+    ostream& html,
+    const LocalAssemblyGraphDisplayOptions& /* options */) const
+{
+    html <<
+        "<p><table>";
+
+    // Add drag and zoom.
+    addSvgDragAndZoom(html);
+
+
+
+    // Buttons to change vertex size.
+    html << R"stringDelimiter(
+    <tr><th class=left>Vertex size<td>
+    <button type='button' onClick='changeVertexSize(0.1)' style='width:3em'>---</button>
+    <button type='button' onClick='changeVertexSize(0.5)' style='width:3em'>--</button>
+    <button type='button' onClick='changeVertexSize(0.8)' style='width:3em'>-</button>
+    <button type='button' onClick='changeVertexSize(1.25)' style='width:3em'>+</button>
+    <button type='button' onClick='changeVertexSize(2.)' style='width:3em'>++</button>
+    <button type='button' onClick='changeVertexSize(10.)' style='width:3em'>+++</button>
+        <script>
+        function changeVertexSize(factor)
+        {
+            var vertexGroup = document.getElementById('vertices');
+            var vertices = vertexGroup.getElementsByTagName('circle');
+            for(i=0; i<vertices.length; i++) {
+                v = vertices[i];
+                v.setAttribute('r', factor * v.getAttribute('r'));
+            }
+        }
+        </script>
+        )stringDelimiter";
+
+
+
+    // Buttons to change edge thickness.
+    html << R"stringDelimiter(
+    <tr><th class=left>Edge thickness<td>
+    <button type='button' onClick='changeThickness(0.1)' style='width:3em'>---</button>
+    <button type='button' onClick='changeThickness(0.5)' style='width:3em'>--</button>
+    <button type='button' onClick='changeThickness(0.8)' style='width:3em'>-</button>
+    <button type='button' onClick='changeThickness(1.25)' style='width:3em'>+</button>
+    <button type='button' onClick='changeThickness(2.)' style='width:3em'>++</button>
+    <button type='button' onClick='changeThickness(10.)' style='width:3em'>+++</button>
+        <script>
+        function changeThickness(factor)
+        {
+            var edgeGroup = document.getElementById('edges');
+            var edges = edgeGroup.getElementsByTagName('path');
+            for(i=0; i<edges.length; i++) {
+                e = edges[i];
+                e.setAttribute('stroke-width', factor * e.getAttribute('stroke-width'));
+            }
+
+            var arrowsGroup = document.getElementById('arrows');
+            var arrows = arrowsGroup.getElementsByTagName('line');
+            for(i=0; i<arrows.length; i++) {
+                a = arrows[i];
+                a.setAttribute('stroke-width', factor * a.getAttribute('stroke-width'));
+            }
+        }
+        </script>
+        )stringDelimiter";
+
+
+
+    // Zoom buttons.
+    html << R"stringDelimiter(
+        <tr title='Or use the mouse wheel.'><th class=left>Zoom<td>
+        <button type='button' onClick='zoomSvg(0.1)' style='width:3em'>---</button>
+        <button type='button' onClick='zoomSvg(0.5)' style='width:3em'>--</button>
+        <button type='button' onClick='zoomSvg(0.8)' style='width:3em'>-</button>
+        <button type='button' onClick='zoomSvg(1.25)' style='width:3em'>+</button>
+        <button type='button' onClick='zoomSvg(2.)' style='width:3em'>++</button>
+        <button type='button' onClick='zoomSvg(10.)' style='width:3em'>+++</button>
+    )stringDelimiter";
+
+
+
+    // Buttons to highlight an anchor and zoom to an anchor.
+    html << R"stringDelimiter(
+        <tr><td colspan=2>
+        <button onClick='highlightAnchor()'>Highlight</button>
+        <button onClick='zoomToAnchor()'>Zoom to</button>anchor
+        <input id=selectedAnchorId type=text size=10 style='text-align:center'>
+    <script>
+    function zoomToAnchor()
+    {
+        // Get the anchor id from the input field.
+        var anchorId = document.getElementById("selectedAnchorId").value;
+        zoomToGivenAnchor(anchorId);
+    }
+    function zoomToGivenAnchor(anchorId)
+    {
+        var element = document.getElementById(anchorId);
+        // Find the bounding box and its center.
+        var box = element.getBBox();
+        var xCenter = box.x + 0.5 * box.width;
+        var yCenter = box.y + 0.5 * box.height;
+
+        // Change the viewbox of the svg to be a bit larger than a square
+        // containing the bounding box.
+        var enlargeFactor = 5.;
+        var size = enlargeFactor * Math.max(box.width, box.height);
+        var factor = size / width;
+        width = size;
+        height = size;
+        x = xCenter - 0.5 * size;
+        y = yCenter - 0.5 * size;
+        var svg = document.querySelector('svg');
+        svg.setAttribute('viewBox', `${x} ${y} ${size} ${size}`);
+        ratio = size / svg.getBoundingClientRect().width;
+        svg.setAttribute('font-size', svg.getAttribute('font-size') * factor);
+    }
+    function highlightAnchor()
+    {
+        // Get the anchor id  from the input field.
+        var anchorId = document.getElementById("selectedAnchorId").value;
+        var element = document.getElementById(anchorId);
+
+        element.style.fill = "Magenta";
+    }
+    </script>
+    )stringDelimiter";
+
+
+    html << "</table>";
+
+    // Scroll down to the svg.
+    const string svgId = "LocalAssemblyGraph";
+    html <<
+        "<script>"
+        "document.getElementById('" << svgId << "').scrollIntoView({block:'center'});"
+        "</script>";
+
+    html <<
+        "<p>Use Ctrl+Click to pan."
+        "<p>Use Ctrl-Wheel or the above buttons to zoom.";
+}
+
+
+
+void LocalAssemblyGraph::writeVertices(
+    ostream& html,
+    const LocalAssemblyGraphDisplayOptions& options) const
+{
+    const LocalAssemblyGraph& localAssemblyGraph = *this;
+
+    html << "\n<g id='vertices' style='stroke:none'>";
+
+    BGL_FORALL_VERTICES(v, localAssemblyGraph, LocalAssemblyGraph) {
+        const LocalAssemblyGraphVertex& vertex = localAssemblyGraph[v];
+        const AnchorId anchorId = getAnchorId(v);
+        const string anchorIdString = anchorIdToString(anchorId);
+        const uint64_t coverage = assemblyGraph.anchors[anchorId].coverage();
+
+        // Get the position of this vertex in the computed layout.
+        const auto& xy = vertex.xy;
+        const double x = xy[0];
+        const double y = xy[1];
+
+
+        // Choose the color for this vertex.
+        string color;
+        if(vertex.distance == maxDistance) {
+            color = "Cyan";
+        } else if(vertex.distance == 0) {
+            color = "Blue";
+        }
+
+        // Hyperlink.
+        html << "\n<a href='exploreAnchor?anchorIdString=" <<
+            HttpServer::urlEncode(anchorIdString) << "'>";
+
+        // Write the vertex.
+        html << "<circle cx='" << x << "' cy='" << y <<
+            "' fill='" << color <<
+            "' r='" << vertexRadius(v, options) <<
+            "' id='" << anchorIdString << "'>"
+            "<title>" << anchorIdString << ", coverage " << coverage <<
+            "</title></circle>";
+
+        // End the hyperlink.
+        html << "</a>";
+    }
+    html << "\n</g>";
+}
+
+
+
+double LocalAssemblyGraph::vertexRadius(
+    vertex_descriptor v,
+    const LocalAssemblyGraphDisplayOptions& options) const
+{
+    const double scalingFactor =
+        (options.layoutMethod == "sfdp") ? 0.01 : 0.05;
+
+    if(options.vertexSizeByCoverage) {
+        const AnchorId anchorId = getAnchorId(v);
+        const uint64_t coverage = assemblyGraph.anchors[anchorId].coverage();
+        return options.vertexSize * (scalingFactor * sqrt(double(coverage)));
+    } else {
+        return options.vertexSize * (scalingFactor * 3.);
+    }
+}
+
+
+void LocalAssemblyGraph::writeEdges(
+    ostream& html,
+    const LocalAssemblyGraphDisplayOptions& options,
+    const string& assemblyStage) const
+{
+    const LocalAssemblyGraph& localAssemblyGraph = *this;
+    const double scalingFactor =
+        (options.layoutMethod == "sfdp") ? 0.001 : 0.005;
+
+
+    html << "\n<g id=edges>";
+
+    BGL_FORALL_EDGES(e, localAssemblyGraph, LocalAssemblyGraph) {
+        const LocalAssemblyGraphEdge& edge = localAssemblyGraph[e];
+        const string chainStringId = assemblyGraph.getChainStringId(edge);
+
+        const vertex_descriptor v0 = source(e, localAssemblyGraph);
+        const vertex_descriptor v1 = target(e, localAssemblyGraph);
+
+        const LocalAssemblyGraphVertex& vertex0 = localAssemblyGraph[v0];
+        const LocalAssemblyGraphVertex& vertex1 = localAssemblyGraph[v1];
+
+        const auto& xy0 = vertex0.xy;
+        const auto& xy1 = vertex1.xy;
+
+        const double x0 = xy0[0];
+        const double y0 = xy0[1];
+        const double x1 = xy1[0];
+        const double y1 = xy1[1];
+
+        // The middle point of the quadratic Bezier spline used ot display the
+        // edge is the xy stored in the edge.
+        const auto& xym = edge.xy;
+        const double xm = xym[0];
+        const double ym = xym[1];
+
+
+        string color = "Black";
+
+        if(options.edgeColoring == "random") {
+            // To decide the color, hash the chainStringId.
+            // This way we always get the same color for the same edge.
+            const uint32_t hashValue = MurmurHash2(chainStringId.data(), int(chainStringId.size()), 759);
+            const uint32_t hue = hashValue % 360;
+            color = "hsl(" + to_string(hue) + ",50%,50%)";
+        }
+
+        // Hyperlink.
+        html << "\n<a href='"
+            "exploreSegment?assemblyStage=" << assemblyStage <<
+            "&segmentName=" << chainStringId << "'>";
+
+        html <<
+            "\n<path d="
+            "'M " << x0 << " " << y0 <<
+            " Q " << xm << " " << ym <<
+            " " << x1 << " " << y1 <<
+            "' stroke='" << color <<
+            "' stroke-width='" << scalingFactor * options.edgeThickness <<
+            "' fill=none>"
+            "<title>" << chainStringId << "</title>"
+            "</path>";
+
+        // End the hyperlink.
+        // html << "</a>";
+    }
+    html << "</g>";
+
+
+
+    // Write the "arrows" to show edge directions.
+    // They are just short lines near the target vertex of each edge.
+    html << "\n<g id=arrows";
+    if(options.edgeColoring == "black") {
+        html << " stroke=white";
+    } else {
+        html << " stroke=black";
+    }
+    html << ">";
+    BGL_FORALL_EDGES(e, localAssemblyGraph, LocalAssemblyGraph) {
+        const LocalAssemblyGraphEdge& edge = localAssemblyGraph[e];
+        const string chainStringId = assemblyGraph.getChainStringId(edge);
+
+        const vertex_descriptor v0 = source(e, localAssemblyGraph);
+        const vertex_descriptor v1 = target(e, localAssemblyGraph);
+
+        const LocalAssemblyGraphVertex& vertex0 = localAssemblyGraph[v0];
+        const LocalAssemblyGraphVertex& vertex1 = localAssemblyGraph[v1];
+
+        const auto& xy0 = vertex0.xy;
+        const auto& xy1 = vertex1.xy;
+
+        // The positions of v0 and v1.
+        const double x0 = xy0[0];
+        const double y0 = xy0[1];
+        const double x1 = xy1[0];
+        const double y1 = xy1[1];
+
+        // The distance between x0 and x1.
+        const double d01x = x1 - x0;
+        const double d01y = y1 - y0;
+        const double d01 = sqrt(d01x * d01x + d01y * d01y);
+
+        // The middle point of the quadratic Bezier spline used to display the
+        // edge is the xy stored in the edge.
+        const auto& xym = edge.xy;
+        const double xm = xym[0];
+        const double ym = xym[1];
+
+        // Compute a unit vector in the direction xym - x1.
+        const double d1mx = xm - x1;
+        const double d1my = ym - y1;
+        const double d1m = sqrt(d1mx * d1mx + d1my * d1my);
+        const double e1mx = d1mx / d1m;
+        const double e1my = d1my / d1m;
+
+        // The "arrow" begins at xy1 and ends at xy2 computed here.
+        const double relativeArrowLength = 0.2;
+        const double arrowLength = relativeArrowLength * d01;
+        const double x2 = x1 + e1mx * arrowLength;
+        const double y2 = y1 + e1my * arrowLength;
+
+
+        html <<
+            "\n<line x1='" << x1 << "' y1='" << y1 <<
+            "' x2='" << x2 << "' y2='" << y2 <<
+            "' stroke-width='" << 0.2 * scalingFactor * options.edgeThickness <<
+            "' />";
+
+    }
+    html << "</g>";
 }
 
 
@@ -885,4 +1256,30 @@ void LocalAssemblyGraph::computeLayoutBoundingBox()
         boundingBox.yMax = max(boundingBox.yMax, y);
     }
 
+}
+
+
+
+void LocalAssemblyGraph::Box::makeSquare()
+{
+    if(xSize() > ySize()) {
+        const double delta = (xSize() - ySize()) / 2.;
+        yMin -= delta;
+        yMax += delta;
+    } else {
+        const double delta = (ySize() - xSize()) / 2.;
+        xMin -= delta;
+        xMax += delta;
+    }
+}
+
+
+
+void LocalAssemblyGraph::Box::extend(double factor)
+{
+    const double extend = factor * max(xSize(), ySize());
+    xMin -= extend;
+    xMax += extend;
+    yMin -= extend;
+    yMax += extend;
 }
