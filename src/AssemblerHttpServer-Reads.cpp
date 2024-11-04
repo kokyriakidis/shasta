@@ -1391,15 +1391,44 @@ void Assembler::exploreReadSequence(const vector<string>& request, ostream& html
 
             } else {
 
-                // There is no marker graph vertex.
-                // Write this marker as text.
-                html << "<span title='Marker " << ordinal <<
-                    ", position " << marker.position <<
-                    "'>";
-                for(uint64_t i=0; i<k; i++) {
-                    html << kmer[i];
+                if(assemblerInfo->assemblyMode != 3) {
+
+                    // There is no marker graph vertex.
+                    // Write this marker as text.
+                    html << "<span title='Marker " << ordinal <<
+                        ", position " << marker.position <<
+                        "'>";
+                    for(uint64_t i=0; i<k; i++) {
+                        html << kmer[i];
+                    }
+                    html << "</span>";
+
+                } else {
+
+                    // For assembly mode 3 we write the first half of the marker
+                    // a different color than the second half.
+                    // This helps visualize the anchors.
+                    SHASTA_ASSERT((k % 2) == 0);
+                    html << "<span title='Marker " << ordinal <<
+                        ", position " << marker.position <<
+                        "'>";
+
+                    // The first half.
+                    html << "<span style='color:Green'>";
+                    for(uint64_t i=0; i<k/2; i++) {
+                        html << kmer[i];
+                    }
+                    html << "</span>";
+
+                    // The second half.
+                    html << "<span style='color:Red'>";
+                    for(uint64_t i=k/2; i<k; i++) {
+                        html << kmer[i];
+                    }
+                    html << "</span>";
+
+                    html << "</span>";
                 }
-                html << "</span>";
             }
         }
         html << "<br>";
