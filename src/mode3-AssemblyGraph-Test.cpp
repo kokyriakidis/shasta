@@ -16,38 +16,38 @@ const uint64_t haploidCoverageThreshold = 18;
 
 
 
-// This function removes short hanging bubble chains
+/*******************************************************************************
+ * Remove short hanging bubble chains from the assembly graph.
+ * A hanging bubble chain is one that is connected to the rest of the graph only 
+ * at one end (either source or target vertex). A bubble chain is considered short
+ * if its average offset is less than or equal to the pruneLength threshold.
+ * 
+ * The function iteratively removes short hanging chains and checks for new hanging
+ * chains that may be created after each removal. This process continues until no
+ * more short hanging chains are found.
+ *
+ * @param debug If true, enables debug output
+ * @param pruneLength The length threshold below which hanging chains are removed
+ */
 void AssemblyGraph::prune(
     bool debug,
     uint64_t pruneLength)
 {
-
     AssemblyGraph& assemblyGraph = *this;
-
-    // Variable to keep track of the edges to be removed. 
-    // These edges are haploid bubble chains with no coverage.
     std::stack<edge_descriptor> edgesToRemove;
 
-    // Loop over edges of the AssemblyGraph. Each edge corresponds to a
-    // BubbleChain (not just a single Chain).
+    // Find short leaf edges
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
-        // e is the edge descriptor for this edge (boost graph library).
-
         const vertex_descriptor v0 = source(e, assemblyGraph);
         const vertex_descriptor v1 = target(e, assemblyGraph);
 
-        const uint64_t inDegree0 = in_degree(v0, assemblyGraph);
-        const uint64_t outDegree1 = out_degree(v1, assemblyGraph);
-
-        // If not a leaf, skip it.
-        const bool isLeaf = (inDegree0 == 0 and outDegree1 != 0) or (inDegree0 != 0 and outDegree1 == 0);
-        if(not isLeaf) {
+        const bool isLeaf = (in_degree(v0, assemblyGraph) == 0 && out_degree(v1, assemblyGraph) != 0) || 
+                           (in_degree(v0, assemblyGraph) != 0 && out_degree(v1, assemblyGraph) == 0);
+        if(!isLeaf) {
             continue;
         }
 
-        uint64_t averageOffset;
-        uint64_t minOffset;
-        uint64_t maxOffset;
+        uint64_t averageOffset, minOffset, maxOffset;
         assemblyGraph.bubbleChainOffset(assemblyGraph[e], averageOffset, minOffset, maxOffset);
         
         if (averageOffset <= pruneLength) {
@@ -55,107 +55,51 @@ void AssemblyGraph::prune(
         }
     }
 
-    // Remove the short leaves.
-    // Every time a short leaf is removed, check if any nearby short leaves
-    // appear and add them to the stack if they do.
+    // Remove short leaves and check for new ones
     uint64_t pruneCount = 0;
-    while(not edgesToRemove.empty()) {
-
-        // Get the next short leaf edge from the stack.
-        // This will be removed.
-        const edge_descriptor eA = edgesToRemove.top();
+    while(!edgesToRemove.empty()) {
+        const edge_descriptor e = edgesToRemove.top();
         edgesToRemove.pop();
 
-        // Get the two vertices.
-        const vertex_descriptor vA0 = source(eA, assemblyGraph);
-        const vertex_descriptor vA1 = target(eA, assemblyGraph);
+        const vertex_descriptor v0 = source(e, assemblyGraph);
+        const vertex_descriptor v1 = target(e, assemblyGraph);
 
-        // Compute the degrees.
-        const uint64_t inDegree0 = in_degree(vA0, assemblyGraph);
-        const uint64_t outDegree1 = out_degree(vA1, assemblyGraph);
-
-        // Sanity checks that this is indeed a short leaf.
-        SHASTA_ASSERT((inDegree0 == 0 and outDegree1 != 0) or (inDegree0 != 0 and outDegree1 == 0));
-        uint64_t averageOffset;
-        uint64_t minOffset;
-        uint64_t maxOffset;
-        assemblyGraph.bubbleChainOffset(assemblyGraph[eA], averageOffset, minOffset, maxOffset);
-        SHASTA_ASSERT(averageOffset <= pruneLength);
-
-
-        // Add to the stack any short leaves that will be created when we remove eA.
-        if(inDegree0 == 0) {
-            if(outDegree1 == 0) {
-
-                // This edge is isolated, so removing it will not
-                // create any new leafs.
-
-            } else {
-
-                // There are no parents.
-                // If the inDegree of vA1 is 1, removing eA would turn
-                // all of its children into leaves.
-                if(in_degree(vA1, assemblyGraph) == 1) {
-
-                    // Loop over the children edges to see if any should
-                    // be added to the stack.
-                    BGL_FORALL_OUTEDGES(vA1, eB, assemblyGraph, AssemblyGraph) {
-                        if(eB == eA) {
-                            continue;
-                        }
-                        uint64_t averageOffset;
-                        uint64_t minOffset;
-                        uint64_t maxOffset;
-                        assemblyGraph.bubbleChainOffset(assemblyGraph[eB], averageOffset, minOffset, maxOffset);
-                        if(averageOffset >= pruneLength) {
-                            continue;
-                        }
-                        const vertex_descriptor vB1 = target(eB, assemblyGraph);
-                        if(out_degree(vB1, assemblyGraph) != 0) {
-                            edgesToRemove.push(eB);
-                        }
+        // Check for new potential leaves after removing this edge
+        if(in_degree(v0, assemblyGraph) == 0 && out_degree(v1, assemblyGraph) > 0) {
+            if(in_degree(v1, assemblyGraph) == 1) {
+                // Check children edges
+                BGL_FORALL_OUTEDGES(v1, child, assemblyGraph, AssemblyGraph) {
+                    if(child == e) {
+                        continue;
+                    }
+                    
+                    uint64_t avgOffset, minOffset, maxOffset;
+                    assemblyGraph.bubbleChainOffset(assemblyGraph[child], avgOffset, minOffset, maxOffset);
+                    
+                    if(avgOffset < pruneLength && out_degree(target(child, assemblyGraph), assemblyGraph) != 0) {
+                        edgesToRemove.push(child);
                     }
                 }
-
             }
-        } else {
-            if(outDegree1 == 0) {
-
-                // There are no children.
-                // If the outDegree of vA0 is 1, removing eA would turn
-                // all of its parents into leaves.
-                if(out_degree(vA0, assemblyGraph) == 1) {
-
-                    // Loop over the parent edges to see if any should
-                    // be added to the stack.
-                    BGL_FORALL_INEDGES(vA0, eB, assemblyGraph, AssemblyGraph) {
-                        if(eB == eA) {
-                            continue;
-                        }
-                        uint64_t averageOffset;
-                        uint64_t minOffset;
-                        uint64_t maxOffset;
-                        assemblyGraph.bubbleChainOffset(assemblyGraph[eB], averageOffset, minOffset, maxOffset);
-                        if(averageOffset >= pruneLength) {
-                            continue;
-                        }
-                        const vertex_descriptor vB1 = source(eB, assemblyGraph);
-                        if(in_degree(vB1, assemblyGraph) != 0) {
-                            edgesToRemove.push(eB);
-                        }
+        } else if(in_degree(v0, assemblyGraph) > 0 && out_degree(v1, assemblyGraph) == 0) {
+            if(out_degree(v0, assemblyGraph) == 1) {
+                // Check parent edges  
+                BGL_FORALL_INEDGES(v0, parent, assemblyGraph, AssemblyGraph) {
+                    if(parent == e) {
+                        continue;
+                    }
+                    
+                    uint64_t avgOffset, minOffset, maxOffset; 
+                    assemblyGraph.bubbleChainOffset(assemblyGraph[parent], avgOffset, minOffset, maxOffset);
+                    
+                    if(avgOffset < pruneLength && in_degree(source(parent, assemblyGraph), assemblyGraph) != 0) {
+                        edgesToRemove.push(parent);
                     }
                 }
-
-            } else {
-
-                // This edge is not a leaf!
-                SHASTA_ASSERT(0);
             }
-
         }
 
-        // Now we can remove eA.
-        boost::remove_edge(eA, assemblyGraph);
+        boost::remove_edge(e, assemblyGraph);
         ++pruneCount;
     }
 
@@ -163,97 +107,71 @@ void AssemblyGraph::prune(
         cout << "Pruned " << pruneCount << " edges." << endl;
         cout << timestamp << "mode3-AssemblyGraph::prune ends" << endl;
     }
-
 }
 
 
 
 
 
-// This function removes the chains in the bubbles that have no coverage
-void AssemblyGraph::removeChainsInBubblesWithNoInternalAnchors(bool debug)
+/*******************************************************************************
+ * Remove chains in bubbles that have no internal anchors (length <= 2).
+ * 
+ * This function processes each bubble chain in the assembly graph and filters out
+ * chains that have 2 or fewer anchors, since these have no internal anchors.
+ * For each non-haploid bubble in a chain:
+ * 1. Creates a new filtered bubble containing only chains with >2 anchors
+ * 2. Replaces the original bubble with the filtered version if any chains remain
+ * 3. Skips haploid bubbles and empty filtered bubbles
+ *
+ * @param debug If true, prints debug information about skipped/kept chains
+ */
+void AssemblyGraph::removeChainsInBubblesWithNoInternalAnchors(bool debug) 
 {
-
     AssemblyGraph& assemblyGraph = *this;
 
-    // Loop over edges of the AssemblyGraph. Each edge corresponds to a
-    // BubbleChain (not just a single Chain).
+    // Loop over edges (BubbleChains) in the assembly graph
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
-        // e is the edge descriptor for this edge (boost graph library).
+        BubbleChain& bubbleChain = assemblyGraph[e];
 
-        if (debug) {
-            cout << "Working on BubbleChain " << bubbleChainStringId(e) << endl;
-        }
-
-        // Access the edge.
-        AssemblyGraphEdge& edge = assemblyGraph[e];
-
-        // Access the bubble chain.
-        BubbleChain& bubbleChain = edge;  // Because BubbleChain is derived from AssemblyGraphEdge
-
-        // If the bubble chain contains only one haploid bubble, skip it.
+        // Skip simple chains (containing only one haploid bubble)
         if(bubbleChain.isSimpleChain()) {
             continue;
         }
 
-        // Loop over all bubbles in the bubble chain.
+        // Process each bubble in the chain
         for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            Bubble& bubble = bubbleChain[positionInBubbleChain];
 
-            // Access the bubble at this position.
-            const Bubble& bubble = bubbleChain[positionInBubbleChain];
-
-            // Get its ploidy.
-            const uint64_t ploidy = bubble.size();
-
-            if(debug) {
-                cout << "Working on Bubble " << bubbleStringId(e, positionInBubbleChain) <<
-                    " with ploidy " << ploidy << endl;
-            }
-            
-            // If the bubble is haploid, skip it.
+            // Skip haploid bubbles
             if(bubble.isHaploid()) {
                 if(debug) {
-                    cout << "Skipped it because it is a haploid bubble..." << endl;
+                    cout << "Skipping haploid bubble " << bubbleStringId(e, positionInBubbleChain) << endl;
                 }
                 continue;
             }
 
-
-            // Find the chains of the bubble that have coverage and keep them
-            vector<u_int64_t> indexesToKeep;
-            for(uint64_t indexInBubble = 0; indexInBubble < bubble.size(); indexInBubble++) {
-                const Chain& chain = bubble[indexInBubble];
-                if (chain.size() > 2) {
-                    double coverage = primaryCoverage(chain);
-                    indexesToKeep.push_back(indexInBubble);
-                    if (debug) {
-                        cout << "  Chain at index " << indexInBubble << " has coverage " << coverage << " . We keep it." << endl;
-                    }
-                }
-                else {
-                    if (debug) {
-                        cout << "  Chain at index " << indexInBubble << " has only 2 anchors. We remove it." << endl;
-                    }
-                }
-            }
-
-            // If there are no chains with coverage, we skip this bubble
-            if (indexesToKeep.empty()) {
-                if (debug) {
-                    cout << "No chains with coverage found. We skip this bubble." << endl;
-                }
-                continue;
-            }
-
-            // Create a new bubble with the chains that have coverage
+            // Keep only chains with >2 anchors
             Bubble newBubble;
-            for (const u_int64_t index : indexesToKeep) {
-                newBubble.push_back(bubble[index]);
+            for(uint64_t i=0; i<bubble.size(); i++) {
+                const Chain& chain = bubble[i];
+                if(chain.size() > 2) {
+                    newBubble.push_back(chain);
+                    if(debug) {
+                        cout << "Keeping chain " << i << " with " << chain.size() << " anchors" << endl;
+                    }
+                }
             }
 
-            // Replace the original bubble in the bubble chain with the new bubble
-            bubbleChain[positionInBubbleChain] = newBubble;
-            
+            // Skip if no chains remain
+            if(newBubble.empty()) {
+                if(debug) {
+                    cout << "No chains with >2 anchors found in bubble " << bubbleStringId(e, positionInBubbleChain) << endl;
+                }
+                continue;
+            }
+
+            // Replace original bubble with filtered version
+            bubble = newBubble;
         }
     }
 }
@@ -261,274 +179,165 @@ void AssemblyGraph::removeChainsInBubblesWithNoInternalAnchors(bool debug)
 
 
 
-// This function fixes the bubbles that are haploid but appear as polyploid with low coverage.
+
+/*******************************************************************************
+ * Check if a bubble at the given position in a bubble chain is haploid and has 
+ * low coverage.
+ *
+ * A bubble is considered to have low coverage if its primary coverage is below
+ * haploidCoverageThreshold. The function checks several conditions:
+ * 1. Position must be valid within the bubble chain
+ * 2. Bubble must be haploid (contain only one chain)
+ * 3. Chain must have more than 2 anchors
+ * 4. Chain's primary coverage must be below the threshold
+ *
+ * @param assemblyGraph The assembly graph containing the bubble chain
+ * @param bubbleChain The bubble chain to check
+ * @param position Position of the bubble within the chain to check
+ * @return true if the bubble is haploid and has low coverage, false otherwise
+ */
+bool hasLowCoverageHaploidBubble(AssemblyGraph& assemblyGraph, const BubbleChain& bubbleChain, uint64_t position)
+{
+    // Check if position is valid
+    if (position >= bubbleChain.size()) {
+        return false;
+    }
+
+    const Bubble& bubble = bubbleChain[position];
+
+    // Check if bubble is haploid
+    if (!bubble.isHaploid()) {
+        return false;
+    }
+
+    // Get the only chain
+    const Chain& chain = bubble.front();
+
+    // Skip chains with only 2 anchors
+    if (chain.size() <= 2) {
+        return false;
+    }
+
+    // Check if coverage is low
+    const double coverage = assemblyGraph.primaryCoverage(chain);
+    return coverage < haploidCoverageThreshold;
+}
+
+
+/*******************************************************************************
+ * Fix bubbles that appear polyploid but are likely haploid with low coverage.
+ * 
+ * This function identifies polyploid bubbles that are likely actually haploid
+ * based on the coverage patterns of their neighboring bubbles. If a polyploid
+ * bubble has a neighboring haploid bubble with low coverage (based on haploidCoverageThreshold),
+ * it is considered a candidate for simplification.
+ * 
+ * For each candidate bubble:
+ * 1. Takes the first chain's start and end anchors
+ * 2. Verifies there are common reads between these anchors
+ * 3. Creates a new simplified haploid bubble with just those two anchors
+ * 4. Replaces the original polyploid bubble with this simplified version
+ * 
+ * @param debug If true, outputs debug information during processing
+ */
 void AssemblyGraph::haplotizeWronglyPolyploidBubbles(bool debug)
 {
-
     AssemblyGraph& assemblyGraph = *this;
 
-    // Loop over edges of the AssemblyGraph. Each edge corresponds to a
-    // BubbleChain (not just a single Chain).
+    // Loop over edges of the AssemblyGraph.
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
-        // e is the edge descriptor for this edge (boost graph library).
-
         if (debug) {
             cout << "Working on BubbleChain " << bubbleChainStringId(e) << endl;
         }
 
-        // Access the edge.
-        AssemblyGraphEdge& edge = assemblyGraph[e];
-
         // Access the bubble chain.
-        BubbleChain& bubbleChain = edge;  // Because BubbleChain is derived from AssemblyGraphEdge
+        BubbleChain& bubbleChain = assemblyGraph[e];
 
-        // If the bubble chain contains only one haploid bubble, skip it.
+        // Skip if simple chain
         if(bubbleChain.isSimpleChain()) {
             continue;
         }
 
-        // Loop over all bubbles in the bubble chain.
+        // Loop over all bubbles in the chain
         for (uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
-
-            // Access the bubble at this position.
             const Bubble& bubble = bubbleChain[positionInBubbleChain];
-
-            // Get its ploidy.
-            const uint64_t ploidy = bubble.size();
 
             if(debug) {
                 cout << "Working on Bubble " << bubbleStringId(e, positionInBubbleChain) <<
-                    " with ploidy " << ploidy << endl;
+                    " with ploidy " << bubble.size() << endl;
             }
             
-            // If the bubble is haploid, skip it.
+            // Skip haploid bubbles
             if(bubble.isHaploid()) {
                 continue;
             }
 
-            // Check the first bubble of the bubble chain            
-            if (positionInBubbleChain == 0) {
-                // Check coverage of the next bubble only
-                bool nextBubbleIsHaploidAndLowCoverage = false;
-                if (positionInBubbleChain < bubbleChain.size() - 1) {
-                    const Bubble& nextBubble = bubbleChain[positionInBubbleChain + 1];
-                    if(nextBubble.isHaploid()) {
-                        uint64_t indexInNextHaploidBubble = 0;
-                        const Chain& nextChain = nextBubble[indexInNextHaploidBubble];
-                        if (nextChain.size() > 2) {
-                            double nextPrimaryCoverage = primaryCoverage(nextChain);
-                            if (nextPrimaryCoverage <= haploidCoverageThreshold) {
-                                nextBubbleIsHaploidAndLowCoverage = true;
-                            }
-                        }
-                    }
-                }
-
-                if(not nextBubbleIsHaploidAndLowCoverage) {
-                    continue;
-                }
-                
-                //
-                // Remove the bubble by turning it into a trivial bubble chain with just two anchors
-                //
-
-                // Access the first Chain of the bubble (it does not matter which one we choose).
-                const Chain& firstChainInBubble = bubble.front();
-
-                // The Chain must have at least two "anchors", one at its beginning
-                // and one at its end.
-                SHASTA_ASSERT(firstChainInBubble.size() >= 2);
-
-                // Get the first and last anchor of the bubble.
-                const AnchorId firstAnchor = firstChainInBubble.front();
-                const AnchorId lastAnchor = firstChainInBubble.back();
-
-                // Check if there are common oriented reads between the first and last anchors.
-                const uint64_t commonCount = anchors.countCommon(firstAnchor, lastAnchor);
-
-                if (debug) {
-                    cout << "Anchors " << firstAnchor << " " << lastAnchor <<
-                            ", common count " << commonCount << endl;
-                    }
-
-                // If there are no supporting reads, we skip
-                if (commonCount == 0) {
-                    if (debug) {
-                        cout << "No supporting reads found between the anchors." << endl;
-                    }
-                    continue;
-                }
-
-                // Create a new bubble with a single chain
-                Bubble newBubble;
-                Chain newChain;
-
-                // Add only the first and last anchors to the new chain
-                newChain.push_back(firstAnchor);
-                newChain.push_back(lastAnchor);
-
-                // Add the new chain to the new bubble
-                newBubble.push_back(newChain);
-
-                // Replace the original bubble in the bubble chain with the new bubble
-                bubbleChain[positionInBubbleChain] = newBubble;
-                
-            } else if (positionInBubbleChain == bubbleChain.size() - 1) {
-                // Check coverage of the previous bubble only
-                bool previousBubbleIsHaploidAndLowCoverage = false;
-                const Bubble& previousBubble = bubbleChain[positionInBubbleChain - 1];
-                if(previousBubble.isHaploid()) {
-                    uint64_t indexInPreviousHaploidBubble = 0;
-                    const Chain& previousChain = previousBubble[indexInPreviousHaploidBubble];
-                    if (previousChain.size() > 2) {
-                        double previousPrimaryCoverage = primaryCoverage(previousChain);
-                        if (previousPrimaryCoverage <= haploidCoverageThreshold) {
-                            previousBubbleIsHaploidAndLowCoverage = true;
-                        }
-                    }
-                }
-                
-
-                if(not previousBubbleIsHaploidAndLowCoverage) {
-                    continue;
-                }
-                
-                //
-                // Remove the bubble by turning it into a trivial bubble chain with just two anchors
-                //
-
-                // Access the first Chain of the bubble (it does not matter which one we choose).
-                const Chain& firstChainInBubble = bubble.front();
-
-                // The Chain must have at least two "anchors", one at its beginning
-                // and one at its end.
-                SHASTA_ASSERT(firstChainInBubble.size() >= 2);
-
-                // Get the first and last anchor of the bubble.
-                const AnchorId firstAnchor = firstChainInBubble.front();
-                const AnchorId lastAnchor = firstChainInBubble.back();
-
-                // Check if there are common oriented reads between the first and last anchors.
-                const uint64_t commonCount = anchors.countCommon(firstAnchor, lastAnchor);
-
-                if (debug) {
-                    cout << "Anchors " << firstAnchor << " " << lastAnchor <<
-                            ", common count " << commonCount << endl;
-                    }
-
-                // If there are no supporting reads, we skip
-                if (commonCount == 0) {
-                    if (debug) {
-                        cout << "No supporting reads found between the anchors." << endl;
-                    }
-                    continue;
-                }
-
-                // Create a new bubble with a single chain
-                Bubble newBubble;
-                Chain newChain;
-
-                // Add only the first and last anchors to the new chain
-                newChain.push_back(firstAnchor);
-                newChain.push_back(lastAnchor);
-
-                // Add the new chain to the new bubble
-                newBubble.push_back(newChain);
-
-                // Replace the original bubble in the bubble chain with the new bubble
-                bubbleChain[positionInBubbleChain] = newBubble;
-
-            } else {
-                //
-                // Check coverage in both previous and next bubble
-                //
-
-                // Check coverage of the next bubble
-                bool nextBubbleIsHaploidAndLowCoverage = false;
-                if (positionInBubbleChain < bubbleChain.size() - 1) {
-                    const Bubble& nextBubble = bubbleChain[positionInBubbleChain + 1];
-                    if(nextBubble.isHaploid()) {
-                        uint64_t indexInNextHaploidBubble = 0;
-                        const Chain& nextChain = nextBubble[indexInNextHaploidBubble];
-                        if (nextChain.size() > 2) {
-                            double nextPrimaryCoverage = primaryCoverage(nextChain);
-                            if (nextPrimaryCoverage <= haploidCoverageThreshold) {
-                                nextBubbleIsHaploidAndLowCoverage = true;
-                            }
-                        }
-                    }
-                }
-
-                // Check coverage of the previous bubble
-                bool previousBubbleIsHaploidAndLowCoverage = false;
-                const Bubble& previousBubble = bubbleChain[positionInBubbleChain - 1];
-                if(previousBubble.isHaploid()) {
-                    uint64_t indexInPreviousHaploidBubble = 0;
-                    const Chain& previousChain = previousBubble[indexInPreviousHaploidBubble];
-                    if (previousChain.size() > 2) {
-                        double previousPrimaryCoverage = primaryCoverage(previousChain);
-                        if (previousPrimaryCoverage <= haploidCoverageThreshold) {
-                            previousBubbleIsHaploidAndLowCoverage = true;
-                        }
-                    }
-                }
-                
-
-                if(not previousBubbleIsHaploidAndLowCoverage and not nextBubbleIsHaploidAndLowCoverage) {
-                    continue;
-                }
-
-                //
-                // Remove the bubble by turning it into a trivial bubble chain with just two anchors
-                //
-
-                // Access the first Chain of the bubble (it does not matter which one we choose).
-                const Chain& firstChainInBubble = bubble.front();
-
-                // The Chain must have at least two "anchors", one at its beginning
-                // and one at its end.
-                SHASTA_ASSERT(firstChainInBubble.size() >= 2);
-
-                // Get the first and last anchor of the bubble.
-                const AnchorId firstAnchor = firstChainInBubble.front();
-                const AnchorId lastAnchor = firstChainInBubble.back();
-
-                // Check if there are common oriented reads between the first and last anchors.
-                const uint64_t commonCount = anchors.countCommon(firstAnchor, lastAnchor);
-
-                if (debug) {
-                    cout << "Anchors " << firstAnchor << " " << lastAnchor <<
-                            ", common count " << commonCount << endl;
-                    }
-
-                // If there are no supporting reads, we skip
-                if (commonCount == 0) {
-                    if (debug) {
-                        cout << "No supporting reads found between the anchors." << endl;
-                    }
-                    continue;
-                }
-
-                // Create a new bubble with a single chain
-                Bubble newBubble;
-                Chain newChain;
-
-                // Add only the first and last anchors to the new chain
-                newChain.push_back(firstAnchor);
-                newChain.push_back(lastAnchor);
-
-                // Add the new chain to the new bubble
-                newBubble.push_back(newChain);
-
-                // Replace the original bubble in the bubble chain with the new bubble
-                bubbleChain[positionInBubbleChain] = newBubble;
-
-            }
+            // Check if neighboring bubbles have low coverage
+            bool shouldSimplify = false;
             
+            if (positionInBubbleChain == 0) {
+                // Check next bubble only
+                shouldSimplify = hasLowCoverageHaploidBubble(assemblyGraph, bubbleChain, positionInBubbleChain + 1);
+            }
+            else if (positionInBubbleChain == bubbleChain.size() - 1) {
+                // Check previous bubble only  
+                shouldSimplify = hasLowCoverageHaploidBubble(assemblyGraph, bubbleChain, positionInBubbleChain - 1);
+            }
+            else {
+                // Check both neighbors
+                shouldSimplify = hasLowCoverageHaploidBubble(assemblyGraph, bubbleChain, positionInBubbleChain - 1) ||
+                                hasLowCoverageHaploidBubble(assemblyGraph, bubbleChain, positionInBubbleChain + 1);
+            }
+
+            if (!shouldSimplify) {
+                continue;
+            }
+
+            // Get first and last anchors
+            const Chain& firstChain = bubble.front();
+            SHASTA_ASSERT(firstChain.size() >= 2);
+            const AnchorId firstAnchor = firstChain.front();
+            const AnchorId lastAnchor = firstChain.back();
+
+            // Check for common reads
+            const uint64_t commonCount = anchors.countCommon(firstAnchor, lastAnchor);
+            if (debug) {
+                cout << "Anchors " << firstAnchor << " " << lastAnchor <<
+                        ", common count " << commonCount << endl;
+            }
+
+            if (commonCount == 0) {
+                if (debug) {
+                    cout << "No supporting reads found between the anchors." << endl;
+                }
+                continue;
+            }
+
+            // Create simplified bubble with single chain
+            Bubble newBubble;
+            Chain newChain;
+            newChain.push_back(firstAnchor);
+            newChain.push_back(lastAnchor);
+            newBubble.push_back(newChain);
+
+            // Replace original bubble
+            bubbleChain[positionInBubbleChain] = newBubble;
         }
     }
 }
 
+
+
+
+/*******************************************************************************
+ * Check if a vertex has any outgoing edges containing chains with internal anchors.
+ * A chain has internal anchors if it contains more than 2 anchors.
+ * Returns true if any outgoing edge has a chain with internal anchors in its first bubble.
+ *
+ * @param v The vertex descriptor to check
+ * @param assemblyGraph The assembly graph containing the vertex
+ * @return true if the vertex has an outgoing chain with internal anchors, false otherwise
+ */
 bool vertexHasOutgoingChainWithInternalAnchors(AssemblyGraph::vertex_descriptor v, AssemblyGraph& assemblyGraph) {
     BGL_FORALL_OUTEDGES(v, e, assemblyGraph, AssemblyGraph) {
         // Access the edge.
@@ -550,6 +359,16 @@ bool vertexHasOutgoingChainWithInternalAnchors(AssemblyGraph::vertex_descriptor 
     return false;
 }
 
+
+/*******************************************************************************
+ * Check if a vertex has any incoming edges containing chains with internal anchors.
+ * A chain has internal anchors if it contains more than 2 anchors.
+ * Returns true if any incoming edge has a chain with internal anchors in its last bubble.
+ *
+ * @param v The vertex descriptor to check
+ * @param assemblyGraph The assembly graph containing the vertex
+ * @return true if the vertex has an incoming chain with internal anchors, false otherwise
+ */
 bool vertexHasIncomingChainWithInternalAnchors(AssemblyGraph::vertex_descriptor v, AssemblyGraph& assemblyGraph) {
     BGL_FORALL_INEDGES(v, e, assemblyGraph, AssemblyGraph) {
         // Access the edge.
@@ -572,6 +391,14 @@ bool vertexHasIncomingChainWithInternalAnchors(AssemblyGraph::vertex_descriptor 
 }
 
 
+/*******************************************************************************
+ * Check if a bubble chain is simple (contains only one haploid bubble) and has no internal anchors.
+ * A chain has no internal anchors if it contains exactly 2 anchors.
+ *
+ * @param e The edge descriptor for the bubble chain to check
+ * @param assemblyGraph The assembly graph containing the bubble chain
+ * @return true if the bubble chain is simple and has no internal anchors, false otherwise
+ */
 bool isSimpleBubbleChainWithNoInternalAnchors(AssemblyGraph::edge_descriptor e, AssemblyGraph& assemblyGraph) {
     // Access the edge.
     const AssemblyGraphEdge& edge = assemblyGraph[e];
@@ -599,11 +426,24 @@ bool isSimpleBubbleChainWithNoInternalAnchors(AssemblyGraph::edge_descriptor e, 
 
 
 
-// Remove cross-edges in the AssemblyGraph.
-// This removes an edge Z:v0->v1 if the following are all true:
-// 1. Z has no internal anchors. 
-// 2. v0 has at least one outgoing chain with internal anchors.
-// 3. v1 has at least one incoming chain with internal anchors.
+/*******************************************************************************
+ * Remove cross-edges in the AssemblyGraph.
+ * 
+ * This function identifies and removes edges that appear to be "cross-edges" - 
+ * edges that likely represent incorrect connections in the assembly graph.
+ * An edge Z:v0->v1 is considered a cross-edge and removed if all of the following
+ * conditions are met:
+ * 
+ * 1. Z has no internal anchors (contains exactly 2 anchors)
+ * 2. v0 (source vertex) has at least one outgoing chain with internal anchors
+ * 3. v1 (target vertex) has at least one incoming chain with internal anchors
+ * 
+ * The rationale is that edges with no internal anchors connecting vertices that
+ * have other well-supported connections (chains with internal anchors) are likely
+ * to be spurious cross-connections that should be removed to improve the graph.
+ * 
+ * @param debug If true, outputs debug information during processing
+ */
 void AssemblyGraph::removeCrossEdgesInAssemblyGraph(
     bool debug)
 {
@@ -647,60 +487,4 @@ void AssemblyGraph::removeCrossEdgesInAssemblyGraph(
 
 
 
-
-
-
-
-
-
-// void AssemblyGraph::removeSimpleBubbleChainsWithNoInternalAnchors(bool debug)
-// {
-
-//     AssemblyGraph& assemblyGraph = *this;
-
-//     // Change the type to store edge descriptors instead of AssemblyGraphEdge
-//     vector<edge_descriptor> edgesToRemove;
-
-//     // Loop over edges of the AssemblyGraph. Each edge corresponds to a
-//     // BubbleChain (not just a single Chain).
-//     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
-//         // e is the edge descriptor for this edge (boost graph library).
-
-//         if (debug) {
-//             cout << "Working on BubbleChain " << bubbleChainStringId(e) << endl;
-//         }
-
-//         // Access the edge.
-//         AssemblyGraphEdge& edge = assemblyGraph[e];
-
-//         // Access the bubble chain.
-//         BubbleChain& bubbleChain = edge;  // Because BubbleChain is derived from AssemblyGraphEdge
-
-//         // Process the bubble chain if it contains only one haploid bubble.
-//         if(bubbleChain.isSimpleChain()) {
-//             // Access the bubble at this position.
-//             const Bubble& bubble = bubbleChain[0];
-
-//             if(debug) {
-//                 cout << "Working on Bubble " << bubbleStringId(e, 0) <<
-//                     " with ploidy " << 1 << endl;
-//             }
-            
-//             const Chain& chain = bubble[0];
-//             if (chain.size() <= 2) {
-//                 if (debug) {
-//                     cout << "  Chain at index " << 0 << " has only 2 anchors" << endl;
-//                     cout << "  Removing haploid bubble chain " << bubbleChainStringId(e) << " due to no coverage" << endl;
-//                 }
-//                 // Store the edge descriptor instead of the edge itself
-//                 edgesToRemove.push_back(e);
-//             }
-//         }
-//     }
-
-//     // Remove the edges using the stored edge descriptors
-//     for (const edge_descriptor& edgeToRemove : edgesToRemove) {
-//         boost::remove_edge(edgeToRemove, assemblyGraph);
-//     }
-// }
 
