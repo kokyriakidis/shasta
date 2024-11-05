@@ -147,6 +147,13 @@ private:
     MemoryMapped::VectorOfVectors<AnchorMarkerInterval, uint64_t> anchorMarkerIntervals;
 
 public:
+
+    // Get the first ordinal for the AnchorMarkerInterval corresponding to a
+    // given AnchorId and OrientedReadId.
+    // This asserts if the given AnchorId does not contain an AnchorMarkerInterval
+    // for the requested OrientedReadId.
+    uint32_t getFirstOrdinal(AnchorId, OrientedReadId) const;
+
     const Reads& reads;
     uint64_t k;
     uint64_t kHalf;

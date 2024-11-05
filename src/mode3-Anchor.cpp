@@ -832,3 +832,19 @@ void Anchors::findParents(
     deduplicateAndCount(parents, count);
 }
 
+
+
+// Get the first ordinal for the AnchorMarkerInterval corresponding to a
+// given AnchorId and OrientedReadId.
+// This asserts if the given AnchorId does not contain an AnchorMarkerInterval
+// for the requested OrientedReadId.
+uint32_t Anchors::getFirstOrdinal(AnchorId anchorId, OrientedReadId orientedReadId) const
+{
+    for(const auto& markerInterval: anchorMarkerIntervals[anchorId]) {
+        if(markerInterval.orientedReadId == orientedReadId) {
+            return markerInterval.ordinal0;
+        }
+    }
+
+    SHASTA_ASSERT(0);
+}

@@ -7,9 +7,19 @@
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-LocalAnchorGraph.hpp"
 #include "mode3-LocalAssemblyGraph.hpp"
+#include "Reads.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3;
+
+namespace shasta {
+    // Write an html form to select strand.
+    void writeStrandSelection(
+        ostream&,               // The html stream to write the form to.
+        const string& name,     // The selection name.
+        bool select0,           // Whether strand 0 is selected.
+        bool select1);          // Whether strand 1 is selected.
+}
 
 // Boost libraries.
 #include <boost/tokenizer.hpp>
@@ -232,6 +242,171 @@ void Mode3Assembler::exploreAnchorPair(const vector<string>& request, ostream& h
     AnchorPairInfo info;
     anchors().analyzeAnchorPair(anchorIdA, anchorIdB, info);
     anchors().writeHtml(anchorIdA, anchorIdB, info, html);
+}
+
+
+
+void Mode3Assembler::exploreJourney(const vector<string>& request, ostream& html)
+{
+    html <<
+        "<h2>Oriented read journey</h2>"
+        "<p>The journey of an oriented read is the sequence of anchors it visits.";
+
+
+    // Get the request parameters.
+    ReadId readId = 0;
+    const bool readIdIsPresent = HttpServer::getParameterValue(request, "readId", readId);
+    Strand strand = 0;
+    const bool strandIsPresent = HttpServer::getParameterValue(request, "strand", strand);
+    uint32_t beginPosition = 0;
+    const bool beginPositionIsPresent = HttpServer::getParameterValue(request, "beginPosition", beginPosition);
+    uint32_t endPosition = 0;
+    const bool endPositionIsPresent = HttpServer::getParameterValue(request, "endPosition", endPosition);
+
+    // Write the form.
+    html <<
+        "<form>"
+        "<table>"
+
+        "<tr>"
+        "<th class=left>Numeric read id"
+        "<td><input type=text name=readId" <<
+        (readIdIsPresent ? (" value=" + to_string(readId)) : "") <<
+        " title='Enter a read id between 0 and " << reads.readCount()-1 << "'>"
+
+        "<tr>"
+        "<th class=left>Strand"
+        "<td>";
+    writeStrandSelection(html, "strand", strandIsPresent && strand==0, strandIsPresent && strand==1);
+
+    html <<
+        "<tr>"
+        "<th class=left>Begin position"
+        "<td><input type=text name=beginPosition"
+        " title='Leave blank to begin display at beginning of read.'";
+    if(beginPositionIsPresent) {
+        html << " value=" << beginPosition;
+    }
+    html << ">";
+
+    html <<
+        "<tr>"
+        "<th class=left>End position"
+        "<td><input type=text name=endPosition"
+        " title='Leave blank to end display at end of read.'";
+    if(endPositionIsPresent) {
+        html << " value=" << endPosition;
+    }
+    html << ">";
+
+
+    html <<
+        "</table>"
+        "<input type=submit value='Display'>"
+        "</form>";
+
+    if(not readIdIsPresent) {
+        html << "Specify a numeric read id.";
+        return;
+    }
+
+    // If the strand is missing, stop here.
+    if(not strandIsPresent) {
+        return;
+    }
+
+    // Sanity checks.
+    if(readId >= reads.readCount()) {
+        html << "<p>Invalid read id.";
+        return;
+    }
+    if(strand!=0 && strand!=1) {
+        html << "<p>Invalid strand.";
+        return;
+    }
+
+    // Adjust the position range, if necessary.
+    if(!beginPositionIsPresent) {
+        beginPosition = 0;
+    }
+    if(!endPositionIsPresent) {
+        endPosition = uint32_t(reads.getReadRawSequenceLength(readId));
+    }
+    if(endPosition <= beginPosition) {
+        html << "<p>Invalid choice of begin and end position.";
+        return;
+    }
+
+    // Access the information we need.
+    const OrientedReadId orientedReadId(readId, strand);
+    const span<const CompressedMarker> orientedReadMarkers = markers[orientedReadId.getValue()];
+    const auto& journeys = anchors().journeys;
+    SHASTA_ASSERT(journeys.isOpen());
+    SHASTA_ASSERT(journeys.size() == 2 * reads.readCount());
+    const span<const AnchorId> journey = journeys[orientedReadId.getValue()];
+
+    // Page title.
+    html << "<h2>Journey of oriented read " << orientedReadId << "</h2>"
+        "<p>Each anchor begins at the midpoint of the first marker (Marker0) "
+        "and ends at the midpoint of the second marker (Marker1).";
+
+    // Begin the main table.
+    html <<
+        "<table><tr>"
+        "<th>Position<br>in journey"
+        "<th>Anchor"
+        "<th>Anchor<br>coverage"
+        "<th>Marker0<br>ordinal"
+        "<th>Marker1<br>ordinal"
+        "<th>Marker0<br>position"
+        "<th>Marker1<br>position"
+        "<th>Anchor<br>begin"
+        "<th>Anchor<br>end"
+        "<th>Anchor<br>length"
+        "<th>Anchor<br>sequence";
+
+    // Loop over the anchors in the journey of this oriented read.
+    for(uint64_t positionInJourney=0; positionInJourney<journey.size(); positionInJourney++) {
+        const AnchorId anchorId = journey[positionInJourney];
+        const uint64_t anchorCoverage = anchors()[anchorId].coverage();
+        const string anchorIdString = anchorIdToString(anchorId);
+
+        const uint64_t ordinal0 = anchors().getFirstOrdinal(anchorId, orientedReadId);
+        const uint64_t ordinal1 = ordinal0 + anchors().ordinalOffset(anchorId);
+
+        const auto orientedReadMarkers = markers[orientedReadId.getValue()];
+        const uint32_t position0 = orientedReadMarkers[ordinal0].position;
+        const uint32_t position1 = orientedReadMarkers[ordinal1].position;
+
+        if(position0 < beginPosition) {
+            continue;
+        }
+        if(position1 >= endPosition) {
+            continue;
+        }
+
+        const span<const Base> anchorSequence = anchors().anchorSequence(anchorId);
+        SHASTA_ASSERT(anchorSequence.size() == position1 - position0);
+
+        html <<
+            "<tr>"
+            "<td class=centered>" << positionInJourney <<
+            "<td class=centered>" <<
+            "<a href='exploreAnchor?anchorIdString=" << anchorIdString << "'>" <<
+            anchorIdString << "</a>"
+            "<td class=centered>" << anchorCoverage <<
+            "<td class=centered>" << ordinal0 <<
+            "<td class=centered>" << ordinal1 <<
+            "<td class=centered>" << position0 <<
+            "<td class=centered>" << position1 <<
+            "<td class=centered>" << position0 + k/2 <<
+            "<td class=centered>" << position1 + k/2 <<
+            "<td class=centered>" << anchorSequence.size() <<
+            "<td class=centered style='font-family:courier'>";
+        copy(anchorSequence.begin(), anchorSequence.end(), ostream_iterator<Base>(html));
+    }
+
+    html << "</table>";
 }
 
 

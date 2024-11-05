@@ -539,6 +539,15 @@ void Assembler::exploreAnchorPair(const vector<string>& request, ostream& html)
 
 
 
+void Assembler::exploreJourney(const vector<string>& request, ostream& html)
+{
+    SHASTA_ASSERT(assemblerInfo->readRepresentation == 0);
+    SHASTA_ASSERT(assemblerInfo->assemblyMode == 3);
+    mode3Assembler->exploreJourney(request, html);
+}
+
+
+
 void Assembler::exploreLocalAssembly(const vector<string>& request, ostream& html)
 {
     mode3Assembler->exploreLocalAssembly(request, html);
