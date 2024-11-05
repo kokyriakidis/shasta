@@ -131,6 +131,7 @@ public:
     // Http server functions for Mode 3 assembly.
     void exploreAnchor(const vector<string>&, ostream&);
     void exploreAnchorPair(const vector<string>&, ostream&);
+    void exploreJourney(const vector<string>&, ostream&);
     void exploreLocalAssembly(
         const vector<string>&, ostream&);
     void exploreLocalAnchorGraph(
