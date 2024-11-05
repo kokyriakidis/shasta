@@ -363,7 +363,7 @@ void Mode3Assembler::exploreJourney(const vector<string>& request, ostream& html
         "<th>Anchor<br>begin"
         "<th>Anchor<br>end"
         "<th>Anchor<br>length"
-        "<th>Anchor<br>sequence";
+        "<th class=left>Anchor<br>sequence";
 
     // Loop over the anchors in the journey of this oriented read.
     for(uint64_t positionInJourney=0; positionInJourney<journey.size(); positionInJourney++) {
@@ -402,7 +402,7 @@ void Mode3Assembler::exploreJourney(const vector<string>& request, ostream& html
             "<td class=centered>" << position0 + k/2 <<
             "<td class=centered>" << position1 + k/2 <<
             "<td class=centered>" << anchorSequence.size() <<
-            "<td class=centered style='font-family:courier'>";
+            "<td style='font-family:courier'>";
         copy(anchorSequence.begin(), anchorSequence.end(), ostream_iterator<Base>(html));
     }
 
