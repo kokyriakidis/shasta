@@ -41,8 +41,7 @@ void AssemblyGraph::prune(
         const vertex_descriptor v0 = source(e, assemblyGraph);
         const vertex_descriptor v1 = target(e, assemblyGraph);
 
-        const bool isLeaf = (in_degree(v0, assemblyGraph) == 0 && out_degree(v1, assemblyGraph) != 0) || 
-                           (in_degree(v0, assemblyGraph) != 0 && out_degree(v1, assemblyGraph) == 0);
+        const bool isLeaf = in_degree(v0, assemblyGraph) == 0 || out_degree(v1, assemblyGraph) == 0;
         if(!isLeaf) {
             continue;
         }

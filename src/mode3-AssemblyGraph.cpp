@@ -202,10 +202,10 @@ void AssemblyGraph::run(
     compressBubbleChains();
     if(debug) write("F");
 
-    removeChainsInBubblesWithNoInternalAnchors(debug);
-    compress();
-    compressBubbleChains();
-    if(debug) write("G");
+    // removeChainsInBubblesWithNoInternalAnchors(debug);
+    // compress();
+    // compressBubbleChains();
+    // if(debug) write("G");
 
     haplotizeWronglyPolyploidBubbles(debug);
     compress();
