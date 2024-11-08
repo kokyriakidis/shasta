@@ -1037,6 +1037,12 @@ void AssemblerOptions::addConfigurableOptions()
         default_value(false),
         "Suppress output of haploid representation of the assembly (Mode 2 assembly only).")
 
+        ("Assembly.mode3.anchorCreationMethod",
+        value<string>(&assemblyOptions.mode3Options.anchorCreationMethod)->
+        default_value("FromMarkerGraphEdges"),
+        "Selects the method used to create anchors for mode 3 assembly. "
+        "Can be: FromMarkerGraphEdges, FromMarkerKmers, FromJson.")
+
         ("Assembly.mode3.minPrimaryCoverage",
         value<uint64_t>(&assemblyOptions.mode3Options.minPrimaryCoverage)->
         default_value(0),
@@ -1448,6 +1454,7 @@ void Mode2AssemblyOptions::write(ostream& s) const
 
 void Mode3AssemblyOptions::write(ostream& s) const
 {
+    s << "mode3.anchorCreationMethod = " << anchorCreationMethod << "\n";
     s << "mode3.minPrimaryCoverage = " << minPrimaryCoverage << "\n";
     s << "mode3.maxPrimaryCoverage = " << maxPrimaryCoverage << "\n";
     primaryGraphOptions.write(s);
