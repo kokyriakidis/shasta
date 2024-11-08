@@ -2487,6 +2487,9 @@ public:
         bool debug
     );
 
+    // Alignment-free version of mode 3 assembly.
+    void alignmentFreeAssembly(const Mode3AssemblyOptions&, uint64_t threadCount);
+
     // Http server functions related to Mode 3 assembly.
     void exploreAnchor(const vector<string>&, ostream&);
     void exploreAnchorPair(const vector<string>&, ostream&);

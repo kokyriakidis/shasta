@@ -625,6 +625,17 @@ void shasta::main::assemble(
     assembler.findMarkers(threadCount);
     assembler.initiateSaveBinaryData(&Assembler::saveMarkers);
 
+    // If mode 3 assembly and Assembly.mode3.anchorCreationMethod is not
+    // FromMarkerGraphEdges, use the alignment free code path and return.
+    if(
+        (assemblerOptions.assemblyOptions.mode == 3) and
+        (assemblerOptions.assemblyOptions.mode3Options.anchorCreationMethod != "FromMarkerGraphEdges")) {
+        assembler.alignmentFreeAssembly(
+            assemblerOptions.assemblyOptions.mode3Options,
+            threadCount);
+        return;
+    }
+
     // If using alignment method 6, count marker k-mers.
     if(assemblerOptions.alignOptions.alignMethod == 6) {
         assembler.countKmers(threadCount, assemblerOptions.kmersOptions.globalFrequencyOverrideDirectory);

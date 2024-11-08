@@ -574,3 +574,39 @@ void Assembler::exploreSegment(const vector<string>& request, ostream& html)
     mode3Assembler->exploreSegment(request, html);
 }
 
+
+
+// Alignment-free version of mode 3 assembly.
+void Assembler::alignmentFreeAssembly(
+    const Mode3AssemblyOptions& mode3Options,
+    uint64_t threadCount)
+{
+    cout << timestamp << "Alignment free mode 3 assembly begins." << endl;
+
+    // Create the Anchors.
+    shared_ptr<mode3::Anchors> anchorsPointer;
+    if(mode3Options.anchorCreationMethod == "FromMarkerKmers") {
+        throw runtime_error("Anchor creation method FromMarkerKmers is not yet implemented.");
+    } else if(mode3Options.anchorCreationMethod == "FromJson") {
+        anchorsPointer =
+            make_shared<mode3::Anchors>(
+                MappedMemoryOwner(*this),
+                getReads(),
+                assemblerInfo->k,
+                markers,
+                "anchors.json",
+                mode3Options.minPrimaryCoverage,
+                mode3Options.maxPrimaryCoverage,
+                threadCount);
+    } else {
+        throw runtime_error("Invalid value for --Assembly.mode3.anchorCreationMethod.");
+    }
+
+    // Compute oriented read journeys.
+    anchorsPointer->computeJourneys(threadCount);
+
+    // Run Mode 3 assembly.
+    mode3Assembly(threadCount, anchorsPointer, mode3Options, false);
+
+    cout << timestamp << "Alignment free mode 3 assembly ends." << endl;
+}
