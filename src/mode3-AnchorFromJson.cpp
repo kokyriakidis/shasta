@@ -39,6 +39,7 @@ So in summary the input looks something like this (spacing only used for readabi
 // Shasta.
 #include "mode3-Anchor.hpp"
 #include "Base.hpp"
+#include "Marker.hpp"
 #include "Reads.hpp"
 using namespace shasta;
 using namespace mode3;
@@ -95,6 +96,8 @@ Anchors::Anchors(
 
         if(processCandidateAnchor(candidateAnchor)) {
             ++successCount;
+        } else {
+            cout << "Discarded." << endl;
         }
     }
     cout << "Of " << json.size() << " candidate anchors, " << successCount <<
@@ -116,9 +119,21 @@ bool Anchors::processCandidateAnchor(
         OrientedReadId orientedReadId;
         uint64_t begin;
         uint64_t end;
+        uint64_t clippedBegin;
+        uint64_t clippedEnd;
+        uint32_t ordinal0;
+        uint32_t ordinal1;
         uint64_t length() const
         {
             return end - begin;
+        }
+        uint64_t leftClip() const
+        {
+            return clippedBegin - begin;
+        }
+        uint64_t rightClip() const
+        {
+            return end - clippedEnd;
         }
     };
 
@@ -177,6 +192,10 @@ bool Anchors::processCandidateAnchor(
     // Check that the sequences on these intervals are identical.
     const Interval& interval0 = intervals[0];
     const uint64_t length0 = interval0.length();
+    if(length0 < k) {
+        // cout << "Anchor is too short." << endl;
+        return false;
+    }
     for(uint64_t i=1; i<intervals.size(); i++) {
         const Interval& interval = intervals[i];
 
@@ -194,6 +213,72 @@ bool Anchors::processCandidateAnchor(
             const Base b = reads.getOrientedReadBase(interval.orientedReadId, uint32_t(interval.begin + j));
             SHASTA_ASSERT(b == b0);
         }
+    }
+
+    // Object to compare CompressedMarkers by position.
+    class Comparator {
+    public:
+        bool operator()(
+            const CompressedMarker& x,
+            const CompressedMarker& y) const
+        {
+            return x.position < y.position;
+        }
+    };
+    const Comparator comparator;
+
+    // Clip to the first/last marker entirely contained in each interval.
+    for(Interval& interval: intervals) {
+        // cout << "Clipping " << interval.orientedReadId << " " << interval.begin << " " << interval.end << endl;
+        const span<const CompressedMarker> orientedReadMarkers = markers[interval.orientedReadId.getValue()];
+
+        // Find the ordinal of the first marker entirely contained in this interval.
+        auto it = std::lower_bound(
+            orientedReadMarkers.begin(), orientedReadMarkers.end(),
+            CompressedMarker({Uint24(uint32_t(interval.begin))}), comparator);
+        if(it == orientedReadMarkers.end()) {
+            // cout << "The interval begins after the last marker." << endl;
+            return false;
+        }
+
+        const uint32_t ordinal0 = uint32_t(it - orientedReadMarkers.begin());
+        const uint32_t position0 = it->position;
+        if(position0 + k > interval.end) {
+            // cout << "No marker is entirely inside this interval." << endl;
+            return false;
+        }
+
+        // Ok, the marker at ordinal0 is entirely inside the interval.
+        // Find the ordinal of the last marker entirely contained in this interval.
+        uint32_t ordinal1 = ordinal0;
+        uint32_t position1 = position0;
+        for(; ordinal1<orientedReadMarkers.size(); ++ordinal1) {
+            const uint32_t newPosition1 = orientedReadMarkers[ordinal1].position;
+            if(newPosition1 + k > interval.end) {
+                break;
+            }
+            position1 = newPosition1;
+        }
+        ordinal1 -= 1;
+        position1 += uint32_t(k);
+        // cout << "Clipped to ordinals " << ordinal0 << " " << ordinal1 <<
+        //     ", positions " << position0 << " " << position1 << endl;
+
+        interval.ordinal0 = ordinal0;
+        interval.ordinal1 = ordinal1;
+        interval.clippedBegin = position0;
+        interval.clippedEnd = position1;
+    }
+
+    // cout << "Clipped bases: " << intervals.front().leftClip() << " " << intervals.front().rightClip() << endl;
+
+    // Check that the number of bases clipped is the same for all the intervals.
+    const uint64_t leftClip0 = intervals[0].leftClip();
+    const uint64_t rightClip0 = intervals[0].rightClip();
+    for(uint64_t i=1; i<intervals.size(); i++) {
+        const Interval& interval = intervals[i];
+        SHASTA_ASSERT(interval.leftClip() == leftClip0);
+        SHASTA_ASSERT(interval.rightClip() == rightClip0);
     }
 
     return true;
