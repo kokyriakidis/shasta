@@ -579,6 +579,7 @@ void Assembler::exploreSegment(const vector<string>& request, ostream& html)
 // Alignment-free version of mode 3 assembly.
 void Assembler::alignmentFreeAssembly(
     const Mode3AssemblyOptions& mode3Options,
+    const string& anchorFileAbsolutePath,
     uint64_t threadCount)
 {
     cout << timestamp << "Alignment free mode 3 assembly begins." << endl;
@@ -594,7 +595,7 @@ void Assembler::alignmentFreeAssembly(
                 getReads(),
                 assemblerInfo->k,
                 markers,
-                "anchors.json",
+                anchorFileAbsolutePath,
                 mode3Options.minPrimaryCoverage,
                 mode3Options.maxPrimaryCoverage,
                 threadCount);

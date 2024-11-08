@@ -1,14 +1,22 @@
 #pragma once
 
+// Shasta.
 #include "invalid.hpp"
 #include "MarkerInterval.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "MemoryMappedVectorOfVectors.hpp"
 #include "MultithreadedObject.hpp"
 
+// Boost libraries.
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS
+#include <boost/property_tree/ptree_fwd.hpp>
+
+// Standard library.
 #include "cstdint.hpp"
 #include "memory.hpp"
 #include "span.hpp"
+
+
 
 namespace shasta {
 
@@ -257,6 +265,11 @@ private:
     };
     ConstructFromMarkerGraphData constructFromMarkerGraphData;
     void constructFromMarkerGraphThreadFunction(uint64_t threadId);
+
+
+    // Process a candidate anchor from json input.
+    using Ptree = boost::property_tree::basic_ptree<string, string>;
+    bool processCandidateAnchor(const Ptree&);
 };
 
 
