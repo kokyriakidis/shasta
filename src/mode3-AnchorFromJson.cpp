@@ -79,6 +79,13 @@ Anchors::Anchors(
     Ptree json;
     boost::property_tree::read_json(inputFile, json);
 
+    // Initialize anchor data structures.
+    anchorMarkerIntervals.createNew(
+            largeDataName("AnchorMarkerIntervals"),
+            largeDataPageSize);
+    anchorSequences.createNew(
+        largeDataName("AnchorSequences"), largeDataPageSize);
+    anchorInfos.createNew(largeDataName("AnchorInfos"), largeDataPageSize);
 
 
     // Loop over the candidate anchors.
@@ -103,8 +110,10 @@ Anchors::Anchors(
     cout << "Of " << json.size() << " candidate anchors, " << successCount <<
         " were used and " << json.size() - successCount << " were discarded." << endl;
 
+    SHASTA_ASSERT(anchorMarkerIntervals.size() == 2 * successCount);
+    SHASTA_ASSERT(anchorSequences.size() == 2 * successCount);
+    SHASTA_ASSERT(anchorInfos.size() == 2 * successCount);
 
-    throw runtime_error("Anchor creation from json is not yet implemented.");
 }
 
 
@@ -280,6 +289,57 @@ bool Anchors::processCandidateAnchor(
         SHASTA_ASSERT(interval.leftClip() == leftClip0);
         SHASTA_ASSERT(interval.rightClip() == rightClip0);
     }
+
+
+    // All good. Generate an anchor.
+    {
+
+        // Generate the sequence for this anchor.
+        anchorSequences.appendVector();
+        const Interval& interval0 = intervals[0];
+        const OrientedReadId orientedReadId0 = interval0.orientedReadId;
+        const uint64_t begin0 = interval0.clippedBegin + kHalf;
+        const uint64_t end0 = interval0.clippedEnd - kHalf;
+        for(uint64_t position=begin0; position<end0; ++position) {
+            const Base b = reads.getOrientedReadBase(orientedReadId0, uint32_t(position));
+            anchorSequences.append(b);
+        }
+
+        // Generate the marker intervals for this anchor.
+        anchorMarkerIntervals.appendVector();
+        for(const Interval& interval: intervals) {
+            anchorMarkerIntervals.append(AnchorMarkerInterval(interval.orientedReadId, interval.ordinal0));
+        }
+
+        // Generate the AnchorInfo and store the ordinal offset.
+        anchorInfos.resize(anchorInfos.size() + 1);
+        AnchorInfo& anchorInfo = anchorInfos.back();
+        anchorInfo.ordinalOffset = interval0.ordinal1 - interval0.ordinal0;
+
+
+
+        // Also generate the reverse complemented anchor.
+        anchorSequences.appendVector();
+        for(uint64_t position=end0-1; /* Check later */ ; --position) {
+            const Base b = reads.getOrientedReadBase(orientedReadId0, uint32_t(position));
+            anchorSequences.append(b.complement());
+            if(position == begin0) {
+                break;
+            }
+        }
+
+        anchorMarkerIntervals.appendVector();
+        for(const Interval& interval: intervals) {
+            const uint32_t markerCount = uint32_t(markers[interval.orientedReadId.getValue()].size());
+            AnchorMarkerInterval markerInterval(interval.orientedReadId, markerCount - 1 - interval.ordinal1);
+            markerInterval.orientedReadId.flipStrand();
+            anchorMarkerIntervals.append(markerInterval);
+        }
+
+        anchorInfos.resize(anchorInfos.size() + 1);
+        anchorInfos.back().ordinalOffset = interval0.ordinal1 - interval0.ordinal0;
+    }
+
 
     return true;
 }
