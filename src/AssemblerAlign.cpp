@@ -551,7 +551,7 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                     orientedReadIds,
                     alignment,
                     true);
-                alignmentInfo.errorRateRle = float(projectedAlignment.errorRateRle());
+                alignmentInfo.mismatchCountRle = uint32_t(projectedAlignment.mismatchCountRle);
             }
 
             // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " good." << endl;

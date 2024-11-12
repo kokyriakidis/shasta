@@ -153,7 +153,7 @@ void Anchors::analyzeAnchorPair(
     // Joint loop over the MarkerIntervals of the two Anchors,
     // to count the common oreiented reads and compute average offsets.
     info.common = 0;
-    int64_t sumMarkerOffsets = 0;
+    int64_t sumTwiceMarkerOffsets = 0;
     int64_t sumTwiceBaseOffsets = 0;
     auto itA = beginA;
     auto itB = beginB;
@@ -177,18 +177,20 @@ void Anchors::analyzeAnchorPair(
         // Compute the offset in markers.
         // This assumes an ordinal offset of 1.
         // If this changes, this code will need some changes.
-        SHASTA_ASSERT(ordinalOffset(anchorIdA) == 1);
-        SHASTA_ASSERT(ordinalOffset(anchorIdB) == 1);
-        const uint32_t ordinalA = itA->ordinal0;
-        const uint32_t ordinalB = itB->ordinal0;
-        const int64_t markerOffset = int64_t(ordinalB) - int64_t(ordinalA);
-        sumMarkerOffsets += markerOffset;
+        const uint32_t ordinalOffsetA = ordinalOffset(anchorIdA);
+        const uint32_t ordinalOffsetB = ordinalOffset(anchorIdB);
+        const uint32_t ordinalA0 = itA->ordinal0;
+        const uint32_t ordinalA1 = ordinalA0 + ordinalOffsetA;
+        const uint32_t ordinalB0 = itB->ordinal0;
+        const uint32_t ordinalB1 = ordinalB0 + ordinalOffsetB;
+        sumTwiceMarkerOffsets += int64_t(ordinalB0) - int64_t(ordinalA0);
+        sumTwiceMarkerOffsets += int64_t(ordinalB1) - int64_t(ordinalA1);
 
         // Compute the offset in bases.
-        const int64_t positionA0 = int64_t(orientedReadMarkers[ordinalA].position);
-        const int64_t positionA1 = int64_t(orientedReadMarkers[ordinalA+1].position);
-        const int64_t positionB0 = int64_t(orientedReadMarkers[ordinalB].position);
-        const int64_t positionB1 = int64_t(orientedReadMarkers[ordinalB+1].position);
+        const int64_t positionA0 = int64_t(orientedReadMarkers[ordinalA0].position);
+        const int64_t positionA1 = int64_t(orientedReadMarkers[ordinalA1].position);
+        const int64_t positionB0 = int64_t(orientedReadMarkers[ordinalB0].position);
+        const int64_t positionB1 = int64_t(orientedReadMarkers[ordinalB1].position);
         sumTwiceBaseOffsets -= positionA0;
         sumTwiceBaseOffsets -= positionA1;
         sumTwiceBaseOffsets += positionB0;
@@ -212,7 +214,7 @@ void Anchors::analyzeAnchorPair(
     }
 
     // Compute the estimated offsets.
-    info.offsetInMarkers = int64_t(std::round(double(sumMarkerOffsets) / double(info.common)));
+    info.offsetInMarkers = int64_t(0.5 * std::round(double(sumTwiceMarkerOffsets) / double(info.common)));
     info.offsetInBases = int64_t(0.5 * std::round(double(sumTwiceBaseOffsets) / double(info.common)));
 
 

@@ -63,6 +63,7 @@ ProjectedAlignment::ProjectedAlignment(
 
 void ProjectedAlignment::constructSlow()
 {
+    mismatchCountRle = 0;
 
     // Loop over pairs of consecutive aligned markers (A, B).
     for(uint64_t iB=1; iB<alignment.ordinals.size(); iB++) {
@@ -88,6 +89,7 @@ void ProjectedAlignment::constructSlow()
         // Same, in RLE.
         segment.fillRleSequences();
         segment.computeRleAlignment(matchScore, mismatchScore, gapScore);
+        mismatchCountRle += segment.mismatchCountRle;
     }
 
     computeStatistics();
@@ -107,6 +109,7 @@ void ProjectedAlignment::constructQuick()
 
     totalLengthRle = {0, 0};
     totalEditDistanceRle = 0;
+    mismatchCountRle = 0;
 
     // Loop over pairs of consecutive aligned markers (A, B).
     for(uint64_t iB=1; iB<alignment.ordinals.size(); iB++) {
@@ -145,6 +148,7 @@ void ProjectedAlignment::constructQuick()
         // Otherwise, we compute the RLE alignment and store this segment.
         segment.computeRleAlignment(matchScore, mismatchScore, gapScore);
         totalEditDistanceRle += segment.rleEditDistance;
+        mismatchCountRle += segment.mismatchCountRle;
         segments.push_back(segment);
     }
 }
@@ -221,6 +225,24 @@ void ProjectedAlignmentSegment::computeRleAlignment(
             rleAlignment);
     }
 
+    // Compute the number of mismatches in the RLE alignment.
+    mismatchCountRle = 0;
+    uint64_t position0 = 0;
+    uint64_t position1 = 0;
+    for(const pair<bool, bool>& p: rleAlignment) {
+        if(p.first and p.second and (sequence0[position0] != sequence1[position1])) {
+            ++mismatchCountRle;
+        }
+        if(p.first) {
+            ++position0;
+        }
+        if(p.second) {
+            ++position1;
+        }
+    }
+    SHASTA_ASSERT(position0 == sequence0.size());
+    SHASTA_ASSERT(position1 == sequence1.size());
+
 }
 
 
@@ -234,6 +256,7 @@ void ProjectedAlignment::writeHtml(ostream& html, bool brief) const
         "<th colspan=6>" << orientedReadIds[1] <<
         "<th rowspan=2>Edit<br>distance"
         "<th rowspan=2>RLE<br>edit<br>distance"
+        "<th rowspan=2>RLE<br>mismatch<br>count"
         "<th rowspan=2 class=left>Alignments"
         "<tr>"
         "<th>OrdinalA"
@@ -277,6 +300,7 @@ void ProjectedAlignmentSegment::writeHtml(ostream& html) const
 
     html << "<td class=centered>" << editDistance;
     html << "<td class=centered>" << rleEditDistance;
+    html << "<td class=centered>" << mismatchCountRle;
 
     html << "<td class=left style='font-family:courier'>";
     writeAlignmentHtml(html);
@@ -580,11 +604,17 @@ void ProjectedAlignment::writeStatisticsHtml(ostream& html) const
         "<th class=left>Q (dB)" <<
         "<td colspan=3 class=centered>" << fixed << setprecision(1) << Q();
 
-    // Q.
+    // RLE Q.
     html <<
         "<tr>"
         "<th class=left>RLE Q (dB)" <<
         "<td colspan=3 class=centered>" << fixed << setprecision(1) << QRle();
+
+    // RLE mismatch count
+    html <<
+        "<tr>"
+        "<th class=left>RLE mismatch count" <<
+        "<td colspan=3 class=centered>" << fixed << setprecision(1) << mismatchCountRle;
 
     html << "</table>";
 }

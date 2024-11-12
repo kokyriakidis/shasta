@@ -79,7 +79,8 @@ public:
 
 class shasta::mode3::AnchorInfo {
 public:
-    uint64_t componentId = invalid<uint64_t>;
+    uint32_t ordinalOffset = invalid<uint32_t>;
+    uint32_t componentId = invalid<uint32_t>;
     uint64_t localAnchorIdInComponent = invalid<uint64_t>;
 };
 
@@ -154,12 +155,13 @@ public:
     // For precise definition see the code.
     bool areAdjacentAnchors(AnchorId, AnchorId) const;
 
-    // The offset to be added to ordinal0 of an Anchor to obtaine ordinal1.
-    // Currently this is the same for all Anchors and always equal to 1,
-    // but this could change.
-    uint32_t ordinalOffset(AnchorId) const
+    // The offset to be added to ordinal0 of an Anchor to obtain ordinal1.
+    // * When constructing anchors from the marker graph, this is the same for all Anchors
+    //   and always equal to 1.
+    // * When reading the anchors from a json file, each anchor can have a different value.
+    uint32_t ordinalOffset(AnchorId anchorId) const
     {
-        return 1;
+        return anchorInfos[anchorId].ordinalOffset;
     }
 
 private:
@@ -229,7 +231,7 @@ public:
 public:
         void storeAnchorInfo(
             AnchorId anchorId,
-            uint64_t componentId,
+            uint32_t componentId,
             uint64_t localAnchorIdInComponent)
         {
             AnchorInfo& anchorInfo = anchorInfos[anchorId];

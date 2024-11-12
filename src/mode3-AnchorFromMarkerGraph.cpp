@@ -129,8 +129,16 @@ Anchors::Anchors(
     data.threadSequences.clear();
     cout << "Found " << anchorMarkerIntervals.size() << " anchors." << endl;
 
+    // Initialize the AnchorInfos with the ordinal offset, which is always
+    // 1 when creating anchors from the marker graph.
+    // The componentId and localAnchorIdInComponent fields will be filled later,
+    // when processing each component.
     anchorInfos.createNew(largeDataName("AnchorInfos"), largeDataPageSize);
     anchorInfos.resize(anchorMarkerIntervals.size());
+    const uint32_t ordinalOffset = 1;
+    for(AnchorInfo& anchorInfo: anchorInfos) {
+        anchorInfo.ordinalOffset = ordinalOffset;
+    }
 
     performanceLog << timestamp << "Anchor creation from the marker graph ends." << endl;
 }

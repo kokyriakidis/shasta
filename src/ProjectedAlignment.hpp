@@ -81,6 +81,9 @@ public:
         int64_t mismatchScore,
         int64_t gapScore);
 
+    // The number of mismatches in the RLE alignment.
+    uint64_t mismatchCountRle;
+
 
     void writeAlignmentHtml(ostream&) const;
     void writeRleAlignmentHtml(ostream&) const;
@@ -153,6 +156,9 @@ public:
     // Total edit distance (raw and RLE).
     int64_t totalEditDistance;
     int64_t totalEditDistanceRle;
+
+    // The number of mismatches in the RLE alignment.
+    uint64_t mismatchCountRle;
 
     void computeStatistics();
     double errorRate() const;

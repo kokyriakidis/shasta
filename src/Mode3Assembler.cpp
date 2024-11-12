@@ -398,7 +398,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     // Store AnchorInfos for this component.
     for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
         const AnchorId anchorId = anchorIds[localAnchorId];
-        anchors().storeAnchorInfo(anchorId, componentId, localAnchorId);
+        anchors().storeAnchorInfo(anchorId, uint32_t(componentId), localAnchorId);
     }
 
 
