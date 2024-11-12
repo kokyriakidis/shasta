@@ -785,8 +785,6 @@ void shasta::main::assemble(
     // Strict strand separation.
     if(assemblerOptions.readGraphOptions.strandSeparationMethod == 2) {
         assembler.flagCrossStrandReadGraphEdges2();
-    } else if(assemblerOptions.readGraphOptions.strandSeparationMethod == 3) {
-        assembler.flagCrossStrandReadGraphEdges3();
     } else if(assemblerOptions.readGraphOptions.strandSeparationMethod == 4) {
         assembler.flagCrossStrandReadGraphEdges4();
     } else if(assemblerOptions.readGraphOptions.strandSeparationMethod == 5) {

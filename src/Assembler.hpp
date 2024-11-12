@@ -1128,7 +1128,6 @@ public:
 
     // Strict strand separation in the read graph.
     void flagCrossStrandReadGraphEdges2();
-    void flagCrossStrandReadGraphEdges3();
     void flagCrossStrandReadGraphEdges4();
     void flagCrossStrandReadGraphEdges5();
 
