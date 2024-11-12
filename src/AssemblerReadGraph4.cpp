@@ -170,23 +170,13 @@ void Assembler::flagCrossStrandReadGraphEdges4()
             SHASTA_ASSERT(nextEdge.alignmentId == alignmentId);
         }
 
-        // // Store this pair of edges in our edgeTable.
-        // const double errorRateRle = alignment.info.errorRateRle;
-        // const double L = (alignment.info.range(0) + alignment.info.range(1)) / 0.04;
-        // const double m = L * 0.0001;
-        // const uint64_t n = static_cast<uint64_t>(std::round(errorRateRle * L));
 
         // // Store this pair of edges in our edgeTable.
         // const uint32_t range0 = alignment.info.baseRange(assemblerInfo->k, edge.orientedReadIds[0], 0, markers);
         // const uint32_t range1 = alignment.info.baseRange(assemblerInfo->k, edge.orientedReadIds[1], 1, markers);
-        // // const double L = (range0 + range1)/2;
+        // const double L = (range0 + range1) / 2;
         // const uint64_t n = alignment.info.mismatchCountRle;
-        // // const double m = L * 0.0001;
-        
-        // const double L = (alignment.info.range(0) + alignment.info.range(1)) / 0.04;
         // const double m = L * 0.0001;
-        // const double errorRateRle = double(n)/(2.0*L);;
-        // const uint64_t n_mismatch = static_cast<uint64_t>(std::round(errorRateRle * L));
 
         // // Calculate Q using Poisson CDF
         // // Helper function to calculate gamma_q(k+1, λ)
@@ -198,7 +188,7 @@ void Assembler::flagCrossStrandReadGraphEdges4()
         //     return boost::math::gamma_q(a, lambda);
         // };
 
-        // const double poissonCDF = calculate_gamma_q(n_mismatch, m);
+        // const double poissonCDF = calculate_gamma_q(n, m);
 
 
         // edgeTable.push_back(make_pair(edgeId, poissonCDF));
@@ -228,7 +218,7 @@ void Assembler::flagCrossStrandReadGraphEdges4()
 
     // Print out top 100 alignments by Q value
     cout << "Top 100 alignments by Q value:" << endl;
-    cout << "EdgeId\tQ\tMarkerCount\tErrorRateRle\tL\tn" << endl;
+    cout << "EdgeId\tQ\tMarkerCount\tErrorRateRleNew\tErrorRateRleOld\tL\tn" << endl;
     for(size_t i = 0; i < min(size_t(100), edgeTable.size()); i++) {
         const auto& p = edgeTable[i];
         const uint64_t edgeId = p.first;
@@ -239,11 +229,12 @@ void Assembler::flagCrossStrandReadGraphEdges4()
         const uint32_t range1 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[1], 1, markers);
         const double L = (range0 + range1)/2;
         const uint64_t n = alignment.info.mismatchCountRle;
-        const double errorRateRle = double(n)/(2.0*L);;
+        const double errorRateRleNew = double(n)/(2.0*L);;
+        const double errorRateRleOld = alignment.info.errorRateRle;
         const double m = L * 0.0001;
         const ReadId readId0 = alignment.readIds[0];
         const ReadId readId1 = alignment.readIds[1];
-        cout << edgeId << "(" << readId0 << "," << readId1 << ")" << "\t" << q << "\t" << markerCount << "\t" << errorRateRle << "\t" << m << "\t" << L << "\t" << n << endl;
+        cout << edgeId << "(" << readId0 << "," << readId1 << ")" << "\t" << q << "\t" << markerCount << "\t" << errorRateRleNew << "\t" << errorRateRleOld << "\t" << L << "\t" << n << endl;
     }
 
 
