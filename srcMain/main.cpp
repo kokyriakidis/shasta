@@ -710,6 +710,7 @@ void shasta::main::assemble(
         } else if(assemblerOptions.readGraphOptions.creationMethod == 4) {
             assembler.createReadGraph4(
                 assemblerOptions.readGraphOptions.maxAlignmentCount);
+            // assembler.findReliableStrandSpecificReadGraphEdges();
         }
 
         // Actual alignment criteria are as specified in the command line options
@@ -757,6 +758,12 @@ void shasta::main::assemble(
     // Strict strand separation.
     if(assemblerOptions.readGraphOptions.strandSeparationMethod == 2) {
         assembler.flagCrossStrandReadGraphEdges2();
+    } else if(assemblerOptions.readGraphOptions.strandSeparationMethod == 3) {
+        assembler.flagCrossStrandReadGraphEdges3();
+    } else if(assemblerOptions.readGraphOptions.strandSeparationMethod == 4) {
+        assembler.flagCrossStrandReadGraphEdges4();
+    } else if(assemblerOptions.readGraphOptions.strandSeparationMethod == 5) {
+        assembler.flagCrossStrandReadGraphEdges5();
     }
 
     // Compute connected components of the read graph.

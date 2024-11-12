@@ -1021,6 +1021,8 @@ public:
 
     void createReadGraph3(uint64_t maxAlignmentCount);
     void createReadGraph4(uint32_t maxAlignmentCount);
+    void findReliableStrandSpecificReadGraphEdges();
+    void removeReadGraph();
 
 
 
@@ -1126,7 +1128,9 @@ public:
 
     // Strict strand separation in the read graph.
     void flagCrossStrandReadGraphEdges2();
-
+    void flagCrossStrandReadGraphEdges3();
+    void flagCrossStrandReadGraphEdges4();
+    void flagCrossStrandReadGraphEdges5();
 
 
     // Create the ReadGraph given a bool vector that specifies which
