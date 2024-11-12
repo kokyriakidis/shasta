@@ -24,6 +24,12 @@ namespace shasta {
         uint32_t markerCount1,
         int32_t ordinalOffset
     );
+
+    class CompressedMarker;
+
+    namespace MemoryMapped {
+        template<class T, class Int> class VectorOfVectors;
+    }
 }
 
 
@@ -120,6 +126,11 @@ public:
             return lastOrdinal + 1 - firstOrdinal;
         }
 
+        // Return the number of bases in the range covered by the alignment.
+        uint32_t baseRange(
+            uint64_t k,
+            OrientedReadId,
+            const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) const;
 
         // Sanity check.
         void check() const
@@ -266,8 +277,15 @@ public:
     uint32_t rightTrim(size_t i) const {
         return data[i].rightTrim();
     }
-    uint32_t range(size_t i) const {
+    uint32_t range(size_t i) const {    // In markers
         return data[i].range();
+    }
+    uint32_t baseRange(
+        uint64_t k,
+        OrientedReadId orientedReadId,
+        size_t i,
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) const {    // In bases
+        return data[i].baseRange(k, orientedReadId, markers);
     }
 
     // Return the ratio of aligned markers over the alignment range.

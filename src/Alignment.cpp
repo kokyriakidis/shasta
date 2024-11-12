@@ -1,4 +1,6 @@
 #include "Alignment.hpp"
+#include "Marker.hpp"
+#include "MemoryMappedVectorOfVectors.hpp"
 using namespace shasta;
 
 uint32_t Alignment::maxSkip() const
@@ -155,3 +157,18 @@ AlignmentInfo AlignmentData::orient(
     return alignmentInfo;
 
 }
+
+
+
+// Return the number of bases in the range covered by the alignment.
+uint32_t AlignmentInfo::Data::baseRange(
+    uint64_t k,
+    OrientedReadId orientedReadId,
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers) const
+{
+    const auto orientedReadMarkers = markers[orientedReadId.getValue()];
+    const uint32_t position0 = orientedReadMarkers[firstOrdinal].position;
+    const uint32_t position1 = orientedReadMarkers[lastOrdinal].position + uint32_t(k);
+    return position1 - position0;
+}
+
