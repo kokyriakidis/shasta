@@ -352,6 +352,8 @@ public:
 class shasta::Mode3AssemblyOptions {
 public:
 
+    string anchorCreationMethod;
+
     uint64_t minPrimaryCoverage;
     uint64_t maxPrimaryCoverage;
 
