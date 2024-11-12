@@ -1,6 +1,7 @@
 #ifndef SHASTA_ALIGNMENT_HPP
 #define SHASTA_ALIGNMENT_HPP
 
+#include "invalid.hpp"
 #include "OrientedReadPair.hpp"
 #include "ReadId.hpp"
 
@@ -210,7 +211,7 @@ public:
 
     // ProjectedAlignment metrics.
     // Only computed for read graph creation method 4.
-    float errorRateRle = 0.;
+    uint32_t mismatchCountRle = invalid<uint32_t>;
 
     void clearFlags()
     {
