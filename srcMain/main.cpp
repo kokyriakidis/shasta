@@ -31,7 +31,7 @@ namespace shasta {
             Assembler&,
             const AssemblerOptions&,
             vector<string> inputNames,
-            const string& anchorFileName);
+            const vector<string>& anchorFileNames);
 
         void mode0Assembly(
             Assembler&,
@@ -315,18 +315,19 @@ void shasta::main::assemble(
         }
         inputFileAbsolutePaths.push_back(filesystem::getAbsolutePath(inputFileName));
     }
-    string anchorFileAbsolutePath;
+    vector<string> anchorFileAbsolutePaths;
     if(
         (assemblerOptions.assemblyOptions.mode == 3) and
         (assemblerOptions.assemblyOptions.mode3Options.anchorCreationMethod == "FromJson")) {
-        const string anchorFileName = "anchors.json";
-        if(!std::filesystem::exists(anchorFileName)) {
-            throw runtime_error("Input file not found: " + anchorFileName);
+        for(const string& anchorFileName: assemblerOptions.commandLineOnlyOptions.anchorFileNames) {
+            if(!std::filesystem::exists(anchorFileName)) {
+                throw runtime_error("Anchor file not found: " + anchorFileName);
+            }
+            if(!std::filesystem::is_regular_file(anchorFileName)) {
+                throw runtime_error("Anchor file is not a regular file: " + anchorFileName);
+            }
+            anchorFileAbsolutePaths.push_back(filesystem::getAbsolutePath(anchorFileName));
         }
-        if(!std::filesystem::is_regular_file(anchorFileName)) {
-            throw runtime_error("Input file is not a regular file: " + anchorFileName);
-        }
-        anchorFileAbsolutePath = filesystem::getAbsolutePath(anchorFileName);
     }
 
 
@@ -414,7 +415,7 @@ void shasta::main::assemble(
 
 
     // Run the assembly.
-    assemble(assembler, assemblerOptions, inputFileAbsolutePaths, anchorFileAbsolutePath);
+    assemble(assembler, assemblerOptions, inputFileAbsolutePaths, anchorFileAbsolutePaths);
 
     // Final disclaimer message.
     if(assemblerOptions.commandLineOnlyOptions.memoryBacking != "2M" &&
@@ -548,7 +549,7 @@ void shasta::main::assemble(
     Assembler& assembler,
     const AssemblerOptions& assemblerOptions,
     vector<string> inputFileNames,
-    const string& anchorFileName)
+    const vector<string>& anchorFileNames)
 {
     const auto steadyClock0 = std::chrono::steady_clock::now();
     const auto userClock0 = boost::chrono::process_user_cpu_clock::now();
@@ -647,7 +648,7 @@ void shasta::main::assemble(
         (assemblerOptions.assemblyOptions.mode3Options.anchorCreationMethod != "FromMarkerGraphEdges")) {
         assembler.alignmentFreeAssembly(
             assemblerOptions.assemblyOptions.mode3Options,
-            anchorFileName,
+            anchorFileNames,
             threadCount);
         return;
     }

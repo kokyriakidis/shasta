@@ -93,6 +93,7 @@ class shasta::CommandLineOnlyOptions {
 public:
     string configName;
     vector <string> inputFileNames;
+    vector <string> anchorFileNames;
     string assemblyDirectory;
     string command;
     string memoryMode;

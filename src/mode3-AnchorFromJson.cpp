@@ -59,7 +59,7 @@ Anchors::Anchors(
     const Reads& reads,
     uint64_t k,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
-    const string& jsonFileName,
+    const vector<string>& jsonFileNames,
     uint64_t minPrimaryCoverage,
     uint64_t maxPrimaryCoverage,
     uint64_t /* threadCount */) :
@@ -71,10 +71,6 @@ Anchors::Anchors(
 {
     kHalf = k / 2;
 
-    // Read the json file into a boost property tree.
-    Ptree json;
-    boost::property_tree::read_json(jsonFileName, json);
-
     // Initialize anchor data structures.
     anchorMarkerIntervals.createNew(
             largeDataName("AnchorMarkerIntervals"),
@@ -84,32 +80,56 @@ Anchors::Anchors(
     anchorInfos.createNew(largeDataName("AnchorInfos"), largeDataPageSize);
 
 
-    // Loop over the candidate anchors.
-    uint64_t successCount = 0;
-    for(const auto& p: json) {
-        const Ptree& candidateAnchor = p.second;
+    // Loop over the json input files.
+    uint64_t candidateAnchorCount = 0;
+    uint64_t candidateAnchorKeptCount = 0;
+    uint64_t candidateAnchorDiscardedDueToCoverageCount = 0;
+    uint64_t candidateAnchorDiscardedDueToLengthCount = 0;
+    for(const string& jsonFileName: jsonFileNames) {
 
-        // If not in the desired coverage range, skip it.
-        const uint64_t coverage = candidateAnchor.size();
-        if(
-            (coverage < minPrimaryCoverage) or
-            (coverage > maxPrimaryCoverage)) {
-            continue;
-        }
+        // Read the json file into a boost property tree.
+        Ptree json;
+        boost::property_tree::read_json(jsonFileName, json);
 
-        if(processCandidateAnchor(candidateAnchor)) {
-            ++successCount;
-        } else {
-            cout << "Discarded." << endl;
+        // Loop over the candidate anchors.
+        for(const auto& p: json) {
+            const Ptree& candidateAnchor = p.second;
+            ++candidateAnchorCount;
+
+            // If not in the desired coverage range, skip it.
+            const uint64_t coverage = candidateAnchor.size();
+            if(
+                (coverage < minPrimaryCoverage) or
+                (coverage > maxPrimaryCoverage)) {
+                ++candidateAnchorDiscardedDueToCoverageCount;
+                continue;
+            }
+
+            if(processCandidateAnchor(candidateAnchor)) {
+                ++candidateAnchorKeptCount;
+            } else {
+                ++candidateAnchorDiscardedDueToLengthCount;
+            }
         }
     }
-    cout << "Of " << json.size() << " candidate anchors, " << successCount <<
-        " were used and " << json.size() - successCount << " were discarded." << endl;
+    const uint64_t anchorCount = anchorInfos.size();
 
-    SHASTA_ASSERT(anchorMarkerIntervals.size() == 2 * successCount);
-    SHASTA_ASSERT(anchorSequences.size() == 2 * successCount);
-    SHASTA_ASSERT(anchorInfos.size() == 2 * successCount);
+    cout << "Of " << candidateAnchorCount << " candidate anchors on input, " << candidateAnchorKeptCount <<
+        " were kept, " << candidateAnchorDiscardedDueToCoverageCount << " were discarded due to coverage, and " <<
+        candidateAnchorDiscardedDueToLengthCount << " were discarded due to length." << endl;
+    cout << "Number of anchors created is " << anchorCount << endl;
+    cout << "Anchor coverage in use is " << minPrimaryCoverage << " through " <<
+        maxPrimaryCoverage << " included." << endl;
 
+    // Sanity checks.
+    SHASTA_ASSERT(
+        candidateAnchorKeptCount +
+        candidateAnchorDiscardedDueToCoverageCount +
+        candidateAnchorDiscardedDueToLengthCount ==
+        candidateAnchorCount);
+    SHASTA_ASSERT(anchorCount == 2 * candidateAnchorKeptCount);
+    SHASTA_ASSERT(anchorMarkerIntervals.size() == anchorCount);
+    SHASTA_ASSERT(anchorSequences.size() == anchorCount);
 }
 
 

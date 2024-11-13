@@ -193,6 +193,10 @@ void AssemblerOptions::addCommandLineOnlyOptions()
         value< vector<string> >(&commandLineOnlyOptions.inputFileNames)->multitoken(),
         "Names of input files containing reads. Specify at least one.")
 
+        ("anchors",
+        value< vector<string> >(&commandLineOnlyOptions.anchorFileNames)->multitoken(),
+        "Names of input files containing anchors for mode 3 assembly.")
+
         ("assemblyDirectory",
         value<string>(&commandLineOnlyOptions.assemblyDirectory)->
         default_value("ShastaRun"),

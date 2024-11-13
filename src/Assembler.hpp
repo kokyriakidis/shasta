@@ -2490,7 +2490,7 @@ public:
     // Alignment-free version of mode 3 assembly.
     void alignmentFreeAssembly(
         const Mode3AssemblyOptions&,
-        const string& anchorFileAbsolutePath,
+        const vector<string>& anchorFileAbsolutePaths,
         uint64_t threadCount);
 
     // Http server functions related to Mode 3 assembly.
