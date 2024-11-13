@@ -735,9 +735,11 @@ void shasta::main::assemble(
             assembler.createReadGraph3(
                 assemblerOptions.readGraphOptions.maxAlignmentCount);
         } else if(assemblerOptions.readGraphOptions.creationMethod == 4) {
-            assembler.createReadGraph4(
+            assembler.createReadGraph4withStrandSeparation(
                 assemblerOptions.readGraphOptions.maxAlignmentCount);
-            // assembler.findReliableStrandSpecificReadGraphEdges();
+        } else if(assemblerOptions.readGraphOptions.creationMethod == 5) {
+            assembler.createReadGraph4withStrandSeparation(
+                assemblerOptions.readGraphOptions.maxAlignmentCount);
         }
 
         // Actual alignment criteria are as specified in the command line options
@@ -788,7 +790,9 @@ void shasta::main::assemble(
     } else if(assemblerOptions.readGraphOptions.strandSeparationMethod == 4) {
         assembler.flagCrossStrandReadGraphEdges4();
     } else if(assemblerOptions.readGraphOptions.strandSeparationMethod == 5) {
-        assembler.flagCrossStrandReadGraphEdges5();
+        if(assemblerOptions.readGraphOptions.creationMethod != 4) {
+            assembler.flagCrossStrandReadGraphEdges5();
+        }
     }
 
     // Compute connected components of the read graph.

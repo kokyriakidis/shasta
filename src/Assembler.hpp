@@ -1021,7 +1021,7 @@ public:
 
     void createReadGraph3(uint64_t maxAlignmentCount);
     void createReadGraph4(uint32_t maxAlignmentCount);
-    void findReliableStrandSpecificReadGraphEdges();
+    void createReadGraph4withStrandSeparation(uint32_t maxAlignmentCount);
     void removeReadGraph();
 
 
