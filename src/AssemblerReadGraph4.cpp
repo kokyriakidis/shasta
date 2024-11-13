@@ -23,6 +23,9 @@ void Assembler::createReadGraph4withStrandSeparation(
 {
     cout << timestamp << "createReadGraph4 with strand separation begins" << endl;
 
+    const double QThreshold = 1e-6;
+    const double logQThreshold = log(QThreshold);
+
     //
     // 1. Order alignments in order of increasing Q. 
     //
@@ -67,9 +70,12 @@ void Assembler::createReadGraph4withStrandSeparation(
         const uint64_t n = thisAlignmentData.info.mismatchCountRle;     
 
         // logQ(n) = αn - δL
-        const double logQ_n = alpha * double(n) - delta * L;
+        const double logQ = alpha * double(n) - delta * L;
 
-        alignmentTable.push_back(make_pair(alignmentId, logQ_n));
+
+        if (logQ <= logQThreshold) {
+            alignmentTable.push_back(make_pair(alignmentId, logQ));
+        }
     }
 
     // Sort by increasing Q
@@ -181,7 +187,7 @@ void Assembler::createReadGraph4withStrandSeparation(
         // of neighbors, the alignment is also skipped. 
         const uint64_t degreeA0 = verticesDegree[A0.getValue()];
         const uint64_t degreeB0 = verticesDegree[B0.getValue()];
-        if(degreeA0 > maxAlignmentCount || degreeB0 > maxAlignmentCount) {
+        if(degreeA0 >= maxAlignmentCount && degreeB0 >= maxAlignmentCount) {
             cout << "Skipping alignment " << alignmentId << " because vertex " << A0.getValue() << " has degree " << degreeA0 << " and vertex " << B0.getValue() << " has degree " << degreeB0 << endl;
             continue;
         }
@@ -236,9 +242,9 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
     // Remove bridges from the read graph.
-    removeReadGraphBridges(5);
+    // removeReadGraphBridges(5);
 
-    cout << timestamp << "Bridge removal ends." << endl;
+    // cout << timestamp << "Bridge removal ends." << endl;
 
 
     // Gather the vertices of each component.
