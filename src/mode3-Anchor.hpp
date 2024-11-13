@@ -164,6 +164,8 @@ public:
         return anchorInfos[anchorId].ordinalOffset;
     }
 
+    void writeCoverageHistogram() const;
+
 private:
     MemoryMapped::VectorOfVectors<AnchorMarkerInterval, uint64_t> anchorMarkerIntervals;
 

@@ -850,3 +850,23 @@ uint32_t Anchors::getFirstOrdinal(AnchorId anchorId, OrientedReadId orientedRead
 
     SHASTA_ASSERT(0);
 }
+
+
+
+void Anchors::writeCoverageHistogram() const
+{
+    vector<uint64_t> histogram;
+    for(AnchorId anchorId=0; anchorId<anchorMarkerIntervals.size(); anchorId++) {
+        const uint64_t coverage = anchorMarkerIntervals.size(anchorId);
+        if(coverage >= histogram.size()) {
+            histogram.resize(coverage + 1, 0);
+        }
+        ++histogram[coverage];
+    }
+
+    ofstream csv("AnchorCoverageHistogram.csv");
+    csv << "Coverage,Frequency\n";
+    for(uint64_t coverage=0; coverage<histogram.size(); coverage++) {
+        csv << coverage << "," << histogram[coverage] << "\n";
+    }
+}
