@@ -71,15 +71,9 @@ Anchors::Anchors(
 {
     kHalf = k / 2;
 
-    // Open the input json file.
-    ifstream inputFile(jsonFileName);
-    if(not inputFile) {
-        throw runtime_error("Could not open " + jsonFileName);
-    }
-
     // Read the json file into a boost property tree.
     Ptree json;
-    boost::property_tree::read_json(inputFile, json);
+    boost::property_tree::read_json(jsonFileName, json);
 
     // Initialize anchor data structures.
     anchorMarkerIntervals.createNew(
