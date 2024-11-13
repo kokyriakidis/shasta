@@ -162,24 +162,6 @@ void Assembler::createReadGraph4withStrandSeparation(
         const uint32_t a1 = disjointSets.find_set(A1.getValue());
         const uint32_t b1 = disjointSets.find_set(B1.getValue());
 
-        // // If A0 and B0 are in the same connected component,
-        // // A1 and B1 also must be in the same connected component.
-        // // There is nothing to do as this pair of edges
-        // // does not affect the connected components.
-        // if (a0 == b0) {
-        //     SHASTA_ASSERT(a1 == b1);
-
-        //     // Add the alignment to the read graph.
-        //     keepAlignment[alignmentId] = true;
-        //     alignment.info.isInReadGraph = 1;
-
-        //     // Update vertex degrees
-        //     verticesDegree[A0.getValue()]++;
-        //     verticesDegree[B0.getValue()]++;
-        //     verticesDegree[A1.getValue()]++;
-        //     verticesDegree[B1.getValue()]++;
-        //     continue;
-        // }
 
         // If the alignment breaks strand separation, it is skipped.
         // If A0 and B1 are in the same connected component,
