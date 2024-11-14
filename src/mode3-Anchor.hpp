@@ -127,7 +127,7 @@ public:
         const Reads& reads,
         uint64_t k,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
-        const string& jsonFileName,
+        const vector<string>& jsonFileNames,
         uint64_t minPrimaryCoverage,
         uint64_t maxPrimaryCoverage,
         uint64_t threadCount);
@@ -163,6 +163,8 @@ public:
     {
         return anchorInfos[anchorId].ordinalOffset;
     }
+
+    void writeCoverageHistogram() const;
 
 private:
     MemoryMapped::VectorOfVectors<AnchorMarkerInterval, uint64_t> anchorMarkerIntervals;

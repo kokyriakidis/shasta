@@ -59,7 +59,7 @@ Anchors::Anchors(
     const Reads& reads,
     uint64_t k,
     const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
-    const string& jsonFileName,
+    const vector<string>& jsonFileNames,
     uint64_t minPrimaryCoverage,
     uint64_t maxPrimaryCoverage,
     uint64_t /* threadCount */) :
@@ -69,15 +69,7 @@ Anchors::Anchors(
     k(k),
     markers(markers)
 {
-    // Open the input json file.
-    ifstream inputFile(jsonFileName);
-    if(not inputFile) {
-        throw runtime_error("Could not open " + jsonFileName);
-    }
-
-    // Read the json file into a boost property tree.
-    Ptree json;
-    boost::property_tree::read_json(inputFile, json);
+    kHalf = k / 2;
 
     // Initialize anchor data structures.
     anchorMarkerIntervals.createNew(
@@ -88,32 +80,56 @@ Anchors::Anchors(
     anchorInfos.createNew(largeDataName("AnchorInfos"), largeDataPageSize);
 
 
-    // Loop over the candidate anchors.
-    uint64_t successCount = 0;
-    for(const auto& p: json) {
-        const Ptree& candidateAnchor = p.second;
+    // Loop over the json input files.
+    uint64_t candidateAnchorCount = 0;
+    uint64_t candidateAnchorKeptCount = 0;
+    uint64_t candidateAnchorDiscardedDueToCoverageCount = 0;
+    uint64_t candidateAnchorDiscardedDueToLengthCount = 0;
+    for(const string& jsonFileName: jsonFileNames) {
 
-        // If not in the desired coverage range, skip it.
-        const uint64_t coverage = candidateAnchor.size();
-        if(
-            (coverage < minPrimaryCoverage) or
-            (coverage > maxPrimaryCoverage)) {
-            continue;
-        }
+        // Read the json file into a boost property tree.
+        Ptree json;
+        boost::property_tree::read_json(jsonFileName, json);
 
-        if(processCandidateAnchor(candidateAnchor)) {
-            ++successCount;
-        } else {
-            cout << "Discarded." << endl;
+        // Loop over the candidate anchors.
+        for(const auto& p: json) {
+            const Ptree& candidateAnchor = p.second;
+            ++candidateAnchorCount;
+
+            // If not in the desired coverage range, skip it.
+            const uint64_t coverage = candidateAnchor.size();
+            if(
+                (coverage < minPrimaryCoverage) or
+                (coverage > maxPrimaryCoverage)) {
+                ++candidateAnchorDiscardedDueToCoverageCount;
+                continue;
+            }
+
+            if(processCandidateAnchor(candidateAnchor)) {
+                ++candidateAnchorKeptCount;
+            } else {
+                ++candidateAnchorDiscardedDueToLengthCount;
+            }
         }
     }
-    cout << "Of " << json.size() << " candidate anchors, " << successCount <<
-        " were used and " << json.size() - successCount << " were discarded." << endl;
+    const uint64_t anchorCount = anchorInfos.size();
 
-    SHASTA_ASSERT(anchorMarkerIntervals.size() == 2 * successCount);
-    SHASTA_ASSERT(anchorSequences.size() == 2 * successCount);
-    SHASTA_ASSERT(anchorInfos.size() == 2 * successCount);
+    cout << "Of " << candidateAnchorCount << " candidate anchors on input, " << candidateAnchorKeptCount <<
+        " were kept, " << candidateAnchorDiscardedDueToCoverageCount << " were discarded due to coverage, and " <<
+        candidateAnchorDiscardedDueToLengthCount << " were discarded due to length." << endl;
+    cout << "Number of anchors created is " << anchorCount << endl;
+    cout << "Anchor coverage in use is " << minPrimaryCoverage << " through " <<
+        maxPrimaryCoverage << " included." << endl;
 
+    // Sanity checks.
+    SHASTA_ASSERT(
+        candidateAnchorKeptCount +
+        candidateAnchorDiscardedDueToCoverageCount +
+        candidateAnchorDiscardedDueToLengthCount ==
+        candidateAnchorCount);
+    SHASTA_ASSERT(anchorCount == 2 * candidateAnchorKeptCount);
+    SHASTA_ASSERT(anchorMarkerIntervals.size() == anchorCount);
+    SHASTA_ASSERT(anchorSequences.size() == anchorCount);
 }
 
 
@@ -121,6 +137,10 @@ Anchors::Anchors(
 bool Anchors::processCandidateAnchor(
     const Ptree& candidateAnchor)
 {
+    const bool debug = false;
+    if(debug) {
+        cout << "Processing a candidate anchor with coverage " << candidateAnchor.size() << endl;
+    }
     using Ptree = boost::property_tree::basic_ptree<string, string>;
 
     class Interval {
@@ -190,6 +210,10 @@ bool Anchors::processCandidateAnchor(
             }
             intervals.push_back({orientedReadId, begin, end});
 
+            if(debug) {
+                cout << readName << " " << orientedReadId << " " << begin << " " << end << endl;
+            }
+
         } catch (...) {
             std::ostringstream s;
             boost::property_tree::write_json(s, candidateAnchorInterval);
@@ -238,7 +262,9 @@ bool Anchors::processCandidateAnchor(
 
     // Clip to the first/last marker entirely contained in each interval.
     for(Interval& interval: intervals) {
-        // cout << "Clipping " << interval.orientedReadId << " " << interval.begin << " " << interval.end << endl;
+        if(debug) {
+            cout << "Clipping " << interval.orientedReadId << " " << interval.begin << " " << interval.end << endl;
+        }
         const span<const CompressedMarker> orientedReadMarkers = markers[interval.orientedReadId.getValue()];
 
         // Find the ordinal of the first marker entirely contained in this interval.
@@ -246,14 +272,18 @@ bool Anchors::processCandidateAnchor(
             orientedReadMarkers.begin(), orientedReadMarkers.end(),
             CompressedMarker({Uint24(uint32_t(interval.begin))}), comparator);
         if(it == orientedReadMarkers.end()) {
-            // cout << "The interval begins after the last marker." << endl;
+            if(debug) {
+                cout << "The interval begins after the last marker." << endl;
+            }
             return false;
         }
 
         const uint32_t ordinal0 = uint32_t(it - orientedReadMarkers.begin());
         const uint32_t position0 = it->position;
         if(position0 + k > interval.end) {
-            // cout << "No marker is entirely inside this interval." << endl;
+            if(debug) {
+                cout << "No marker is entirely inside this interval." << endl;
+            }
             return false;
         }
 
@@ -270,8 +300,10 @@ bool Anchors::processCandidateAnchor(
         }
         ordinal1 -= 1;
         position1 += uint32_t(k);
-        // cout << "Clipped to ordinals " << ordinal0 << " " << ordinal1 <<
-        //     ", positions " << position0 << " " << position1 << endl;
+        if(debug) {
+            cout << "Clipped to ordinals " << ordinal0 << " " << ordinal1 <<
+                ", positions " << position0 << " " << position1 << endl;
+        }
 
         interval.ordinal0 = ordinal0;
         interval.ordinal1 = ordinal1;
@@ -279,7 +311,10 @@ bool Anchors::processCandidateAnchor(
         interval.clippedEnd = position1;
     }
 
-    // cout << "Clipped bases: " << intervals.front().leftClip() << " " << intervals.front().rightClip() << endl;
+    if(debug) {
+        cout << "Clipped bases: " << intervals.front().leftClip() << " on left, " <<
+            intervals.front().rightClip() << " on right." <<endl;
+    }
 
     // Check that the number of bases clipped is the same for all the intervals.
     const uint64_t leftClip0 = intervals[0].leftClip();
@@ -293,6 +328,10 @@ bool Anchors::processCandidateAnchor(
 
     // All good. Generate an anchor.
     {
+        if(debug) {
+            const AnchorId anchorId = anchorSequences.size();
+            cout << "Generating anchor " << anchorIdToString(anchorId) << endl;
+        }
 
         // Generate the sequence for this anchor.
         anchorSequences.appendVector();
@@ -304,11 +343,20 @@ bool Anchors::processCandidateAnchor(
             const Base b = reads.getOrientedReadBase(orientedReadId0, uint32_t(position));
             anchorSequences.append(b);
         }
+        if(debug) {
+            cout << "Anchor sequence:" << endl;
+            const auto sequence = anchorSequences[anchorSequences.size() - 1];
+            copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(cout));
+            cout << endl;
+        }
 
         // Generate the marker intervals for this anchor.
         anchorMarkerIntervals.appendVector();
         for(const Interval& interval: intervals) {
             anchorMarkerIntervals.append(AnchorMarkerInterval(interval.orientedReadId, interval.ordinal0));
+            if(debug) {
+                cout << interval.orientedReadId << " " << interval.ordinal0 << " " << interval.ordinal1 << endl;
+            }
         }
 
         // Generate the AnchorInfo and store the ordinal offset.
@@ -320,11 +368,13 @@ bool Anchors::processCandidateAnchor(
 
         // Also generate the reverse complemented anchor.
         anchorSequences.appendVector();
-        for(uint64_t position=end0-1; /* Check later */ ; --position) {
-            const Base b = reads.getOrientedReadBase(orientedReadId0, uint32_t(position));
-            anchorSequences.append(b.complement());
-            if(position == begin0) {
-                break;
+        if(end0 > begin0) {
+            for(uint64_t position=end0-1; /* Check later */ ; --position) {
+                const Base b = reads.getOrientedReadBase(orientedReadId0, uint32_t(position));
+                anchorSequences.append(b.complement());
+                if(position == begin0) {
+                    break;
+                }
             }
         }
 
