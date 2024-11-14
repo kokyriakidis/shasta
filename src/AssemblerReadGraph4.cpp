@@ -7,6 +7,7 @@
 #include "SHASTA_ASSERT.hpp"
 #include "timestamp.hpp"
 #include <queue>
+#include <map>
 #include "orderPairs.hpp"
 #include "Mode3Assembler.hpp"
 using namespace shasta;
@@ -23,7 +24,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 {
     cout << timestamp << "createReadGraph4 with strand separation begins" << endl;
 
-    const double QThreshold = 1e-6;
+    const double QThreshold = 1e-5;
     const double logQThreshold = log(QThreshold);
 
     //
@@ -40,6 +41,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     // ε = 1e-4, δ = 5e-4
     // logQ(n) = αn - δL
     vector< pair<uint64_t, double> > alignmentTable;
+    vector< pair<uint64_t, double> > alignmentTableFiltered;
     const double epsilon = 1e-4;
     const double delta = 5e-4;
     const double alpha = log(1 + delta/(2*epsilon));
@@ -74,12 +76,15 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
         if (logQ <= logQThreshold) {
-            alignmentTable.push_back(make_pair(alignmentId, logQ));
+            alignmentTableFiltered.push_back(make_pair(alignmentId, logQ));
         }
+        alignmentTable.push_back(make_pair(alignmentId, logQ));
     }
+
 
     // Sort by increasing Q
     sort(alignmentTable.begin(), alignmentTable.end(), OrderPairsBySecondOnly<uint64_t, double>());
+    sort(alignmentTableFiltered.begin(), alignmentTableFiltered.end(), OrderPairsBySecondOnly<uint64_t, double>());
 
     cout << "The alignment table has " << alignmentTable.size() << " entries." << endl; // 123863
 
@@ -95,6 +100,90 @@ void Assembler::createReadGraph4withStrandSeparation(
              << alignment.readIds[1] << endl;
     }
 
+    // Create and initialize the disjoint sets data structure needed below.
+    const size_t readCount = reads->readCount();
+    const size_t orientedReadCount = 2*readCount;
+
+    // Keep track of which readIds were used in alignments
+    vector<bool> readUsed(readCount, false);
+    for(size_t i=0; i<alignmentTableFiltered.size(); i++) {
+        const uint64_t alignmentId = alignmentTableFiltered[i].first;
+        const AlignmentData& alignment = alignmentData[alignmentId];
+        readUsed[alignment.readIds[0]] = true;
+        readUsed[alignment.readIds[1]] = true;
+    }
+
+    // Create a map of readId -> vector of alignment stats for alignments involving that read
+    std::map<ReadId, vector<pair<uint64_t, double>>> readToAlignments;
+
+    // Loop over alignments in alignmentTable
+    for(size_t i=0; i<alignmentTable.size(); i++) {
+        const uint64_t alignmentId = alignmentTable[i].first;
+        const AlignmentData& alignment = alignmentData[alignmentId];
+
+        // check if the reads were used in alignments
+        if(readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]]) {
+            continue;
+        }
+
+        // check if the first read was used and the second was not in alignments 
+        if(readUsed[alignment.readIds[0]] && !readUsed[alignment.readIds[1]]) {
+            readToAlignments[alignment.readIds[1]].push_back(make_pair(alignmentId, alignmentTable[i].second));
+        }
+
+        // check if the second read was used and the first was not in alignments
+        if(!readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]]) {
+            readToAlignments[alignment.readIds[0]].push_back(make_pair(alignmentId, alignmentTable[i].second));
+        }
+    }
+
+    // // Loop over all alignments.
+    // for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
+    //      {
+    //         // Get information for this alignment.
+    //         if((alignmentId % 10000) == 0) {
+    //             cout << timestamp << alignmentId << "/" << alignmentCount << endl;
+    //         }
+    //     const AlignmentData& alignment = alignmentData[alignmentId];
+
+    //     // check if the reads were used in alignments
+    //     if(readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]]) {
+    //         continue;
+    //     }
+
+    //     // check if the first read was used and the second was not in alignments
+    //     if(readUsed[alignment.readIds[0]] && !readUsed[alignment.readIds[1]]) {
+    //         readToAlignments[alignment.readIds[1]].push_back(make_pair(alignmentId, alignmentTable[alignmentId].second));
+    //     }
+
+    //     // check if the second read was used and the first was not in alignments
+    //     if(!readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]]) {
+    //         readToAlignments[alignment.readIds[0]].push_back(make_pair(alignmentId, alignmentTable[alignmentId].second));
+    //     }
+
+    // }
+
+    // For each read that was used in alignments, keep only the best alignment
+    for(const auto& readEntry : readToAlignments) {
+        if(!readEntry.second.empty()) {
+            // Find alignment with lowest Q value (best alignment)
+            auto bestAlignment = std::min_element(
+                readEntry.second.begin(),
+                readEntry.second.end(),
+                [](const auto& a, const auto& b) {
+                    return a.second < b.second;
+                });
+                
+            // Mark all other alignments for this read as not to be kept
+            for(const auto& alignment : readEntry.second) {
+                if(alignment != *bestAlignment) {
+                    alignmentData[alignment.first].info.isInReadGraph = false;
+                }
+            }
+        }
+    }
+
+    
 
     ///
     // 2. Process alignments in order of increasing Q. 
@@ -108,9 +197,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 
     
 
-    // Create and initialize the disjoint sets data structure needed below.
-    const size_t readCount = reads->readCount();
-    const size_t orientedReadCount = 2*readCount;
+    
 
     // Maintain a vector containing the degree of each vertex
     // verticesDegree[vertexID] -> degree
@@ -188,7 +275,7 @@ void Assembler::createReadGraph4withStrandSeparation(
         const uint64_t degreeA0 = verticesDegree[A0.getValue()];
         const uint64_t degreeB0 = verticesDegree[B0.getValue()];
         if(degreeA0 >= maxAlignmentCount && degreeB0 >= maxAlignmentCount) {
-            cout << "Skipping alignment " << alignmentId << " because vertex " << A0.getValue() << " has degree " << degreeA0 << " and vertex " << B0.getValue() << " has degree " << degreeB0 << endl;
+            // cout << "Skipping alignment " << alignmentId << " because vertex " << A0.getValue() << " has degree " << degreeA0 << " and vertex " << B0.getValue() << " has degree " << degreeB0 << endl;
             continue;
         }
 
