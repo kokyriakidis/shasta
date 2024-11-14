@@ -23,7 +23,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 {
     cout << timestamp << "createReadGraph4 with strand separation begins" << endl;
 
-    const double QThreshold = 1e-12;
+    const double QThreshold = 1e-15;
     const double logQThreshold = log(QThreshold);
 
     //
@@ -272,7 +272,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 
     // Process notIncludedReadsToAlignments in order of increasing Q
     // but now use the already constructed disjointSets as a "good starting point"
-    uint64_t crossStrandEdgeCount = 0;
+    uint64_t crossStrandEdgeCountR2 = 0;
     for(auto it=notIncludedReadsToAlignments.begin(); it!=notIncludedReadsToAlignments.end(); ++it) {
         const pair<uint64_t, double>& p = *it;
         const uint64_t alignmentId = p.first;
@@ -310,7 +310,7 @@ void Assembler::createReadGraph4withStrandSeparation(
         // and don't use them to update the disjoint set data structure.
         if(a0 == b1) {
             SHASTA_ASSERT(a1 == b0);
-            crossStrandEdgeCount += 2;
+            crossStrandEdgeCountR2 += 2;
             continue;
         }
 
@@ -375,7 +375,10 @@ void Assembler::createReadGraph4withStrandSeparation(
     cout << timestamp << "createReadGraph4 with strand separation ends." << endl;
 
     cout << "Strand separation flagged " << crossStrandEdgeCount <<
-        " read graph edges out of " << readGraph.edges.size() << " total." << endl;
+        " read graph edges out of " << readGraph.edges.size() << " total in round 1." << endl;
+    
+    cout << "Strand separation flagged " << crossStrandEdgeCountR2 <<
+        " read graph edges out of " << readGraph.edges.size() << " total in round 2." << endl;
 
 
     // Remove bridges from the read graph.
