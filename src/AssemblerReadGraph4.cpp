@@ -7,7 +7,6 @@
 #include "SHASTA_ASSERT.hpp"
 #include "timestamp.hpp"
 #include <queue>
-#include <map>
 #include "orderPairs.hpp"
 #include "Mode3Assembler.hpp"
 using namespace shasta;
@@ -24,7 +23,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 {
     cout << timestamp << "createReadGraph4 with strand separation begins" << endl;
 
-    const double QThreshold = 1e-5;
+    const double QThreshold = 1e-12;
     const double logQThreshold = log(QThreshold);
 
     //
@@ -41,10 +40,17 @@ void Assembler::createReadGraph4withStrandSeparation(
     // ε = 1e-4, δ = 5e-4
     // logQ(n) = αn - δL
     vector< pair<uint64_t, double> > alignmentTable;
-    vector< pair<uint64_t, double> > alignmentTableFiltered;
+    vector< pair<uint64_t, double> > alignmentTableNotPassFilter;
     const double epsilon = 1e-4;
     const double delta = 5e-4;
     const double alpha = log(1 + delta/(2*epsilon));
+
+    // Get stats about the reads
+    const size_t readCount = reads->readCount();
+    const size_t orientedReadCount = 2*readCount;
+    
+    // Keep track of which readIds were used in alignments
+    vector<bool> readUsed(readCount, false);
 
     // Loop over all alignments.
     for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
@@ -76,17 +82,21 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
         if (logQ <= logQThreshold) {
-            alignmentTableFiltered.push_back(make_pair(alignmentId, logQ));
+            alignmentTable.push_back(make_pair(alignmentId, logQ));
+            readUsed[readId0] = true;
+            readUsed[readId1] = true;
+        } else {
+            alignmentTableNotPassFilter.push_back(make_pair(alignmentId, logQ));
         }
-        alignmentTable.push_back(make_pair(alignmentId, logQ));
     }
 
 
     // Sort by increasing Q
     sort(alignmentTable.begin(), alignmentTable.end(), OrderPairsBySecondOnly<uint64_t, double>());
-    sort(alignmentTableFiltered.begin(), alignmentTableFiltered.end(), OrderPairsBySecondOnly<uint64_t, double>());
+    sort(alignmentTableNotPassFilter.begin(), alignmentTableNotPassFilter.end(), OrderPairsBySecondOnly<uint64_t, double>());
 
-    cout << "The alignment table has " << alignmentTable.size() << " entries." << endl; // 123863
+    cout << "The alignmentTable has " << alignmentTable.size() << " entries." << endl; // 123863
+    cout << "The alignmentTableNotPassFilter has " << alignmentTableNotPassFilter.size() << " entries." << endl;
 
     // Print the first 100 entries of the alignment table
     cout << "First 10 entries of the alignment table:" << endl;
@@ -100,85 +110,38 @@ void Assembler::createReadGraph4withStrandSeparation(
              << alignment.readIds[1] << endl;
     }
 
-    // Create and initialize the disjoint sets data structure needed below.
-    const size_t readCount = reads->readCount();
-    const size_t orientedReadCount = 2*readCount;
+    // Create a vector of <alignment, logQ> stats for the best alignment of each not included reads
+    vector< pair<uint64_t, double> > notIncludedReadsToAlignments;
 
-    // Keep track of which readIds were used in alignments
-    vector<bool> readUsed(readCount, false);
-    for(size_t i=0; i<alignmentTableFiltered.size(); i++) {
-        const uint64_t alignmentId = alignmentTableFiltered[i].first;
-        const AlignmentData& alignment = alignmentData[alignmentId];
-        readUsed[alignment.readIds[0]] = true;
-        readUsed[alignment.readIds[1]] = true;
-    }
+    // Loop over alignments in alignmentTableNotPassFilter
+    // The order of the alignments are in increasing Q
+    // We want to keep the best alignment for each not included read
+    // We will keep the first alignment from the alignmentTableNotPassFilter
+    // that involves a not included read.
+    bool weFoundIsolatedReadsToAdd = true;
+    while (weFoundIsolatedReadsToAdd) {
+        weFoundIsolatedReadsToAdd = false;
+        for(size_t i=0; i<alignmentTableNotPassFilter.size(); i++) {
+            const uint64_t alignmentId = alignmentTableNotPassFilter[i].first;
+            const AlignmentData& alignment = alignmentData[alignmentId];
 
-    // Create a map of readId -> vector of alignment stats for alignments involving that read
-    std::map<ReadId, vector<pair<uint64_t, double>>> readToAlignments;
+            // check if the reads were used in alignments
+            if(readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]]) {
+                continue;
+            }
 
-    // Loop over alignments in alignmentTable
-    for(size_t i=0; i<alignmentTable.size(); i++) {
-        const uint64_t alignmentId = alignmentTable[i].first;
-        const AlignmentData& alignment = alignmentData[alignmentId];
+            // check if the first read was used and the second was not in alignments 
+            if(readUsed[alignment.readIds[0]] && !readUsed[alignment.readIds[1]]) {
+                notIncludedReadsToAlignments.push_back(make_pair(alignmentId, alignmentTableNotPassFilter[i].second));
+                readUsed[alignment.readIds[1]] = true;
+                weFoundIsolatedReadsToAdd = true;
+            }
 
-        // check if the reads were used in alignments
-        if(readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]]) {
-            continue;
-        }
-
-        // check if the first read was used and the second was not in alignments 
-        if(readUsed[alignment.readIds[0]] && !readUsed[alignment.readIds[1]]) {
-            readToAlignments[alignment.readIds[1]].push_back(make_pair(alignmentId, alignmentTable[i].second));
-        }
-
-        // check if the second read was used and the first was not in alignments
-        if(!readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]]) {
-            readToAlignments[alignment.readIds[0]].push_back(make_pair(alignmentId, alignmentTable[i].second));
-        }
-    }
-
-    // // Loop over all alignments.
-    // for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
-    //      {
-    //         // Get information for this alignment.
-    //         if((alignmentId % 10000) == 0) {
-    //             cout << timestamp << alignmentId << "/" << alignmentCount << endl;
-    //         }
-    //     const AlignmentData& alignment = alignmentData[alignmentId];
-
-    //     // check if the reads were used in alignments
-    //     if(readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]]) {
-    //         continue;
-    //     }
-
-    //     // check if the first read was used and the second was not in alignments
-    //     if(readUsed[alignment.readIds[0]] && !readUsed[alignment.readIds[1]]) {
-    //         readToAlignments[alignment.readIds[1]].push_back(make_pair(alignmentId, alignmentTable[alignmentId].second));
-    //     }
-
-    //     // check if the second read was used and the first was not in alignments
-    //     if(!readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]]) {
-    //         readToAlignments[alignment.readIds[0]].push_back(make_pair(alignmentId, alignmentTable[alignmentId].second));
-    //     }
-
-    // }
-
-    // For each read that was used in alignments, keep only the best alignment
-    for(const auto& readEntry : readToAlignments) {
-        if(!readEntry.second.empty()) {
-            // Find alignment with lowest Q value (best alignment)
-            auto bestAlignment = std::min_element(
-                readEntry.second.begin(),
-                readEntry.second.end(),
-                [](const auto& a, const auto& b) {
-                    return a.second < b.second;
-                });
-                
-            // Mark all other alignments for this read as not to be kept
-            for(const auto& alignment : readEntry.second) {
-                if(alignment != *bestAlignment) {
-                    alignmentData[alignment.first].info.isInReadGraph = false;
-                }
+            // check if the second read was used and the first was not in alignments
+            if(!readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]]) {
+                notIncludedReadsToAlignments.push_back(make_pair(alignmentId, alignmentTableNotPassFilter[i].second));
+                readUsed[alignment.readIds[0]] = true;
+                weFoundIsolatedReadsToAdd = true;
             }
         }
     }
@@ -193,12 +156,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     // iii. If the alignment breaks strand separation, it is skipped. 
     // iv.  If both vertices of the potential edge have at least the required minimum number of neighbors, the alignment is also skipped.  
     // v.   Otherwise, the pair of reverse complement edges corresponding to the alignment are added to the read graph.
-
-
     
-
-    
-
     // Maintain a vector containing the degree of each vertex
     // verticesDegree[vertexID] -> degree
     vector<uint64_t> verticesDegree(orientedReadCount, 0);
@@ -295,12 +253,91 @@ void Assembler::createReadGraph4withStrandSeparation(
         disjointSets.union_set(a1, b1);
     }
 
-    // Print the first 100 vertices and their degrees
-    cout << "First 100 vertices and their degrees:" << endl;
-    for(uint64_t i=0; i<min(uint64_t(100), uint64_t(verticesDegree.size())); i++) {
-        cout << "Vertex " << i << ": degree " << verticesDegree[i] << endl;
+    // Verify that for any read the two oriented reads are in distinct
+    // connected components.
+    for(ReadId readId=0; readId<readCount; readId++) {
+        const OrientedReadId orientedReadId0(readId, 0);
+        const OrientedReadId orientedReadId1(readId, 1);
+        SHASTA_ASSERT(
+            disjointSets.find_set(orientedReadId0.getValue()) !=
+            disjointSets.find_set(orientedReadId1.getValue())
+        );
     }
-    
+
+
+    // Print how many alignments were kept in this step
+    const size_t keepCountR1 = count(keepAlignment.begin(), keepAlignment.end(), true);
+    cout << "Finding strict disjointSets step: Keeping " << keepCountR1 << " alignments of " << keepAlignment.size() << endl;
+
+
+    // Process notIncludedReadsToAlignments in order of increasing Q
+    // but now use the already constructed disjointSets as a "good starting point"
+    uint64_t crossStrandEdgeCount = 0;
+    for(auto it=notIncludedReadsToAlignments.begin(); it!=notIncludedReadsToAlignments.end(); ++it) {
+        const pair<uint64_t, double>& p = *it;
+        const uint64_t alignmentId = p.first;
+
+        // Get the alignment data
+        AlignmentData& alignment = alignmentData[alignmentId];
+        const ReadId readId0 = alignment.readIds[0];
+        const ReadId readId1 = alignment.readIds[1];
+        const bool isSameStrand = alignment.isSameStrand;
+        SHASTA_ASSERT(readId0 < readId1);
+        const OrientedReadId A0 = OrientedReadId(readId0, 0);
+        const OrientedReadId B0 = OrientedReadId(readId1, isSameStrand ? 0 : 1);
+        const OrientedReadId A1 = OrientedReadId(readId0, 1);
+        const OrientedReadId B1 = OrientedReadId(readId1, isSameStrand ? 1 : 0);
+
+        SHASTA_ASSERT(A0.getReadId() == A1.getReadId());
+        SHASTA_ASSERT(B0.getReadId() == B1.getReadId());
+        SHASTA_ASSERT(A0.getStrand() == 1 - A1.getStrand());
+        SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
+
+        // Get the connected components that these oriented reads are in.
+        const uint32_t a0 = disjointSets.find_set(A0.getValue());
+        const uint32_t b0 = disjointSets.find_set(B0.getValue());
+        const uint32_t a1 = disjointSets.find_set(A1.getValue());
+        const uint32_t b1 = disjointSets.find_set(B1.getValue());
+
+
+        // If the alignment breaks strand separation, it is skipped.
+        // If A0 and B1 are in the same connected component,
+        // A1 and B0 also must be in the same connected component.
+        // Adding this pair of edges would create a self-complementary
+        // connected component containing A0, B0, A1, and B1,
+        // and to ensure strand separation we don't want to do that.
+        // So we mark these edges as cross-strand edges
+        // and don't use them to update the disjoint set data structure.
+        if(a0 == b1) {
+            SHASTA_ASSERT(a1 == b0);
+            crossStrandEdgeCount += 2;
+            continue;
+        }
+
+        // If both vertices of the potential edge have at least the required minimum number 
+        // of neighbors, the alignment is also skipped. 
+        const uint64_t degreeA0 = verticesDegree[A0.getValue()];
+        const uint64_t degreeB0 = verticesDegree[B0.getValue()];
+        if(degreeA0 >= maxAlignmentCount && degreeB0 >= maxAlignmentCount) {
+            // cout << "Skipping alignment " << alignmentId << " because vertex " << A0.getValue() << " has degree " << degreeA0 << " and vertex " << B0.getValue() << " has degree " << degreeB0 << endl;
+            continue;
+        }
+
+        // Add the alignment to the read graph.
+        keepAlignment[alignmentId] = true;
+        alignment.info.isInReadGraph = 1;
+
+        // Update vertex degrees
+        verticesDegree[A0.getValue()]++;
+        verticesDegree[B0.getValue()]++;
+        verticesDegree[A1.getValue()]++;
+        verticesDegree[B1.getValue()]++;
+        
+
+        // Update disjoint sets
+        disjointSets.union_set(a0, b0);
+        disjointSets.union_set(a1, b1);
+    }
 
     // Verify that for any read the two oriented reads are in distinct
     // connected components.
@@ -312,6 +349,19 @@ void Assembler::createReadGraph4withStrandSeparation(
             disjointSets.find_set(orientedReadId1.getValue())
         );
     }
+
+
+    // Print how many alignments were kept
+    const size_t keepCountR2 = count(keepAlignment.begin(), keepAlignment.end(), true);
+    cout << "Adding isolated reads step: Keeping " << keepCountR2 << " alignments of " << keepAlignment.size() << endl;
+
+
+    // Print the first 100 vertices and their degrees
+    cout << "First 100 vertices and their degrees:" << endl;
+    for(uint64_t i=0; i<min(uint64_t(100), uint64_t(verticesDegree.size())); i++) {
+        cout << "Vertex " << i << ": degree " << verticesDegree[i] << endl;
+    }
+    
 
     cout << timestamp << "Done processing alignments." << endl;
 
