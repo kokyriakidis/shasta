@@ -115,7 +115,7 @@ void AssemblyGraph::run(
         performanceLog << timestamp << "Iteration " << iteration <<
             " of bubble cleanup begins." << endl;
         const uint64_t cleanedUpBubbleCount = cleanupBubbles(
-            false,
+            debug,
             options.assemblyGraphOptions.bubbleCleanupMaxOffset,
             options.assemblyGraphOptions.chainTerminalCommonThreshold,
             threadCount);
@@ -7723,7 +7723,8 @@ uint64_t AssemblyGraph::cleanupBubbles(bool debug, edge_descriptor ce,
         if(debug) {
             cout << "cleanupBubbles working on Bubble " << bubbleStringId(ce, positionInBubbleChain) <<
                 " ploidy " << bubble.size() << endl;
-            cout << "Entrance " << bubble.front().front() << ", exit " << bubble.front().back() << endl;
+            cout << "Entrance " << anchorIdToString(bubble.front().front()) <<
+                ", exit " << anchorIdToString(bubble.front().back()) << endl;
         }
 
         bool keepBubble = false;
