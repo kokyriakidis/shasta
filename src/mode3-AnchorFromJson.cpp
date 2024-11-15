@@ -164,6 +164,10 @@ bool Anchors::processCandidateAnchor(
         {
             return end - clippedEnd;
         }
+        bool operator<(const Interval& that) const
+        {
+            return orientedReadId < that.orientedReadId;
+        }
     };
 
     // Gather the intervals of this candidate anchor.
@@ -328,6 +332,8 @@ bool Anchors::processCandidateAnchor(
 
     // All good. Generate an anchor.
     {
+        sort(intervals.begin(), intervals.end());
+
         if(debug) {
             const AnchorId anchorId = anchorSequences.size();
             cout << "Generating anchor " << anchorIdToString(anchorId) << endl;
