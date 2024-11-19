@@ -279,7 +279,7 @@ void AnchorGraph::removeCrossEdges(
             if(graph[e0].isNonTransitiveReductionEdge) {
                 continue;
             }
-            if(graph[e0].info.common >= highCoverageThreshold) {
+            if(graph[e0].coverage >= highCoverageThreshold) {
                 v0HasStrongOutEdge = true;
                 break;
             }
@@ -296,7 +296,7 @@ void AnchorGraph::removeCrossEdges(
             if(graph[e1].isNonTransitiveReductionEdge) {
                 continue;
             }
-            if(graph[e1].info.common >= highCoverageThreshold) {
+            if(graph[e1].coverage >= highCoverageThreshold) {
                 v1HasStrongOutEdge = true;
                 break;
             }
