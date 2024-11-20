@@ -148,6 +148,7 @@ void AssemblyGraph::run(
         options.assemblyGraphOptions.phaseErrorThreshold,
         options.assemblyGraphOptions.bubbleErrorThreshold,
         options.assemblyGraphOptions.longBubbleThreshold);
+    if(debug) write("DD");
     compress();
 
     // For detangling, expand all bubble chains.
@@ -6933,8 +6934,8 @@ void AssemblyGraph::runAssemblyStep(
         stepSequence.sequence.clear();
         stepSequence.success = false;
         std::lock_guard<std::mutex> lock(mutex);
-        cout << "Error occurred in local assembly between marker graph edges " <<
-            edgeIdA << " and " << edgeIdB << endl;
+        cout << "Error occurred in local assembly between anchors " <<
+            anchorIdToString(edgeIdA) << " and " << anchorIdToString(edgeIdB) << endl;
         throw;
     }
 }
