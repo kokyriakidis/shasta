@@ -587,7 +587,15 @@ void Assembler::alignmentFreeAssembly(
     // Create the Anchors.
     shared_ptr<mode3::Anchors> anchorsPointer;
     if(mode3Options.anchorCreationMethod == "FromMarkerKmers") {
-        throw runtime_error("Anchor creation method FromMarkerKmers is not yet implemented.");
+        anchorsPointer =
+            make_shared<mode3::Anchors>(
+                MappedMemoryOwner(*this),
+                getReads(),
+                assemblerInfo->k,
+                markers,
+                mode3Options.minPrimaryCoverage,
+                mode3Options.maxPrimaryCoverage,
+                threadCount);
     } else if(mode3Options.anchorCreationMethod == "FromJson") {
         anchorsPointer =
             make_shared<mode3::Anchors>(

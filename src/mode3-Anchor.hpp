@@ -121,6 +121,16 @@ public:
         uint64_t maxPrimaryCoverage,
         uint64_t threadCount);
 
+    // This constructor creates the Anchors from marker k-mers.
+    Anchors(
+        const MappedMemoryOwner&,
+        const Reads& reads,
+        uint64_t k,
+        const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
+        uint64_t minPrimaryCoverage,
+        uint64_t maxPrimaryCoverage,
+        uint64_t threadCount);
+
     // This constructor creates the Anchors from a json file.
     Anchors(
         const MappedMemoryOwner&,
@@ -269,6 +279,42 @@ private:
     };
     ConstructFromMarkerGraphData constructFromMarkerGraphData;
     void constructFromMarkerGraphThreadFunction(uint64_t threadId);
+
+
+
+    // Data and functions used when constructing the Anchors from marker k-mers
+    class ConstructFromMarkerKmersData {
+    public:
+        uint64_t minPrimaryCoverage;
+        uint64_t maxPrimaryCoverage;
+
+        class MarkerInfo {
+        public:
+            OrientedReadId orientedReadId;
+            uint32_t ordinal;
+        };
+
+        // A hash table that will contain a MarkerInfo object
+        // for each marker in all oriented reads.
+        // Indexed by bucketId.
+        // The bucket is computed by hashing the k-mer of each marker,
+        // so all markers with the same k-mer end up in the same bucket.
+        MemoryMapped::VectorOfVectors<MarkerInfo, uint64_t> buckets;
+
+        // The number of buckets is chosen equal to a power of 2,
+        // so the bucketId can be obtained with a siple bitwise and
+        // with a mask equal to the number of buckets minus 1.
+        uint64_t mask;
+
+        // The MarkerInfo objects for the anchors found by each thread.
+        vector< shared_ptr<MemoryMapped::VectorOfVectors<MarkerInfo, uint64_t> > > threadAnchors;
+    };
+    ConstructFromMarkerKmersData constructFromMarkerKmersData;
+    void constructFromMarkerKmersThreadFunction1(uint64_t threadId);
+    void constructFromMarkerKmersThreadFunction2(uint64_t threadId);
+    void constructFromMarkerKmersThreadFunction12(uint64_t pass);
+    void constructFromMarkerKmersThreadFunction3(uint64_t threadId);
+
 
 
     // Process a candidate anchor from json input.
