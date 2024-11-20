@@ -165,7 +165,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     // Create the read graph using all the alignments.
     createReadGraphUsingAllAlignments(keepAllAlignments);
 
-    const double QThreshold = 1e-14;
+    const double QThreshold = 1e-12;
     const double logQThreshold = log(QThreshold);
 
     //
@@ -417,7 +417,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     vector<bool> alignmentTableNotPassFilterAlreadyConsidered(alignmentTableNotPassFilter.size(), false);
     bool weFoundAlignmentsInBreaksToAdd = true;
 
-    const double QThresholdForAlignmentsInBreaks = 1e-4;
+    const double QThresholdForAlignmentsInBreaks = 1e-8;
     const double logQThresholdForAlignmentsInBreaks = log(QThresholdForAlignmentsInBreaks);
 
     uint64_t allignmentsAdded = 0;
@@ -427,7 +427,7 @@ void Assembler::createReadGraph4withStrandSeparation(
         cout << "We added " << allignmentsAdded << " Alignments" << endl;
         for(size_t i=0; i<alignmentTableNotPassFilter.size(); i++) {
 
-            if((i % 1000) == 0) {
+            if((i % 100000) == 0) {
                 cout << timestamp << i << "/" << alignmentTableNotPassFilter.size() << endl;
             }
 
@@ -449,17 +449,40 @@ void Assembler::createReadGraph4withStrandSeparation(
             const uint32_t a1 = disjointSets.find_set(A1.getValue());
             const uint32_t b1 = disjointSets.find_set(B1.getValue());
 
-            // Case 1: There is an alignment between two added reads
-            // that passed the initial strict logQ filter.
+            // Case 1a: There is an alignment between two added reads
+            // that passed the initial strict logQ filter and these reads are 
+            // IN THE SAME CONNECTED COMPONENT.
             // This case checks for direct connections between to nodes in a break
             // using alignments that did not pass the initial strict logQ filter.
             // TODO: check if these alignments introduce bad connections (logQThresholdForAlignmentsInBreaks)
-            if(readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]] && logQ <= logQThresholdForAlignmentsInBreaks && alignmentTableNotPassFilterAlreadyConsidered[i] == false) {
-                // If they do not belong to the same connected component, we can skip this alignment.
-                // Otherwise, it would introduce a cross-strand edge.
-                if(a0 != b0) {
-                    continue;
+            if(readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]] && a0 == b0 && logQ <= logQThresholdForAlignmentsInBreaks && alignmentTableNotPassFilterAlreadyConsidered[i] == false) {
+                // Find neighbors of the orientedReadId in the filtered readGraph.
+                // We know there is a distance 1 connection between the 2 reads in the readGraphAllAlignments.
+                // If there is no connection in the filtered readGraph in maxDistance apart, we can add the alignment.
+                uint64_t maxDistance = 5;
+                vector<OrientedReadId> readGraphNeighbors;
+                readGraph.findNeighbors(A0, maxDistance, readGraphNeighbors);
+
+                // Check if B0 is NOT in the neighbors
+                if(find(readGraphNeighbors.begin(), readGraphNeighbors.end(), B0) == readGraphNeighbors.end()) {
+                    endNodes[A0.getValue()] = true;
+                    endNodes[B0.getValue()] = true;
+                    add_edge(A0.getValue(), B0.getValue(), ReadGraph4Edge(alignmentId), readGraph);
+                    keepAlignment[alignmentId] = true;
+                    weFoundAlignmentsInBreaksToAdd = true;
+                    allignmentsAdded++;
+                    alignmentTableNotPassFilterAlreadyConsidered[i] = true;
                 }
+                continue;
+            }
+
+            // Case 1b: There is an alignment between two added reads
+            // that passed the initial strict logQ filter and these reads are 
+            // IN A DIFFERENT COMPONENT.
+            // This case checks for direct connections between to nodes in a break
+            // using alignments that did not pass the initial strict logQ filter.
+            // TODO: check if these alignments introduce bad connections (logQThresholdForAlignmentsInBreaks)
+            if(readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]] && a0 != b1 && a0 != b0 && logQ <= logQThresholdForAlignmentsInBreaks && alignmentTableNotPassFilterAlreadyConsidered[i] == false) {
                 // Find neighbors of the orientedReadId in the filtered readGraph.
                 // We know there is a distance 1 connection between the 2 reads in the readGraphAllAlignments.
                 // If there is no connection in the filtered readGraph in maxDistance apart, we can add the alignment.
@@ -595,66 +618,6 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
 
-
-    // // Create a vector of <alignment, logQ> stats for the best alignment of each not included reads
-    // vector< pair<uint64_t, double> > alignmentTableNotPassFilterIncludedAlignments;
-
-    // // Loop over alignments in alignmentTableNotPassFilter
-    // // The order of the alignments are in increasing logQ
-    // // We want to keep the best alignment for each not included read
-    // // This way we will not introduce cross-strand edges.
-    // // We will keep the first alignment from the alignmentTableNotPassFilter
-    // // that involves a not included read.
-    // bool weFoundIsolatedReadsToAdd = true;
-    // // Keep track of which new readIds were added
-    // vector<bool> readAdded(readCount, false);
-    // while (weFoundIsolatedReadsToAdd) {
-    //     weFoundIsolatedReadsToAdd = false;
-    //     for(size_t i=0; i<alignmentTableNotPassFilter.size(); i++) {
-    //         const uint64_t alignmentId = alignmentTableNotPassFilter[i].first;
-    //         const double logQ = alignmentTableNotPassFilter[i].second;
-    //         const AlignmentData& alignment = alignmentData[alignmentId];
-
-    //         // check if the reads were used in alignments
-    //         if(readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]]) {
-    //             continue;
-    //         }
-            
-    //         // check if the first read was used and the second was not in alignments 
-    //         // if(readUsed[alignment.readIds[0]] && !readUsed[alignment.readIds[1]] and logQ <= log(1e-8)) {
-    //         if(readUsed[alignment.readIds[0]] && !readUsed[alignment.readIds[1]] and logQ <= log(1e-10)) {
-    //             alignmentTable.push_back(make_pair(alignmentId, logQ));
-    //             alignmentTableNotPassFilterIncludedAlignments.push_back(make_pair(alignmentId, logQ));
-    //             readUsed[alignment.readIds[1]] = true;
-    //             readAdded[alignment.readIds[1]] = true;
-    //             weFoundIsolatedReadsToAdd = true;
-    //             keepAlignment[alignmentId] = true;
-    //             continue;
-    //         }
-
-    //         // check if the second read was used and the first was not in alignments
-    //         // if(!readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]] and logQ <= 1e-4) {
-    //         if(!readUsed[alignment.readIds[0]] && readUsed[alignment.readIds[1]] and logQ <= log(1e-10)) {
-    //             alignmentTable.push_back(make_pair(alignmentId, logQ));
-    //             alignmentTableNotPassFilterIncludedAlignments.push_back(make_pair(alignmentId, logQ));
-    //             readUsed[alignment.readIds[0]] = true;
-    //             readAdded[alignment.readIds[0]] = true;
-    //             weFoundIsolatedReadsToAdd = true;
-    //             keepAlignment[alignmentId] = true;
-    //             continue;
-    //         }
-    //     }
-    // }
-
-    // // Create a new vector that has the difference between the two vectors
-    // vector< pair<uint64_t, double> > alignmentTableNotPassFilterNotIncludedAlignments;
-    // set_difference(alignmentTableNotPassFilter.begin(), alignmentTableNotPassFilter.end(), alignmentTableNotPassFilterIncludedAlignments.begin(), alignmentTableNotPassFilterIncludedAlignments.end(), back_inserter(alignmentTableNotPassFilterNotIncludedAlignments), OrderPairsBySecondOnly<uint64_t, double>());
-
-    // // verify that the alignmentTableNotPassFilterNotIncludedAlignments
-    // // contains elements in increasing order of Q (the second term in the pair)
-    // for(size_t i=1; i<alignmentTableNotPassFilterNotIncludedAlignments.size(); i++) {
-    //     SHASTA_ASSERT(alignmentTableNotPassFilterNotIncludedAlignments[i-1].second <= alignmentTableNotPassFilterNotIncludedAlignments[i].second);
-    // }
 
 
 
