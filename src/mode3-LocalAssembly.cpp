@@ -93,7 +93,7 @@ LocalAssembly::LocalAssembly(
         if(html) {
             html << "<br>The estimated offset is not positive." << endl;
         }
-        return;
+        throw std::runtime_error("The estimated offset is not positive.");
     }
 
     // Markers.
