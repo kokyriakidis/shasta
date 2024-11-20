@@ -5523,6 +5523,7 @@ void AssemblyGraph::cleanupBubbleChainUsingPhasingTable(
     //   unless they are longer than longBubbleThreshold.
     // - All bubbles with ploidy greater than 2,
     //   unless they are longer than longBubbleThreshold.
+    // - Bubbles with ploidy 2, if one of the sides has no iternal anchors.
     // Each bubble that is removed is replaced by a haploid bubble consisting
     // of only the terminalAnchorIds.
     BubbleChain newBubbleChain;
@@ -5539,19 +5540,26 @@ void AssemblyGraph::cleanupBubbleChainUsingPhasingTable(
                     " is haploid and will be kept." << endl;
             }
         } else if(bubble.isDiploid()) {
-            const double bubbleErrorRate = phasingTable.bubbleErrorRate(positionInBubbleChain);
-            if(debug) {
-                cout << "Bubble at phasing table index " << phasingTable.bubblesMap[positionInBubbleChain] <<
-                    " position in bubble chain " << positionInBubbleChain <<
-                    " has error rate " << bubbleErrorRate;
-                if(bubbleErrorRate <= bubbleErrorThreshold) {
-                    cout << " and will be kept." << endl;
-                } else {
-                    cout << " and will be removed." << endl;
+            if((bubble[0].size() == 2) or (bubble[1].size() == 2)) {
+                if(debug) {
+                    cout << "Bubble at position in bubble chain " << positionInBubbleChain <<
+                        " is diploid but one side has no internal anchors." << endl;
                 }
-            }
-            if(bubbleErrorRate <= bubbleErrorThreshold) {
-                copyVerbatim = true;
+            } else {
+                const double bubbleErrorRate = phasingTable.bubbleErrorRate(positionInBubbleChain);
+                if(debug) {
+                    cout << "Bubble at phasing table index " << phasingTable.bubblesMap[positionInBubbleChain] <<
+                        " position in bubble chain " << positionInBubbleChain <<
+                        " has error rate " << bubbleErrorRate;
+                    if(bubbleErrorRate <= bubbleErrorThreshold) {
+                        cout << " and will be kept." << endl;
+                    } else {
+                        cout << " and will be removed." << endl;
+                    }
+                }
+                if(bubbleErrorRate <= bubbleErrorThreshold) {
+                    copyVerbatim = true;
+                }
             }
         } else {
             if(debug) {
