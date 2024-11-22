@@ -123,6 +123,12 @@ LocalAnchorGraph::LocalAnchorGraph(
             edge.coverage = coverage[i];
             anchors.analyzeAnchorPair(anchorId0, anchorId1, edge.info);
 
+            if((edge.info.common == 0) or (edge.info.offsetInBases < 0)) {
+                throw runtime_error("Invalid anchor pair " +
+                    anchorIdToString(anchorId0) + " " +
+                    anchorIdToString(anchorId1));
+            }
+
             // Add it if requested.
             if((not filterEdgesByCoverageLoss) or
                 (edge.coverageLoss() <= maxCoverageLoss)) {
