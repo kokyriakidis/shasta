@@ -79,6 +79,9 @@ Anchors::Anchors(
         largeDataName("AnchorSequences"), largeDataPageSize);
     anchorInfos.createNew(largeDataName("AnchorInfos"), largeDataPageSize);
 
+    // Open a csv file that will contain the anchors generated for each candidate anchor.
+    ofstream csv("AnchorsFromJson.csv");
+
 
     // Loop over the json input files.
     uint64_t candidateAnchorCount = 0;
@@ -93,8 +96,17 @@ Anchors::Anchors(
 
         // Loop over the candidate anchors.
         for(const auto& p: json) {
-            const Ptree& candidateAnchor = p.second;
+            const Ptree& candidateAnchorWithName = p.second;
             ++candidateAnchorCount;
+
+            // Get the name.
+            auto it = candidateAnchorWithName.begin();
+            const Ptree& namePtree = (*it).second;
+            const string name = namePtree.get<string>("");
+
+            // Get the list of the base intervals.
+            ++it;
+            const Ptree& candidateAnchor = (*it).second;
 
             // If not in the desired coverage range, skip it.
             const uint64_t coverage = candidateAnchor.size();
@@ -102,13 +114,17 @@ Anchors::Anchors(
                 (coverage < minPrimaryCoverage) or
                 (coverage > maxPrimaryCoverage)) {
                 ++candidateAnchorDiscardedDueToCoverageCount;
+                csv << name << "," << "Discarded due to coverage," << coverage << "\n";
                 continue;
             }
 
             if(processCandidateAnchor(candidateAnchor)) {
                 ++candidateAnchorKeptCount;
+                csv << name << "," << anchorIdToString(anchorInfos.size() - 2) << "," <<
+                    anchorIdToString(anchorInfos.size() - 1) << "\n";
             } else {
                 ++candidateAnchorDiscardedDueToLengthCount;
+                csv << name << "," << "Discarded when clipping to markers\n";
             }
         }
     }
@@ -163,6 +179,10 @@ bool Anchors::processCandidateAnchor(
         uint64_t rightClip() const
         {
             return end - clippedEnd;
+        }
+        bool operator<(const Interval& that) const
+        {
+            return orientedReadId < that.orientedReadId;
         }
     };
 
@@ -328,6 +348,8 @@ bool Anchors::processCandidateAnchor(
 
     // All good. Generate an anchor.
     {
+        sort(intervals.begin(), intervals.end());
+
         if(debug) {
             const AnchorId anchorId = anchorSequences.size();
             cout << "Generating anchor " << anchorIdToString(anchorId) << endl;
