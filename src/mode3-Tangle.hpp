@@ -44,30 +44,61 @@ private:
     void writeTangleEdges() const;
     bool isTangleEdge(AssemblyGraph::edge_descriptor) const;
 
-    // The entrance edges are AssemblyGraph edges that are not in the Tangle
+
+
+    // The entrances are AssemblyGraph edges that are not in the Tangle
     // but whose target vertex is in the Tangle.
-    // The exit edges are AssemblyGraph edges that are not in the Tangle
+    // The exits are AssemblyGraph edges that are not in the Tangle
     // but whose source vertex is in the Tangle.
     // Note that an AssemblyGraph edge can be both an entrance and an exit at the
     // same time. This can happen if the corresponding Chain has an offset
     // larger than maxOffset, because in that case the edge is not part of the Tangle.
     // The AnchorId of an entrance is the second to last AnchorId in the corresponding Chain.
-    // The AnchorId of an exit is the second to AnchorId in the corresponding Chain.
-    class Entrance {
+    // The AnchorId of an exit is the second AnchorId in the corresponding Chain.
+    class EntranceOrExit {
     public:
         AssemblyGraph::edge_descriptor e;
         AnchorId anchorId;
-        Entrance(AssemblyGraph::edge_descriptor e, AnchorId anchorId) :
-            e(e), anchorId(anchorId) {}
+
+        // The AnchorMarkerIntervals on that AnchorId.
+        // These are initially copies from class Anchors.
+        // But later, for entrances we remove AnchorMarkerIntervals
+        // for which the same OrientedReadId appears in another entrance;
+        // and for exits we remove AnchorMarkerIntervals
+        // for which the same OrientedReadId appears in another exit.
+        vector<AnchorMarkerInterval> anchorMarkerIntervals;
+
+        // The AnchorIds encountered during read following.
+        // For an entrance, read following moves forward, starting at the entrance.
+        // For an exit, read following moves backward, starting at the exit.
+        vector<AnchorId> journeyAnchorIds;
+
+        // The AnchorIds encountered during read following starting from this Entrance
+        // and no other entrance.
+        vector<AnchorId> uniqueJourneyAnchorIds;
+
+        EntranceOrExit(
+            AssemblyGraph::edge_descriptor,
+            AnchorId,
+            const Anchor&);
     };
-    using Exit = Entrance;
+    class Entrance : public EntranceOrExit {using EntranceOrExit::EntranceOrExit;};
+    class Exit : public EntranceOrExit {using EntranceOrExit::EntranceOrExit;};
+
     vector<Entrance> entrances;
     vector<Exit> exits;
+
     void findEntrances();
     void findExits();
     bool isEntrance(AssemblyGraph::edge_descriptor) const;
     bool isExit(AssemblyGraph::edge_descriptor) const;
     void writeEntrances() const;
     void writeExits() const;
+
+    // Use read following to fill in the journeyAnchorIds of each entrance/exit.
+    void readFollowingFromEntrances();
+    void readFollowingFromEntrance(Entrance&);
+    void readFollowingFromExits();
+    void readFollowingFromExit(Exit&);
 
 };

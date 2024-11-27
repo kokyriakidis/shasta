@@ -202,7 +202,6 @@ void AssemblyGraph::run(
     detangleSuperbubblesWithReadFollowing(
         true,
         options.assemblyGraphOptions.superbubbleLengthThreshold4);
-    write("Q");
     throw runtime_error("Forced early termination for debugging.");
 #endif
 
