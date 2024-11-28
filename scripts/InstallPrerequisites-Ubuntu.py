@@ -40,7 +40,7 @@ def installAptPackages():
 
 # We don't use Ubuntu package libseqan2-dev because
 # it does not include the fix for this issue:
-# https://github.com/seqan/seqan/issues?q=is%3Aissue+author%3A%40me+is%3Aclosed
+# https://github.com/seqan/seqan/issues/2524
 # Instead, we clone the GitHub seqan/seqan repository, 
 # then copy seqan/include/seqan to /usr/include/seqan.
 def installSeqan():
