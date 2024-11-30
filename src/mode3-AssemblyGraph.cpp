@@ -159,6 +159,7 @@ void AssemblyGraph::run(
     performanceLog << timestamp << "Detangling begins." << endl;
     while(compressSequentialEdges());
     compressBubbleChains();
+#if 1
     detangleEdges(false,
         options.assemblyGraphOptions.detangleToleranceLow,
         options.assemblyGraphOptions.detangleToleranceHigh,
@@ -196,6 +197,14 @@ void AssemblyGraph::run(
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP,
         6);
+#else
+    write("P");
+    detangleSuperbubblesWithReadFollowing(
+        true,
+        options.assemblyGraphOptions.superbubbleLengthThreshold4);
+    throw runtime_error("Forced early termination for debugging.");
+#endif
+
 
     performanceLog << timestamp << "Detangling ends." << endl;
 

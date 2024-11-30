@@ -579,6 +579,16 @@ private:
         double epsilon,
         double minLogP);
 
+    // Detangle with read following.
+    void detangleSuperbubblesWithReadFollowing(
+        bool debug,
+        uint64_t maxOffset);
+    void detangleSuperbubbleWithReadFollowing(
+        bool debug,
+        const Superbubbles&,
+        uint64_t superbubbleId,
+        uint64_t maxOffset);
+
 
     // Cleanup/simplify superbubbles that are likely to be caused by errors,
     // completely or in part.

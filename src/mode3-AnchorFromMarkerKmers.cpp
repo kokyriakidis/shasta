@@ -105,17 +105,14 @@ Anchors::Anchors(
     // The anchor sequences are all empty.
     // The ordinal offsets are all 0.
     const uint64_t anchorCount = anchorMarkerIntervals.size();
+    anchorInfos.resize(anchorCount);
     for(AnchorId anchorId=0; anchorId<anchorCount; anchorId++) {
-
+        anchorSequences.appendVector();
+        anchorInfos[anchorId].ordinalOffset = 0;
     }
 
-    SHASTA_ASSERT(0);
-
-   SHASTA_ASSERT(0);
-
+    cout << "Generated " << anchorCount << " anchors." << endl;
     cout << timestamp << "Anchor creation from marker kmers ends." << endl;
-
-    SHASTA_ASSERT(0);
 }
 
 
@@ -153,6 +150,7 @@ void Anchors::constructFromMarkerKmersThreadFunction12(uint64_t pass)
             // Get the markers on this read, without reverse complementing (strand 0).
             OrientedReadId orientedReadId(readId, 0);
             const auto orientedReadMarkers = markers[orientedReadId.getValue()];
+            const uint32_t orientedReadMarkerCount = uint32_t(orientedReadMarkers.size());
 
             // Loop  over the markers.
             for(uint32_t ordinal=0; ordinal<orientedReadMarkers.size(); ordinal++) {
@@ -163,7 +161,7 @@ void Anchors::constructFromMarkerKmersThreadFunction12(uint64_t pass)
                 Kmer kmer;
                 extractKmer(readSequence, position, k, kmer);
 
-                // Find the bucket this bucket goes to.
+                // Find the bucket this marker goes to.
                 const uint64_t hashValue = MurmurHash64A(&kmer, sizeof(kmer), 1241);
                 const uint64_t bucketId = hashValue & mask;
 
@@ -174,6 +172,18 @@ void Anchors::constructFromMarkerKmersThreadFunction12(uint64_t pass)
                     markerInfo.orientedReadId = orientedReadId;
                     markerInfo.ordinal = ordinal;
                     buckets.storeMultithreaded(bucketId, markerInfo);
+                }
+
+                // Do the same for the reverse complemented k-mer.
+                const Kmer kmerRc = kmer.reverseComplement(k);
+                const uint64_t hashValueRc = MurmurHash64A(&kmerRc, sizeof(kmerRc), 1241);
+                const uint64_t bucketIdRc = hashValueRc & mask;
+                if(pass == 1) {
+                    buckets.incrementCountMultithreaded(bucketIdRc);
+                } else {
+                    markerInfo.orientedReadId.flipStrand();
+                    markerInfo.ordinal = orientedReadMarkerCount - 1 - markerInfo.ordinal;
+                    buckets.storeMultithreaded(bucketIdRc, markerInfo);
                 }
             }
         }
@@ -187,6 +197,8 @@ void Anchors::constructFromMarkerKmersThreadFunction12(uint64_t pass)
 void Anchors::constructFromMarkerKmersThreadFunction3(uint64_t threadId )
 {
     ConstructFromMarkerKmersData& data = constructFromMarkerKmersData;
+    const uint64_t minPrimaryCoverage = data.minPrimaryCoverage;
+    const uint64_t maxPrimaryCoverage = data.maxPrimaryCoverage;
     auto& buckets = data.buckets;
 
     // Initialize the anchors that will be found by this thread.
@@ -218,7 +230,11 @@ void Anchors::constructFromMarkerKmersThreadFunction3(uint64_t threadId )
         for(uint64_t bucketId=begin; bucketId!=end; ++bucketId) {
 
             // Gather the markers in this bucket with the corresponding Kmers.
+            // If the bucket is too small it cannot generate any anchors.
             auto bucket = buckets[bucketId];
+            if(bucket.size() < minPrimaryCoverage) {
+                continue;
+            }
             bucketInfo.clear();
             for(const ConstructFromMarkerKmersData::MarkerInfo& markerInfo: bucket) {
                 const Kmer kmer = getOrientedReadMarkerKmer(
@@ -233,8 +249,10 @@ void Anchors::constructFromMarkerKmersThreadFunction3(uint64_t threadId )
 
 
 
-            // Each streak with the same k-mer generates a pair of anchors, but only if the
-            // first OrientedReadId is on strand 0.
+            // Each streak with the same k-mer generates a pair of anchors, but only if:
+            // - Its coverage is in [minPrimaryCoverage, maxPrimaryCoverage].
+            // - The first OrientedReadId is on strand 0, AND
+            // - There are no repeated ReadIds.
             for(uint64_t streakBegin=0; streakBegin<bucketInfo.size(); /* Increment later */) {
                 const Kmer& kmer = bucketInfo[streakBegin].kmer;
 
@@ -247,26 +265,53 @@ void Anchors::constructFromMarkerKmersThreadFunction3(uint64_t threadId )
                     ++streakEnd;
                 }
 
-                // Only generate a pair of reverse complementary anchors
-                // if the first oriented read is on strand 0.
-                if(bucketInfo.front().orientedReadId.getStrand() == 0) {
-
-                    // Generate the first anchor of the pair (no reverse complementing).
-                    threadAnchors.appendVector();
-                    for(const MarkerInfo& markerInfo: bucketInfo) {
-                        threadAnchors.append(markerInfo);
-                    }
-
-                    // Generate the second anchor of the pair (with reverse complementing).
-                    threadAnchors.appendVector();
-                    for(ConstructFromMarkerKmersData::MarkerInfo markerInfo: bucketInfo) {
-                        const uint32_t markerCount = uint32_t(markers[markerInfo.orientedReadId.getValue()].size());
-                        markerInfo.orientedReadId.flipStrand();
-                        markerInfo.ordinal = markerCount - 1 - markerInfo.ordinal;
-                        threadAnchors.append(markerInfo);
-                    }
-
+                // If the first oriented read is not on strand 0, skip it.
+                if(bucketInfo[streakBegin].orientedReadId.getStrand() != 0) {
+                    // Prepare to process the next streak.
+                    streakBegin = streakEnd;
+                    continue;
                 }
+
+                // If coverage is not in the desired range, skip it.
+                const uint64_t coverage = streakEnd - streakBegin;
+                if((coverage < minPrimaryCoverage) or (coverage > maxPrimaryCoverage)) {
+                    // Prepare to process the next streak.
+                    streakBegin = streakEnd;
+                    continue;
+                }
+
+                // If there are repeated ReadIds, skip it.
+                bool repeatedReadIdsExist = false;
+                for(uint64_t i=streakBegin+1; i<streakEnd; i++) {
+                    if(bucketInfo[i-1].orientedReadId.getReadId() == bucketInfo[i].orientedReadId.getReadId()) {
+                        repeatedReadIdsExist = true;
+                        break;
+                    }
+                }
+                if(repeatedReadIdsExist) {
+                    // Prepare to process the next streak.
+                    streakBegin = streakEnd;
+                    continue;
+                }
+
+
+                // Generate the first anchor of the pair (no reverse complementing).
+                threadAnchors.appendVector();
+                for(uint64_t i=streakBegin; i!=streakEnd; i++) {
+                    const MarkerInfo& markerInfo = bucketInfo[i];
+                    threadAnchors.append(markerInfo);
+                }
+
+                // Generate the second anchor of the pair (with reverse complementing).
+                threadAnchors.appendVector();
+                for(uint64_t i=streakBegin; i!=streakEnd; i++) {
+                    MarkerInfo markerInfo = bucketInfo[i];
+                    const uint32_t markerCount = uint32_t(markers[markerInfo.orientedReadId.getValue()].size());
+                    markerInfo.orientedReadId.flipStrand();
+                    markerInfo.ordinal = markerCount - 1 - markerInfo.ordinal;
+                    threadAnchors.append(markerInfo);
+                }
+
 
                 // Prepare to process the next streak.
                 streakBegin = streakEnd;
