@@ -1,5 +1,6 @@
 // Shasta.
 #include "mode3-Tangle.hpp"
+#include "mode3-TangleGraph.hpp"
 #include "deduplicate.hpp"
 using namespace shasta;
 using namespace mode3;
@@ -8,6 +9,55 @@ using namespace mode3;
 #include <boost/graph/iteration_macros.hpp>
 
 
+Tangle::Tangle(
+    bool debug,
+    AssemblyGraph& assemblyGraph,
+    uint64_t maxOffset,
+    const vector<AssemblyGraph::vertex_descriptor>& tangleVerticesArgument) :
+    debug(debug),
+    assemblyGraph(assemblyGraph),
+    tangleVertices(tangleVerticesArgument)
+{
+    if(debug) {
+        cout << "Working on a tangle with " << tangleVertices.size() << " vertices." << endl;
+    }
+
+    // Sort the tangleVertices so we can do binary searches in them
+    // in isTangleVertex.
+    sort(tangleVertices.begin(), tangleVertices.end());
+    if(debug) {
+        writeTangleVertices();
+    }
+
+    findTangleEdges(maxOffset);
+    if(debug) {
+        writeTangleEdges();
+    }
+
+    findEntrances();
+    findExits();
+    if(debug) {
+        writeEntrances();
+        writeExits();
+    }
+
+    // Create the TangleGraph.
+    vector<AnchorId> entranceAnchorIds;
+    for(const Entrance& entrance: entrances) {
+        entranceAnchorIds.push_back(entrance.anchorId);
+    }
+    vector<AnchorId> exitAnchorIds;
+    for(const Exit& exit: exits) {
+        exitAnchorIds.push_back(exit.anchorId);
+    }
+    const bool bidirectional = true;
+    TangleGraph tangleGraph(debug, assemblyGraph.anchors,
+        entranceAnchorIds, exitAnchorIds, bidirectional);
+}
+
+
+#if 0
+// Old code that does not use the TangleGraph.
 Tangle::Tangle(
     bool debug,
     AssemblyGraph& assemblyGraph,
@@ -65,7 +115,7 @@ Tangle::Tangle(
     }
 
 }
-
+#endif
 
 
 bool Tangle::isTangleVertex(AssemblyGraph::vertex_descriptor v) const
@@ -139,16 +189,30 @@ void Tangle::writeTangleEdges() const
 
 Tangle::EntranceOrExit::EntranceOrExit(
     AssemblyGraph::edge_descriptor e,
-    AnchorId anchorId,
-    const Anchor& anchor) :
+    AnchorId anchorId) :
     e(e),
     anchorId(anchorId)
 {
-    copy(anchor.begin(), anchor.end(), back_inserter(anchorMarkerIntervals));
 }
 
 
 
+// The entrances are AssemblyGraph edges that are not in the Tangle
+// but whose target vertex is in the Tangle.
+void Tangle::findEntrances()
+{
+    for(const AssemblyGraph::vertex_descriptor v: tangleVertices) {
+        BGL_FORALL_INEDGES(v, e, assemblyGraph, AssemblyGraph) {
+            if(not isTangleEdge(e)) {
+                const Chain& chain = assemblyGraph[e].getOnlyChain();
+                const AnchorId anchorId = chain.secondToLast();
+                entrances.push_back(Entrance(e, anchorId));
+            }
+        }
+    }
+}
+
+#if 0
 // The entrances are AssemblyGraph edges that are not in the Tangle
 // but whose target vertex is in the Tangle.
 void Tangle::findEntrances()
@@ -203,9 +267,26 @@ void Tangle::findEntrances()
         }
     }
 }
+#endif
 
 
+// The exits are AssemblyGraph edges that are not in the Tangle
+// but whose source vertex is in the Tangle.
+void Tangle::findExits()
+{
+    for(const AssemblyGraph::vertex_descriptor v: tangleVertices) {
+        BGL_FORALL_OUTEDGES(v, e, assemblyGraph, AssemblyGraph) {
+            if(not isTangleEdge(e)) {
+                const Chain& chain = assemblyGraph[e].getOnlyChain();
+                const AnchorId anchorId = chain.second();
+                exits.push_back(Exit(e, anchorId));
+            }
+        }
+    }
+}
 
+
+#if 0
 // The exits are AssemblyGraph edges that are not in the Tangle
 // but whose source vertex is in the Tangle.
 void Tangle::findExits()
@@ -284,7 +365,7 @@ bool Tangle::isExit(AssemblyGraph::edge_descriptor e) const
     }
     return false;
 }
-
+#endif
 
 
 void Tangle::writeEntrances() const
@@ -308,7 +389,7 @@ void Tangle::writeExits() const
 }
 
 
-
+#if 0
 void Tangle::readFollowingFromEntrances()
 {
     for(Entrance& entrance: entrances) {
@@ -426,3 +507,6 @@ void Tangle::readFollowingFromExit(Exit& exit)
         cout << "After deduplication, read following found " << exit.journeyAnchorIds.size() << " anchors." << endl;
     }
 }
+
+#endif
+
