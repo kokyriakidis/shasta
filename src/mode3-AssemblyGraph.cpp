@@ -217,15 +217,15 @@ void AssemblyGraph::run(
     // compressBubbleChains();
     // if(debug) write("G");
 
-    haplotizeWronglyPolyploidBubbles(debug);
-    compress();
-    compressBubbleChains();
-    if(debug) write("H");
+    // haplotizeWronglyPolyploidBubbles(debug);
+    // compress();
+    // compressBubbleChains();
+    // if(debug) write("H");
 
-    removeCrossEdgesInAssemblyGraph(debug);
-    compress();
-    compressBubbleChains();
-    if(debug) write("I");
+    // removeCrossEdgesInAssemblyGraph(debug);
+    // compress();
+    // compressBubbleChains();
+    // if(debug) write("I");
 
     // Final cleanup. For now this just prunes the assembly graph.
     prune(debug, options.assemblyGraphOptions.pruneLength);
