@@ -123,12 +123,6 @@ LocalAnchorGraph::LocalAnchorGraph(
             edge.coverage = coverage[i];
             anchors.analyzeAnchorPair(anchorId0, anchorId1, edge.info);
 
-            if((edge.info.common == 0) or (edge.info.offsetInBases < 0)) {
-                throw runtime_error("Invalid anchor pair " +
-                    anchorIdToString(anchorId0) + " " +
-                    anchorIdToString(anchorId1));
-            }
-
             // Add it if requested.
             if((not filterEdgesByCoverageLoss) or
                 (edge.coverageLoss() <= maxCoverageLoss)) {
@@ -317,9 +311,13 @@ void LocalAnchorGraph::writeGraphviz(
         s << " arrowsize=" << 0.5 * options.arrowSize;
 
         // Length. Only use by fdp and neato layouts.
+        int64_t offsetInBases = edge.info.offsetInBases;
+        if(offsetInBases < 0) {
+            offsetInBases = 10;
+        }
         const double displayLength =
             (options.minimumEdgeLength +
-                options.additionalEdgeLengthPerKb * 0.001 * double(edge.info.offsetInBases)) / 72.;
+                options.additionalEdgeLengthPerKb * 0.001 * double(offsetInBases)) / 72.;
         s << " len=" << displayLength;
 
 
@@ -652,9 +650,13 @@ void LocalAnchorGraph::computeLayout(const LocalAnchorGraphDisplayOptions& optio
     // Create a map containing the desired length for each edge.
     std::map<edge_descriptor, double> edgeLengthMap;
     BGL_FORALL_EDGES(e, graph, LocalAnchorGraph) {
+        int64_t offsetInBases = graph[e].info.offsetInBases;
+        if(offsetInBases < 0) {
+            offsetInBases = 10;
+        }
         const double displayLength =
             options.minimumEdgeLength +
-            options.additionalEdgeLengthPerKb * 0.001 * double(graph[e].info.offsetInBases);
+            options.additionalEdgeLengthPerKb * 0.001 * double(offsetInBases);
         edgeLengthMap.insert({e, displayLength});
     }
 
