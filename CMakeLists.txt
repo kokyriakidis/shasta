@@ -15,7 +15,7 @@ project(shasta)
 
 # Figure out if we are on Intel (as opposed to ARM).
 set(X86_64 OFF)
-if(${CMAKE_HOST_SYSTEM_PROCESSOR} MATCHES "x86_64")
+if(${CMAKE_SYSTEM_PROCESSOR} MATCHES "x86_64")
     set(X86_64 ON)
 endif()
 
