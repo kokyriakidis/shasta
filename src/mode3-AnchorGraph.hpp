@@ -149,6 +149,9 @@ public:
         uint64_t distance,
         uint64_t maxCoverage);
 
+    // Remove edges with negative estimated offset.
+    void removeNegativeOffsetEdges();
+
     // Remove cross-edges.
     // This removes an edge v0->v1 if the following are all true:
     // - Its coverage is at most lowCoverageThreshold.

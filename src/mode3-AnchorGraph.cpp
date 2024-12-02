@@ -234,6 +234,27 @@ void AnchorGraph::writeEdgeCoverageHistogram(const string& fileName) const
 
 
 
+void AnchorGraph::removeNegativeOffsetEdges()
+{
+    AnchorGraph& graph = *this;
+
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, graph, AnchorGraph) {
+        const AnchorGraphEdge& edge = graph[e];
+        SHASTA_ASSERT(edge.info.common > 0);
+        if(edge.info.offsetInBases < 0) {
+            edgesToBeRemoved.push_back(e);
+        }
+    }
+
+    // Remove the edges we found.
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, graph);
+    }
+}
+
+
+
 // Remove cross-edges.
 // This removes an edge v0->v1 if the following are all true:
 // - It is not marked as removed by transitive reduction.
