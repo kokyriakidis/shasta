@@ -1,8 +1,12 @@
+// Shasta.
 #include "mode3-TangleGraph.hpp"
 #include "deduplicate.hpp"
+#include "orderPairs.hpp"
 using namespace shasta;
 using namespace mode3;
 
+// Boost libraries.
+#include <boost/graph/iteration_macros.hpp>
 
 TangleGraph::TangleGraph(
     bool debug,
@@ -31,7 +35,13 @@ TangleGraph::TangleGraph(
 
     constructEntrances(entranceAnchors);
     constructExits(exitAnchors);
-    computeTangleMatrix();
+
+    createVertices();
+
+    if(debug) {
+        cout << "The tangle graph has " << num_vertices(*this) <<
+            " vertices and " << num_edges(*this) << " edges." << endl;
+    }
 }
 
 
@@ -228,7 +238,7 @@ void TangleGraph::Entrance::readFollowing(
         const OrientedReadId orientedReadId = anchorMarkerInterval.orientedReadId;
         const auto journey = anchors.journeys[orientedReadId.getValue()];
 
-        const uint64_t begin = (bidirectional ? 0 : anchorMarkerInterval.positionInJourney + 1);
+        const uint64_t begin = (bidirectional ? 0 : anchorMarkerInterval.positionInJourney);
         const uint64_t end = journey.size();
         for(uint64_t position = begin; position != end; position++) {
             journeyAnchorIds.push_back(journey[position]);
@@ -255,7 +265,7 @@ void TangleGraph::Exit::readFollowing(
         const auto journey = anchors.journeys[orientedReadId.getValue()];
 
         const uint64_t begin = 0;
-        const uint64_t end = (bidirectional ? journey.size() : anchorMarkerInterval.positionInJourney);
+        const uint64_t end = (bidirectional ? journey.size() : anchorMarkerInterval.positionInJourney + 1);
         for(uint64_t position = begin; position != end; position++) {
             journeyAnchorIds.push_back(journey[position]);
         }
@@ -272,7 +282,7 @@ void TangleGraph::Exit::readFollowing(
 
 
 
-
+#if 0
 void TangleGraph::computeTangleMatrix()
 {
     if(debug) {
@@ -294,7 +304,9 @@ void TangleGraph::computeTangleMatrix()
             tangleMatrix[entranceIndex][exitIndex] = commonUniqueAnchors.size();
 
             if(debug) {
-                cout << anchorIdToString(entrance.anchorId) << " " <<
+                cout <<
+                    "(" << entranceIndex << "," << exitIndex << ") " <<
+                    anchorIdToString(entrance.anchorId) << " " <<
                     anchorIdToString(exit.anchorId) << " " << tangleMatrix[entranceIndex][exitIndex] << endl;
             }
 
@@ -302,3 +314,151 @@ void TangleGraph::computeTangleMatrix()
     }
 
 }
+#endif
+
+
+// Create TangleGraph vertices.
+// There is a vertex for each AnchorId that is unique to one Entrance and/or one Exit.
+void TangleGraph::createVertices()
+{
+    TangleGraph& tangleGraph = *this;
+
+    // Gather the uniqueJourneyAnchorIds from all Entrances and Exits
+    // and deduplicate. Deduplication is needed because,
+    // even an AnchorId can appear in only one Entrance and one Exit,
+    // it can appear in both one Entrance and one Exit, and we want to generate
+    // only one vertex.
+    for(const Entrance& entrance: entrances) {
+        for(const AnchorId anchorId: entrance.uniqueJourneyAnchorIds) {
+            vertexTable.push_back({anchorId, null_vertex()});
+        }
+    }
+    for(const Exit& exit: exits) {
+        for(const AnchorId anchorId: exit.uniqueJourneyAnchorIds) {
+            vertexTable.push_back({anchorId, null_vertex()});
+        }
+    }
+    deduplicate(vertexTable);
+    // After deduplicate the vertexTable is sorted.
+
+    // Now we generate one vertex for each of these AnchorIds.
+    for(auto& p: vertexTable) {
+        const AnchorId anchorId = p.first;
+        p.second = add_vertex(TangleGraphVertex(anchorId), *this);
+    }
+
+    // At this point the vertexTable is valid and we can use getVertex.
+
+    // Fill in the entranceIndex and exitIndex of each vertex.
+    for(uint64_t entranceIndex=0; entranceIndex<entrances.size(); entranceIndex++) {
+        const Entrance& entrance = entrances[entranceIndex];
+        for(const AnchorId anchorId: entrance.uniqueJourneyAnchorIds) {
+            const vertex_descriptor v = getVertex(anchorId);
+            TangleGraphVertex& vertex = tangleGraph[v];
+            SHASTA_ASSERT(vertex.entranceIndex == invalid<uint64_t>);
+            vertex.entranceIndex = entranceIndex;
+        }
+    }
+    for(uint64_t exitIndex=0; exitIndex<exits.size(); exitIndex++) {
+        const Exit& exit = exits[exitIndex];
+        for(const AnchorId anchorId: exit.uniqueJourneyAnchorIds) {
+            const vertex_descriptor v = getVertex(anchorId);
+            TangleGraphVertex& vertex = tangleGraph[v];
+            SHASTA_ASSERT(vertex.exitIndex == invalid<uint64_t>);
+            vertex.exitIndex = exitIndex;
+        }
+    }
+
+
+    // Histogram the vertices by their entranceIndex and exitIndex.
+    std::map< pair<uint64_t, uint64_t>, uint64_t> histogram;
+    BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+        const TangleGraphVertex& vertex = tangleGraph[v];
+        const auto p = make_pair(vertex.entranceIndex, vertex.exitIndex);
+        auto it = histogram.find(p);
+        if(it == histogram.end()) {
+            histogram.insert({p, 1});
+        } else {
+            ++(it->second);
+        }
+    }
+
+
+
+    if(debug) {
+        cout << "Histogram of vertex count by (entrance, exit):" << endl;
+        for(const auto& p: histogram) {
+            const auto& q = p.first;
+            const uint64_t frequency = p.second;
+            const uint64_t entranceIndex = q.first;
+            const uint64_t exitIndex = q.second;
+
+            cout << "Entrance: ";
+            if(entranceIndex == invalid<uint64_t>) {
+                cout << "None";
+            } else {
+                cout << entranceIndex << " " << anchorIdToString(entrances[entranceIndex].anchorId);
+            }
+
+            cout << ", exit: ";
+            if(exitIndex == invalid<uint64_t>) {
+                cout << "None";
+            } else {
+                cout << exitIndex << " " << anchorIdToString(exits[exitIndex].anchorId);
+            }
+
+            cout << ", frequency " << frequency << "\n";
+        }
+    }
+
+
+
+    // Use the histogram to fill in the tangleMatrix.
+    tangleMatrix.resize(entrances.size(), vector<uint64_t>(exits.size(), 0));
+    for(const auto& p: histogram) {
+        const auto& q = p.first;
+        const uint64_t frequency = p.second;
+        const uint64_t entranceIndex = q.first;
+        if(entranceIndex == invalid<uint64_t>) {
+            continue;
+        }
+
+        const uint64_t exitIndex = q.second;
+        if(exitIndex == invalid<uint64_t>) {
+            continue;
+        }
+
+        tangleMatrix[entranceIndex][exitIndex] = frequency;
+    }
+
+
+
+    if(debug) {
+        cout << "Tangle matrix:" << endl;
+        for(uint64_t entranceIndex=0; entranceIndex<entrances.size(); entranceIndex++) {
+            const Entrance& entrance = entrances[entranceIndex];
+            for(uint64_t exitIndex=0; exitIndex<exits.size(); exitIndex++) {
+                const Exit& exit = exits[exitIndex];
+                cout <<
+                    "(" << entranceIndex << "," << exitIndex << ") " <<
+                    anchorIdToString(entrance.anchorId) << " " <<
+                    anchorIdToString(exit.anchorId) << " " << tangleMatrix[entranceIndex][exitIndex] << endl;
+            }
+        }
+    }
+
+}
+
+
+
+TangleGraph::vertex_descriptor TangleGraph::getVertex(AnchorId anchorId) const
+{
+    auto it = lower_bound(
+        vertexTable.begin(), vertexTable.end(),
+        make_pair(anchorId, null_vertex()),
+        OrderPairsByFirstOnly<AnchorId, vertex_descriptor>());
+    SHASTA_ASSERT(it != vertexTable.end());
+    SHASTA_ASSERT(it->first == anchorId);
+    return it->second;
+}
+

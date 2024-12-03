@@ -6,19 +6,52 @@
 // Shasta.
 #include "mode3-Anchor.hpp"
 
+// Boost libraries.
+#include <boost/graph/adjacency_list.hpp>
+
 // Standard library.
 #include <cstdint.hpp>
 #include <vector.hpp>
 
 namespace shasta {
     namespace mode3 {
+
+        class TangleGraphVertex;
+        class TangleGraphEdge;
         class TangleGraph;
+        using TangleGraphBaseClass = boost::adjacency_list<
+            boost::listS,
+            boost::listS,
+            boost::bidirectionalS,
+            TangleGraphVertex,
+            TangleGraphEdge>;
     }
 }
 
 
 
-class shasta::mode3::TangleGraph {
+class shasta::mode3::TangleGraphVertex {
+public:
+    AnchorId anchorId;
+    uint64_t coverage = 0;
+    TangleGraphVertex(AnchorId anchorId) : anchorId(anchorId) {}
+
+    // Each vertex can appear in zero or one Entrances
+    // and zero or one Exits.
+    uint64_t entranceIndex = invalid<uint64_t>;
+    uint64_t exitIndex = invalid<uint64_t>;
+};
+
+
+
+class shasta::mode3::TangleGraphEdge {
+public:
+    uint64_t coverage = 0;
+};
+
+
+
+class shasta::mode3::TangleGraph : public TangleGraphBaseClass {
 public:
     TangleGraph(
         bool debug,
@@ -81,6 +114,14 @@ private:
     // entrance/exit pair.
     // Indexed by [entranceIndex][exitIndex]
     vector< vector<uint64_t> > tangleMatrix;
-    void computeTangleMatrix();
+
+    // Create TangleGraph vertices.
+    // There is a vertex for each AnchorId that is unique to one Entrance and/or one Exit.
+    void createVertices();
+
+    // The vertexTable contains pairs of AnchorIds with the corresponding
+    // file descriptors. Sorted by AnchorId so findVertex can use std::lowerBound.
+    vector< pair<AnchorId, vertex_descriptor> > vertexTable;
+    vertex_descriptor getVertex(AnchorId) const;
 
 };

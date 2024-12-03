@@ -50,7 +50,7 @@ Tangle::Tangle(
     for(const Exit& exit: exits) {
         exitAnchorIds.push_back(exit.anchorId);
     }
-    const bool bidirectional = true;
+    const bool bidirectional = false;
     TangleGraph tangleGraph(debug, assemblyGraph.anchors,
         entranceAnchorIds, exitAnchorIds, bidirectional);
 }
