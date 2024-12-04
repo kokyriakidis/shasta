@@ -110,18 +110,58 @@ private:
     void constructEntrances(const vector<AnchorId>& entranceAnchors);
     void constructExits(const vector<AnchorId>& entranceAnchors);
 
-    // The tangle matrix is the number of common unique anchors between each
-    // entrance/exit pair.
-    // Indexed by [entranceIndex][exitIndex]
-    vector< vector<uint64_t> > tangleMatrix;
+
+
+    // The oriented reads used in this TangleGraph..
+    // Each oriented read can appear in at most one entrance and one exit.
+    // They are stored sorted by OrientedReadId.
+    class OrientedReadInfo {
+    public:
+        OrientedReadId orientedReadId;
+        OrientedReadInfo(OrientedReadId orientedReadId) : orientedReadId(orientedReadId) {}
+        bool operator<(const OrientedReadInfo& that) const
+        {
+            return orientedReadId < that.orientedReadId;
+        }
+
+        // These are set if this oriented read appears in one entrance.
+        uint64_t entranceIndex = invalid<uint64_t>;
+        uint32_t entrancePositionInJourney = invalid<uint32_t>;
+
+        // These are set if this oriented read appears in one exit.
+        uint64_t exitIndex = invalid<uint64_t>;
+        uint32_t exitPositionInJourney = invalid<uint32_t>;
+
+        // The journey of this oriented read in the tangle graph.
+        // This is obtained from the journey of the oriented read in the Anchors,
+        // possibly clipped at the beginning/end if bidirectional==false.
+        // Only AnchorIds that correspond to a vertex are entered.
+        vector<vertex_descriptor> tangleJourney;
+    };
+    vector<OrientedReadInfo> orientedReadInfos;
+    void gatherOrientedReads();
+    OrientedReadInfo& getOrientedReadInfo(OrientedReadId);
+
+
 
     // Create TangleGraph vertices.
     // There is a vertex for each AnchorId that is unique to one Entrance and/or one Exit.
     void createVertices();
 
+    // Create edges.
+    // This uses the OrientedReadInfo::tangleJourney.
+    void createEdges();
+
+    // The tangle matrix is the number of common unique anchors between each
+    // entrance/exit pair.
+    // Indexed by [entranceIndex][exitIndex]
+    vector< vector<uint64_t> > tangleMatrix;
+
     // The vertexTable contains pairs of AnchorIds with the corresponding
     // file descriptors. Sorted by AnchorId so findVertex can use std::lowerBound.
     vector< pair<AnchorId, vertex_descriptor> > vertexTable;
     vertex_descriptor getVertex(AnchorId) const;
+
+    void writeGraphviz() const;
 
 };
