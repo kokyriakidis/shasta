@@ -9,22 +9,26 @@ using namespace mode3;
 #include <boost/graph/iteration_macros.hpp>
 
 // Standard library.
+#include <algorithm.hpp>
 #include <fstream.hpp>
 
 
 
 TangleGraph::TangleGraph(
     bool debug,
+    uint64_t tangleId,
     const Anchors& anchors,
     const vector<AnchorId>& entranceAnchors,
     const vector<AnchorId>& exitAnchors,
     bool bidirectional) :
     debug(debug),
+    tangleId(tangleId),
     anchors(anchors),
     bidirectional(bidirectional)
 {
     if(debug) {
-        cout << "Creating a tangle graph with " << entranceAnchors.size() <<
+        cout << "Creating a tangle graph for tangle " << tangleId <<
+            " with " << entranceAnchors.size() <<
             " entrances and " << exitAnchors.size() << " exits." << endl;
         cout << "Entrances:";
         for(const AnchorId anchorId: entranceAnchors) {
@@ -40,19 +44,16 @@ TangleGraph::TangleGraph(
 
     constructEntrances(entranceAnchors);
     constructExits(exitAnchors);
+    gatherOrientedReads();
 
     createVertices();
-    gatherOrientedReads();
     createEdges();
 
     if(debug) {
         cout << "The tangle graph has " << num_vertices(*this) <<
             " vertices and " << num_edges(*this) << " edges." << endl;
         writeGraphviz();
-        throw runtime_error("Stopping after first TangleGraph.");
     }
-
-
 
 }
 
@@ -60,6 +61,11 @@ TangleGraph::TangleGraph(
 
 void TangleGraph::constructEntrances(const vector<AnchorId>& entranceAnchors)
 {
+    for(const AnchorId anchorId: entranceAnchors) {
+        entrances.push_back(Entrance(anchorId));
+    }
+
+#if 0
     // Initialize the anchorMarkerIntervals of the entrances.
     for(const AnchorId anchorId: entranceAnchors) {
         entrances.push_back(Entrance(anchorId, anchors[anchorId]));
@@ -141,12 +147,18 @@ void TangleGraph::constructEntrances(const vector<AnchorId>& entranceAnchors)
                 " found " << entrance.uniqueJourneyAnchorIds.size() << " anchors unique to this entrance." << endl;
         }
     }
+#endif
 }
 
 
 
 void TangleGraph::constructExits(const vector<AnchorId>& exitAnchors)
 {
+    for(const AnchorId anchorId: exitAnchors) {
+        exits.push_back(Exit(anchorId));
+    }
+
+    #if 0
     // Initialize the anchorMarkerIntervals of the entrances.
     for(const AnchorId anchorId: exitAnchors) {
         exits.push_back(Exit(anchorId, anchors[anchorId]));
@@ -228,20 +240,19 @@ void TangleGraph::constructExits(const vector<AnchorId>& exitAnchors)
                 " found " << exit.uniqueJourneyAnchorIds.size() << " anchors unique to this exit." << endl;
         }
     }
+#endif
 }
 
 
 
 TangleGraph::EntranceOrExit::EntranceOrExit(
-    AnchorId anchorId,
-    const Anchor& anchor) :
+    AnchorId anchorId) :
     anchorId(anchorId)
 {
-    copy(anchor.begin(), anchor.end(), back_inserter(anchorMarkerIntervals));
 }
 
 
-
+#if 0
 // This fills in the journeyAnchorIds.
 void TangleGraph::Entrance::readFollowing(
     bool debug, const Anchors& anchors, bool bidirectional)
@@ -291,130 +302,198 @@ void TangleGraph::Exit::readFollowing(
     }
 
 }
+#endif
 
 
 
 void TangleGraph::gatherOrientedReads()
 {
-    TangleGraph& tangleGraph = *this;
 
-    // Find the OrientedReadIds.
-    // Some can appear in both one entrance and one exit so we have to deduplicate them.
-    vector<OrientedReadId> orientedReadIds;
+    // Gather the OrientedReadIds that appear in one entrance and no more than one.
+    vector<OrientedReadId> entranceOrientedReadIds;
     for(const Entrance& entrance: entrances) {
-        for(const auto& anchorMarkerInterval: entrance.anchorMarkerIntervals) {
-            orientedReadIds.push_back(anchorMarkerInterval.orientedReadId);
+        const Anchor anchor = anchors[entrance.anchorId];
+        for(const auto& anchorMarkerInterval: anchor) {
+            entranceOrientedReadIds.push_back(anchorMarkerInterval.orientedReadId);
         }
     }
+    deduplicateAndCountAndKeepUnique(entranceOrientedReadIds);
+    // The entranceOrientedReadIds are now sorted.
+
+    // Gather the OrientedReadIds that appear in one exit and no more than one.
+    vector<OrientedReadId> exitOrientedReadIds;
     for(const Exit& exit: exits) {
-        for(const auto& anchorMarkerInterval: exit.anchorMarkerIntervals) {
-            orientedReadIds.push_back(anchorMarkerInterval.orientedReadId);
+        const Anchor anchor = anchors[exit.anchorId];
+        for(const auto& anchorMarkerInterval: anchor) {
+            exitOrientedReadIds.push_back(anchorMarkerInterval.orientedReadId);
         }
     }
-    deduplicate(orientedReadIds);
+    deduplicateAndCountAndKeepUnique(exitOrientedReadIds);
+    // The exitOrientedReadIds are now sorted.
+
+    // We will work with the union set of entranceOrientedReadIds and exitOrientedReadIds.
+    // This is also stored sorted.
+    vector<OrientedReadId> orientedReadIds;
+    std::set_union(
+        entranceOrientedReadIds.begin(), entranceOrientedReadIds.end(),
+        exitOrientedReadIds.begin(), exitOrientedReadIds.end(),
+        back_inserter(orientedReadIds));
 
     // Initialize the OrientedReadInfos.
     for(const OrientedReadId orientedReadId: orientedReadIds) {
         orientedReadInfos.push_back(OrientedReadInfo(orientedReadId));
     }
-
-
+    // We can now use getOrientedReadInfo.
 
     // Fill in the OrientedReadInfos.
     for(uint64_t entranceIndex=0; entranceIndex<entrances.size(); entranceIndex++) {
         const Entrance& entrance = entrances[entranceIndex];
-        for(const auto& anchorMarkerInterval: entrance.anchorMarkerIntervals) {
-            OrientedReadInfo& orientedReadInfo = getOrientedReadInfo(anchorMarkerInterval.orientedReadId);
-            orientedReadInfo.entranceIndex = entranceIndex;
-            orientedReadInfo.entrancePositionInJourney = anchorMarkerInterval.positionInJourney;
+        const Anchor anchor = anchors[entrance.anchorId];
+        for(const auto& anchorMarkerInterval: anchor) {
+            OrientedReadInfo* orientedReadInfo = getOrientedReadInfo(anchorMarkerInterval.orientedReadId);
+            if(orientedReadInfo) {
+                orientedReadInfo->entranceIndex = entranceIndex;
+                orientedReadInfo->entrancePositionInJourney = anchorMarkerInterval.positionInJourney;
+            }
         }
     }
     for(uint64_t exitIndex=0; exitIndex<exits.size(); exitIndex++) {
         const Exit& exit = exits[exitIndex];
-        for(const auto& anchorMarkerInterval: exit.anchorMarkerIntervals) {
-            OrientedReadInfo& orientedReadInfo = getOrientedReadInfo(anchorMarkerInterval.orientedReadId);
-            orientedReadInfo.exitIndex = exitIndex;
-            orientedReadInfo.exitPositionInJourney = anchorMarkerInterval.positionInJourney;
+        const Anchor anchor = anchors[exit.anchorId];
+        for(const auto& anchorMarkerInterval: anchor) {
+            OrientedReadInfo* orientedReadInfo = getOrientedReadInfo(anchorMarkerInterval.orientedReadId);
+            if(orientedReadInfo) {
+                orientedReadInfo->exitIndex = exitIndex;
+                orientedReadInfo->exitPositionInJourney = anchorMarkerInterval.positionInJourney;
+            }
         }
     }
 
 
-    if(debug) {
-        cout << "Oriented reads summary for this tangle:" << endl;
-        for(OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
-            cout << orientedReadInfo.orientedReadId;
-            if(orientedReadInfo.entranceIndex != invalid<uint64_t>) {
-                cout << " appears at entrance index " << orientedReadInfo.entranceIndex <<
-                    " (global journey position " << orientedReadInfo.entrancePositionInJourney << ")";
-            }
-            if(orientedReadInfo.exitIndex != invalid<uint64_t>) {
-                cout << " appears at exit index " << orientedReadInfo.exitIndex <<
-                    " (global journey position " << orientedReadInfo.exitPositionInJourney << ")";
-            }
-            cout << endl;
-        }
-    }
 
-
-    // Now we can fill in the tangleJourney of each OrientedReadInfo.
-    // This also increments coverage for the vertices encountered.
-    ofstream csv;
-    if(debug) {
-        csv.open("TangleJourneys.csv");
-    }
+    // Fill in the journeyBegin and journeyEnd fields for each OrientedReadInfo.
     for(OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
         const OrientedReadId orientedReadId = orientedReadInfo.orientedReadId;
-        const auto globalJourney = anchors.journeys[orientedReadId.getValue()];
+        const auto journey = anchors.journeys[orientedReadId.getValue()];
 
-        // Find the portion of the global journey to use.
-        // If bidirectional is true, this is the entire global journey.
-        uint64_t begin = 0;
-        uint64_t end = globalJourney.size();
+        // Start with the entire journey.
+        orientedReadInfo.journeyBegin = 0;
+        orientedReadInfo.journeyEnd = journey.size();
+
+        // If bidirectional is false, clip it at the entrances/exits as appropriate.
         if(not bidirectional) {
             if(orientedReadInfo.entranceIndex != invalid<uint64_t>) {
-                begin = orientedReadInfo.entrancePositionInJourney;
+                orientedReadInfo.journeyBegin = orientedReadInfo.entrancePositionInJourney;
             }
             if(orientedReadInfo.exitIndex != invalid<uint64_t>) {
-                end = orientedReadInfo.exitPositionInJourney + 1;
+                orientedReadInfo.journeyEnd = orientedReadInfo.exitPositionInJourney + 1;
             }
         }
-        SHASTA_ASSERT(begin < end);
+    }
 
-        // Loop over this portion of the global journey.
-        for(uint64_t positionInJourney=begin; positionInJourney!=end; positionInJourney++) {
-            const AnchorId anchorId = globalJourney[positionInJourney];
-            const vertex_descriptor v = getVertex(anchorId);
-            if(v != null_vertex()) {
-                orientedReadInfo.tangleJourney.push_back(v);
-                ++tangleGraph[v].coverage;
+
+
+    if(debug) {
+        ofstream csv("TangleOrientedReads-" + to_string(tangleId) + ".csv");
+        csv << "OrientedReadId,Journey length,"
+            "Entrance index,Entrance,Entrance position in journey,"
+            "Exit index,Exit,Exit position in journey,Type,Journey begin,Journey end," << endl;
+        for(OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
+            const auto journey = anchors.journeys[orientedReadInfo.orientedReadId.getValue()];
+            csv << orientedReadInfo.orientedReadId << ",";
+            csv << journey.size() << ",";
+
+            // Entrance information.
+            if(orientedReadInfo.entranceIndex == invalid<uint64_t>) {
+                csv << ",,,";
+            } else {
+                const Entrance& entrance = entrances[orientedReadInfo.entranceIndex];
+                csv <<
+                    orientedReadInfo.entranceIndex << "," <<
+                    anchorIdToString(entrance.anchorId) << "," <<
+                    orientedReadInfo.entrancePositionInJourney << ",";
+
             }
+
+            // Exit information.
+            if(orientedReadInfo.exitIndex == invalid<uint64_t>) {
+                csv << ",,,";
+            } else {
+                const Exit& exit = exits[orientedReadInfo.exitIndex];
+                csv <<
+                    orientedReadInfo.exitIndex << "," <<
+                    anchorIdToString(exit.anchorId) << "," <<
+                    orientedReadInfo.exitPositionInJourney << ",";
+            }
+
+            // Type.
+            if(orientedReadInfo.entranceIndex == invalid<uint64_t>) {
+                SHASTA_ASSERT(orientedReadInfo.exitIndex != invalid<uint64_t>);
+                csv << "Exit only,";
+            } else {
+                if(orientedReadInfo.exitIndex == invalid<uint64_t>) {
+                    csv << "Entrance only,";
+                } else {
+                    csv << "Both,";
+                }
+            }
+
+            // Journey information.
+            csv << orientedReadInfo.journeyBegin << ",";
+            csv << orientedReadInfo.journeyEnd << ",";
+
+            csv << endl;
         }
+    }
 
-        if(debug) {
-            cout << "The tangle journey for " << orientedReadId <<
-                " has " << orientedReadInfo.tangleJourney.size() << " anchors." << endl;
 
-            csv << orientedReadId;
-            for(const vertex_descriptor v: orientedReadInfo.tangleJourney) {
-                csv << "," << anchorIdToString(tangleGraph[v].anchorId);
+    // We can compute a tangle matrix at tangle boundary by just counting the oriented reads
+    // present in each entrance/exit pair.
+    vector< vector<uint64_t> > tangleMatrixAtBoundary(entrances.size(), vector<uint64_t>(exits.size(), 0));
+    for(OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
+        const uint64_t entranceIndex = orientedReadInfo.entranceIndex;
+        if(orientedReadInfo.entranceIndex == invalid<uint64_t>) {
+            continue;
+        }
+        const uint64_t exitIndex = orientedReadInfo.exitIndex;
+        if(exitIndex == invalid<uint64_t>) {
+            continue;
+        }
+        ++tangleMatrixAtBoundary[entranceIndex][exitIndex];
+    }
+
+    if(debug) {
+        cout << "Tangle matrix at tangle boundary:" << endl;
+        for(uint64_t entranceIndex=0; entranceIndex<entrances.size(); entranceIndex++) {
+            const Entrance& entrance = entrances[entranceIndex];
+            for(uint64_t exitIndex=0; exitIndex<exits.size(); exitIndex++) {
+                const Exit& exit = exits[exitIndex];
+                cout <<
+                    "(" << entranceIndex << "," << exitIndex << ") " <<
+                    anchorIdToString(entrance.anchorId) << " " <<
+                    anchorIdToString(exit.anchorId) << " " << tangleMatrixAtBoundary[entranceIndex][exitIndex] << endl;
             }
-            csv << "\n";
         }
     }
 }
 
 
 
-TangleGraph::OrientedReadInfo& TangleGraph::getOrientedReadInfo(OrientedReadId orientedReadId)
+TangleGraph::OrientedReadInfo* TangleGraph::getOrientedReadInfo(OrientedReadId orientedReadId)
 {
     const auto it = std::lower_bound(
         orientedReadInfos.begin(), orientedReadInfos.end(),
         OrientedReadInfo(orientedReadId));;
 
-    SHASTA_ASSERT(it != orientedReadInfos.end());
-    OrientedReadInfo&  orientedReadInfo = *it;
-    SHASTA_ASSERT(orientedReadInfo.orientedReadId == orientedReadId);
-    return orientedReadInfo;
+    if(it == orientedReadInfos.end()) {
+        return 0;
+    }
+    if(it->orientedReadId != orientedReadId)
+    {
+        return 0;
+    }
+
+    return &(*it);
 }
 
 
@@ -454,12 +533,139 @@ void TangleGraph::computeTangleMatrix()
 #endif
 
 
+
 // Create TangleGraph vertices.
-// There is a vertex for each AnchorId that is unique to one Entrance and/or one Exit.
+// There is a vertex for each AnchorId that:
+// - Appears in at least one Entrance and/or one Exit.
+// - Does not appear in more than one Entrance.
+// - Does not appear in more than one Exit.
 void TangleGraph::createVertices()
 {
     TangleGraph& tangleGraph = *this;
 
+    // Gather the AnchorIds in the journeys of oriented reads that appear in each entrance.
+    vector< vector<AnchorId> > entranceAnchorIds(entrances.size());
+    for(const OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
+        const uint64_t entranceIndex = orientedReadInfo.entranceIndex;
+        if(entranceIndex == invalid<uint64_t>) {
+            // This oriented read does not appear in any entrance.
+            continue;
+        }
+
+        // Gather AnchorIds reached by this oriented read.
+        const auto journey = anchors.journeys[orientedReadInfo.orientedReadId.getValue()];
+        copy(
+            journey.begin() + orientedReadInfo.journeyBegin,
+            journey.begin() + orientedReadInfo.journeyEnd,
+            back_inserter(entranceAnchorIds[entranceIndex]));
+    }
+
+    // Deduplicate the AnchorIds for each entrance.
+    for(auto& v: entranceAnchorIds) {
+        deduplicate(v);
+    }
+
+
+    // Now find the AnchorIds that are in more than one entrance.
+    vector<AnchorId> duplicateEntranceAnchorIds;
+    for(auto& v: entranceAnchorIds) {
+        copy(v.begin(), v.end(), back_inserter(duplicateEntranceAnchorIds));
+    }
+    vector<uint64_t> count;
+    deduplicateAndCountWithThreshold(duplicateEntranceAnchorIds, count, 2UL);
+
+
+
+    // Do the same for the exits.
+    // Gather the AnchorIds in the journeys of oriented reads that appear in each exit.
+    vector< vector<AnchorId> > exitAnchorIds(exits.size());
+    for(const OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
+        const uint64_t exitIndex = orientedReadInfo.exitIndex;
+        if(exitIndex == invalid<uint64_t>) {
+            // This oriented read does not appear in any exit.
+            continue;
+        }
+
+        // Gather AnchorIds reached by this oriented read.
+        const auto journey = anchors.journeys[orientedReadInfo.orientedReadId.getValue()];
+        copy(
+            journey.begin() + orientedReadInfo.journeyBegin,
+            journey.begin() + orientedReadInfo.journeyEnd,
+            back_inserter(exitAnchorIds[exitIndex]));
+    }
+
+    // Deduplicate the AnchorIds for each exit.
+    for(auto& v: exitAnchorIds) {
+        deduplicate(v);
+    }
+
+    // Now find the AnchorIds that are in more than one exit.
+    vector<AnchorId> duplicateExitAnchorIds;
+    for(auto& v: exitAnchorIds) {
+        copy(v.begin(), v.end(), back_inserter(duplicateExitAnchorIds));
+    }
+    deduplicateAndCountWithThreshold(duplicateExitAnchorIds, count, 2UL);
+
+
+    // The forbiddenAnchorIds are the union set of
+    // duplicateEntranceAnchorIds and duplicateExitAnchorIds.
+    vector<AnchorId> forbiddenAnchorIds;
+    std::set_union(
+        duplicateEntranceAnchorIds.begin(), duplicateEntranceAnchorIds.end(),
+        duplicateExitAnchorIds.begin(), duplicateExitAnchorIds.end(),
+        back_inserter(forbiddenAnchorIds));
+
+
+    // Generate the set of all allowed anchorIds.
+    vector<AnchorId> allAnchorIds;
+    for(auto& v: entranceAnchorIds) {
+        copy(v.begin(), v.end(), back_inserter(allAnchorIds));
+    }
+    for(auto& v: exitAnchorIds) {
+        copy(v.begin(), v.end(), back_inserter(allAnchorIds));
+    }
+    deduplicate(allAnchorIds);
+    vector<AnchorId> allowedAnchorIds;
+    std::set_difference(
+        allAnchorIds.begin(), allAnchorIds.end(),
+        forbiddenAnchorIds.begin(), forbiddenAnchorIds.end(),
+        back_inserter(allowedAnchorIds));
+
+
+    // Now we generate one vertex for each of these AnchorIds.
+    for(const AnchorId anchorId: allowedAnchorIds) {
+        const vertex_descriptor v = add_vertex(TangleGraphVertex(anchorId), tangleGraph);
+        vertexTable.push_back(make_pair(anchorId, v));
+    }
+
+
+    // At this point the vertexTable is valid and we can use getVertex.
+
+    // Fill in the entranceIndex and exitIndex of each vertex.
+    for(uint64_t entranceIndex=0; entranceIndex<entrances.size(); entranceIndex++) {
+        for(const AnchorId anchorId: entranceAnchorIds[entranceIndex]) {
+            const vertex_descriptor v = getVertex(anchorId);
+            if(v == null_vertex()) {
+                continue;
+            }
+            TangleGraphVertex& vertex = tangleGraph[v];
+            SHASTA_ASSERT(vertex.entranceIndex == invalid<uint64_t>);
+            vertex.entranceIndex = entranceIndex;
+        }
+    }
+    for(uint64_t exitIndex=0; exitIndex<exits.size(); exitIndex++) {
+        for(const AnchorId anchorId: exitAnchorIds[exitIndex]) {
+            const vertex_descriptor v = getVertex(anchorId);
+            if(v == null_vertex()) {
+                continue;
+            }
+            TangleGraphVertex& vertex = tangleGraph[v];
+            SHASTA_ASSERT(vertex.exitIndex == invalid<uint64_t>);
+            vertex.exitIndex = exitIndex;
+        }
+    }
+
+#if 0
     // Gather the uniqueJourneyAnchorIds from all Entrances and Exits
     // and deduplicate. Deduplication is needed because,
     // even an AnchorId can appear in only one Entrance and one Exit,
@@ -505,7 +711,7 @@ void TangleGraph::createVertices()
             vertex.exitIndex = exitIndex;
         }
     }
-
+#endif
 
     // Histogram the vertices by their entranceIndex and exitIndex.
     std::map< pair<uint64_t, uint64_t>, uint64_t> histogram;
@@ -584,6 +790,31 @@ void TangleGraph::createVertices()
         }
     }
 
+
+
+    // Now we can fill in the tangleJourney of each OrientedReadInfo.
+    // This also increments coverage for the vertices as they are encountered.
+    for(OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
+        const OrientedReadId orientedReadId = orientedReadInfo.orientedReadId;
+        const auto globalJourney = anchors.journeys[orientedReadId.getValue()];
+
+        // Loop over the portion of the global journey we selected for this oriented read.
+        const uint64_t begin = orientedReadInfo.journeyBegin;
+        const uint64_t end = orientedReadInfo.journeyEnd;
+        for(uint64_t positionInJourney=begin; positionInJourney!=end; positionInJourney++) {
+            const AnchorId anchorId = globalJourney[positionInJourney];
+            const vertex_descriptor v = getVertex(anchorId);
+            if(v != null_vertex()) {
+                orientedReadInfo.tangleJourney.push_back(v);
+                ++tangleGraph[v].coverage;
+            }
+        }
+
+        if(debug) {
+            cout << "The tangle journey for " << orientedReadId <<
+                " has " << orientedReadInfo.tangleJourney.size() << " anchors." << endl;
+        }
+    }
 }
 
 
@@ -640,8 +871,8 @@ void TangleGraph::createEdges()
 void TangleGraph::writeGraphviz() const
 {
     const TangleGraph& tangleGraph = *this;
-    ofstream dot("TangleGraph.dot");
-    dot << "digraph TangleGraph {\n";
+    ofstream dot("TangleGraph-" + to_string(tangleId) + ".dot");
+    dot << "digraph TangleGraph" << tangleId << "{\n";
 
     BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
         const AnchorId anchorId = tangleGraph[v].anchorId;

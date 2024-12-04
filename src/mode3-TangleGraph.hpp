@@ -55,6 +55,7 @@ class shasta::mode3::TangleGraph : public TangleGraphBaseClass {
 public:
     TangleGraph(
         bool debug,
+        uint64_t tangleId,
         const Anchors&,
         const vector<AnchorId>& entranceAnchors,
         const vector<AnchorId>& exitAnchors,
@@ -63,6 +64,7 @@ public:
 
 private:
     bool debug;
+    uint64_t tangleId;
     const Anchors& anchors;
     bool bidirectional;
 
@@ -70,15 +72,7 @@ private:
     class EntranceOrExit {
     public:
         AnchorId anchorId;
-
-        // The AnchorMarkerIntervals on that AnchorId.
-        // These are initially copied from class Anchors.
-        // But later, for entrances we remove AnchorMarkerIntervals
-        // for which the same OrientedReadId appears in another entrance;
-        // and for exits we remove AnchorMarkerIntervals
-        // for which the same OrientedReadId appears in another exit.
-        vector<AnchorMarkerInterval> anchorMarkerIntervals;
-
+#if 0
         // The AnchorIds encountered during read following.
         // For an entrance, read following moves forward, starting at the entrance.
         // For an exit, read following moves backward, starting at the exit.
@@ -89,8 +83,8 @@ private:
         // The AnchorIds encountered during read following starting from this Entrance/Exit
         // and no other Entrance/Exit.
         vector<AnchorId> uniqueJourneyAnchorIds;
-
-        EntranceOrExit(AnchorId, const Anchor&);
+#endif
+        EntranceOrExit(AnchorId);
     };
 
     class Entrance : public EntranceOrExit {
@@ -132,15 +126,18 @@ private:
         uint64_t exitIndex = invalid<uint64_t>;
         uint32_t exitPositionInJourney = invalid<uint32_t>;
 
-        // The journey of this oriented read in the tangle graph.
-        // This is obtained from the journey of the oriented read in the Anchors,
-        // possibly clipped at the beginning/end if bidirectional==false.
-        // Only AnchorIds that correspond to a vertex are entered.
+        // The portion of this oriented read journey used in the TangleGraph.
+        uint64_t journeyBegin;
+        uint64_t journeyEnd;
+
+        // The journey of this oriented read in the TangleGraph.
+        // This is the sequence of vertices it encounters.
+        // On ther initial TangleGraph, it is also a path.
         vector<vertex_descriptor> tangleJourney;
     };
     vector<OrientedReadInfo> orientedReadInfos;
     void gatherOrientedReads();
-    OrientedReadInfo& getOrientedReadInfo(OrientedReadId);
+    OrientedReadInfo* getOrientedReadInfo(OrientedReadId);
 
 
 
