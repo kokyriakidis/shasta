@@ -60,6 +60,7 @@ private:
         AssemblyGraph::edge_descriptor e;
         AnchorId anchorId;
 
+#if 0
         // The AnchorMarkerIntervals on that AnchorId.
         // These are initially copies from class Anchors.
         // But later, for entrances we remove AnchorMarkerIntervals
@@ -76,11 +77,11 @@ private:
         // The AnchorIds encountered during read following starting from this Entrance
         // and no other entrance.
         vector<AnchorId> uniqueJourneyAnchorIds;
+#endif
 
         EntranceOrExit(
             AssemblyGraph::edge_descriptor,
-            AnchorId,
-            const Anchor&);
+            AnchorId);
     };
     class Entrance : public EntranceOrExit {using EntranceOrExit::EntranceOrExit;};
     class Exit : public EntranceOrExit {using EntranceOrExit::EntranceOrExit;};
