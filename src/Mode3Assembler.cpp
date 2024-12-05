@@ -437,7 +437,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
      }
 
      // Remove edges with negative offset.
-     anchorGraph.removeNegativeOffsetEdges();
+     // anchorGraph.removeNegativeOffsetEdges();
 
      // Remove weak edges.
      anchorGraph.removeWeakEdges(options.primaryGraphOptions.maxLoss, debug);
