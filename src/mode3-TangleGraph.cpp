@@ -875,11 +875,45 @@ void TangleGraph::writeGraphviz() const
     dot << "digraph TangleGraph" << tangleId << "{\n";
 
     BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
-        const AnchorId anchorId = tangleGraph[v].anchorId;
-        dot << "\"" << anchorIdToString(anchorId) << "\";\n";
+        const TangleGraphVertex& vertex = tangleGraph[v];
+        const AnchorId anchorId = vertex.anchorId;
+        dot << "\"" << anchorIdToString(anchorId) << "\"";
+
+        // Begin attributes.
+        dot << " [";
+
+
+
+        // Label.
+        dot << "label=\"";
+        dot << anchorIdToString(anchorId) << "\\n";
+
+        if(vertex.entranceIndex == invalid<uint64_t>) {
+            dot << "N";
+        } else {
+            dot << vertex.entranceIndex;
+        }
+        dot << ",";
+        if(vertex.exitIndex == invalid<uint64_t>) {
+            dot << "N";
+        } else {
+            dot << vertex.exitIndex;
+        }
+
+        // End of label.
+        dot << "\"";
+
+
+
+        // End attributes.
+        dot << "]";
+
+        // End the line for this vertex.
+        dot << ";\n";
     }
 
     BGL_FORALL_EDGES(e, tangleGraph, TangleGraph) {
+        const TangleGraphEdge& edge = tangleGraph[e];
         const vertex_descriptor v0 = source(e, tangleGraph);
         const vertex_descriptor v1 = target(e, tangleGraph);
 
@@ -887,7 +921,18 @@ void TangleGraph::writeGraphviz() const
         const AnchorId anchorId1 = tangleGraph[v1].anchorId;
 
         dot << "\"" << anchorIdToString(anchorId0) << "\"->";
-        dot << "\"" << anchorIdToString(anchorId1) << "\";\n";
+        dot << "\"" << anchorIdToString(anchorId1) << "\"";
+
+        // Begin attributes.
+        dot << " [";
+
+        dot << "penwidth=" << 0.5 * double(edge.coverage);
+
+        // End attributes.
+        dot << "]";
+
+        // End the line for this edge.
+        dot << ";\n";
     }
 
     dot << "}\n";
