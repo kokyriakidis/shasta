@@ -33,20 +33,39 @@ namespace shasta {
 class shasta::mode3::TangleGraphVertex {
 public:
     AnchorId anchorId;
-    uint64_t coverage = 0;
     TangleGraphVertex(AnchorId anchorId) : anchorId(anchorId) {}
 
     // Each vertex can appear in zero or one Entrances
     // and zero or one Exits.
     uint64_t entranceIndex = invalid<uint64_t>;
     uint64_t exitIndex = invalid<uint64_t>;
+
+    // The OrientedReadIds that visit this vertex.
+    // This only includes OrientedReadIds used in the TangleGraph
+    // and therefore is generally a subset of the OrientedReadIds
+    // for the same AnchorId in the global AnchorGraph.
+    // The OrientedReadIds are stored sorted.
+    vector<OrientedReadId> orientedReadIds;
+    uint64_t coverage() const
+    {
+        return orientedReadIds.size();
+    }
 };
 
 
 
 class shasta::mode3::TangleGraphEdge {
 public:
-    uint64_t coverage = 0;
+    // The OrientedReadIds that contribute to this edge.
+    // This only includes OrientedReadIds used in the TangleGraph
+    // and therefore is generally a subset of the OrientedReadIds
+    // for the same edge of the global AnchorGraph.
+    // The OrientedReadIds are stored sorted.
+    vector<OrientedReadId> orientedReadIds;
+    uint64_t coverage() const
+    {
+        return orientedReadIds.size();
+    }
 };
 
 

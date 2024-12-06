@@ -806,7 +806,7 @@ void TangleGraph::createVertices()
             const vertex_descriptor v = getVertex(anchorId);
             if(v != null_vertex()) {
                 orientedReadInfo.tangleJourney.push_back(v);
-                ++tangleGraph[v].coverage;
+                tangleGraph[v].orientedReadIds.push_back(orientedReadId);
             }
         }
 
@@ -840,9 +840,10 @@ TangleGraph::vertex_descriptor TangleGraph::getVertex(AnchorId anchorId) const
 
 void TangleGraph::createEdges()
 {
-    TangleGraph& graph = *this;
+    TangleGraph& tangleGraph = *this;
 
     for(const OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
+        const OrientedReadId orientedReadId = orientedReadInfo.orientedReadId;
         const vector<vertex_descriptor>& tangleJourney = orientedReadInfo.tangleJourney;
 
         for(uint64_t i1=1; i1<tangleJourney.size(); i1++) {
@@ -850,17 +851,18 @@ void TangleGraph::createEdges()
             const vertex_descriptor v0 = tangleJourney[i0];
             const vertex_descriptor v1 = tangleJourney[i1];
 
+            // Find this edge, and create it if necessary.
             edge_descriptor e;
             bool edgeWasFound = false;
-            tie(e, edgeWasFound) = boost::edge(v0, v1, graph);
-            if(edgeWasFound) {
-                ++graph[e].coverage;
-            } else {
+            tie(e, edgeWasFound) = boost::edge(v0, v1, tangleGraph);
+            if(not edgeWasFound) {
                 bool edgeWasAdded = false;
-                tie(e, edgeWasAdded) = add_edge(v0, v1, graph);
+                tie(e, edgeWasAdded) = add_edge(v0, v1, tangleGraph);
                 SHASTA_ASSERT(edgeWasAdded);
-                graph[e].coverage = 1;
             }
+
+            // Store this OrientedReadId in the edge.
+            tangleGraph[e].orientedReadIds.push_back(orientedReadId);
         }
     }
 }
@@ -886,7 +888,7 @@ void TangleGraph::writeGraphviz() const
 
         // Label.
         dot << "label=\"";
-        dot << anchorIdToString(anchorId) << "\\n";
+        dot << anchorIdToString(anchorId) << "\\n" << vertex.coverage() << "\\n";
 
         if(vertex.entranceIndex == invalid<uint64_t>) {
             dot << "N";
@@ -926,7 +928,15 @@ void TangleGraph::writeGraphviz() const
         // Begin attributes.
         dot << " [";
 
-        dot << "penwidth=" << 0.5 * double(edge.coverage);
+        // Tooltip.
+        dot <<
+            "tooltip=\"" <<
+            anchorIdToString(anchorId0) << "->" <<
+            anchorIdToString(anchorId1) << " " <<
+            edge.coverage() << "\"";
+
+        // Thickness.
+        dot << "penwidth=" << 0.5 * double(edge.coverage());
 
         // End attributes.
         dot << "]";
