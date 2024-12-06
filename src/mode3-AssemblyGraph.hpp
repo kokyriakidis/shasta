@@ -582,12 +582,14 @@ private:
     // Detangle with read following.
     void detangleSuperbubblesWithReadFollowing(
         bool debug,
-        uint64_t maxOffset);
+        uint64_t maxOffset,
+        double maxLoss);
     void detangleSuperbubbleWithReadFollowing(
         bool debug,
         const Superbubbles&,
         uint64_t superbubbleId,
-        uint64_t maxOffset);
+        uint64_t maxOffset,
+        double maxLoss);
 
 
     // Cleanup/simplify superbubbles that are likely to be caused by errors,

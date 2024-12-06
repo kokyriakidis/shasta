@@ -78,8 +78,8 @@ public:
         const Anchors&,
         const vector<AnchorId>& entranceAnchors,
         const vector<AnchorId>& exitAnchors,
-        bool bidirectional
-    );
+        bool bidirectional,
+        double maxLoss);
 
 private:
     bool debug;
@@ -177,6 +177,9 @@ private:
     // file descriptors. Sorted by AnchorId so findVertex can use std::lowerBound.
     vector< pair<AnchorId, vertex_descriptor> > vertexTable;
     vertex_descriptor getVertex(AnchorId) const;
+
+    double edgeLoss(edge_descriptor) const;
+    void removeWeakEdges(double maxLoss);
 
     void writeGraphviz() const;
 

@@ -20,6 +20,7 @@ public:
         uint64_t tangleId,
         AssemblyGraph&,
         uint64_t maxOffset,
+        double maxLoss,
         const vector<AssemblyGraph::vertex_descriptor>& tangleVertices);
 
 private:

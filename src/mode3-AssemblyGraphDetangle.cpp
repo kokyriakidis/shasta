@@ -14,7 +14,8 @@ using namespace mode3;
 // (that is, to consist of just one haploid bubble).
 void AssemblyGraph::detangleSuperbubblesWithReadFollowing(
     bool debug,
-    uint64_t maxOffset)
+    uint64_t maxOffset,
+    double maxLoss)
 {
     AssemblyGraph& assemblyGraph = *this;
 
@@ -36,7 +37,7 @@ void AssemblyGraph::detangleSuperbubblesWithReadFollowing(
 
     // Loop over the superbubbles.
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        detangleSuperbubbleWithReadFollowing(debug, superbubbles, superbubbleId, maxOffset);
+        detangleSuperbubbleWithReadFollowing(debug, superbubbles, superbubbleId, maxOffset, maxLoss);
     }
 
     if(debug) {
@@ -51,8 +52,9 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     bool debug,
     const Superbubbles& superbubbles,
     uint64_t superbubbleId,
-    uint64_t maxOffset)
+    uint64_t maxOffset,
+    double maxLoss)
 {
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
-    Tangle tangle(debug, superbubbleId, *this, maxOffset, superbubble);
+    Tangle tangle(debug, superbubbleId, *this, maxOffset, maxLoss, superbubble);
 }

@@ -20,7 +20,8 @@ TangleGraph::TangleGraph(
     const Anchors& anchors,
     const vector<AnchorId>& entranceAnchors,
     const vector<AnchorId>& exitAnchors,
-    bool bidirectional) :
+    bool bidirectional,
+    double maxLoss) :
     debug(debug),
     tangleId(tangleId),
     anchors(anchors),
@@ -48,9 +49,15 @@ TangleGraph::TangleGraph(
 
     createVertices();
     createEdges();
+    if(debug) {
+        cout << "The initial tangle graph has " << num_vertices(*this) <<
+            " vertices and " << num_edges(*this) << " edges." << endl;
+    }
+
+    removeWeakEdges(maxLoss);
 
     if(debug) {
-        cout << "The tangle graph has " << num_vertices(*this) <<
+        cout << "The final tangle graph has " << num_vertices(*this) <<
             " vertices and " << num_edges(*this) << " edges." << endl;
         writeGraphviz();
     }
@@ -933,7 +940,8 @@ void TangleGraph::writeGraphviz() const
             "tooltip=\"" <<
             anchorIdToString(anchorId0) << "->" <<
             anchorIdToString(anchorId1) << " " <<
-            edge.coverage() << "\"";
+            edge.coverage() << " " <<
+            edgeLoss(e) << "\"";
 
         // Thickness.
         dot << "penwidth=" << 0.5 * double(edge.coverage());
@@ -946,4 +954,55 @@ void TangleGraph::writeGraphviz() const
     }
 
     dot << "}\n";
+}
+
+
+
+// Remove edges for which loss = (commonCount - coverage) / commonCount > maxLoss
+// This is similar to AnchorGraph::removeWeakEdges.
+void TangleGraph::removeWeakEdges(double maxLoss)
+{
+    TangleGraph& tangleGraph = *this;
+
+    // Find the edges we are going to remove.
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, tangleGraph, TangleGraph) {
+        if(edgeLoss(e) > maxLoss) {
+            edgesToBeRemoved.push_back(e);
+        }
+    }
+
+    // Remove the edges we found.
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, tangleGraph);
+    }
+
+    if(debug) {
+        cout << "Removed " << edgesToBeRemoved.size() << " weak edges." << endl;
+    }
+
+}
+
+
+
+
+double TangleGraph::edgeLoss(edge_descriptor e) const
+{
+    const TangleGraph& tangleGraph = *this;
+
+    const TangleGraphEdge& edge = tangleGraph[e];
+    const vertex_descriptor v0 = source(e, tangleGraph);
+    const vertex_descriptor v1 = target(e, tangleGraph);
+
+    // Find the number of common oriented reads between the two vertices.
+    const vector<OrientedReadId>& orientedReadIds0 = tangleGraph[v0].orientedReadIds;
+    const vector<OrientedReadId>& orientedReadIds1 = tangleGraph[v1].orientedReadIds;
+    vector<OrientedReadId> commonOrientedReadIds;
+    std::set_intersection(
+        orientedReadIds0.begin(), orientedReadIds0.end(),
+        orientedReadIds1.begin(), orientedReadIds1.end(),
+        back_inserter(commonOrientedReadIds));
+    const uint64_t commonCount = commonOrientedReadIds.size();
+
+    return double(commonCount - edge.coverage()) / double(commonCount);
 }
