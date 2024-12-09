@@ -17,7 +17,8 @@ Tangle::Tangle(
     double maxLoss,
     uint64_t lowCoverageThreshold,
     uint64_t highCoverageThreshold,
-    const vector<AssemblyGraph::vertex_descriptor>& tangleVerticesArgument) :
+    const vector<AssemblyGraph::vertex_descriptor>& tangleVerticesArgument,
+    vector< vector<AnchorId> >& anchorChains) :
     debug(debug),
     assemblyGraph(assemblyGraph),
     tangleVertices(tangleVerticesArgument)
@@ -61,6 +62,19 @@ Tangle::Tangle(
     TangleGraph tangleGraph(debug, tangleId, assemblyGraph.anchors,
         entranceAnchorIds, exitAnchorIds, bidirectional, maxLoss,
         lowCoverageThreshold, highCoverageThreshold);
+
+    tangleGraph.getChains(anchorChains);
+
+    if(debug) {
+        cout << "Found " << anchorChains.size() << " chains:" << endl;
+        for(const vector<AnchorId>& anchorChain: anchorChains) {
+            cout << "Chain with " << anchorChain.size() << " anchors:";
+            for(const AnchorId anchorId: anchorChain) {
+                cout << " " << anchorIdToString(anchorId);
+            }
+            cout << endl;
+        }
+    }
 }
 
 
@@ -517,4 +531,3 @@ void Tangle::readFollowingFromExit(Exit& exit)
 }
 
 #endif
-

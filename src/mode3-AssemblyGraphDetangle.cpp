@@ -61,7 +61,9 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     uint64_t highCoverageThreshold)
 {
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
+
+    vector< vector<AnchorId> > anchorChains;
     Tangle tangle(debug, superbubbleId, *this, maxOffset, maxLoss,
         lowCoverageThreshold, highCoverageThreshold,
-        superbubble);
+        superbubble, anchorChains);
 }

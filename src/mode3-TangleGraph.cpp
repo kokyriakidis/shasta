@@ -1,6 +1,7 @@
 // Shasta.
 #include "mode3-TangleGraph.hpp"
 #include "deduplicate.hpp"
+#include "findLinearChains.hpp"
 #include "orderPairs.hpp"
 using namespace shasta;
 using namespace mode3;
@@ -1074,4 +1075,36 @@ void TangleGraph::removeCrossEdges(
     if(debug) {
         cout << "Removed " << edgesToBeRemoved.size() << " cross edges." << endl;
     }
+}
+
+
+
+void TangleGraph::getChains(vector< vector<AnchorId> >& anchorChains) const
+{
+    const TangleGraph& tangleGraph = *this;
+
+    // Find chains of edges (linear paths).
+    vector< vector<edge_descriptor> > edgeChains;
+    findLinearChains(tangleGraph, 1, edgeChains);
+    const uint64_t chainCount = edgeChains.size();
+
+    // Create the corresponding chains of AnchorIds.
+    anchorChains.clear();
+    anchorChains.resize(chainCount);
+    for(uint64_t i=0; i<chainCount; i++) {
+        const vector<edge_descriptor>& edgeChain = edgeChains[i];
+        vector<AnchorId>& anchorChain = anchorChains[i];
+        anchorChain.reserve(edgeChain.size());
+
+        // Add the source AnchorId for the first edge.
+        const vertex_descriptor v = source(edgeChain.front(), tangleGraph);
+        anchorChain.push_back(tangleGraph[v].anchorId);
+
+        // Add the target AnchorId for all the edges.
+        for(const edge_descriptor e: edgeChain) {
+            const vertex_descriptor v = target(e, tangleGraph);
+            anchorChain.push_back(tangleGraph[v].anchorId);
+        }
+    }
+
 }

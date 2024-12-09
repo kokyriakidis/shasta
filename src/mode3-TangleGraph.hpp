@@ -83,6 +83,8 @@ public:
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold);
 
+    void getChains(vector< vector<AnchorId> >&) const;
+
 private:
     bool debug;
     uint64_t tangleId;
@@ -186,5 +188,4 @@ private:
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold);
     void writeGraphviz(const string& name) const;
-
 };

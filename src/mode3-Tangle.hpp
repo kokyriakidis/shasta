@@ -23,7 +23,8 @@ public:
         double maxLoss,
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold,
-        const vector<AssemblyGraph::vertex_descriptor>& tangleVertices);
+        const vector<AssemblyGraph::vertex_descriptor>& tangleVertices,
+        vector< vector<AnchorId> >& anchorChains);
 
 private:
     bool debug;
