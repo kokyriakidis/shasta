@@ -3066,11 +3066,11 @@ bool AssemblyGraph::detangleVertex(
             // Create truncated versions of the inEdges and outEdges.
             vector<vertex_descriptor> inVertices;
             for(const edge_descriptor ce: inEdges) {
-                inVertices.push_back(cloneAndTruncateAtEnd(ce));
+                inVertices.push_back(cloneAndTruncateAtEnd(debug, ce));
             }
             vector<vertex_descriptor> outVertices;
             for(const edge_descriptor ce: outEdges) {
-                outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+                outVertices.push_back(cloneAndTruncateAtBeginning(debug, ce));
             }
 
             if(isInPhase) {
@@ -3166,11 +3166,11 @@ bool AssemblyGraph::detangleVertex(
         // Create truncated versions of the inEdges and outEdges.
         vector<vertex_descriptor> inVertices;
         for(const edge_descriptor ce: inEdges) {
-            inVertices.push_back(cloneAndTruncateAtEnd(ce));
+            inVertices.push_back(cloneAndTruncateAtEnd(debug, ce));
         }
         vector<vertex_descriptor> outVertices;
         for(const edge_descriptor ce: outEdges) {
-            outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+            outVertices.push_back(cloneAndTruncateAtBeginning(debug, ce));
         }
 
         // Each significant element of the tangle matrix generates a new edge.
@@ -3768,11 +3768,11 @@ bool AssemblyGraph::detangleEdge(
             // Create truncated versions of the inEdges and outEdges.
             vector<vertex_descriptor> inVertices;
             for(const edge_descriptor ce: inEdges) {
-                inVertices.push_back(cloneAndTruncateAtEnd(ce));
+                inVertices.push_back(cloneAndTruncateAtEnd(debug, ce));
             }
             vector<vertex_descriptor> outVertices;
             for(const edge_descriptor ce: outEdges) {
-                outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+                outVertices.push_back(cloneAndTruncateAtBeginning(debug, ce));
             }
 
             if(isInPhase) {
@@ -3883,11 +3883,11 @@ bool AssemblyGraph::detangleEdge(
         // Create truncated versions of the inEdges and outEdges.
         vector<vertex_descriptor> inVertices;
         for(const edge_descriptor ce: inEdges) {
-            inVertices.push_back(cloneAndTruncateAtEnd(ce));
+            inVertices.push_back(cloneAndTruncateAtEnd(debug, ce));
         }
         vector<vertex_descriptor> outVertices;
         for(const edge_descriptor ce: outEdges) {
-            outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+            outVertices.push_back(cloneAndTruncateAtBeginning(debug, ce));
         }
 
 
@@ -4602,11 +4602,11 @@ bool AssemblyGraph::detangleShortSuperbubble(
                 // Create truncated versions of the inEdges and outEdges.
                 vector<vertex_descriptor> inVertices;
                 for(const edge_descriptor ce: inEdges) {
-                    inVertices.push_back(cloneAndTruncateAtEnd(ce));
+                    inVertices.push_back(cloneAndTruncateAtEnd(debug, ce));
                 }
                 vector<vertex_descriptor> outVertices;
                 for(const edge_descriptor ce: outEdges) {
-                    outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+                    outVertices.push_back(cloneAndTruncateAtBeginning(debug, ce));
                 }
 
                 if(isInPhase) {
@@ -4732,11 +4732,11 @@ bool AssemblyGraph::detangleShortSuperbubble(
     // Create truncated versions of the inEdges and outEdges.
     vector<vertex_descriptor> inVertices;
     for(const edge_descriptor ce: inEdges) {
-        inVertices.push_back(cloneAndTruncateAtEnd(ce));
+        inVertices.push_back(cloneAndTruncateAtEnd(debug, ce));
     }
     vector<vertex_descriptor> outVertices;
     for(const edge_descriptor ce: outEdges) {
-        outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+        outVertices.push_back(cloneAndTruncateAtBeginning(debug, ce));
     }
 
 
@@ -6969,7 +6969,7 @@ void AssemblyGraph::runAssemblyStep(
 // If the bubble chain consists of just a single haploid bubble with a chain of length 2,
 // no new edge is created, and this simply returns the source vertex of the given edge.
 AssemblyGraph::vertex_descriptor
-    AssemblyGraph::cloneAndTruncateAtEnd(edge_descriptor ce)
+    AssemblyGraph::cloneAndTruncateAtEnd(bool debug, edge_descriptor ce)
 {
     AssemblyGraph& cGraph = *this;
     const AssemblyGraphEdge& edge = cGraph[ce];
@@ -6994,6 +6994,10 @@ AssemblyGraph::vertex_descriptor
         // So we don't create a new edge, and instead just return cv0.
         // Detangling code will connect there, as prescribed by the tangle matrix.
         if(chain.size() == 2) {
+            if(debug) {
+                cout << "cloneAndTruncateAtEnd: " << bubbleChainStringId(ce) <<
+                    " not truncated because it only has two anchors." << endl;
+            }
             return cv0;
         }
 
@@ -7007,6 +7011,11 @@ AssemblyGraph::vertex_descriptor
         Chain& newChain = newBubble.front();
         SHASTA_ASSERT(chain.size() > 2);
         newChain.pop_back();    // Remove the last AnchorId.
+
+        if(debug) {
+            cout << "cloneAndTruncateAtEnd: " << bubbleChainStringId(ce) <<
+                " truncated and becomes " << componentId << "-" << newEdge.id << endl;
+        }
 
         // Add it to the graph.
         // It will be dangling at its end.
@@ -7062,7 +7071,7 @@ AssemblyGraph::vertex_descriptor
 // If the bubble chain consists of just a single haploid bubble with a chain of length 2,
 // no new edge is created, and this simply returns the target vertex of the given edge.
 AssemblyGraph::vertex_descriptor
-    AssemblyGraph::cloneAndTruncateAtBeginning(edge_descriptor ce)
+    AssemblyGraph::cloneAndTruncateAtBeginning(bool debug, edge_descriptor ce)
 {
     AssemblyGraph& cGraph = *this;
     const AssemblyGraphEdge& edge = cGraph[ce];
@@ -7087,6 +7096,10 @@ AssemblyGraph::vertex_descriptor
         // So we don't create a new edge, and instead just return cv1.
         // Detangling code will connect there, as prescribed by the tangle matrix.
         if(chain.size() == 2) {
+            if(debug) {
+                cout << "cloneAndTruncateAtBeginning: " << bubbleChainStringId(ce) <<
+                    " not truncated because it only has two anchors." << endl;
+            }
             return cv1;
         }
 
@@ -7100,6 +7113,11 @@ AssemblyGraph::vertex_descriptor
         Chain& newChain = newBubble.front();
         SHASTA_ASSERT(chain.size() > 2);
         newChain.erase(newChain.begin());    // Remove the first AnchorId.
+
+        if(debug) {
+            cout << "cloneAndTruncateAtBeginning: " << bubbleChainStringId(ce) <<
+                " truncated and becomes " << componentId << "-" << newEdge.id << endl;
+        }
 
         // Add it to the graph.
         // It will be dangling at its beginning.

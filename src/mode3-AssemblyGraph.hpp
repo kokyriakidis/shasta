@@ -414,8 +414,8 @@ private:
 
     // Low level primitives used in detangling.
     // See the implementation for details.
-    vertex_descriptor cloneAndTruncateAtEnd(edge_descriptor);
-    vertex_descriptor cloneAndTruncateAtBeginning(edge_descriptor);
+    vertex_descriptor cloneAndTruncateAtEnd(bool debug, edge_descriptor);
+    vertex_descriptor cloneAndTruncateAtBeginning(bool debug, edge_descriptor);
 
     // Vertex detangling.
     bool detangleVertices(bool debug,
