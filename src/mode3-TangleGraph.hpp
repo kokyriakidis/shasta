@@ -79,7 +79,9 @@ public:
         const vector<AnchorId>& entranceAnchors,
         const vector<AnchorId>& exitAnchors,
         bool bidirectional,
-        double maxLoss);
+        double maxLoss,
+        uint64_t lowCoverageThreshold,
+        uint64_t highCoverageThreshold);
 
 private:
     bool debug;
@@ -180,7 +182,9 @@ private:
 
     double edgeLoss(edge_descriptor) const;
     void removeWeakEdges(double maxLoss);
-
-    void writeGraphviz() const;
+    void removeCrossEdges(
+        uint64_t lowCoverageThreshold,
+        uint64_t highCoverageThreshold);
+    void writeGraphviz(const string& name) const;
 
 };

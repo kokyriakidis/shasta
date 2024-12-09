@@ -15,7 +15,9 @@ using namespace mode3;
 void AssemblyGraph::detangleSuperbubblesWithReadFollowing(
     bool debug,
     uint64_t maxOffset,
-    double maxLoss)
+    double maxLoss,
+    uint64_t lowCoverageThreshold,
+    uint64_t highCoverageThreshold)
 {
     AssemblyGraph& assemblyGraph = *this;
 
@@ -37,7 +39,8 @@ void AssemblyGraph::detangleSuperbubblesWithReadFollowing(
 
     // Loop over the superbubbles.
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        detangleSuperbubbleWithReadFollowing(debug, superbubbles, superbubbleId, maxOffset, maxLoss);
+        detangleSuperbubbleWithReadFollowing(debug, superbubbles, superbubbleId, maxOffset, maxLoss,
+            lowCoverageThreshold, highCoverageThreshold);
     }
 
     if(debug) {
@@ -53,8 +56,12 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     const Superbubbles& superbubbles,
     uint64_t superbubbleId,
     uint64_t maxOffset,
-    double maxLoss)
+    double maxLoss,
+    uint64_t lowCoverageThreshold,
+    uint64_t highCoverageThreshold)
 {
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
-    Tangle tangle(debug, superbubbleId, *this, maxOffset, maxLoss, superbubble);
+    Tangle tangle(debug, superbubbleId, *this, maxOffset, maxLoss,
+        lowCoverageThreshold, highCoverageThreshold,
+        superbubble);
 }

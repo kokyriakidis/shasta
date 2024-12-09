@@ -583,14 +583,17 @@ private:
     void detangleSuperbubblesWithReadFollowing(
         bool debug,
         uint64_t maxOffset,
-        double maxLoss);
+        double maxLoss,
+        uint64_t lowCoverageThreshold,
+        uint64_t highCoverageThreshold);
     void detangleSuperbubbleWithReadFollowing(
         bool debug,
         const Superbubbles&,
         uint64_t superbubbleId,
         uint64_t maxOffset,
-        double maxLoss);
-
+        double maxLoss,
+        uint64_t lowCoverageThreshold,
+        uint64_t highCoverageThreshold);
 
     // Cleanup/simplify superbubbles that are likely to be caused by errors,
     // completely or in part.

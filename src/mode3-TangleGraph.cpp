@@ -21,7 +21,9 @@ TangleGraph::TangleGraph(
     const vector<AnchorId>& entranceAnchors,
     const vector<AnchorId>& exitAnchors,
     bool bidirectional,
-    double maxLoss) :
+    double maxLoss,
+    uint64_t lowCoverageThreshold,
+    uint64_t highCoverageThreshold) :
     debug(debug),
     tangleId(tangleId),
     anchors(anchors),
@@ -55,11 +57,13 @@ TangleGraph::TangleGraph(
     }
 
     removeWeakEdges(maxLoss);
+    writeGraphviz("A");
+    removeCrossEdges(lowCoverageThreshold, highCoverageThreshold);
 
     if(debug) {
         cout << "The final tangle graph has " << num_vertices(*this) <<
             " vertices and " << num_edges(*this) << " edges." << endl;
-        writeGraphviz();
+        writeGraphviz("B");
     }
 
 }
@@ -877,10 +881,10 @@ void TangleGraph::createEdges()
 
 
 
-void TangleGraph::writeGraphviz() const
+void TangleGraph::writeGraphviz(const string& name) const
 {
     const TangleGraph& tangleGraph = *this;
-    ofstream dot("TangleGraph-" + to_string(tangleId) + ".dot");
+    ofstream dot("TangleGraph-" + to_string(tangleId) + "-" + name + ".dot");
     dot << "digraph TangleGraph" << tangleId << "{\n";
 
     BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
@@ -1005,4 +1009,72 @@ double TangleGraph::edgeLoss(edge_descriptor e) const
     const uint64_t commonCount = commonOrientedReadIds.size();
 
     return double(commonCount - edge.coverage()) / double(commonCount);
+}
+
+
+
+// Remove cross-edges.
+// This removes an edge v0->v1 if the following are all true:
+// - Its coverage is at most lowCoverageThreshold.
+// - v0 has at least one out-edge with coverage at least highCoverageThreshold
+// - v1 has at least one in-edge with coverage at least highCoverageThreshold.
+void TangleGraph::removeCrossEdges(
+    uint64_t lowCoverageThreshold,
+    uint64_t highCoverageThreshold)
+{
+    TangleGraph& tangleGraph = *this;
+
+    // Find the edges we are going to remove.
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, tangleGraph, TangleGraph) {
+        const TangleGraphEdge& edge = tangleGraph[e];
+
+        // Check coverage.
+        if(edge.coverage() > lowCoverageThreshold) {
+            continue;
+        }
+
+        // Check out-edges of v0.
+        const vertex_descriptor v0 = source(e, tangleGraph);
+        bool v0HasStrongOutEdge = false;
+        BGL_FORALL_OUTEDGES(v0, e0, tangleGraph, TangleGraph) {
+            if(tangleGraph[e0].coverage() >= highCoverageThreshold) {
+                v0HasStrongOutEdge = true;
+                break;
+            }
+        }
+        if(not v0HasStrongOutEdge) {
+            continue;
+        }
+
+        // Check in-edges of v1.
+        const vertex_descriptor v1 = target(e, tangleGraph);
+        bool v1HasStrongOutEdge = false;
+        BGL_FORALL_INEDGES(v1, e1, tangleGraph, TangleGraph) {
+            if(tangleGraph[e1].coverage() >= highCoverageThreshold) {
+                v1HasStrongOutEdge = true;
+                break;
+            }
+        }
+        if(not v1HasStrongOutEdge) {
+            continue;
+        }
+
+        // If all above checks passed, this edge will be removed.
+        edgesToBeRemoved.push_back(e);
+    }
+
+    // Remove the edges we found.
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        if(debug) {
+            const vertex_descriptor v0 = source(e, tangleGraph);
+            const vertex_descriptor v1 = target(e, tangleGraph);
+            cout << "Removed cross edge " << anchorIdToString(tangleGraph[v0].anchorId) <<
+                " -> " << anchorIdToString(tangleGraph[v1].anchorId) << endl;
+        }
+        boost::remove_edge(e, tangleGraph);
+    }
+    if(debug) {
+        cout << "Removed " << edgesToBeRemoved.size() << " cross edges." << endl;
+    }
 }

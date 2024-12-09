@@ -21,6 +21,8 @@ public:
         AssemblyGraph&,
         uint64_t maxOffset,
         double maxLoss,
+        uint64_t lowCoverageThreshold,
+        uint64_t highCoverageThreshold,
         const vector<AssemblyGraph::vertex_descriptor>& tangleVertices);
 
 private:

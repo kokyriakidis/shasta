@@ -15,6 +15,8 @@ Tangle::Tangle(
     AssemblyGraph& assemblyGraph,
     uint64_t maxOffset,
     double maxLoss,
+    uint64_t lowCoverageThreshold,
+    uint64_t highCoverageThreshold,
     const vector<AssemblyGraph::vertex_descriptor>& tangleVerticesArgument) :
     debug(debug),
     assemblyGraph(assemblyGraph),
@@ -57,7 +59,8 @@ Tangle::Tangle(
     }
     const bool bidirectional = false;
     TangleGraph tangleGraph(debug, tangleId, assemblyGraph.anchors,
-        entranceAnchorIds, exitAnchorIds, bidirectional, maxLoss);
+        entranceAnchorIds, exitAnchorIds, bidirectional, maxLoss,
+        lowCoverageThreshold, highCoverageThreshold);
 }
 
 
