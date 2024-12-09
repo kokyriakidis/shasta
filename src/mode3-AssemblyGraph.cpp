@@ -159,7 +159,7 @@ void AssemblyGraph::run(
     performanceLog << timestamp << "Detangling begins." << endl;
     while(compressSequentialEdges());
     compressBubbleChains();
-#if 0
+#if 1
     detangleEdges(false,
         options.assemblyGraphOptions.detangleToleranceLow,
         options.assemblyGraphOptions.detangleToleranceHigh,
