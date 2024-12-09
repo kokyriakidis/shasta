@@ -164,7 +164,7 @@ private:
 
     // Create TangleGraph vertices.
     // There is a vertex for each AnchorId that is unique to one Entrance and/or one Exit.
-    void createVertices();
+    void createVertices(uint64_t minVertexCoverage);
 
     // Create edges.
     // This uses the OrientedReadInfo::tangleJourney.

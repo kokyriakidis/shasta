@@ -29,6 +29,10 @@ TangleGraph::TangleGraph(
     anchors(anchors),
     bidirectional(bidirectional)
 {
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t minVertexCoverage = 5;
+
+
     if(debug) {
         cout << "Creating a tangle graph for tangle " << tangleId <<
             " with " << entranceAnchors.size() <<
@@ -49,7 +53,7 @@ TangleGraph::TangleGraph(
     constructExits(exitAnchors);
     gatherOrientedReads();
 
-    createVertices();
+    createVertices(minVertexCoverage);
     createEdges();
     if(debug) {
         cout << "The initial tangle graph has " << num_vertices(*this) <<
@@ -550,7 +554,7 @@ void TangleGraph::computeTangleMatrix()
 // - Appears in at least one Entrance and/or one Exit.
 // - Does not appear in more than one Entrance.
 // - Does not appear in more than one Exit.
-void TangleGraph::createVertices()
+void TangleGraph::createVertices(uint64_t minVertexCoverage)
 {
     TangleGraph& tangleGraph = *this;
 
@@ -676,53 +680,71 @@ void TangleGraph::createVertices()
         }
     }
 
-#if 0
-    // Gather the uniqueJourneyAnchorIds from all Entrances and Exits
-    // and deduplicate. Deduplication is needed because,
-    // even an AnchorId can appear in only one Entrance and one Exit,
-    // it can appear in both one Entrance and one Exit, and we want to generate
-    // only one vertex.
-    for(const Entrance& entrance: entrances) {
-        for(const AnchorId anchorId: entrance.uniqueJourneyAnchorIds) {
-            vertexTable.push_back({anchorId, null_vertex()});
-        }
-    }
-    for(const Exit& exit: exits) {
-        for(const AnchorId anchorId: exit.uniqueJourneyAnchorIds) {
-            vertexTable.push_back({anchorId, null_vertex()});
-        }
-    }
-    deduplicate(vertexTable);
-    // After deduplicate the vertexTable is sorted.
 
-    // Now we generate one vertex for each of these AnchorIds.
-    for(auto& p: vertexTable) {
-        const AnchorId anchorId = p.first;
-        p.second = add_vertex(TangleGraphVertex(anchorId), *this);
-    }
 
-    // At this point the vertexTable is valid and we can use getVertex.
+    // Find the oriented reads that visit each vertex.
+    for(OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
+        const OrientedReadId orientedReadId = orientedReadInfo.orientedReadId;
+        const auto globalJourney = anchors.journeys[orientedReadId.getValue()];
 
-    // Fill in the entranceIndex and exitIndex of each vertex.
-    for(uint64_t entranceIndex=0; entranceIndex<entrances.size(); entranceIndex++) {
-        const Entrance& entrance = entrances[entranceIndex];
-        for(const AnchorId anchorId: entrance.uniqueJourneyAnchorIds) {
+        // Loop over the portion of the global journey we selected for this oriented read.
+        const uint64_t begin = orientedReadInfo.journeyBegin;
+        const uint64_t end = orientedReadInfo.journeyEnd;
+        for(uint64_t positionInJourney=begin; positionInJourney!=end; positionInJourney++) {
+            const AnchorId anchorId = globalJourney[positionInJourney];
             const vertex_descriptor v = getVertex(anchorId);
-            TangleGraphVertex& vertex = tangleGraph[v];
-            SHASTA_ASSERT(vertex.entranceIndex == invalid<uint64_t>);
-            vertex.entranceIndex = entranceIndex;
+            if(v != null_vertex()) {
+                tangleGraph[v].orientedReadIds.push_back(orientedReadId);
+            }
         }
     }
-    for(uint64_t exitIndex=0; exitIndex<exits.size(); exitIndex++) {
-        const Exit& exit = exits[exitIndex];
-        for(const AnchorId anchorId: exit.uniqueJourneyAnchorIds) {
+
+
+    // Remove low coverage vertices.
+    {
+        vector<vertex_descriptor> verticesToBeRemoved;
+        BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+            if(tangleGraph[v].coverage() < minVertexCoverage) {
+                verticesToBeRemoved.push_back(v);
+            }
+        }
+        for(const vertex_descriptor v: verticesToBeRemoved) {
+            boost::remove_vertex(v, tangleGraph);
+        }
+
+        // We also need to recreate the vertexTable.
+        vertexTable.clear();
+        BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+            vertexTable.push_back(make_pair(tangleGraph[v].anchorId, v));
+        }
+        sort(vertexTable.begin(), vertexTable.end());
+    }
+
+
+
+    // Now we can fill in the tangleJourney of each OrientedReadInfo.
+    for(OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
+        const OrientedReadId orientedReadId = orientedReadInfo.orientedReadId;
+        const auto globalJourney = anchors.journeys[orientedReadId.getValue()];
+
+        // Loop over the portion of the global journey we selected for this oriented read.
+        const uint64_t begin = orientedReadInfo.journeyBegin;
+        const uint64_t end = orientedReadInfo.journeyEnd;
+        for(uint64_t positionInJourney=begin; positionInJourney!=end; positionInJourney++) {
+            const AnchorId anchorId = globalJourney[positionInJourney];
             const vertex_descriptor v = getVertex(anchorId);
-            TangleGraphVertex& vertex = tangleGraph[v];
-            SHASTA_ASSERT(vertex.exitIndex == invalid<uint64_t>);
-            vertex.exitIndex = exitIndex;
+            if(v != null_vertex()) {
+                orientedReadInfo.tangleJourney.push_back(v);
+            }
+        }
+
+        if(debug) {
+            cout << "The tangle journey for " << orientedReadId <<
+                " has " << orientedReadInfo.tangleJourney.size() << " anchors." << endl;
         }
     }
-#endif
+
+
 
     // Histogram the vertices by their entranceIndex and exitIndex.
     std::map< pair<uint64_t, uint64_t>, uint64_t> histogram;
@@ -767,6 +789,7 @@ void TangleGraph::createVertices()
 
 
 
+
     // Use the histogram to fill in the tangleMatrix.
     tangleMatrix.resize(entrances.size(), vector<uint64_t>(exits.size(), 0));
     for(const auto& p: histogram) {
@@ -798,32 +821,6 @@ void TangleGraph::createVertices()
                     anchorIdToString(entrance.anchorId) << " " <<
                     anchorIdToString(exit.anchorId) << " " << tangleMatrix[entranceIndex][exitIndex] << endl;
             }
-        }
-    }
-
-
-
-    // Now we can fill in the tangleJourney of each OrientedReadInfo.
-    // This also increments coverage for the vertices as they are encountered.
-    for(OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
-        const OrientedReadId orientedReadId = orientedReadInfo.orientedReadId;
-        const auto globalJourney = anchors.journeys[orientedReadId.getValue()];
-
-        // Loop over the portion of the global journey we selected for this oriented read.
-        const uint64_t begin = orientedReadInfo.journeyBegin;
-        const uint64_t end = orientedReadInfo.journeyEnd;
-        for(uint64_t positionInJourney=begin; positionInJourney!=end; positionInJourney++) {
-            const AnchorId anchorId = globalJourney[positionInJourney];
-            const vertex_descriptor v = getVertex(anchorId);
-            if(v != null_vertex()) {
-                orientedReadInfo.tangleJourney.push_back(v);
-                tangleGraph[v].orientedReadIds.push_back(orientedReadId);
-            }
-        }
-
-        if(debug) {
-            cout << "The tangle journey for " << orientedReadId <<
-                " has " << orientedReadInfo.tangleJourney.size() << " anchors." << endl;
         }
     }
 }
