@@ -103,20 +103,20 @@ void Mode3Assembler::computeConnectedComponents()
     }
 
     // Gather the oriented reads in each connected component.
-    vector< vector<OrientedReadId> > componentsOrientedReads(orientedReadCount);
+    vector< vector<OrientedReadId> > orientedReads(orientedReadCount);
     for(uint64_t i=0; i<orientedReadCount; i++) {
         const uint64_t componentId = disjointSets.find(i);
-        componentsOrientedReads[componentId].push_back(OrientedReadId::fromValue(ReadId(i)));
+        orientedReads[componentId].push_back(OrientedReadId::fromValue(ReadId(i)));
     }
 
-    // Gather the anchors (marker graph edges) in each connected component.
-    vector< vector<uint64_t> > componentsAnchorIds(orientedReadCount);
+    // Gather the anchors in each connected component.
+    vector< vector<uint64_t> > anchorIds(orientedReadCount);
     for(AnchorId anchorId=0; anchorId<anchors().size(); anchorId++) {
         const auto markerIntervals = anchors()[anchorId];
         SHASTA_ASSERT(not markerIntervals.empty());
         const OrientedReadId orientedReadId0 = markerIntervals.front().orientedReadId;
         const uint64_t componentId = disjointSets.find(orientedReadId0.getValue());
-        componentsAnchorIds[componentId].push_back(anchorId);
+        anchorIds[componentId].push_back(anchorId);
     }
 
     disjointSetsData.clear();
@@ -131,7 +131,7 @@ void Mode3Assembler::computeConnectedComponents()
     // that has the first oriented read on strand 0.
     vector< pair<uint64_t, uint64_t> > componentTable;
     for(uint64_t componentId=0; componentId<orientedReadCount; componentId++) {
-        const vector<OrientedReadId>& component = componentsOrientedReads[componentId];
+        const vector<OrientedReadId>& component = orientedReads[componentId];
         if(component.size() < 2) {
             continue;
         }
@@ -152,11 +152,12 @@ void Mode3Assembler::computeConnectedComponents()
     connectedComponents.resize(componentTable.size());
     for(uint64_t i=0; i<connectedComponents.size(); i++) {
         const uint64_t componentId = componentTable[i].first;
-        connectedComponents[i].orientedReadIds.swap(componentsOrientedReads[componentId]);
-        connectedComponents[i].anchorIds.swap(componentsAnchorIds[componentId]);
+        connectedComponents[i].orientedReadIds.swap(orientedReads[componentId]);
+        connectedComponents[i].anchorIds.swap(anchorIds[componentId]);
     }
 
     // Fill in the orientedReadIdTable.
+    // This is currently not used.
     orientedReadIdTable.clear();
     orientedReadIdTable.resize(orientedReadCount, {invalid<uint64_t>, invalid<uint64_t>});
     for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
