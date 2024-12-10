@@ -1054,6 +1054,7 @@ const AssemblyGraphPostprocessor& Mode3Assembler::getAssemblyGraph(
             componentId,
             anchors(),
             componentOrientedReadIds[componentId],
+            componentAnchorIds[componentId],
             options);
         cout << timestamp << "Done loading assembly graph for stage " << assemblyStage <<
             " component " << componentId << endl;

@@ -29,6 +29,7 @@ public:
         uint64_t componentIdArgument,
         const Anchors& anchors,
         span<const OrientedReadId> orientedReadIds,
+        span<const AnchorId> anchorIds,
         const Mode3AssemblyOptions& options);
 
     // Access functions.

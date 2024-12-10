@@ -92,15 +92,12 @@ private:
     // of this bipartite graph and process them one at a time.
     // These are also connected components of the global anchor graph
     // (with one vertex for each anchor, and edges created by following the reads).
-    class ConnectedComponent {
-    public:
-        // The anchors in this connected component.
-        vector<mode3::AnchorId> anchorIds;
-    };
-    vector<ConnectedComponent> connectedComponents;
 
-    // The OrientedReadIds in each component.
+    // The OrientedReadIds in each component. Indexed by componentId.
     MemoryMapped::VectorOfVectors<OrientedReadId, uint64_t> componentOrientedReadIds;
+
+    // The anchorIds in each component. Indexed by componentId.
+    MemoryMapped::VectorOfVectors<mode3::AnchorId, uint64_t> componentAnchorIds;
 
     bool isSelfComplementaryComponent(uint64_t componentId) const;
     void checkComponentIsValid(uint64_t componentId) const;

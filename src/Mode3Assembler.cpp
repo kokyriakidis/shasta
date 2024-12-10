@@ -74,6 +74,7 @@ Mode3Assembler::Mode3Assembler(
 {
     SHASTA_ASSERT(anchorsPointer);
     componentOrientedReadIds.accessExistingReadOnly(largeDataName("Mode3Assembler-componentOrientedReadIds"));
+    componentAnchorIds.accessExistingReadOnly(largeDataName("Mode3Assembler-componentAnchorIds"));
 }
 
 
@@ -152,19 +153,19 @@ void Mode3Assembler::computeConnectedComponents()
         OrderPairsBySecondOnlyGreater<uint64_t, uint64_t>());
 
     // Store the connected components we kept.
-    connectedComponents.resize(componentTable.size());
     componentOrientedReadIds.createNew(largeDataName("Mode3Assembler-componentOrientedReadIds"), largeDataPageSize);
-    for(uint64_t i=0; i<connectedComponents.size(); i++) {
+    componentAnchorIds.createNew(largeDataName("Mode3Assembler-componentAnchorIds"), largeDataPageSize);
+    for(uint64_t i=0; i<componentTable.size(); i++) {
         const uint64_t componentId = componentTable[i].first;
         componentOrientedReadIds.appendVector(orientedReads[componentId]);
-        connectedComponents[i].anchorIds.swap(anchorIds[componentId]);
+        componentAnchorIds.appendVector(anchorIds[componentId]);
     }
 
     // Fill in the orientedReadIdTable.
     // This is currently not used.
     orientedReadIdTable.clear();
     orientedReadIdTable.resize(orientedReadCount, {invalid<uint64_t>, invalid<uint64_t>});
-    for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
+    for(uint64_t componentId=0; componentId<componentOrientedReadIds.size(); componentId++) {
         const span<OrientedReadId> orientedReadIds = componentOrientedReadIds[componentId];
         for(uint64_t position=0; position<orientedReadIds.size(); position++) {
             const OrientedReadId orientedReadId = orientedReadIds[position];
@@ -193,7 +194,7 @@ void Mode3Assembler::assembleConnectedComponents(
     orientedReadsCsv << "Component,OrientedReadId,ReadName\n";
 
     vector< shared_ptr<mode3::AssemblyGraph> > assemblyGraphs;
-    for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
+    for(uint64_t componentId=0; componentId<componentOrientedReadIds.size(); componentId++) {
         const shared_ptr<AssemblyGraph> assemblyGraph =
             assembleConnectedComponent(componentId, threadCount, true, orientedReadsCsv, debug);
         assemblyGraphs.push_back(assemblyGraph);
@@ -386,13 +387,12 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     bool debug)
 {
     performanceLog << timestamp << "Assembling connected component " <<
-        componentId << " of " << connectedComponents.size() << endl;
+        componentId << " of " << componentOrientedReadIds.size() << endl;
     cout << timestamp << "Assembling connected component " <<
-        componentId << " of " << connectedComponents.size() << endl;
+        componentId << " of " << componentOrientedReadIds.size() << endl;
 
-    const ConnectedComponent& connectedComponent = connectedComponents[componentId];
     const span<const OrientedReadId> orientedReadIds = componentOrientedReadIds[componentId];
-    const vector<uint64_t>& anchorIds = connectedComponent.anchorIds;
+    const span<const uint64_t> anchorIds = componentAnchorIds[componentId];
 
     const bool isSelfComplementary = isSelfComplementaryComponent(componentId);
     checkComponentIsValid(componentId);
@@ -481,7 +481,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 // Debug output of all connected components.
 void Mode3Assembler::writeConnectedComponents() const
 {
-    for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
+    for(uint64_t componentId=0; componentId<componentOrientedReadIds.size(); componentId++) {
         writeConnectedComponent(componentId);
     }
 }
@@ -491,9 +491,8 @@ void Mode3Assembler::writeConnectedComponents() const
 // Debug output of a connected components.
 void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
 {
-    const ConnectedComponent& component = connectedComponents[componentId];
     const span<const OrientedReadId> orientedReadIds = componentOrientedReadIds[componentId];
-    const vector<uint64_t>& anchorIds = component.anchorIds;
+    const span<const uint64_t> anchorIds = componentAnchorIds[componentId];
 
     // Write the oriented reads.
     {
@@ -510,7 +509,7 @@ void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
         ofstream csv("Anchors-" + to_string(componentId) + ".csv");
         csv << "AnchorId,OrientedReadId,Ordinal0,Ordinal1\n";
 
-        for(uint64_t localAnchorId=0; localAnchorId<component.anchorIds.size(); localAnchorId++) {
+        for(uint64_t localAnchorId=0; localAnchorId<anchorIds.size(); localAnchorId++) {
             const AnchorId anchorId = anchorIds[localAnchorId];
             const Anchor anchor = anchors()[anchorId];
             for(const AnchorMarkerInterval& markerInterval: anchor) {
