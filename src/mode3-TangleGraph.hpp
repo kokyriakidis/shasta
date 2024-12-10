@@ -127,6 +127,10 @@ private:
     void constructEntrances(const vector<AnchorId>& entranceAnchors);
     void constructExits(const vector<AnchorId>& entranceAnchors);
 
+    // Find out if a given AnchorId is an entrance or exit.
+    bool isEntrance(AnchorId) const;
+    bool isExit(AnchorId) const;
+
 
 
     // The oriented reads used in this TangleGraph..

@@ -1088,23 +1088,95 @@ void TangleGraph::getChains(vector< vector<AnchorId> >& anchorChains) const
     findLinearChains(tangleGraph, 1, edgeChains);
     const uint64_t chainCount = edgeChains.size();
 
+
+
     // Create the corresponding chains of AnchorIds.
     anchorChains.clear();
-    anchorChains.resize(chainCount);
+    vector<AnchorId> anchorChain;
+    vector<uint64_t> splitPoints;
     for(uint64_t i=0; i<chainCount; i++) {
         const vector<edge_descriptor>& edgeChain = edgeChains[i];
-        vector<AnchorId>& anchorChain = anchorChains[i];
-        anchorChain.reserve(edgeChain.size());
 
+        // Fill in the AnchorIds corresponding to this chain.
+        anchorChain.clear();
         // Add the source AnchorId for the first edge.
         const vertex_descriptor v = source(edgeChain.front(), tangleGraph);
         anchorChain.push_back(tangleGraph[v].anchorId);
-
         // Add the target AnchorId for all the edges.
         for(const edge_descriptor e: edgeChain) {
             const vertex_descriptor v = target(e, tangleGraph);
             anchorChain.push_back(tangleGraph[v].anchorId);
         }
+
+
+        // If any of the internal AnchorIds of this chain correspond to an
+        // Entrance or Exit, we have to split it.
+        splitPoints.clear();
+        for(uint64_t i=1; i<anchorChain.size()-1; i++) {
+            const AnchorId anchorId = anchorChain[i];
+            if(isEntrance(anchorId) or isExit(anchorId)) {
+                splitPoints.push_back(i);
+            }
+        }
+
+        if(splitPoints.empty()) {
+            anchorChains.push_back(anchorChain);
+        } else {
+
+            if(debug) {
+                cout << "Splitting chain " << anchorChain.front() << "..." << anchorChain.back() << endl;
+            }
+
+            // Add a split chain from the beginning to the first split point.
+            anchorChains.resize(anchorChains.size() + 1);
+            vector<AnchorId>& firstSplitChain = anchorChains.back();
+            for(uint64_t j=0; j<=splitPoints.front(); j++) {
+                firstSplitChain.push_back(anchorChain[j]);
+            }
+            // Add split chains in-between split points.
+            for(uint64_t i1=1; i1<splitPoints.size(); i1++) {
+                const uint64_t i0 = i1 - 1;
+                const uint64_t j0 = splitPoints[i0];
+                const uint64_t j1 = splitPoints[i1];
+                anchorChains.resize(anchorChains.size() + 1);
+                vector<AnchorId>& splitChain = anchorChains.back();
+                for(uint64_t j=j0; j<=j1; j++) {
+                    splitChain.push_back(anchorChain[j]);
+                }
+            }
+            // Add a split chain from the last split point to the end.
+            anchorChains.resize(anchorChains.size() + 1);
+            vector<AnchorId>& lastSplitChain = anchorChains.back();
+            for(uint64_t j=splitPoints.back(); j<anchorChain.size(); j++) {
+                lastSplitChain.push_back(anchorChain[j]);
+            }
+        }
     }
 
+}
+
+
+
+// Find out if a given AnchorId is an entrance.
+bool TangleGraph::isEntrance(AnchorId anchorId) const
+{
+    for(const Entrance& entrance: entrances) {
+        if(entrance.anchorId == anchorId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+
+// Find out if a given AnchorId is an exit.
+bool TangleGraph::isExit(AnchorId anchorId) const
+{
+    for(const Exit& exit: exits) {
+        if(exit.anchorId == anchorId) {
+            return true;
+        }
+    }
+    return false;
 }
