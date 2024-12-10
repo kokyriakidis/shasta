@@ -42,7 +42,7 @@ AssemblyGraph::AssemblyGraph(
     const Anchors& anchors,
     uint64_t componentId,
     uint64_t k,
-    const vector<OrientedReadId>& orientedReadIds,
+    span<const OrientedReadId> orientedReadIds,
     const vector<AnchorId>& anchorIds,
     uint64_t threadCount,
     const Mode3AssemblyOptions& options,
@@ -76,12 +76,14 @@ AssemblyGraph::AssemblyGraph(
 AssemblyGraph::AssemblyGraph(
     const string& assemblyStage,
     uint64_t componentIdArgument,
+    span<const OrientedReadId> orientedReadIds,
     const Anchors& anchors,
     const Mode3AssemblyOptions& options) :
     MultithreadedObject<AssemblyGraph>(*this),
     MappedMemoryOwner(anchors),
     anchors(anchors),
-    options(options)
+    options(options),
+    orientedReadIds(orientedReadIds)
 {
     load(assemblyStage, componentIdArgument);
     SHASTA_ASSERT(componentId == componentIdArgument);

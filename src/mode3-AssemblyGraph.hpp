@@ -294,7 +294,7 @@ public:
         const Anchors&,
         uint64_t componentId,
         uint64_t k,
-        const vector<OrientedReadId>&,
+        span<const OrientedReadId>,
         const vector<AnchorId>&,
         uint64_t threadCount,
         const Mode3AssemblyOptions& options,
@@ -306,6 +306,7 @@ public:
     AssemblyGraph(
         const string& assemblyStage,
         uint64_t componentId,
+        span<const OrientedReadId>,
         const Anchors&,
         const Mode3AssemblyOptions&);
 
@@ -320,7 +321,7 @@ public:
 
     // The OrientedReadIds of the connected component that generated this AssemblyGraph.
     // These are sorted.
-    vector<OrientedReadId> orientedReadIds;
+    span<const OrientedReadId> orientedReadIds;
 
     // Get the index of an OrientedReadId in the orientedReadIds sorted vector.
     uint64_t getOrientedReadIndex(OrientedReadId) const;
@@ -949,7 +950,6 @@ private:
         ar & sequenceWasAssembled;
         ar & nextEdgeId;
         ar & anchorIds;
-        ar & orientedReadIds;
     }
     void save(ostream&) const;
     void load(istream&);

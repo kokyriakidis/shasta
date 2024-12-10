@@ -13,8 +13,9 @@ AssemblyGraphPostprocessor::AssemblyGraphPostprocessor(
     const string& assemblyStage,
     uint64_t componentId,
     const Anchors& anchors,
+    span<const OrientedReadId> orientedReadIds,
     const Mode3AssemblyOptions& options) :
-    AssemblyGraph(assemblyStage, componentId, anchors, options)
+    AssemblyGraph(assemblyStage, componentId, orientedReadIds, anchors, options)
 {
     createEdgeIdMap();
 }

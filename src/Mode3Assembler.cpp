@@ -21,6 +21,7 @@ template class MultithreadedObject<Mode3Assembler>;
 
 
 
+// This constructor runs the assembly.
 Mode3Assembler::Mode3Assembler(
     const MappedMemoryOwner& mappedMemoryOwner,
     uint64_t k,
@@ -55,6 +56,7 @@ Mode3Assembler::Mode3Assembler(
 
 
 
+// This constructor just accesses binary data.
 Mode3Assembler::Mode3Assembler(
     const MappedMemoryOwner& mappedMemoryOwner,
     uint64_t k,
@@ -71,6 +73,7 @@ Mode3Assembler::Mode3Assembler(
     options(options)
 {
     SHASTA_ASSERT(anchorsPointer);
+    componentOrientedReadIds.accessExistingReadOnly(largeDataName("Mode3Assembler-componentOrientedReadIds"));
 }
 
 
@@ -150,9 +153,10 @@ void Mode3Assembler::computeConnectedComponents()
 
     // Store the connected components we kept.
     connectedComponents.resize(componentTable.size());
+    componentOrientedReadIds.createNew(largeDataName("Mode3Assembler-componentOrientedReadIds"), largeDataPageSize);
     for(uint64_t i=0; i<connectedComponents.size(); i++) {
         const uint64_t componentId = componentTable[i].first;
-        connectedComponents[i].orientedReadIds.swap(orientedReads[componentId]);
+        componentOrientedReadIds.appendVector(orientedReads[componentId]);
         connectedComponents[i].anchorIds.swap(anchorIds[componentId]);
     }
 
@@ -161,7 +165,7 @@ void Mode3Assembler::computeConnectedComponents()
     orientedReadIdTable.clear();
     orientedReadIdTable.resize(orientedReadCount, {invalid<uint64_t>, invalid<uint64_t>});
     for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
-        const vector<OrientedReadId>& orientedReadIds = connectedComponents[componentId].orientedReadIds;
+        const span<OrientedReadId> orientedReadIds = componentOrientedReadIds[componentId];
         for(uint64_t position=0; position<orientedReadIds.size(); position++) {
             const OrientedReadId orientedReadId = orientedReadIds[position];
             orientedReadIdTable[orientedReadId.getValue()] = {componentId, position};
@@ -230,7 +234,7 @@ void Mode3Assembler::assembleConnectedComponents(
 
         // Write a line to the summaryCsv.
         summaryCsv << componentId << ",";
-        summaryCsv << connectedComponents[componentId].orientedReadIds.size() << ",";
+        summaryCsv << componentOrientedReadIds[componentId].size() << ",";
         summaryCsv << allChainLengths.size() << ",";
         summaryCsv << totalLength << ",";
         summaryCsv << n50 << ",";
@@ -324,8 +328,10 @@ void Mode3Assembler::assembleConnectedComponents(
 
 
 
-bool Mode3Assembler::ConnectedComponent::isSelfComplementary() const
+bool Mode3Assembler::isSelfComplementaryComponent(uint64_t componentId) const
 {
+    const span<const OrientedReadId> orientedReadIds = componentOrientedReadIds[componentId];
+
     // A self-complementary component must have at least two oriented reads.
     if(orientedReadIds.size() < 2) {
         return false;
@@ -342,9 +348,11 @@ bool Mode3Assembler::ConnectedComponent::isSelfComplementary() const
 
 
 
-void Mode3Assembler::ConnectedComponent::checkIsValid() const
+void Mode3Assembler::checkComponentIsValid(uint64_t componentId) const
 {
-    if(isSelfComplementary()) {
+    const span<const OrientedReadId> orientedReadIds = componentOrientedReadIds[componentId];
+
+    if(isSelfComplementaryComponent(componentId)) {
 
         // For a self-complementary component, all oriented reads come in reverse complemented pairs.
         SHASTA_ASSERT((orientedReadIds.size() %2) == 0);
@@ -383,11 +391,11 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
         componentId << " of " << connectedComponents.size() << endl;
 
     const ConnectedComponent& connectedComponent = connectedComponents[componentId];
-    const vector<OrientedReadId>& orientedReadIds = connectedComponent.orientedReadIds;
+    const span<const OrientedReadId> orientedReadIds = componentOrientedReadIds[componentId];
     const vector<uint64_t>& anchorIds = connectedComponent.anchorIds;
 
-    const bool isSelfComplementary = connectedComponent.isSelfComplementary();
-    connectedComponent.checkIsValid();
+    const bool isSelfComplementary = isSelfComplementaryComponent(componentId);
+    checkComponentIsValid(componentId);
 
     cout << "This connected component has " << orientedReadIds.size() <<
         " oriented reads and " << anchorIds.size() << " anchors." << endl;
@@ -484,7 +492,7 @@ void Mode3Assembler::writeConnectedComponents() const
 void Mode3Assembler::writeConnectedComponent(uint64_t componentId) const
 {
     const ConnectedComponent& component = connectedComponents[componentId];
-    const vector<OrientedReadId>& orientedReadIds = component.orientedReadIds;
+    const span<const OrientedReadId> orientedReadIds = componentOrientedReadIds[componentId];
     const vector<uint64_t>& anchorIds = component.anchorIds;
 
     // Write the oriented reads.

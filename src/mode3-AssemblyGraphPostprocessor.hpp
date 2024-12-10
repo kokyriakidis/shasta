@@ -28,6 +28,7 @@ public:
         const string& assemblyStage,
         uint64_t componentIdArgument,
         const Anchors& anchors,
+        span<const OrientedReadId> orientedReadIds,
         const Mode3AssemblyOptions& options);
 
     // Access functions.
