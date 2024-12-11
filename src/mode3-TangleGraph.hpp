@@ -51,7 +51,8 @@ public:
         return orientedReadIds.size();
     }
 
-    bool wasSeenByBfs = false;
+    bool wasSeenByForwardBfs = false;
+    bool wasSeenByBackwardBfs = false;
 };
 
 
@@ -84,6 +85,11 @@ public:
         double maxLoss,
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold);
+
+    // Return true if successful, that is, all Entrances are
+    // connecte to at least one Exit, and all Exits are
+    // connected to at least one Entrance.
+    bool isSuccessful() const;
 
     void getChains(vector< vector<AnchorId> >&) const;
 

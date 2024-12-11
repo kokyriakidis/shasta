@@ -68,6 +68,13 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
         lowCoverageThreshold, highCoverageThreshold,
         superbubble, anchorChains);
 
+    if(not tangle.success) {
+        if(debug) {
+            cout << "Could not detangle superbubble " << superbubbleId << endl;
+        }
+        return;
+    }
+
     // Create a local AssemblyGraph from the detangled anchorChains.
     // This is a detangled representation of this superbubble.
     AssemblyGraph localAssemblyGraph(

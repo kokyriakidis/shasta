@@ -65,6 +65,8 @@ Tangle::Tangle(
 
     tangleGraph.getChains(anchorChains);
 
+    success = tangleGraph.isSuccessful();
+
     if(debug) {
         cout << "Found " << anchorChains.size() << " chains:" << endl;
         for(const vector<AnchorId>& anchorChain: anchorChains) {
@@ -73,6 +75,14 @@ Tangle::Tangle(
                 cout << " " << anchorIdToString(anchorId);
             }
             cout << endl;
+        }
+    }
+
+    if(debug) {
+        if(success) {
+            cout << "Detangling was successful." << endl;
+        } else {
+            cout << "Detangling failed." << endl;
         }
     }
 }

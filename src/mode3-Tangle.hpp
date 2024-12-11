@@ -26,6 +26,8 @@ public:
         const vector<AssemblyGraph::vertex_descriptor>& tangleVertices,
         vector< vector<AnchorId> >& anchorChains);
 
+    bool success;
+
 private:
     bool debug;
     AssemblyGraph& assemblyGraph;
