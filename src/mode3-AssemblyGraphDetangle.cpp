@@ -1,6 +1,7 @@
 // Shasta.
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-Tangle.hpp"
+#include "AssemblerOptions.hpp"
 using namespace shasta;
 using namespace mode3;
 
@@ -79,5 +80,44 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
         1,  // threadCount
         options,
         debug);
+
+    // Cleanup steps similar to what happens for the global assembly graph.
+    localAssemblyGraph.compress();
+    for(uint64_t iteration=0; ; iteration ++) {
+        const uint64_t oldEdgeCount = num_edges(localAssemblyGraph);
+        localAssemblyGraph.cleanupBubbles(
+            debug,
+            options.assemblyGraphOptions.bubbleCleanupMaxOffset,
+            options.assemblyGraphOptions.chainTerminalCommonThreshold,
+            1   // threadCount
+            );
+        localAssemblyGraph.compressBubbleChains();
+        localAssemblyGraph.compress();
+        localAssemblyGraph.cleanupSuperbubbles(false,
+            options.assemblyGraphOptions.superbubbleLengthThreshold1,
+            options.assemblyGraphOptions.chainTerminalCommonThreshold);
+        localAssemblyGraph.compress();
+        localAssemblyGraph.removeShortSuperbubbles(false,
+            options.assemblyGraphOptions.superbubbleLengthThreshold2,
+            options.assemblyGraphOptions.superbubbleLengthThreshold3);
+        localAssemblyGraph.compress();
+        localAssemblyGraph.compressBubbleChains();
+
+        if(num_edges(localAssemblyGraph) == oldEdgeCount) {
+            break;
+        }
+    }
+
+    // Also do a pass of vertex detangling.
+    localAssemblyGraph.expand();
+    localAssemblyGraph.detangleVertices(false,
+        options.assemblyGraphOptions.detangleToleranceLow,
+        options.assemblyGraphOptions.detangleToleranceHigh,
+        true, // useBayesianModel
+        options.assemblyGraphOptions.epsilon,
+        options.assemblyGraphOptions.minLogP);
+    localAssemblyGraph.compress();
+    localAssemblyGraph.compressBubbleChains();
+
     localAssemblyGraph.writeGfa("Tangle-" + to_string(componentId) + "-" + to_string(superbubbleId));
 }
