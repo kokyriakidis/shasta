@@ -12,6 +12,7 @@ using namespace mode3;
 // Standard library.
 #include <algorithm.hpp>
 #include <fstream.hpp>
+#include <queue>
 
 
 
@@ -63,6 +64,7 @@ TangleGraph::TangleGraph(
 
     removeWeakEdges(maxLoss);
     removeCrossEdges(lowCoverageThreshold, highCoverageThreshold);
+    removeUnreachable();
 
     if(debug) {
         cout << "The final tangle graph has " << num_vertices(*this) <<
@@ -1192,4 +1194,83 @@ bool TangleGraph::isExit(AnchorId anchorId) const
         }
     }
     return false;
+}
+
+
+
+void TangleGraph::removeUnreachable()
+{
+    TangleGraph& tangleGraph = *this;
+
+    // Do a forward BFS starting at the entrances.
+    BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+        tangleGraph[v].wasSeenByBfs = false;
+    }
+    std::queue<vertex_descriptor> q;
+    for(const Entrance& entrance: entrances) {
+        const vertex_descriptor v = getVertex(entrance.anchorId);
+        tangleGraph[v].wasSeenByBfs = true;
+        q.push(v);
+    }
+    while(not q.empty()) {
+        const vertex_descriptor v0 = q.front();
+        q.pop();
+        BGL_FORALL_OUTEDGES(v0, e, tangleGraph, TangleGraph) {
+            const vertex_descriptor v1 = target(e, tangleGraph);
+            TangleGraphVertex& vertex1 = tangleGraph[v1];
+            if(not vertex1.wasSeenByBfs) {
+                vertex1.wasSeenByBfs = true;
+                q.push(v1);
+            }
+        }
+    }
+
+    // Remove vertices that were not seen by the forward BFS.
+    vector<vertex_descriptor> verticesToBeRemoved;
+    BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+        if(not tangleGraph[v].wasSeenByBfs) {
+            verticesToBeRemoved.push_back(v);
+        }
+    }
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        boost::clear_vertex(v, tangleGraph);
+        boost::remove_vertex(v, tangleGraph);
+    }
+
+
+
+    // Do a backward BFS starting at the exits.
+    BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+        tangleGraph[v].wasSeenByBfs = false;
+    }
+    SHASTA_ASSERT(q.empty());
+    for(const Exit& exit: exits) {
+        const vertex_descriptor v = getVertex(exit.anchorId);
+        tangleGraph[v].wasSeenByBfs = true;
+        q.push(v);
+    }
+    while(not q.empty()) {
+        const vertex_descriptor v0 = q.front();
+        q.pop();
+        BGL_FORALL_INEDGES(v0, e, tangleGraph, TangleGraph) {
+            const vertex_descriptor v1 = source(e, tangleGraph);
+            TangleGraphVertex& vertex1 = tangleGraph[v1];
+            if(not vertex1.wasSeenByBfs) {
+                vertex1.wasSeenByBfs = true;
+                q.push(v1);
+            }
+        }
+    }
+
+    // Remove vertices that were not seen by the backward BFS.
+    verticesToBeRemoved.clear();
+    BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+        if(not tangleGraph[v].wasSeenByBfs) {
+            verticesToBeRemoved.push_back(v);
+        }
+    }
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        boost::clear_vertex(v, tangleGraph);
+        boost::remove_vertex(v, tangleGraph);
+    }
 }

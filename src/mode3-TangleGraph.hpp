@@ -50,6 +50,8 @@ public:
     {
         return orientedReadIds.size();
     }
+
+    bool wasSeenByBfs = false;
 };
 
 
@@ -191,5 +193,6 @@ private:
     void removeCrossEdges(
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold);
+    void removeUnreachable();
     void writeGraphviz(const string& name) const;
 };
