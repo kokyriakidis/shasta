@@ -93,6 +93,61 @@ AssemblyGraph::AssemblyGraph(
 
 
 
+// Constructor from a vector of vectors of AnchorIds representing Chains.
+// Used for detangling with read following.
+AssemblyGraph::AssemblyGraph(
+    const Anchors& anchors,
+    uint64_t componentId,
+    uint64_t k,
+    span<const OrientedReadId> orientedReadIds,
+    span<const AnchorId> anchorIds,
+    const vector< vector<AnchorId> >& anchorChains,
+    uint64_t /* threadCount */,
+    const Mode3AssemblyOptions& options,
+    bool /* debug */) :
+    MultithreadedObject<AssemblyGraph>(*this),
+    MappedMemoryOwner(anchors),
+    componentId(componentId),
+    anchors(anchors),
+    k(k),
+    options(options),
+    orientedReadIds(orientedReadIds),
+    anchorIds(anchorIds)
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // Each chain generates an edge.
+    // Vertices are added as needed.
+    std::map<AnchorId, vertex_descriptor> vertexMap;
+    for(const vector<AnchorId>& anchorChain: anchorChains) {
+        SHASTA_ASSERT(anchorChain.size() >= 2);
+        const AnchorId anchorId0 = anchorChain.front();
+        const AnchorId anchorId1 = anchorChain.back();
+        const vertex_descriptor cv0 = getVertex(anchorId0, vertexMap);
+        const vertex_descriptor cv1 = getVertex(anchorId1, vertexMap);
+
+        // Create an edge for this chain.
+        edge_descriptor ce;
+        tie(ce, ignore) = add_edge(cv0, cv1, assemblyGraph);
+        AssemblyGraphEdge& edge = assemblyGraph[ce];
+        edge.id = nextEdgeId++;
+
+        // The edge is a trivial BubbleChain consisting of a single haploid bubble.
+        edge.resize(1);                 // BubbleChain has length 1.
+        Bubble& bubble = edge.front();
+        bubble.resize(1);               // Bubble is haploid.
+
+        // Store the chain.
+        Chain& chain = bubble.front();
+        for(const AnchorId anchorId: anchorChain) {
+            chain.push_back(anchorId);
+        }
+    }
+
+}
+
+
+
 void AssemblyGraph::run(
     uint64_t threadCount,
     bool assembleSequence,
@@ -163,7 +218,7 @@ void AssemblyGraph::run(
     performanceLog << timestamp << "Detangling begins." << endl;
     while(compressSequentialEdges());
     compressBubbleChains();
-#if 1
+#if 0
     detangleEdges(false,
         options.assemblyGraphOptions.detangleToleranceLow,
         options.assemblyGraphOptions.detangleToleranceHigh,

@@ -302,7 +302,7 @@ public:
         bool debug);
 
     // Constructor from binary data, for postprocessing.
-    // Uxsed by AssemblyGraphPostprocessor in the http server.
+    // Used by AssemblyGraphPostprocessor in the http server.
     AssemblyGraph(
         const string& assemblyStage,
         uint64_t componentId,
@@ -310,6 +310,20 @@ public:
         span<const AnchorId>,
         const Anchors&,
         const Mode3AssemblyOptions&);
+
+    // Constructor from a vector of vectors of AnchorIds representing Chains.
+    // Used for detangling with read following.
+    AssemblyGraph(
+        const Anchors&,
+        uint64_t componentId,
+        uint64_t k,
+        span<const OrientedReadId>,
+        span<const AnchorId>,
+        const vector< vector<AnchorId> >& anchorChains,
+        uint64_t threadCount,
+        const Mode3AssemblyOptions& options,
+        bool debug);
+
 
     // Hide Base defined by the base class.
     using Base = shasta::Base;

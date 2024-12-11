@@ -66,4 +66,18 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     Tangle tangle(debug, superbubbleId, *this, maxOffset, maxLoss,
         lowCoverageThreshold, highCoverageThreshold,
         superbubble, anchorChains);
+
+    // Create a local AssemblyGraph from the detangled anchorChains.
+    // This is a detangled representation of this superbubble.
+    AssemblyGraph localAssemblyGraph(
+        anchors,
+        componentId,
+        k,
+        orientedReadIds,
+        anchorIds,
+        anchorChains,
+        1,  // threadCount
+        options,
+        debug);
+    localAssemblyGraph.writeGfa("Tangle-" + to_string(componentId) + "-" + to_string(superbubbleId));
 }
