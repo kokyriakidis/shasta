@@ -62,13 +62,12 @@ TangleGraph::TangleGraph(
     }
 
     removeWeakEdges(maxLoss);
-    writeGraphviz("A");
     removeCrossEdges(lowCoverageThreshold, highCoverageThreshold);
 
     if(debug) {
         cout << "The final tangle graph has " << num_vertices(*this) <<
             " vertices and " << num_edges(*this) << " edges." << endl;
-        writeGraphviz("B");
+        writeGraphviz("Final");
     }
 
 }
@@ -910,9 +909,23 @@ void TangleGraph::writeGraphviz(const string& name) const
         } else {
             dot << vertex.exitIndex;
         }
-
         // End of label.
         dot << "\"";
+
+
+
+        // Color.
+        const bool vertexIsEntrance = isEntrance(anchorId);
+        const bool vertexIsExit = isExit(anchorId);
+        if(vertexIsEntrance and not vertexIsExit) {
+            dot << " style=filled color=green fillcolor=green";
+        }
+        if(vertexIsExit and not vertexIsEntrance) {
+            dot << " style=filled color=red fillcolor=red";
+        }
+        if(vertexIsEntrance and vertexIsExit) {
+            dot << " style=filled color=magenta fillcolor=magenta";
+        }
 
 
 
