@@ -264,9 +264,8 @@ void AssemblyGraph::run(
         options.primaryGraphOptions.maxLoss,
         options.primaryGraphOptions.crossEdgesLowCoverageThreshold,
         options.primaryGraphOptions.crossEdgesHighCoverageThreshold);
-    throw runtime_error("Forced early termination for debugging.");
+    write("Q");
 #endif
-
 
     performanceLog << timestamp << "Detangling ends." << endl;
 

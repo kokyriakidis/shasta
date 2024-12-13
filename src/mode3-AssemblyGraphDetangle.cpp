@@ -61,8 +61,10 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     uint64_t lowCoverageThreshold,
     uint64_t highCoverageThreshold)
 {
+    AssemblyGraph& assemblyGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
 
+    // Use Tangle and TangleGraph to compute detangled chains.
     vector< vector<AnchorId> > anchorChains;
     Tangle tangle(debug, superbubbleId, *this, maxOffset, maxLoss,
         lowCoverageThreshold, highCoverageThreshold,
@@ -127,4 +129,60 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     localAssemblyGraph.compressBubbleChains();
 
     localAssemblyGraph.writeGfa("Tangle-" + to_string(componentId) + "-" + to_string(superbubbleId));
+
+
+
+    // Now we have to add these detangled chains to the global assembly graph,
+    // in place of the superbubble. The detangled chains can be connected
+    // to the entrance/exit chains after clipping their first/last AnchorId,
+    // or to new vertices that we create as needed and store in this vertex map.
+    std::map<AnchorId, vertex_descriptor> vertexMap;
+
+    // Clip the entrances and get the corresponding vertices.
+    for(const auto& entrance: tangle.entrances) {
+        const vertex_descriptor v = cloneAndTruncateAtEnd(debug, entrance.e);
+        vertexMap.insert(make_pair(entrance.anchorId, v));
+    }
+
+    // Clip the exits and get the corresponding vertices.
+    for(const auto& exit: tangle.exits) {
+        const vertex_descriptor v = cloneAndTruncateAtBeginning(debug, exit.e);
+        vertexMap.insert(make_pair(exit.anchorId, v));
+    }
+
+    // Add one edge for each detangled chain.
+    for(const vector<AnchorId>& anchorChain: anchorChains) {
+        const AnchorId anchorId0 = anchorChain.front();
+        const AnchorId anchorId1 = anchorChain.back();
+        const vertex_descriptor v0 = getVertex(anchorId0, vertexMap);
+        const vertex_descriptor v1 = getVertex(anchorId1, vertexMap);
+
+        // Add the edge.
+        edge_descriptor e;
+        bool edgeWasAdded = false;
+        tie(e, edgeWasAdded) = add_edge(v0, v1, assemblyGraph);
+        SHASTA_ASSERT(edgeWasAdded);
+        AssemblyGraphEdge& edge = assemblyGraph[e];
+        edge.id = nextEdgeId++;
+
+        // Make it a trivial BubbleChain consisting of a single Chain.
+        BubbleChain& bubbleChain = edge;
+        bubbleChain.resize(1);
+        Bubble& bubble = bubbleChain.front();
+        bubble.resize(1);
+        Chain& chain = bubble.front();
+
+        // Build the chain.
+        for(const AnchorId anchorId: anchorChain) {
+            chain.push_back(anchorId);
+        }
+    }
+
+    // Now we can remove all the vertices and in the superbubble
+    // and all of their edges.
+    for(const vertex_descriptor v: superbubble) {
+        clear_vertex(v, assemblyGraph);
+        remove_vertex(v, assemblyGraph);
+    }
+
 }

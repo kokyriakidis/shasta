@@ -49,6 +49,18 @@ Tangle::Tangle(
         writeExits();
     }
 
+    // If an AnchorId is both an entrance and an exit, don't do anything
+    // and leave success at false.
+    for(const Entrance& entrance: entrances) {
+        if(isExit(entrance.anchorId)) {
+            if(debug) {
+                cout << "Not detangling because anchorId " << anchorIdToString(entrance.anchorId) <<
+                    " is both an entrance and an exit." << endl;
+            }
+            return;
+        }
+    }
+
     // Create the TangleGraph.
     vector<AnchorId> entranceAnchorIds;
     for(const Entrance& entrance: entrances) {
@@ -399,6 +411,28 @@ bool Tangle::isExit(AssemblyGraph::edge_descriptor e) const
 }
 #endif
 
+
+bool Tangle::isEntrance(AnchorId anchorId) const
+{
+    for(const Entrance& entrance: entrances) {
+        if(entrance.anchorId == anchorId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+
+bool Tangle::isExit(AnchorId anchorId) const
+{
+    for(const Exit& exit: exits) {
+        if(exit.anchorId == anchorId) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void Tangle::writeEntrances() const
 {

@@ -26,9 +26,8 @@ public:
         const vector<AssemblyGraph::vertex_descriptor>& tangleVertices,
         vector< vector<AnchorId> >& anchorChains);
 
-    bool success;
+    bool success = false;
 
-private:
     bool debug;
     AssemblyGraph& assemblyGraph;
 
@@ -96,10 +95,14 @@ private:
     vector<Entrance> entrances;
     vector<Exit> exits;
 
+    private:
+
     void findEntrances();
     void findExits();
     bool isEntrance(AssemblyGraph::edge_descriptor) const;
     bool isExit(AssemblyGraph::edge_descriptor) const;
+    bool isEntrance(AnchorId) const;
+    bool isExit(AnchorId) const;
     void writeEntrances() const;
     void writeExits() const;
 
