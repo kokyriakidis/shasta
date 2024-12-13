@@ -45,7 +45,7 @@ void AssemblyGraph::detangleSuperbubblesWithReadFollowing(
     }
 
     if(debug) {
-        cout << "Superbubble detangling with read following begins." << endl;
+        cout << "Superbubble detangling with read following ends." << endl;
     }
 
 }
@@ -116,6 +116,7 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
             break;
         }
     }
+   localAssemblyGraph.writeGfaExpanded("AAA", false, false);
 
     // Also do a pass of vertex detangling.
     localAssemblyGraph.expand();
@@ -129,6 +130,8 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     localAssemblyGraph.compressBubbleChains();
 
     localAssemblyGraph.writeGfa("Tangle-" + to_string(componentId) + "-" + to_string(superbubbleId));
+    localAssemblyGraph.writeGfaExpanded("Tangle-" + to_string(componentId) + "-" + to_string(superbubbleId),
+        false, false);
 
 
 
@@ -150,31 +153,47 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
         vertexMap.insert(make_pair(exit.anchorId, v));
     }
 
-    // Add one edge for each detangled chain.
-    for(const vector<AnchorId>& anchorChain: anchorChains) {
-        const AnchorId anchorId0 = anchorChain.front();
-        const AnchorId anchorId1 = anchorChain.back();
-        const vertex_descriptor v0 = getVertex(anchorId0, vertexMap);
-        const vertex_descriptor v1 = getVertex(anchorId1, vertexMap);
 
-        // Add the edge.
-        edge_descriptor e;
-        bool edgeWasAdded = false;
-        tie(e, edgeWasAdded) = add_edge(v0, v1, assemblyGraph);
-        SHASTA_ASSERT(edgeWasAdded);
-        AssemblyGraphEdge& edge = assemblyGraph[e];
-        edge.id = nextEdgeId++;
 
-        // Make it a trivial BubbleChain consisting of a single Chain.
-        BubbleChain& bubbleChain = edge;
-        bubbleChain.resize(1);
-        Bubble& bubble = bubbleChain.front();
-        bubble.resize(1);
-        Chain& chain = bubble.front();
+    // Add a Chain for each Chain in the local AssemblyGraph.
+    BGL_FORALL_EDGES(eLocal, localAssemblyGraph, AssemblyGraph) {
+        const BubbleChain& localBubbleChain = localAssemblyGraph[eLocal];
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<localBubbleChain.size(); positionInBubbleChain++) {
+            const Bubble& localBubble = localBubbleChain[positionInBubbleChain];
+            for(uint64_t indexInBubble=0; indexInBubble<localBubble.size(); indexInBubble++) {
+                const Chain& localChain = localBubble[indexInBubble];
 
-        // Build the chain.
-        for(const AnchorId anchorId: anchorChain) {
-            chain.push_back(anchorId);
+                const AnchorId anchorId0 = localChain.front();
+                const AnchorId anchorId1 = localChain.back();
+                const vertex_descriptor v0 = getVertex(anchorId0, vertexMap);
+                const vertex_descriptor v1 = getVertex(anchorId1, vertexMap);
+
+                // Add the edge.
+                edge_descriptor eGlobal;
+                bool edgeWasAdded = false;
+                tie(eGlobal, edgeWasAdded) = add_edge(v0, v1, assemblyGraph);
+                SHASTA_ASSERT(edgeWasAdded);
+                AssemblyGraphEdge& globalEdge = assemblyGraph[eGlobal];
+                globalEdge.id = nextEdgeId++;
+
+                // Make it a trivial BubbleChain consisting of a single Chain.
+                BubbleChain& globalBubbleChain = globalEdge;
+                globalBubbleChain.resize(1);
+                Bubble& globalBubble = globalBubbleChain.front();
+                globalBubble.resize(1);
+                Chain& globalChain = globalBubble.front();
+
+                // Build the chain.
+                for(const AnchorId anchorId: localChain) {
+                    globalChain.push_back(anchorId);
+                }
+
+                if(debug) {
+                    cout << "Added detangled chain " << bubbleChainStringId(eGlobal) <<
+                        " with " << globalChain.size() <<
+                        " anchors to the global assembly graph." << endl;
+                }
+            }
         }
     }
 

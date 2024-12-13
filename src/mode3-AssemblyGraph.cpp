@@ -257,6 +257,7 @@ void AssemblyGraph::run(
         options.assemblyGraphOptions.minLogP,
         6);
 #else
+    renumberEdges();    // To simplify debugging.
     write("P");
     detangleSuperbubblesWithReadFollowing(
         true,
