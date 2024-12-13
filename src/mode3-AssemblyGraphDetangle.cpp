@@ -40,6 +40,7 @@ void AssemblyGraph::detangleSuperbubblesWithReadFollowing(
 
     // Loop over the superbubbles.
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
+    // for(uint64_t superbubbleId=1; superbubbleId<=1; superbubbleId++) {              // ONLY DO SUPERBUBBLE 1
         detangleSuperbubbleWithReadFollowing(debug, superbubbles, superbubbleId, maxOffset, maxLoss,
             lowCoverageThreshold, highCoverageThreshold);
     }
@@ -65,10 +66,12 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
 
     // Use Tangle and TangleGraph to compute detangled chains.
+    Tangle tangle(debug, superbubbleId, *this, maxOffset, superbubble);
+
     vector< vector<AnchorId> > anchorChains;
-    Tangle tangle(debug, superbubbleId, *this, maxOffset, maxLoss,
+    tangle.detangle(debug, superbubbleId, *this, maxLoss,
         lowCoverageThreshold, highCoverageThreshold,
-        superbubble, anchorChains);
+        anchorChains);
 
     if(not tangle.success) {
         if(debug) {
@@ -116,7 +119,6 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
             break;
         }
     }
-   localAssemblyGraph.writeGfaExpanded("AAA", false, false);
 
     // Also do a pass of vertex detangling.
     localAssemblyGraph.expand();

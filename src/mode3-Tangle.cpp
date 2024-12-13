@@ -14,11 +14,7 @@ Tangle::Tangle(
     uint64_t tangleId,
     AssemblyGraph& assemblyGraph,
     uint64_t maxOffset,
-    double maxLoss,
-    uint64_t lowCoverageThreshold,
-    uint64_t highCoverageThreshold,
-    const vector<AssemblyGraph::vertex_descriptor>& tangleVerticesArgument,
-    vector< vector<AnchorId> >& anchorChains) :
+    const vector<AssemblyGraph::vertex_descriptor>& tangleVerticesArgument) :
     debug(debug),
     assemblyGraph(assemblyGraph),
     tangleVertices(tangleVerticesArgument)
@@ -60,6 +56,21 @@ Tangle::Tangle(
             return;
         }
     }
+
+
+}
+
+
+
+void Tangle::detangle(
+    bool debug,
+    uint64_t tangleId,
+    AssemblyGraph& assemblyGraph,
+    double maxLoss,
+    uint64_t lowCoverageThreshold,
+    uint64_t highCoverageThreshold,
+    vector< vector<AnchorId> >& anchorChains)
+{
 
     // Create the TangleGraph.
     vector<AnchorId> entranceAnchorIds;

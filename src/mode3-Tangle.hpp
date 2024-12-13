@@ -15,15 +15,21 @@ namespace shasta {
 
 class shasta::mode3::Tangle {
 public:
+
     Tangle(
         bool debug,
         uint64_t tangleId,
         AssemblyGraph&,
         uint64_t maxOffset,
+        const vector<AssemblyGraph::vertex_descriptor>& tangleVertices);
+
+    void detangle(
+        bool debug,
+        uint64_t tangleId,
+        AssemblyGraph&,
         double maxLoss,
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold,
-        const vector<AssemblyGraph::vertex_descriptor>& tangleVertices,
         vector< vector<AnchorId> >& anchorChains);
 
     bool success = false;
