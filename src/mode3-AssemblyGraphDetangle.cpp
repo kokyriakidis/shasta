@@ -40,7 +40,6 @@ void AssemblyGraph::detangleSuperbubblesWithReadFollowing(
 
     // Loop over the superbubbles.
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-    // for(uint64_t superbubbleId=1; superbubbleId<=1; superbubbleId++) {              // ONLY DO SUPERBUBBLE 1
         detangleSuperbubbleWithReadFollowing(debug, superbubbles, superbubbleId, maxOffset, maxLoss,
             lowCoverageThreshold, highCoverageThreshold);
     }
