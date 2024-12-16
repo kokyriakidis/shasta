@@ -61,9 +61,11 @@ TangleGraph::TangleGraph(
         cout << "The initial tangle graph has " << num_vertices(*this) <<
             " vertices and " << num_edges(*this) << " edges." << endl;
     }
+    // writeGraphviz("Initial");
 
     removeWeakEdges(maxLoss);
     removeCrossEdges(lowCoverageThreshold, highCoverageThreshold);
+    // writeGraphviz("Cleanedup");
     removeUnreachable();
 
     if(debug) {
@@ -409,6 +411,18 @@ void TangleGraph::gatherOrientedReads()
     }
 
 
+    // Remove any OrientedReadInfos for which journeyBegin is not less than journeyEnd.
+    {
+        vector<OrientedReadInfo> newOrientedReadInfos;
+        for(OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
+            if(orientedReadInfo.journeyBegin < orientedReadInfo.journeyEnd) {
+                newOrientedReadInfos.push_back(orientedReadInfo);
+            }
+        }
+        orientedReadInfos.swap(newOrientedReadInfos);
+    }
+
+
 
     if(debug) {
         ofstream csv("TangleOrientedReads-" + to_string(tangleId) + ".csv");
@@ -560,6 +574,7 @@ void TangleGraph::createVertices(uint64_t minVertexCoverage)
 {
     TangleGraph& tangleGraph = *this;
 
+
     // Gather the AnchorIds in the journeys of oriented reads that appear in each entrance.
     vector< vector<AnchorId> > entranceAnchorIds(entrances.size());
     for(const OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
@@ -624,6 +639,7 @@ void TangleGraph::createVertices(uint64_t minVertexCoverage)
     deduplicateAndCountWithThreshold(duplicateExitAnchorIds, count, 2UL);
 
 
+
     // The forbiddenAnchorIds are the union set of
     // duplicateEntranceAnchorIds and duplicateExitAnchorIds.
     vector<AnchorId> forbiddenAnchorIds;
@@ -649,11 +665,14 @@ void TangleGraph::createVertices(uint64_t minVertexCoverage)
         back_inserter(allowedAnchorIds));
 
 
+
     // Now we generate one vertex for each of these AnchorIds.
     for(const AnchorId anchorId: allowedAnchorIds) {
         const vertex_descriptor v = add_vertex(TangleGraphVertex(anchorId), tangleGraph);
         vertexTable.push_back(make_pair(anchorId, v));
+        // cout << "Added to vertexTable " << anchorIdToString(anchorId) << " " << v << endl;
     }
+
 
 
     // At this point the vertexTable is valid and we can use getVertex.
@@ -692,22 +711,30 @@ void TangleGraph::createVertices(uint64_t minVertexCoverage)
         // Loop over the portion of the global journey we selected for this oriented read.
         const uint64_t begin = orientedReadInfo.journeyBegin;
         const uint64_t end = orientedReadInfo.journeyEnd;
+        SHASTA_ASSERT(begin < end);
         for(uint64_t positionInJourney=begin; positionInJourney!=end; positionInJourney++) {
             const AnchorId anchorId = globalJourney[positionInJourney];
             const vertex_descriptor v = getVertex(anchorId);
             if(v != null_vertex()) {
+                SHASTA_ASSERT(tangleGraph[v].anchorId == anchorId);
                 tangleGraph[v].orientedReadIds.push_back(orientedReadId);
             }
         }
     }
 
 
+
     // Remove low coverage vertices.
+    // Don't allow removing entrances and exits.
     {
         vector<vertex_descriptor> verticesToBeRemoved;
         BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
-            if(tangleGraph[v].coverage() < minVertexCoverage) {
-                verticesToBeRemoved.push_back(v);
+            const TangleGraphVertex& vertex = tangleGraph[v];
+            if(vertex.coverage() < minVertexCoverage) {
+                const AnchorId anchorId = vertex.anchorId;
+                if(not (isEntrance(anchorId) or isExit(anchorId))) {
+                    verticesToBeRemoved.push_back(v);
+                }
             }
         }
         for(const vertex_descriptor v: verticesToBeRemoved) {
@@ -721,6 +748,7 @@ void TangleGraph::createVertices(uint64_t minVertexCoverage)
         }
         sort(vertexTable.begin(), vertexTable.end());
     }
+
 
 
 
@@ -740,11 +768,12 @@ void TangleGraph::createVertices(uint64_t minVertexCoverage)
             }
         }
 
-        if(debug) {
+        if(false) {
             cout << "The tangle journey for " << orientedReadId <<
                 " has " << orientedReadInfo.tangleJourney.size() << " anchors." << endl;
         }
     }
+
 
 
 
