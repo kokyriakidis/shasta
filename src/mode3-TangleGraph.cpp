@@ -55,7 +55,10 @@ TangleGraph::TangleGraph(
     constructExits(exitAnchors);
     gatherOrientedReads();
 
-    createVertices(minVertexCoverage);
+    if(not createVertices(minVertexCoverage)) {
+        failure = true;
+        return;
+    }
     createEdges();
     if(debug) {
         cout << "The initial tangle graph has " << num_vertices(*this) <<
@@ -570,7 +573,7 @@ void TangleGraph::computeTangleMatrix()
 // - Appears in at least one Entrance and/or one Exit.
 // - Does not appear in more than one Entrance.
 // - Does not appear in more than one Exit.
-void TangleGraph::createVertices(uint64_t minVertexCoverage)
+bool TangleGraph::createVertices(uint64_t minVertexCoverage)
 {
     TangleGraph& tangleGraph = *this;
 
@@ -665,6 +668,20 @@ void TangleGraph::createVertices(uint64_t minVertexCoverage)
         back_inserter(allowedAnchorIds));
 
 
+    // If an entrance or exit is not in this allowed set, give up.
+    for(const Entrance& entrance: entrances) {
+        if(not binary_search(allowedAnchorIds.begin(), allowedAnchorIds.end(), entrance.anchorId)) {
+            return false;
+        }
+    }
+    for(const Exit& exit: exits) {
+        if(not binary_search(allowedAnchorIds.begin(), allowedAnchorIds.end(), exit.anchorId)) {
+            return false;
+        }
+    }
+
+
+
 
     // Now we generate one vertex for each of these AnchorIds.
     for(const AnchorId anchorId: allowedAnchorIds) {
@@ -673,9 +690,19 @@ void TangleGraph::createVertices(uint64_t minVertexCoverage)
         // cout << "Added to vertexTable " << anchorIdToString(anchorId) << " " << v << endl;
     }
 
-
-
     // At this point the vertexTable is valid and we can use getVertex.
+
+    // Sanity checks.
+    for(const Entrance& entrance: entrances) {
+        SHASTA_ASSERT(getVertex(entrance.anchorId) != null_vertex());
+    }
+    for(const Exit& exit: exits) {
+        SHASTA_ASSERT(getVertex(exit.anchorId) != null_vertex());
+    }
+    BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+        SHASTA_ASSERT(getVertex(tangleGraph[v].anchorId) == v);
+    }
+
 
     // Fill in the entranceIndex and exitIndex of each vertex.
     for(uint64_t entranceIndex=0; entranceIndex<entrances.size(); entranceIndex++) {
@@ -854,6 +881,8 @@ void TangleGraph::createVertices(uint64_t minVertexCoverage)
             }
         }
     }
+
+    return true;
 }
 
 
@@ -1241,6 +1270,7 @@ void TangleGraph::removeUnreachable()
     std::queue<vertex_descriptor> q;
     for(const Entrance& entrance: entrances) {
         const vertex_descriptor v = getVertex(entrance.anchorId);
+        SHASTA_ASSERT(v != null_vertex());
         tangleGraph[v].wasSeenByForwardBfs = true;
         q.push(v);
     }
@@ -1263,6 +1293,7 @@ void TangleGraph::removeUnreachable()
     SHASTA_ASSERT(q.empty());
     for(const Exit& exit: exits) {
         const vertex_descriptor v = getVertex(exit.anchorId);
+        SHASTA_ASSERT(v != null_vertex());
         tangleGraph[v].wasSeenByBackwardBfs = true;
         q.push(v);
     }
@@ -1345,6 +1376,9 @@ void TangleGraph::removeUnreachable()
 bool TangleGraph::isSuccessful() const
 {
     const TangleGraph& tangleGraph = *this;
+    if(failure) {
+        return false;
+    }
 
     for(const Entrance& entrance: entrances) {
         const AnchorId anchorId = entrance.anchorId;

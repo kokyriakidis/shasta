@@ -87,8 +87,9 @@ public:
         uint64_t highCoverageThreshold);
 
     // Return true if successful, that is, all Entrances are
-    // connecte to at least one Exit, and all Exits are
-    // connected to at least one Entrance.
+    // connected to at least one Exit, and all Exits are
+    // connected to at least one Entrance, and the failure flag is not set.
+    bool failure = false;
     bool isSuccessful() const;
 
     void getChains(vector< vector<AnchorId> >&) const;
@@ -178,7 +179,7 @@ private:
 
     // Create TangleGraph vertices.
     // There is a vertex for each AnchorId that is unique to one Entrance and/or one Exit.
-    void createVertices(uint64_t minVertexCoverage);
+    bool createVertices(uint64_t minVertexCoverage);
 
     // Create edges.
     // This uses the OrientedReadInfo::tangleJourney.
