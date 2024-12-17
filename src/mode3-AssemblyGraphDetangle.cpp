@@ -130,6 +130,7 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
             );
         localAssemblyGraph.compressBubbleChains();
         localAssemblyGraph.compress();
+#if 0
         localAssemblyGraph.cleanupSuperbubbles(false,
             options.assemblyGraphOptions.superbubbleLengthThreshold1,
             options.assemblyGraphOptions.chainTerminalCommonThreshold);
@@ -139,6 +140,7 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
             options.assemblyGraphOptions.superbubbleLengthThreshold3);
         localAssemblyGraph.compress();
         localAssemblyGraph.compressBubbleChains();
+#endif
 
         if(num_edges(localAssemblyGraph) == oldEdgeCount) {
             break;
