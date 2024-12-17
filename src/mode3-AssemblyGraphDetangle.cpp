@@ -42,6 +42,8 @@ void AssemblyGraph::detangleSuperbubblesWithReadFollowing(
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
         detangleSuperbubbleWithReadFollowing(debug, superbubbles, superbubbleId, maxOffset, maxLoss,
             lowCoverageThreshold, highCoverageThreshold);
+        writeGraphviz("Z-" + to_string(superbubbleId), false);
+        writeGfa("Z-" + to_string(superbubbleId));
     }
 
     if(debug) {
@@ -97,7 +99,7 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     for(uint64_t iteration=0; ; iteration ++) {
         const uint64_t oldEdgeCount = num_edges(localAssemblyGraph);
         localAssemblyGraph.cleanupBubbles(
-            debug,
+            false,
             options.assemblyGraphOptions.bubbleCleanupMaxOffset,
             options.assemblyGraphOptions.chainTerminalCommonThreshold,
             1   // threadCount

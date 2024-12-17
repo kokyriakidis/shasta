@@ -35,11 +35,6 @@ public:
     AnchorId anchorId;
     TangleGraphVertex(AnchorId anchorId) : anchorId(anchorId) {}
 
-    // Each vertex can appear in zero or one Entrances
-    // and zero or one Exits.
-    uint64_t entranceIndex = invalid<uint64_t>;
-    uint64_t exitIndex = invalid<uint64_t>;
-
     // The OrientedReadIds that visit this vertex.
     // This only includes OrientedReadIds used in the TangleGraph
     // and therefore is generally a subset of the OrientedReadIds
@@ -175,20 +170,8 @@ private:
     void gatherOrientedReads();
     OrientedReadInfo* getOrientedReadInfo(OrientedReadId);
 
-
-
-    // Create TangleGraph vertices.
-    // There is a vertex for each AnchorId that is unique to one Entrance and/or one Exit.
-    bool createVertices(uint64_t minVertexCoverage);
-
-    // Create edges.
-    // This uses the OrientedReadInfo::tangleJourney.
+    void createVertices(uint64_t minVertexCoverage);
     void createEdges();
-
-    // The tangle matrix is the number of common unique anchors between each
-    // entrance/exit pair.
-    // Indexed by [entranceIndex][exitIndex]
-    vector< vector<uint64_t> > tangleMatrix;
 
     // The vertexTable contains pairs of AnchorIds with the corresponding
     // file descriptors. Sorted by AnchorId so findVertex can use std::lowerBound.
@@ -200,6 +183,11 @@ private:
     void removeCrossEdges(
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold);
-    void removeUnreachable();
+
+    // This removes vertices that are not reachable by at least one entrance
+    // and at least one exit. If any entrance or exit would be removed in this way,
+    // this returns false ant sets failure to true.
+    bool removeUnreachable();
+
     void writeGraphviz(const string& name) const;
 };
