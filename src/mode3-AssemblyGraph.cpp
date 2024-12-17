@@ -1835,6 +1835,9 @@ AssemblyGraph::Superbubbles::Superbubbles(
     cGraph(cGraph)
 {
     const bool debug = false;
+    if(debug) {
+        cout << "Begin Superbubbles constructor using dominator trees." << endl;
+    }
 
     // Map vertices to integers.
     std::map<vertex_descriptor, uint64_t> indexMap;
@@ -1879,14 +1882,16 @@ AssemblyGraph::Superbubbles::Superbubbles(
             boost::make_assoc_property_map(predecessorMap));
 
         if(debug) {
-            cout << "Forward dominator tree with entrance at " << cGraph[entrance].getAnchorId() << endl;
+            cout << "Forward dominator tree with entrance at " <<
+                anchorIdToString(cGraph[entrance].getAnchorId()) << endl;
         }
         for(const auto& p: predecessorMap) {
             const vertex_descriptor cv0 = p.second;
             const vertex_descriptor cv1 = p.first;
             forwardPairs.push_back({cv0, cv1});
             if(debug) {
-                cout << "F " << cGraph[cv0].getAnchorId() << "->" << cGraph[cv1].getAnchorId() << endl;
+                cout << "F " << anchorIdToString(cGraph[cv0].getAnchorId()) << "->" <<
+                    anchorIdToString(cGraph[cv1].getAnchorId()) << endl;
             }
         }
     }
@@ -1919,14 +1924,16 @@ AssemblyGraph::Superbubbles::Superbubbles(
             boost::make_assoc_property_map(predecessorMap));
 
         if(debug) {
-            cout << "Backward dominator tree with exit at " << cGraph[entrance].getAnchorId() << endl;
+            cout << "Backward dominator tree with exit at " <<
+                anchorIdToString(cGraph[entrance].getAnchorId()) << endl;
         }
         for(const auto& p: predecessorMap) {
             const vertex_descriptor cv0 = p.first;
             const vertex_descriptor cv1 = p.second;
             backwardPairs.push_back({cv0, cv1});
             if(debug) {
-                cout << "B " << cGraph[cv0].getAnchorId() << "->" << cGraph[cv1].getAnchorId() << endl;
+                cout << "B " << anchorIdToString(cGraph[cv0].getAnchorId()) << "->" <<
+                    anchorIdToString(cGraph[cv1].getAnchorId()) << endl;
             }
         }
     }
@@ -1964,7 +1971,8 @@ AssemblyGraph::Superbubbles::Superbubbles(
         for(const auto& p: bidirectionalPairs) {
             const vertex_descriptor cv0 = p.first;
             const vertex_descriptor cv1 = p.second;
-            cout << cGraph[cv0].getAnchorId() << "->" << cGraph[cv1].getAnchorId() << endl;
+            cout << anchorIdToString(cGraph[cv0].getAnchorId()) << "->" <<
+                anchorIdToString(cGraph[cv1].getAnchorId()) << endl;
         }
     }
 
@@ -1997,8 +2005,8 @@ AssemblyGraph::Superbubbles::Superbubbles(
         superbubble.fillInFromEntranceAndExit(cGraph);
 
         if(debug) {
-            cout << "Tentative superbubble with entrance " << cGraph[cv0].getAnchorId() <<
-                " exit " << cGraph[cv1].getAnchorId() << " and " << superbubble.size() <<
+            cout << "Tentative superbubble with entrance " << anchorIdToString(cGraph[cv0].getAnchorId()) <<
+                " exit " << anchorIdToString(cGraph[cv1].getAnchorId()) << " and " << superbubble.size() <<
                 " vertices total." << endl;
         }
 
@@ -2020,8 +2028,13 @@ AssemblyGraph::Superbubbles::Superbubbles(
         for(const Superbubble& superbubble: superbubbles) {
             const vertex_descriptor cv0 = superbubble.entrances.front();
             const vertex_descriptor cv1 = superbubble.exits.front();;
-            cout << cGraph[cv0].getAnchorId() << "->" << cGraph[cv1].getAnchorId() << endl;
+            cout << anchorIdToString(cGraph[cv0].getAnchorId()) << "->" <<
+                anchorIdToString(cGraph[cv1].getAnchorId()) << endl;
         }
+    }
+
+    if(debug) {
+        cout << "End Superbubbles constructor using dominator trees." << endl;
     }
 }
 
@@ -2313,7 +2326,7 @@ void AssemblyGraph::cleanupSuperbubble(
     if(debug) {
         cout << "Working on a superbubble with " << superbubble.size() << " vertices:";
         for(const vertex_descriptor v: superbubble) {
-            cout << " " << cGraph[v].getAnchorId();
+            cout << " " << anchorIdToString(cGraph[v].getAnchorId());
         }
         cout << endl;
     }
@@ -2323,7 +2336,8 @@ void AssemblyGraph::cleanupSuperbubble(
     for(const vertex_descriptor v: superbubble) {
         if(previousSuperbubblesVertices.contains(v)) {
             if(debug) {
-                cout << "This superbubble ignored because it contains vertex " << cGraph[v].getAnchorId() <<
+                cout << "This superbubble ignored because it contains vertex " <<
+                    anchorIdToString(cGraph[v].getAnchorId()) <<
                     " which is in a previously processed superbubble." << endl;
             }
             overlaps = true;
@@ -2350,8 +2364,8 @@ void AssemblyGraph::cleanupSuperbubble(
     const vertex_descriptor entrance = superbubble.entrances.front();
     const vertex_descriptor exit = superbubble.exits.front();
     if(debug) {
-        cout << "Entrance " << cGraph[entrance].getAnchorId() << endl;
-        cout << "Exit " << cGraph[exit].getAnchorId() << endl;
+        cout << "Entrance " << anchorIdToString(cGraph[entrance].getAnchorId()) << endl;
+        cout << "Exit " << anchorIdToString(cGraph[exit].getAnchorId()) << endl;
     }
 
     if(entrance == exit) {
@@ -2499,7 +2513,7 @@ void AssemblyGraph::cleanupSuperbubble(
                     const Chain& chain = entranceBubble[i];
                     cout << "Entrance bubble chain " << i << ":";
                     for (const AnchorId anchorId: chain) {
-                        cout << " " << anchorId;
+                        cout << " " << anchorIdToString(anchorId);
                     }
                     cout << endl;
                 }
@@ -2561,7 +2575,7 @@ void AssemblyGraph::cleanupSuperbubble(
                     const Chain& chain = exitBubble[i];
                     cout << "Exit bubble chain " << i << ":";
                     for (const AnchorId anchorId: chain) {
-                        cout << " " << anchorId;
+                        cout << " " << anchorIdToString(anchorId);
                     }
                     cout << endl;
                 }
@@ -8020,4 +8034,20 @@ void AssemblyGraph::load(const string& assemblyStage, uint64_t componentIdArgume
 
     // Sanity check.
     SHASTA_ASSERT(componentIdArgument == componentId);
+}
+
+
+
+uint64_t AssemblyGraph::totalChainCount() const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+
+    uint64_t count = 0;
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = assemblyGraph[e];
+        for(const Bubble& bubble: bubbleChain) {
+            count += bubble.size();
+        }
+    }
+    return count;
 }

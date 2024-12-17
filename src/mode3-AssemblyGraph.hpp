@@ -419,6 +419,8 @@ private:
     // For optimal results it is best to call compressBubbleChains before expand.
     void expand();
 
+    uint64_t totalChainCount() const;
+
     // Compute the tangle matrix given in-edges and out-edges.
     // The last bubble of each in-edge and the first bubble
     // of each out-edge must be haploid.
