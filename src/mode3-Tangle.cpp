@@ -396,7 +396,7 @@ void Tangle::findExits()
         }
     }
 }
-
+#endif
 
 
 bool Tangle::isEntrance(AssemblyGraph::edge_descriptor e) const
@@ -420,7 +420,7 @@ bool Tangle::isExit(AssemblyGraph::edge_descriptor e) const
     }
     return false;
 }
-#endif
+
 
 
 bool Tangle::isEntrance(AnchorId anchorId) const
@@ -586,3 +586,18 @@ void Tangle::readFollowingFromExit(Exit& exit)
 }
 
 #endif
+
+
+
+// Find Assembly graph edges that are both an entrance and an exit.
+void Tangle::findEntranceExits(vector<AssemblyGraph::edge_descriptor>& entranceExits) const
+{
+    entranceExits.clear();
+    for(const Entrance& entrance: entrances)
+    {
+        const AssemblyGraph::edge_descriptor e = entrance.e;
+        if(isExit(e)) {
+            entranceExits.push_back(e);
+        }
+    }
+}

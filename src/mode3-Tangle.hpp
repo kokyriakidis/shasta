@@ -101,6 +101,9 @@ public:
     vector<Entrance> entrances;
     vector<Exit> exits;
 
+    // Find Assembly graph edges that are both an entrance and an exit.
+    void findEntranceExits(vector<AssemblyGraph::edge_descriptor>&) const;
+
     private:
 
     void findEntrances();
