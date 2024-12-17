@@ -63,18 +63,38 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     uint64_t lowCoverageThreshold,
     uint64_t highCoverageThreshold)
 {
+    if(debug) {
+        cout << "detangleSuperbubbleWithReadFollowing begins for superbubble " << superbubbleId << endl;
+    }
     AssemblyGraph& assemblyGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
 
     // Use Tangle and TangleGraph to compute detangled chains.
-    Tangle tangle(debug, superbubbleId, *this, maxOffset, superbubble);
+    shared_ptr<Tangle> tangle = make_shared<Tangle>(debug, superbubbleId, *this, maxOffset, superbubble);
+
+    // Gather AssemblyGraph edges that are both an entrance and an exit.
+    vector<edge_descriptor> entranceExits;
+    tangle->findEntranceExits(entranceExits);
+
+    // If there are any entrance/exits, we have to split them and recreate the Tangle.
+    if(not entranceExits.empty()) {
+        // For now just give up.
+        if(debug) {
+            cout << "Found the following entrance/exits:";
+            for(const AssemblyGraph::edge_descriptor e: entranceExits) {
+                cout << " " << assemblyGraph.bubbleChainStringId(e);
+            }
+            cout << endl;
+        }
+        return;
+    }
 
     vector< vector<AnchorId> > anchorChains;
-    tangle.detangle(debug, superbubbleId, *this, maxLoss,
+    tangle->detangle(debug, superbubbleId, *this, maxLoss,
         lowCoverageThreshold, highCoverageThreshold,
         anchorChains);
 
-    if(not tangle.success) {
+    if(not tangle->success) {
         if(debug) {
             cout << "Could not detangle superbubble " << superbubbleId << endl;
         }
@@ -93,6 +113,10 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
         1,  // threadCount
         options,
         debug);
+    if(debug) {
+        cout << "The initial local assembly graph for this superbubble has " <<
+            localAssemblyGraph.totalChainCount() << " chains." << endl;
+    }
 
     // Cleanup steps similar to what happens for the global assembly graph.
     localAssemblyGraph.compress();
@@ -120,6 +144,10 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
             break;
         }
     }
+    if(debug) {
+        cout << "After bubble/superbubble removal, the local assembly graph for this superbubble has " <<
+            localAssemblyGraph.totalChainCount() << " chains." << endl;
+    }
 
     // Also do a pass of vertex detangling.
     localAssemblyGraph.expand();
@@ -132,9 +160,13 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     localAssemblyGraph.compress();
     localAssemblyGraph.compressBubbleChains();
 
-    localAssemblyGraph.writeGfa("Tangle-" + to_string(componentId) + "-" + to_string(superbubbleId));
-    localAssemblyGraph.writeGfaExpanded("Tangle-" + to_string(componentId) + "-" + to_string(superbubbleId),
-        false, false);
+    if(debug) {
+        cout << "The final local assembly graph for this superbubble has " <<
+            localAssemblyGraph.totalChainCount() << " chains." << endl;
+        localAssemblyGraph.writeGfa("Tangle-" + to_string(componentId) + "-" + to_string(superbubbleId));
+        localAssemblyGraph.writeGfaExpanded("Tangle-" + to_string(componentId) + "-" + to_string(superbubbleId),
+            false, false);
+    }
 
 
 
@@ -145,13 +177,13 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     std::map<AnchorId, vertex_descriptor> vertexMap;
 
     // Clip the entrances and get the corresponding vertices.
-    for(const auto& entrance: tangle.entrances) {
+    for(const auto& entrance: tangle->entrances) {
         const vertex_descriptor v = cloneAndTruncateAtEnd(debug, entrance.e);
         vertexMap.insert(make_pair(entrance.anchorId, v));
     }
 
     // Clip the exits and get the corresponding vertices.
-    for(const auto& exit: tangle.exits) {
+    for(const auto& exit: tangle->exits) {
         const vertex_descriptor v = cloneAndTruncateAtBeginning(debug, exit.e);
         vertexMap.insert(make_pair(exit.anchorId, v));
     }
