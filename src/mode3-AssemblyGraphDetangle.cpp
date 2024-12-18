@@ -310,4 +310,7 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
         remove_vertex(v, assemblyGraph);
     }
 
+    if(debug) {
+        cout << "Successfully complete detangling for superbubble " << superbubbleId << endl;
+    }
 }
