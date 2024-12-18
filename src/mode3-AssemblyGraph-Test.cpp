@@ -11,8 +11,8 @@ using namespace mode3;
 // Boost libraries.
 #include <boost/graph/iteration_macros.hpp>
 
-const uint64_t haploidCoverageThreshold = 18;
-const uint64_t haploidLengthThreshold = 1000000;
+const uint64_t haploidCoverageThreshold = 10;
+const uint64_t haploidLengthThreshold = 5000000;
 
 
 
