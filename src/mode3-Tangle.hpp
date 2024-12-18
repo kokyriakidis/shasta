@@ -17,6 +17,7 @@ class shasta::mode3::Tangle {
 public:
     Tangle(
         bool debug,
+        uint64_t tangleId,
         AssemblyGraph&,
         uint64_t maxOffset,
         const vector<AssemblyGraph::vertex_descriptor>& tangleVertices);

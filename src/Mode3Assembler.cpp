@@ -436,9 +436,6 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
          anchorGraph.writeEdgeCoverageHistogram("AnchorGraphInitial" + to_string(componentId) + "-EdgeCoverageHistogram.csv");
      }
 
-     // Remove edges with negative offset.
-     // anchorGraph.removeNegativeOffsetEdges();
-
      // Remove weak edges.
      anchorGraph.removeWeakEdges(options.primaryGraphOptions.maxLoss, debug);
      cout << "After removing weak edges, the AnchorGraph for this connected component has " <<

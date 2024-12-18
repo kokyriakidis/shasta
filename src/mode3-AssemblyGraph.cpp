@@ -6972,7 +6972,10 @@ void AssemblyGraph::runAssemblyStep(
         std::lock_guard<std::mutex> lock(mutex);
         cout << "Error occurred in local assembly between anchors " <<
             anchorIdToString(edgeIdA) << " and " << anchorIdToString(edgeIdB) << endl;
-        throw;
+        cout << "See AssemblyDetails-" << componentId << ".csv" << " for details. Assembly continues." << endl;
+        // Let the assembly continue. The AssemblyDetails.csv for this component
+        // will record the failure. Failures are rare and occur in messy regions
+        // that would be unresolved anyway.
     }
 }
 

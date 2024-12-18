@@ -11,6 +11,7 @@ using namespace mode3;
 
 Tangle::Tangle(
     bool debug,
+    uint64_t tangleId,
     AssemblyGraph& assemblyGraph,
     uint64_t maxOffset,
     const vector<AssemblyGraph::vertex_descriptor>& tangleVerticesArgument) :
@@ -19,18 +20,21 @@ Tangle::Tangle(
     tangleVertices(tangleVerticesArgument)
 {
     if(debug) {
-        cout << "Working on a tangle with " << tangleVertices.size() << " vertices." << endl;
+        cout << "Working on tangle " << tangleId << " with " << tangleVertices.size() << " assembly graph vertices." << endl;
     }
 
     // Sort the tangleVertices so we can do binary searches in them
     // in isTangleVertex.
     sort(tangleVertices.begin(), tangleVertices.end());
-    if(debug) {
+    if(false) {
         writeTangleVertices();
     }
 
     findTangleEdges(maxOffset);
     if(debug) {
+        cout << "Tangle " << tangleId << " contains " << tangleEdges.size() << " assembly graph edges." << endl;
+    }
+    if(false) {
         writeTangleEdges();
     }
 
@@ -50,8 +54,8 @@ Tangle::Tangle(
     for(const Exit& exit: exits) {
         exitAnchorIds.push_back(exit.anchorId);
     }
-    const bool bidirectional = true;
-    TangleGraph tangleGraph(debug, assemblyGraph.anchors,
+    const bool bidirectional = false;
+    TangleGraph tangleGraph(debug, tangleId, assemblyGraph.anchors,
         entranceAnchorIds, exitAnchorIds, bidirectional);
 }
 

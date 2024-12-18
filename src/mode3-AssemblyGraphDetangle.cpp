@@ -54,5 +54,5 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     uint64_t maxOffset)
 {
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
-    Tangle tangle(debug, *this, maxOffset, superbubble);
+    Tangle tangle(debug, superbubbleId, *this, maxOffset, superbubble);
 }
