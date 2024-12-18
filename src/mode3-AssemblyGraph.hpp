@@ -531,8 +531,13 @@ private:
             );
 
         // This uses dominator trees.
-        // It only finds superbubbles with one entrance and one ecit.
+        // It only finds superbubbles with one entrance and one exit.
         Superbubbles(AssemblyGraph&);
+
+        // This constructs superbubbles consisting of a single edge v0->v1
+        // such that outDegree(v0)=1 and indegree(v1)=1.
+        class FromEdges{};
+        Superbubbles(AssemblyGraph&, const FromEdges&);
 
         ~Superbubbles();
 
@@ -598,13 +603,18 @@ private:
         double minLogP);
 
     // Detangle with read following.
-    void detangleSuperbubblesWithReadFollowing(
+    enum class SuperbubbleCreationMethod {
+        SingleEdges,
+        ByLength
+    };
+    uint64_t detangleSuperbubblesWithReadFollowing(
         bool debug,
+        SuperbubbleCreationMethod,
         uint64_t maxOffset,
         double maxLoss,
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold);
-    void detangleSuperbubbleWithReadFollowing(
+    bool detangleSuperbubbleWithReadFollowing(
         bool debug,
         const Superbubbles&,
         uint64_t superbubbleId,

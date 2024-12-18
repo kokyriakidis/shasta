@@ -258,14 +258,41 @@ void AssemblyGraph::run(
         6);
 #else
     renumberEdges();    // To simplify debugging.
+    while(compressSequentialEdges());
     write("P");
-    detangleSuperbubblesWithReadFollowing(
-        true,
-        options.assemblyGraphOptions.superbubbleLengthThreshold4,
-        options.primaryGraphOptions.maxLoss,
-        options.primaryGraphOptions.crossEdgesLowCoverageThreshold,
-        options.primaryGraphOptions.crossEdgesHighCoverageThreshold);
+    for(uint64_t iteration=0; iteration<10; iteration++) {
+        // if(iteration == 2) write("X");
+        const uint64_t success0 = detangleSuperbubblesWithReadFollowing(
+            false,
+            SuperbubbleCreationMethod::SingleEdges,
+            options.assemblyGraphOptions.superbubbleLengthThreshold4,
+            options.primaryGraphOptions.maxLoss,
+            options.primaryGraphOptions.crossEdgesLowCoverageThreshold,
+            options.primaryGraphOptions.crossEdgesHighCoverageThreshold);
+        // if(iteration == 2) write("Y");
+        cout << "At detangle iteration " << iteration << ", " << success0 <<
+            " edges were successfully detangled. The assembly graph now has " <<
+            num_edges(*this) << " edges." << endl;
+        while(compressSequentialEdges());
+        compressBubbleChains();
+        const uint64_t success1 = detangleSuperbubblesWithReadFollowing(
+            false,
+            SuperbubbleCreationMethod::ByLength,
+            options.assemblyGraphOptions.superbubbleLengthThreshold4,
+            options.primaryGraphOptions.maxLoss,
+            options.primaryGraphOptions.crossEdgesLowCoverageThreshold,
+            options.primaryGraphOptions.crossEdgesHighCoverageThreshold);
+        cout << "At detangle iteration " << iteration << ", " << success1 <<
+            " superbubbles were successfully detangled. The assembly graph now has " <<
+            num_edges(*this) << " edges." << endl;
+        while(compressSequentialEdges());
+        compressBubbleChains();
+        if((success0 == 0) and (success1 == 0)) {
+            break;
+        }
+    }
     write("Q");
+    throw runtime_error("Forced early termination for debugging.");
 #endif
 
     performanceLog << timestamp << "Detangling ends." << endl;
@@ -1824,6 +1851,52 @@ AssemblyGraph::Superbubbles::Superbubbles(
         }
      }
 
+}
+
+
+
+// This constructs superbubbles consisting of a single edge v0->v1
+// such that outDegree(v0)=1 and inDegree(v1)=1.
+AssemblyGraph::Superbubbles::Superbubbles(
+    AssemblyGraph& assemblyGraph, const FromEdges&) :
+    cGraph(assemblyGraph)
+{
+
+    // Try all edges.
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        SHASTA_ASSERT(assemblyGraph[e].isSimpleChain());
+
+        // Check outDegree of v0.
+        const vertex_descriptor v0 = source(e, assemblyGraph);
+        if(out_degree(v0, assemblyGraph) != 1) {
+            continue;
+        }
+
+        // Check inDegree of v1.
+        const vertex_descriptor v1 = target(e, assemblyGraph);
+        if(in_degree(v1, assemblyGraph) != 1) {
+            continue;
+        }
+
+        // Check the number of entrances.
+        const uint64_t entranceCount = in_degree(v0, assemblyGraph);
+        if(entranceCount < 2) {
+            continue;
+        }
+
+        // Check the number of exitss.
+        const uint64_t exitCount = out_degree(v1, assemblyGraph);
+        if(exitCount < 2) {
+            continue;
+        }
+
+        superbubbles.push_back(Superbubble());
+        Superbubble& superbubble = superbubbles.back();
+        superbubble.push_back(v0);
+        superbubble.push_back(v1);
+        superbubble.entrances.push_back(v0);
+        superbubble.exits.push_back(v1);
+    }
 }
 
 

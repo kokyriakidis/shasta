@@ -33,6 +33,7 @@ TangleGraph::TangleGraph(
 {
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t minVertexCoverage = 5;
+    const uint64_t anchorCoverageThreshold = 3;
 
 
     if(debug) {
@@ -55,7 +56,7 @@ TangleGraph::TangleGraph(
     constructExits(exitAnchors);
     gatherOrientedReads();
 
-    if(not createVertices(minVertexCoverage)) {
+    if(not createVertices(anchorCoverageThreshold, minVertexCoverage)) {
         failure = true;
         return;
     }
@@ -575,7 +576,7 @@ void TangleGraph::computeTangleMatrix()
 
 
 
-bool TangleGraph::createVertices(uint64_t minVertexCoverage)
+bool TangleGraph::createVertices(uint64_t anchorCoverageThreshold, uint64_t minVertexCoverage)
 {
     TangleGraph& tangleGraph = *this;
 
@@ -598,8 +599,10 @@ bool TangleGraph::createVertices(uint64_t minVertexCoverage)
     }
 
     // Deduplicate the AnchorIds for each entrance.
+    // Only keep the ones that appear in at least anchorCoverageThreshold oriented reads.
+    vector<uint64_t> count;
     for(auto& v: entranceAnchorIds) {
-        deduplicate(v);
+        deduplicateAndCountWithThreshold(v, count, anchorCoverageThreshold);
     }
 
 
@@ -608,7 +611,6 @@ bool TangleGraph::createVertices(uint64_t minVertexCoverage)
     for(auto& v: entranceAnchorIds) {
         copy(v.begin(), v.end(), back_inserter(duplicateEntranceAnchorIds));
     }
-    vector<uint64_t> count;
     deduplicateAndCountWithThreshold(duplicateEntranceAnchorIds, count, 2UL);
 
 
@@ -634,7 +636,7 @@ bool TangleGraph::createVertices(uint64_t minVertexCoverage)
 
     // Deduplicate the AnchorIds for each exit.
     for(auto& v: exitAnchorIds) {
-        deduplicate(v);
+        deduplicateAndCountWithThreshold(v, count, anchorCoverageThreshold);
     }
 
     // Now find the AnchorIds that are in more than one exit.
