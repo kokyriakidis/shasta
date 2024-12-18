@@ -76,6 +76,8 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     vector<edge_descriptor> entranceExits;
     tangle->findEntranceExits(entranceExits);
 
+
+
     // If there are any entrance/exits, we have to split them and recreate the Tangle.
     if(not entranceExits.empty()) {
         // For now just give up.
@@ -86,8 +88,75 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
             }
             cout << endl;
         }
-        return;
+
+        // If all of them are at least 4 anchors long, we can split them,
+        // then recreate the tangle. Otherwise we have to give up.
+        bool canDo = true;
+        for(const edge_descriptor e: entranceExits) {
+            const Chain& chain = assemblyGraph[e].getOnlyChain();
+            if(chain.size() < 4) {
+                canDo = false;
+                if(debug) {
+                    cout << "Chain for " << bubbleChainStringId(e) <<
+                        " is only " << chain.size() << " anchors long. Cannot split." << endl;
+                }
+                break;
+            }
+        }
+        if(not canDo) {
+            if(debug) {
+                cout << "Cannot split all entrances which are also exits. "
+                    " Skipping detangling for superbubble " << superbubbleId << endl;
+            }
+            return;
+        }
+
+        // Split in two all the entrances that are also exits.
+        for(const edge_descriptor e: entranceExits) {
+            const vertex_descriptor v0 = source(e, assemblyGraph);
+            const vertex_descriptor v1 = target(e, assemblyGraph);
+            const Chain& chain = assemblyGraph[e].getOnlyChain();
+            auto splitPosition = chain.begin() + chain.size() / 2;
+            // The AnchorId at splitPosition will be included in both chainA and chainB.
+            Chain chainA;
+            copy(chain.begin(), splitPosition + 1, back_inserter(chainA));
+            Chain chainB;
+            copy(splitPosition, chain.end(), back_inserter(chainB));
+            const vertex_descriptor vMiddle = add_vertex(AssemblyGraphVertex(*splitPosition), assemblyGraph);
+
+            // Add an edge for chainA
+            edge_descriptor eA;
+            tie(eA, ignore) = add_edge(v0, vMiddle, assemblyGraph);
+            AssemblyGraphEdge& edgeA = assemblyGraph[eA];
+            edgeA.id = nextEdgeId++;
+            BubbleChain& bubbleChainA = edgeA;
+            bubbleChainA.resize(1);
+            Bubble& bubbleA = bubbleChainA.front();
+            bubbleA.resize(1);
+            bubbleA.front() = chainA;
+
+            // Add an edge for chainB
+            edge_descriptor eB;
+            tie(eB, ignore) = add_edge(vMiddle, v1, assemblyGraph);
+            AssemblyGraphEdge& edgeB = assemblyGraph[eB];
+            edgeB.id = nextEdgeId++;
+            BubbleChain& bubbleChainB = edgeB;
+            bubbleChainB.resize(1);
+            Bubble& bubbleB = bubbleChainB.front();
+            bubbleB.resize(1);
+            bubbleB.front() = chainB;
+
+            // Remove the edge we split.
+            boost::remove_edge(e, assemblyGraph);
+        }
+
+        // Now we can recreate the Tangle.
+        tangle = make_shared<Tangle>(debug, superbubbleId, *this, maxOffset, superbubble);
+        tangle->findEntranceExits(entranceExits);
+        SHASTA_ASSERT(entranceExits.empty());
     }
+
+
 
     vector< vector<AnchorId> > anchorChains;
     tangle->detangle(debug, superbubbleId, *this, maxLoss,
