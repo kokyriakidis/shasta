@@ -25,7 +25,7 @@ using namespace mode3;
 
 
 // Create the AnchorGraph and its vertices and edges given a vector of AnchorIds.
-AnchorGraph::AnchorGraph(const Anchors& anchors, const vector<AnchorId>& anchorIds) :
+AnchorGraph::AnchorGraph(const Anchors& anchors, span<const AnchorId> anchorIds) :
     anchorIds(anchorIds)
 {
 

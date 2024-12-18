@@ -42,8 +42,8 @@ AssemblyGraph::AssemblyGraph(
     const Anchors& anchors,
     uint64_t componentId,
     uint64_t k,
-    const vector<OrientedReadId>& orientedReadIds,
-    const vector<AnchorId>& anchorIds,
+    span<const OrientedReadId> orientedReadIds,
+    span<const AnchorId> anchorIds,
     uint64_t threadCount,
     const Mode3AssemblyOptions& options,
     bool assembleSequence,
@@ -76,15 +76,74 @@ AssemblyGraph::AssemblyGraph(
 AssemblyGraph::AssemblyGraph(
     const string& assemblyStage,
     uint64_t componentIdArgument,
+    span<const OrientedReadId> orientedReadIds,
+    span<const AnchorId> anchorIds,
     const Anchors& anchors,
     const Mode3AssemblyOptions& options) :
     MultithreadedObject<AssemblyGraph>(*this),
     MappedMemoryOwner(anchors),
     anchors(anchors),
-    options(options)
+    options(options),
+    orientedReadIds(orientedReadIds),
+    anchorIds(anchorIds)
 {
     load(assemblyStage, componentIdArgument);
     SHASTA_ASSERT(componentId == componentIdArgument);
+}
+
+
+
+// Constructor from a vector of vectors of AnchorIds representing Chains.
+// Used for detangling with read following.
+AssemblyGraph::AssemblyGraph(
+    const Anchors& anchors,
+    uint64_t componentId,
+    uint64_t k,
+    span<const OrientedReadId> orientedReadIds,
+    span<const AnchorId> anchorIds,
+    const vector< vector<AnchorId> >& anchorChains,
+    uint64_t /* threadCount */,
+    const Mode3AssemblyOptions& options,
+    bool /* debug */) :
+    MultithreadedObject<AssemblyGraph>(*this),
+    MappedMemoryOwner(anchors),
+    componentId(componentId),
+    anchors(anchors),
+    k(k),
+    options(options),
+    orientedReadIds(orientedReadIds),
+    anchorIds(anchorIds)
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // Each chain generates an edge.
+    // Vertices are added as needed.
+    std::map<AnchorId, vertex_descriptor> vertexMap;
+    for(const vector<AnchorId>& anchorChain: anchorChains) {
+        SHASTA_ASSERT(anchorChain.size() >= 2);
+        const AnchorId anchorId0 = anchorChain.front();
+        const AnchorId anchorId1 = anchorChain.back();
+        const vertex_descriptor cv0 = getVertex(anchorId0, vertexMap);
+        const vertex_descriptor cv1 = getVertex(anchorId1, vertexMap);
+
+        // Create an edge for this chain.
+        edge_descriptor ce;
+        tie(ce, ignore) = add_edge(cv0, cv1, assemblyGraph);
+        AssemblyGraphEdge& edge = assemblyGraph[ce];
+        edge.id = nextEdgeId++;
+
+        // The edge is a trivial BubbleChain consisting of a single haploid bubble.
+        edge.resize(1);                 // BubbleChain has length 1.
+        Bubble& bubble = edge.front();
+        bubble.resize(1);               // Bubble is haploid.
+
+        // Store the chain.
+        Chain& chain = bubble.front();
+        for(const AnchorId anchorId: anchorChain) {
+            chain.push_back(anchorId);
+        }
+    }
+
 }
 
 
@@ -198,13 +257,16 @@ void AssemblyGraph::run(
         options.assemblyGraphOptions.minLogP,
         6);
 #else
+    renumberEdges();    // To simplify debugging.
     write("P");
     detangleSuperbubblesWithReadFollowing(
         true,
-        options.assemblyGraphOptions.superbubbleLengthThreshold4);
-    throw runtime_error("Forced early termination for debugging.");
+        options.assemblyGraphOptions.superbubbleLengthThreshold4,
+        options.primaryGraphOptions.maxLoss,
+        options.primaryGraphOptions.crossEdgesLowCoverageThreshold,
+        options.primaryGraphOptions.crossEdgesHighCoverageThreshold);
+    write("Q");
 #endif
-
 
     performanceLog << timestamp << "Detangling ends." << endl;
 
@@ -1792,6 +1854,9 @@ AssemblyGraph::Superbubbles::Superbubbles(
     cGraph(cGraph)
 {
     const bool debug = false;
+    if(debug) {
+        cout << "Begin Superbubbles constructor using dominator trees." << endl;
+    }
 
     // Map vertices to integers.
     std::map<vertex_descriptor, uint64_t> indexMap;
@@ -1836,14 +1901,16 @@ AssemblyGraph::Superbubbles::Superbubbles(
             boost::make_assoc_property_map(predecessorMap));
 
         if(debug) {
-            cout << "Forward dominator tree with entrance at " << cGraph[entrance].getAnchorId() << endl;
+            cout << "Forward dominator tree with entrance at " <<
+                anchorIdToString(cGraph[entrance].getAnchorId()) << endl;
         }
         for(const auto& p: predecessorMap) {
             const vertex_descriptor cv0 = p.second;
             const vertex_descriptor cv1 = p.first;
             forwardPairs.push_back({cv0, cv1});
             if(debug) {
-                cout << "F " << cGraph[cv0].getAnchorId() << "->" << cGraph[cv1].getAnchorId() << endl;
+                cout << "F " << anchorIdToString(cGraph[cv0].getAnchorId()) << "->" <<
+                    anchorIdToString(cGraph[cv1].getAnchorId()) << endl;
             }
         }
     }
@@ -1876,14 +1943,16 @@ AssemblyGraph::Superbubbles::Superbubbles(
             boost::make_assoc_property_map(predecessorMap));
 
         if(debug) {
-            cout << "Backward dominator tree with exit at " << cGraph[entrance].getAnchorId() << endl;
+            cout << "Backward dominator tree with exit at " <<
+                anchorIdToString(cGraph[entrance].getAnchorId()) << endl;
         }
         for(const auto& p: predecessorMap) {
             const vertex_descriptor cv0 = p.first;
             const vertex_descriptor cv1 = p.second;
             backwardPairs.push_back({cv0, cv1});
             if(debug) {
-                cout << "B " << cGraph[cv0].getAnchorId() << "->" << cGraph[cv1].getAnchorId() << endl;
+                cout << "B " << anchorIdToString(cGraph[cv0].getAnchorId()) << "->" <<
+                    anchorIdToString(cGraph[cv1].getAnchorId()) << endl;
             }
         }
     }
@@ -1921,7 +1990,8 @@ AssemblyGraph::Superbubbles::Superbubbles(
         for(const auto& p: bidirectionalPairs) {
             const vertex_descriptor cv0 = p.first;
             const vertex_descriptor cv1 = p.second;
-            cout << cGraph[cv0].getAnchorId() << "->" << cGraph[cv1].getAnchorId() << endl;
+            cout << anchorIdToString(cGraph[cv0].getAnchorId()) << "->" <<
+                anchorIdToString(cGraph[cv1].getAnchorId()) << endl;
         }
     }
 
@@ -1954,8 +2024,8 @@ AssemblyGraph::Superbubbles::Superbubbles(
         superbubble.fillInFromEntranceAndExit(cGraph);
 
         if(debug) {
-            cout << "Tentative superbubble with entrance " << cGraph[cv0].getAnchorId() <<
-                " exit " << cGraph[cv1].getAnchorId() << " and " << superbubble.size() <<
+            cout << "Tentative superbubble with entrance " << anchorIdToString(cGraph[cv0].getAnchorId()) <<
+                " exit " << anchorIdToString(cGraph[cv1].getAnchorId()) << " and " << superbubble.size() <<
                 " vertices total." << endl;
         }
 
@@ -1977,8 +2047,13 @@ AssemblyGraph::Superbubbles::Superbubbles(
         for(const Superbubble& superbubble: superbubbles) {
             const vertex_descriptor cv0 = superbubble.entrances.front();
             const vertex_descriptor cv1 = superbubble.exits.front();;
-            cout << cGraph[cv0].getAnchorId() << "->" << cGraph[cv1].getAnchorId() << endl;
+            cout << anchorIdToString(cGraph[cv0].getAnchorId()) << "->" <<
+                anchorIdToString(cGraph[cv1].getAnchorId()) << endl;
         }
+    }
+
+    if(debug) {
+        cout << "End Superbubbles constructor using dominator trees." << endl;
     }
 }
 
@@ -2270,7 +2345,7 @@ void AssemblyGraph::cleanupSuperbubble(
     if(debug) {
         cout << "Working on a superbubble with " << superbubble.size() << " vertices:";
         for(const vertex_descriptor v: superbubble) {
-            cout << " " << cGraph[v].getAnchorId();
+            cout << " " << anchorIdToString(cGraph[v].getAnchorId());
         }
         cout << endl;
     }
@@ -2280,7 +2355,8 @@ void AssemblyGraph::cleanupSuperbubble(
     for(const vertex_descriptor v: superbubble) {
         if(previousSuperbubblesVertices.contains(v)) {
             if(debug) {
-                cout << "This superbubble ignored because it contains vertex " << cGraph[v].getAnchorId() <<
+                cout << "This superbubble ignored because it contains vertex " <<
+                    anchorIdToString(cGraph[v].getAnchorId()) <<
                     " which is in a previously processed superbubble." << endl;
             }
             overlaps = true;
@@ -2307,8 +2383,8 @@ void AssemblyGraph::cleanupSuperbubble(
     const vertex_descriptor entrance = superbubble.entrances.front();
     const vertex_descriptor exit = superbubble.exits.front();
     if(debug) {
-        cout << "Entrance " << cGraph[entrance].getAnchorId() << endl;
-        cout << "Exit " << cGraph[exit].getAnchorId() << endl;
+        cout << "Entrance " << anchorIdToString(cGraph[entrance].getAnchorId()) << endl;
+        cout << "Exit " << anchorIdToString(cGraph[exit].getAnchorId()) << endl;
     }
 
     if(entrance == exit) {
@@ -2456,7 +2532,7 @@ void AssemblyGraph::cleanupSuperbubble(
                     const Chain& chain = entranceBubble[i];
                     cout << "Entrance bubble chain " << i << ":";
                     for (const AnchorId anchorId: chain) {
-                        cout << " " << anchorId;
+                        cout << " " << anchorIdToString(anchorId);
                     }
                     cout << endl;
                 }
@@ -2518,7 +2594,7 @@ void AssemblyGraph::cleanupSuperbubble(
                     const Chain& chain = exitBubble[i];
                     cout << "Exit bubble chain " << i << ":";
                     for (const AnchorId anchorId: chain) {
-                        cout << " " << anchorId;
+                        cout << " " << anchorIdToString(anchorId);
                     }
                     cout << endl;
                 }
@@ -3084,11 +3160,11 @@ bool AssemblyGraph::detangleVertex(
             // Create truncated versions of the inEdges and outEdges.
             vector<vertex_descriptor> inVertices;
             for(const edge_descriptor ce: inEdges) {
-                inVertices.push_back(cloneAndTruncateAtEnd(ce));
+                inVertices.push_back(cloneAndTruncateAtEnd(debug, ce));
             }
             vector<vertex_descriptor> outVertices;
             for(const edge_descriptor ce: outEdges) {
-                outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+                outVertices.push_back(cloneAndTruncateAtBeginning(debug, ce));
             }
 
             if(isInPhase) {
@@ -3184,11 +3260,11 @@ bool AssemblyGraph::detangleVertex(
         // Create truncated versions of the inEdges and outEdges.
         vector<vertex_descriptor> inVertices;
         for(const edge_descriptor ce: inEdges) {
-            inVertices.push_back(cloneAndTruncateAtEnd(ce));
+            inVertices.push_back(cloneAndTruncateAtEnd(debug, ce));
         }
         vector<vertex_descriptor> outVertices;
         for(const edge_descriptor ce: outEdges) {
-            outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+            outVertices.push_back(cloneAndTruncateAtBeginning(debug, ce));
         }
 
         // Each significant element of the tangle matrix generates a new edge.
@@ -3786,11 +3862,11 @@ bool AssemblyGraph::detangleEdge(
             // Create truncated versions of the inEdges and outEdges.
             vector<vertex_descriptor> inVertices;
             for(const edge_descriptor ce: inEdges) {
-                inVertices.push_back(cloneAndTruncateAtEnd(ce));
+                inVertices.push_back(cloneAndTruncateAtEnd(debug, ce));
             }
             vector<vertex_descriptor> outVertices;
             for(const edge_descriptor ce: outEdges) {
-                outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+                outVertices.push_back(cloneAndTruncateAtBeginning(debug, ce));
             }
 
             if(isInPhase) {
@@ -3901,11 +3977,11 @@ bool AssemblyGraph::detangleEdge(
         // Create truncated versions of the inEdges and outEdges.
         vector<vertex_descriptor> inVertices;
         for(const edge_descriptor ce: inEdges) {
-            inVertices.push_back(cloneAndTruncateAtEnd(ce));
+            inVertices.push_back(cloneAndTruncateAtEnd(debug, ce));
         }
         vector<vertex_descriptor> outVertices;
         for(const edge_descriptor ce: outEdges) {
-            outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+            outVertices.push_back(cloneAndTruncateAtBeginning(debug, ce));
         }
 
 
@@ -4620,11 +4696,11 @@ bool AssemblyGraph::detangleShortSuperbubble(
                 // Create truncated versions of the inEdges and outEdges.
                 vector<vertex_descriptor> inVertices;
                 for(const edge_descriptor ce: inEdges) {
-                    inVertices.push_back(cloneAndTruncateAtEnd(ce));
+                    inVertices.push_back(cloneAndTruncateAtEnd(debug, ce));
                 }
                 vector<vertex_descriptor> outVertices;
                 for(const edge_descriptor ce: outEdges) {
-                    outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+                    outVertices.push_back(cloneAndTruncateAtBeginning(debug, ce));
                 }
 
                 if(isInPhase) {
@@ -4750,11 +4826,11 @@ bool AssemblyGraph::detangleShortSuperbubble(
     // Create truncated versions of the inEdges and outEdges.
     vector<vertex_descriptor> inVertices;
     for(const edge_descriptor ce: inEdges) {
-        inVertices.push_back(cloneAndTruncateAtEnd(ce));
+        inVertices.push_back(cloneAndTruncateAtEnd(debug, ce));
     }
     vector<vertex_descriptor> outVertices;
     for(const edge_descriptor ce: outEdges) {
-        outVertices.push_back(cloneAndTruncateAtBeginning(ce));
+        outVertices.push_back(cloneAndTruncateAtBeginning(debug, ce));
     }
 
 
@@ -6987,7 +7063,7 @@ void AssemblyGraph::runAssemblyStep(
 // If the bubble chain consists of just a single haploid bubble with a chain of length 2,
 // no new edge is created, and this simply returns the source vertex of the given edge.
 AssemblyGraph::vertex_descriptor
-    AssemblyGraph::cloneAndTruncateAtEnd(edge_descriptor ce)
+    AssemblyGraph::cloneAndTruncateAtEnd(bool debug, edge_descriptor ce)
 {
     AssemblyGraph& cGraph = *this;
     const AssemblyGraphEdge& edge = cGraph[ce];
@@ -7012,6 +7088,10 @@ AssemblyGraph::vertex_descriptor
         // So we don't create a new edge, and instead just return cv0.
         // Detangling code will connect there, as prescribed by the tangle matrix.
         if(chain.size() == 2) {
+            if(debug) {
+                cout << "cloneAndTruncateAtEnd: " << bubbleChainStringId(ce) <<
+                    " not truncated because it only has two anchors." << endl;
+            }
             return cv0;
         }
 
@@ -7025,6 +7105,11 @@ AssemblyGraph::vertex_descriptor
         Chain& newChain = newBubble.front();
         SHASTA_ASSERT(chain.size() > 2);
         newChain.pop_back();    // Remove the last AnchorId.
+
+        if(debug) {
+            cout << "cloneAndTruncateAtEnd: " << bubbleChainStringId(ce) <<
+                " truncated and becomes " << componentId << "-" << newEdge.id << endl;
+        }
 
         // Add it to the graph.
         // It will be dangling at its end.
@@ -7080,7 +7165,7 @@ AssemblyGraph::vertex_descriptor
 // If the bubble chain consists of just a single haploid bubble with a chain of length 2,
 // no new edge is created, and this simply returns the target vertex of the given edge.
 AssemblyGraph::vertex_descriptor
-    AssemblyGraph::cloneAndTruncateAtBeginning(edge_descriptor ce)
+    AssemblyGraph::cloneAndTruncateAtBeginning(bool debug, edge_descriptor ce)
 {
     AssemblyGraph& cGraph = *this;
     const AssemblyGraphEdge& edge = cGraph[ce];
@@ -7105,6 +7190,10 @@ AssemblyGraph::vertex_descriptor
         // So we don't create a new edge, and instead just return cv1.
         // Detangling code will connect there, as prescribed by the tangle matrix.
         if(chain.size() == 2) {
+            if(debug) {
+                cout << "cloneAndTruncateAtBeginning: " << bubbleChainStringId(ce) <<
+                    " not truncated because it only has two anchors." << endl;
+            }
             return cv1;
         }
 
@@ -7118,6 +7207,11 @@ AssemblyGraph::vertex_descriptor
         Chain& newChain = newBubble.front();
         SHASTA_ASSERT(chain.size() > 2);
         newChain.erase(newChain.begin());    // Remove the first AnchorId.
+
+        if(debug) {
+            cout << "cloneAndTruncateAtBeginning: " << bubbleChainStringId(ce) <<
+                " truncated and becomes " << componentId << "-" << newEdge.id << endl;
+        }
 
         // Add it to the graph.
         // It will be dangling at its beginning.
@@ -7959,4 +8053,20 @@ void AssemblyGraph::load(const string& assemblyStage, uint64_t componentIdArgume
 
     // Sanity check.
     SHASTA_ASSERT(componentIdArgument == componentId);
+}
+
+
+
+uint64_t AssemblyGraph::totalChainCount() const
+{
+    const AssemblyGraph& assemblyGraph = *this;
+
+    uint64_t count = 0;
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = assemblyGraph[e];
+        for(const Bubble& bubble: bubbleChain) {
+            count += bubble.size();
+        }
+    }
+    return count;
 }

@@ -15,6 +15,7 @@ namespace shasta {
 
 class shasta::mode3::Tangle {
 public:
+
     Tangle(
         bool debug,
         uint64_t tangleId,
@@ -22,7 +23,17 @@ public:
         uint64_t maxOffset,
         const vector<AssemblyGraph::vertex_descriptor>& tangleVertices);
 
-private:
+    void detangle(
+        bool debug,
+        uint64_t tangleId,
+        AssemblyGraph&,
+        double maxLoss,
+        uint64_t lowCoverageThreshold,
+        uint64_t highCoverageThreshold,
+        vector< vector<AnchorId> >& anchorChains);
+
+    bool success = false;
+
     bool debug;
     AssemblyGraph& assemblyGraph;
 
@@ -90,10 +101,17 @@ private:
     vector<Entrance> entrances;
     vector<Exit> exits;
 
+    // Find Assembly graph edges that are both an entrance and an exit.
+    void findEntranceExits(vector<AssemblyGraph::edge_descriptor>&) const;
+
+    private:
+
     void findEntrances();
     void findExits();
     bool isEntrance(AssemblyGraph::edge_descriptor) const;
     bool isExit(AssemblyGraph::edge_descriptor) const;
+    bool isEntrance(AnchorId) const;
+    bool isExit(AnchorId) const;
     void writeEntrances() const;
     void writeExits() const;
 

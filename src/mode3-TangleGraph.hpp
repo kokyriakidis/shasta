@@ -33,20 +33,37 @@ namespace shasta {
 class shasta::mode3::TangleGraphVertex {
 public:
     AnchorId anchorId;
-    uint64_t coverage = 0;
     TangleGraphVertex(AnchorId anchorId) : anchorId(anchorId) {}
 
-    // Each vertex can appear in zero or one Entrances
-    // and zero or one Exits.
-    uint64_t entranceIndex = invalid<uint64_t>;
-    uint64_t exitIndex = invalid<uint64_t>;
+    // The OrientedReadIds that visit this vertex.
+    // This only includes OrientedReadIds used in the TangleGraph
+    // and therefore is generally a subset of the OrientedReadIds
+    // for the same AnchorId in the global AnchorGraph.
+    // The OrientedReadIds are stored sorted.
+    vector<OrientedReadId> orientedReadIds;
+    uint64_t coverage() const
+    {
+        return orientedReadIds.size();
+    }
+
+    bool wasSeenByForwardBfs = false;
+    bool wasSeenByBackwardBfs = false;
 };
 
 
 
 class shasta::mode3::TangleGraphEdge {
 public:
-    uint64_t coverage = 0;
+    // The OrientedReadIds that contribute to this edge.
+    // This only includes OrientedReadIds used in the TangleGraph
+    // and therefore is generally a subset of the OrientedReadIds
+    // for the same edge of the global AnchorGraph.
+    // The OrientedReadIds are stored sorted.
+    vector<OrientedReadId> orientedReadIds;
+    uint64_t coverage() const
+    {
+        return orientedReadIds.size();
+    }
 };
 
 
@@ -59,8 +76,18 @@ public:
         const Anchors&,
         const vector<AnchorId>& entranceAnchors,
         const vector<AnchorId>& exitAnchors,
-        bool bidirectional
-    );
+        bool bidirectional,
+        double maxLoss,
+        uint64_t lowCoverageThreshold,
+        uint64_t highCoverageThreshold);
+
+    // Return true if successful, that is, all Entrances are
+    // connected to at least one Exit, and all Exits are
+    // connected to at least one Entrance, and the failure flag is not set.
+    bool failure = false;
+    bool isSuccessful() const;
+
+    void getChains(vector< vector<AnchorId> >&) const;
 
 private:
     bool debug;
@@ -104,6 +131,10 @@ private:
     void constructEntrances(const vector<AnchorId>& entranceAnchors);
     void constructExits(const vector<AnchorId>& entranceAnchors);
 
+    // Find out if a given AnchorId is an entrance or exit.
+    bool isEntrance(AnchorId) const;
+    bool isExit(AnchorId) const;
+
 
 
     // The oriented reads used in this TangleGraph..
@@ -139,26 +170,24 @@ private:
     void gatherOrientedReads();
     OrientedReadInfo* getOrientedReadInfo(OrientedReadId);
 
-
-
-    // Create TangleGraph vertices.
-    // There is a vertex for each AnchorId that is unique to one Entrance and/or one Exit.
-    void createVertices();
-
-    // Create edges.
-    // This uses the OrientedReadInfo::tangleJourney.
+    void createVertices(uint64_t minVertexCoverage);
     void createEdges();
-
-    // The tangle matrix is the number of common unique anchors between each
-    // entrance/exit pair.
-    // Indexed by [entranceIndex][exitIndex]
-    vector< vector<uint64_t> > tangleMatrix;
 
     // The vertexTable contains pairs of AnchorIds with the corresponding
     // file descriptors. Sorted by AnchorId so findVertex can use std::lowerBound.
     vector< pair<AnchorId, vertex_descriptor> > vertexTable;
     vertex_descriptor getVertex(AnchorId) const;
 
-    void writeGraphviz() const;
+    double edgeLoss(edge_descriptor) const;
+    void removeWeakEdges(double maxLoss);
+    void removeCrossEdges(
+        uint64_t lowCoverageThreshold,
+        uint64_t highCoverageThreshold);
 
+    // This removes vertices that are not reachable by at least one entrance
+    // and at least one exit. If any entrance or exit would be removed in this way,
+    // this returns false ant sets failure to true.
+    bool removeUnreachable();
+
+    void writeGraphviz(const string& name) const;
 };

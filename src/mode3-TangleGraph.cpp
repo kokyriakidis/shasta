@@ -1,6 +1,7 @@
 // Shasta.
 #include "mode3-TangleGraph.hpp"
 #include "deduplicate.hpp"
+#include "findLinearChains.hpp"
 #include "orderPairs.hpp"
 using namespace shasta;
 using namespace mode3;
@@ -11,6 +12,7 @@ using namespace mode3;
 // Standard library.
 #include <algorithm.hpp>
 #include <fstream.hpp>
+#include <queue>
 
 
 
@@ -20,12 +22,19 @@ TangleGraph::TangleGraph(
     const Anchors& anchors,
     const vector<AnchorId>& entranceAnchors,
     const vector<AnchorId>& exitAnchors,
-    bool bidirectional) :
+    bool bidirectional,
+    double maxLoss,
+    uint64_t lowCoverageThreshold,
+    uint64_t highCoverageThreshold) :
     debug(debug),
     tangleId(tangleId),
     anchors(anchors),
     bidirectional(bidirectional)
 {
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t minVertexCoverage = 5;
+
+
     if(debug) {
         cout << "Creating a tangle graph for tangle " << tangleId <<
             " with " << entranceAnchors.size() <<
@@ -46,13 +55,30 @@ TangleGraph::TangleGraph(
     constructExits(exitAnchors);
     gatherOrientedReads();
 
-    createVertices();
+    createVertices(minVertexCoverage);
     createEdges();
+    if(debug) {
+        cout << "The initial tangle graph has " << num_vertices(*this) <<
+            " vertices and " << num_edges(*this) << " edges." << endl;
+    }
+    // writeGraphviz("Initial");
+
+    removeWeakEdges(maxLoss);
+    removeCrossEdges(lowCoverageThreshold, highCoverageThreshold);
+    // writeGraphviz("Cleanedup");
+
+    if(not removeUnreachable()) {
+        failure = true;
+        if(debug) {
+            cout << "Reachability failure." << endl;
+        }
+        return;
+    }
 
     if(debug) {
-        cout << "The tangle graph has " << num_vertices(*this) <<
+        cout << "The final tangle graph has " << num_vertices(*this) <<
             " vertices and " << num_edges(*this) << " edges." << endl;
-        writeGraphviz();
+        writeGraphviz("Final");
     }
 
 }
@@ -392,6 +418,18 @@ void TangleGraph::gatherOrientedReads()
     }
 
 
+    // Remove any OrientedReadInfos for which journeyBegin is not less than journeyEnd.
+    {
+        vector<OrientedReadInfo> newOrientedReadInfos;
+        for(OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
+            if(orientedReadInfo.journeyBegin < orientedReadInfo.journeyEnd) {
+                newOrientedReadInfos.push_back(orientedReadInfo);
+            }
+        }
+        orientedReadInfos.swap(newOrientedReadInfos);
+    }
+
+
 
     if(debug) {
         ofstream csv("TangleOrientedReads-" + to_string(tangleId) + ".csv");
@@ -534,14 +572,10 @@ void TangleGraph::computeTangleMatrix()
 
 
 
-// Create TangleGraph vertices.
-// There is a vertex for each AnchorId that:
-// - Appears in at least one Entrance and/or one Exit.
-// - Does not appear in more than one Entrance.
-// - Does not appear in more than one Exit.
-void TangleGraph::createVertices()
+void TangleGraph::createVertices(uint64_t minVertexCoverage)
 {
     TangleGraph& tangleGraph = *this;
+
 
     // Gather the AnchorIds in the journeys of oriented reads that appear in each entrance.
     vector< vector<AnchorId> > entranceAnchorIds(entrances.size());
@@ -554,6 +588,7 @@ void TangleGraph::createVertices()
 
         // Gather AnchorIds reached by this oriented read.
         const auto journey = anchors.journeys[orientedReadInfo.orientedReadId.getValue()];
+        SHASTA_ASSERT(orientedReadInfo.journeyBegin < orientedReadInfo.journeyEnd);
         copy(
             journey.begin() + orientedReadInfo.journeyBegin,
             journey.begin() + orientedReadInfo.journeyEnd,
@@ -565,14 +600,12 @@ void TangleGraph::createVertices()
         deduplicate(v);
     }
 
-
-    // Now find the AnchorIds that are in more than one entrance.
-    vector<AnchorId> duplicateEntranceAnchorIds;
+    // Gather them all together, then keep only the ones encountered from exactly one entrance.
+    vector<AnchorId> allEntranceAnchorIds;
     for(auto& v: entranceAnchorIds) {
-        copy(v.begin(), v.end(), back_inserter(duplicateEntranceAnchorIds));
+        copy(v.begin(), v.end(), back_inserter(allEntranceAnchorIds));
     }
-    vector<uint64_t> count;
-    deduplicateAndCountWithThreshold(duplicateEntranceAnchorIds, count, 2UL);
+    deduplicateAndCountAndKeepUnique(allEntranceAnchorIds);
 
 
 
@@ -588,212 +621,72 @@ void TangleGraph::createVertices()
 
         // Gather AnchorIds reached by this oriented read.
         const auto journey = anchors.journeys[orientedReadInfo.orientedReadId.getValue()];
+        SHASTA_ASSERT(orientedReadInfo.journeyBegin < orientedReadInfo.journeyEnd);
         copy(
             journey.begin() + orientedReadInfo.journeyBegin,
             journey.begin() + orientedReadInfo.journeyEnd,
             back_inserter(exitAnchorIds[exitIndex]));
     }
 
-    // Deduplicate the AnchorIds for each exit.
+    // Deduplicate the AnchorIds for each entrance.
     for(auto& v: exitAnchorIds) {
         deduplicate(v);
     }
 
-    // Now find the AnchorIds that are in more than one exit.
-    vector<AnchorId> duplicateExitAnchorIds;
+    // Gather them all together, then keep only the ones encountered from exactly one entrance.
+    vector<AnchorId> allExitAnchorIds;
     for(auto& v: exitAnchorIds) {
-        copy(v.begin(), v.end(), back_inserter(duplicateExitAnchorIds));
+        copy(v.begin(), v.end(), back_inserter(allExitAnchorIds));
     }
-    deduplicateAndCountWithThreshold(duplicateExitAnchorIds, count, 2UL);
+    deduplicateAndCountAndKeepUnique(allExitAnchorIds);
 
 
-    // The forbiddenAnchorIds are the union set of
-    // duplicateEntranceAnchorIds and duplicateExitAnchorIds.
-    vector<AnchorId> forbiddenAnchorIds;
-    std::set_union(
-        duplicateEntranceAnchorIds.begin(), duplicateEntranceAnchorIds.end(),
-        duplicateExitAnchorIds.begin(), duplicateExitAnchorIds.end(),
-        back_inserter(forbiddenAnchorIds));
 
-
-    // Generate the set of all allowed anchorIds.
-    vector<AnchorId> allAnchorIds;
-    for(auto& v: entranceAnchorIds) {
-        copy(v.begin(), v.end(), back_inserter(allAnchorIds));
-    }
-    for(auto& v: exitAnchorIds) {
-        copy(v.begin(), v.end(), back_inserter(allAnchorIds));
-    }
-    deduplicate(allAnchorIds);
+    // The allowedAnchorIds are the union set of
+    // allEntranceAnchorIds and allExitAnchorIds.
     vector<AnchorId> allowedAnchorIds;
-    std::set_difference(
-        allAnchorIds.begin(), allAnchorIds.end(),
-        forbiddenAnchorIds.begin(), forbiddenAnchorIds.end(),
+    std::set_union(
+        allEntranceAnchorIds.begin(), allEntranceAnchorIds.end(),
+        allExitAnchorIds.begin(), allExitAnchorIds.end(),
         back_inserter(allowedAnchorIds));
+
+
+
+
+    // Sanity check: all entrances and exits must be in allowedAnchorIds.
+    for(const Entrance& entrance: entrances) {
+        SHASTA_ASSERT(binary_search(allowedAnchorIds.begin(), allowedAnchorIds.end(), entrance.anchorId));
+    }
+    for(const Exit& exit: exits) {
+        SHASTA_ASSERT(binary_search(allowedAnchorIds.begin(), allowedAnchorIds.end(), exit.anchorId));
+    }
+
+
 
 
     // Now we generate one vertex for each of these AnchorIds.
     for(const AnchorId anchorId: allowedAnchorIds) {
         const vertex_descriptor v = add_vertex(TangleGraphVertex(anchorId), tangleGraph);
         vertexTable.push_back(make_pair(anchorId, v));
+        // cout << "Added to vertexTable " << anchorIdToString(anchorId) << " " << v << endl;
     }
-
 
     // At this point the vertexTable is valid and we can use getVertex.
 
-    // Fill in the entranceIndex and exitIndex of each vertex.
-    for(uint64_t entranceIndex=0; entranceIndex<entrances.size(); entranceIndex++) {
-        for(const AnchorId anchorId: entranceAnchorIds[entranceIndex]) {
-            const vertex_descriptor v = getVertex(anchorId);
-            if(v == null_vertex()) {
-                continue;
-            }
-            TangleGraphVertex& vertex = tangleGraph[v];
-            SHASTA_ASSERT(vertex.entranceIndex == invalid<uint64_t>);
-            vertex.entranceIndex = entranceIndex;
-        }
-    }
-    for(uint64_t exitIndex=0; exitIndex<exits.size(); exitIndex++) {
-        for(const AnchorId anchorId: exitAnchorIds[exitIndex]) {
-            const vertex_descriptor v = getVertex(anchorId);
-            if(v == null_vertex()) {
-                continue;
-            }
-            TangleGraphVertex& vertex = tangleGraph[v];
-            SHASTA_ASSERT(vertex.exitIndex == invalid<uint64_t>);
-            vertex.exitIndex = exitIndex;
-        }
-    }
-
-#if 0
-    // Gather the uniqueJourneyAnchorIds from all Entrances and Exits
-    // and deduplicate. Deduplication is needed because,
-    // even an AnchorId can appear in only one Entrance and one Exit,
-    // it can appear in both one Entrance and one Exit, and we want to generate
-    // only one vertex.
+    // Sanity checks.
     for(const Entrance& entrance: entrances) {
-        for(const AnchorId anchorId: entrance.uniqueJourneyAnchorIds) {
-            vertexTable.push_back({anchorId, null_vertex()});
-        }
+        SHASTA_ASSERT(getVertex(entrance.anchorId) != null_vertex());
     }
     for(const Exit& exit: exits) {
-        for(const AnchorId anchorId: exit.uniqueJourneyAnchorIds) {
-            vertexTable.push_back({anchorId, null_vertex()});
-        }
+        SHASTA_ASSERT(getVertex(exit.anchorId) != null_vertex());
     }
-    deduplicate(vertexTable);
-    // After deduplicate the vertexTable is sorted.
-
-    // Now we generate one vertex for each of these AnchorIds.
-    for(auto& p: vertexTable) {
-        const AnchorId anchorId = p.first;
-        p.second = add_vertex(TangleGraphVertex(anchorId), *this);
-    }
-
-    // At this point the vertexTable is valid and we can use getVertex.
-
-    // Fill in the entranceIndex and exitIndex of each vertex.
-    for(uint64_t entranceIndex=0; entranceIndex<entrances.size(); entranceIndex++) {
-        const Entrance& entrance = entrances[entranceIndex];
-        for(const AnchorId anchorId: entrance.uniqueJourneyAnchorIds) {
-            const vertex_descriptor v = getVertex(anchorId);
-            TangleGraphVertex& vertex = tangleGraph[v];
-            SHASTA_ASSERT(vertex.entranceIndex == invalid<uint64_t>);
-            vertex.entranceIndex = entranceIndex;
-        }
-    }
-    for(uint64_t exitIndex=0; exitIndex<exits.size(); exitIndex++) {
-        const Exit& exit = exits[exitIndex];
-        for(const AnchorId anchorId: exit.uniqueJourneyAnchorIds) {
-            const vertex_descriptor v = getVertex(anchorId);
-            TangleGraphVertex& vertex = tangleGraph[v];
-            SHASTA_ASSERT(vertex.exitIndex == invalid<uint64_t>);
-            vertex.exitIndex = exitIndex;
-        }
-    }
-#endif
-
-    // Histogram the vertices by their entranceIndex and exitIndex.
-    std::map< pair<uint64_t, uint64_t>, uint64_t> histogram;
     BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
-        const TangleGraphVertex& vertex = tangleGraph[v];
-        const auto p = make_pair(vertex.entranceIndex, vertex.exitIndex);
-        auto it = histogram.find(p);
-        if(it == histogram.end()) {
-            histogram.insert({p, 1});
-        } else {
-            ++(it->second);
-        }
+        SHASTA_ASSERT(getVertex(tangleGraph[v].anchorId) == v);
     }
 
 
 
-    if(debug) {
-        cout << "Histogram of vertex count by (entrance, exit):" << endl;
-        for(const auto& p: histogram) {
-            const auto& q = p.first;
-            const uint64_t frequency = p.second;
-            const uint64_t entranceIndex = q.first;
-            const uint64_t exitIndex = q.second;
-
-            cout << "Entrance: ";
-            if(entranceIndex == invalid<uint64_t>) {
-                cout << "None";
-            } else {
-                cout << entranceIndex << " " << anchorIdToString(entrances[entranceIndex].anchorId);
-            }
-
-            cout << ", exit: ";
-            if(exitIndex == invalid<uint64_t>) {
-                cout << "None";
-            } else {
-                cout << exitIndex << " " << anchorIdToString(exits[exitIndex].anchorId);
-            }
-
-            cout << ", frequency " << frequency << "\n";
-        }
-    }
-
-
-
-    // Use the histogram to fill in the tangleMatrix.
-    tangleMatrix.resize(entrances.size(), vector<uint64_t>(exits.size(), 0));
-    for(const auto& p: histogram) {
-        const auto& q = p.first;
-        const uint64_t frequency = p.second;
-        const uint64_t entranceIndex = q.first;
-        if(entranceIndex == invalid<uint64_t>) {
-            continue;
-        }
-
-        const uint64_t exitIndex = q.second;
-        if(exitIndex == invalid<uint64_t>) {
-            continue;
-        }
-
-        tangleMatrix[entranceIndex][exitIndex] = frequency;
-    }
-
-
-
-    if(debug) {
-        cout << "Tangle matrix:" << endl;
-        for(uint64_t entranceIndex=0; entranceIndex<entrances.size(); entranceIndex++) {
-            const Entrance& entrance = entrances[entranceIndex];
-            for(uint64_t exitIndex=0; exitIndex<exits.size(); exitIndex++) {
-                const Exit& exit = exits[exitIndex];
-                cout <<
-                    "(" << entranceIndex << "," << exitIndex << ") " <<
-                    anchorIdToString(entrance.anchorId) << " " <<
-                    anchorIdToString(exit.anchorId) << " " << tangleMatrix[entranceIndex][exitIndex] << endl;
-            }
-        }
-    }
-
-
-
-    // Now we can fill in the tangleJourney of each OrientedReadInfo.
-    // This also increments coverage for the vertices as they are encountered.
+    // Find the oriented reads that visit each vertex.
     for(OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
         const OrientedReadId orientedReadId = orientedReadInfo.orientedReadId;
         const auto globalJourney = anchors.journeys[orientedReadId.getValue()];
@@ -801,16 +694,65 @@ void TangleGraph::createVertices()
         // Loop over the portion of the global journey we selected for this oriented read.
         const uint64_t begin = orientedReadInfo.journeyBegin;
         const uint64_t end = orientedReadInfo.journeyEnd;
+        SHASTA_ASSERT(begin < end);
+        for(uint64_t positionInJourney=begin; positionInJourney!=end; positionInJourney++) {
+            const AnchorId anchorId = globalJourney[positionInJourney];
+            const vertex_descriptor v = getVertex(anchorId);
+            if(v != null_vertex()) {
+                SHASTA_ASSERT(tangleGraph[v].anchorId == anchorId);
+                tangleGraph[v].orientedReadIds.push_back(orientedReadId);
+            }
+        }
+    }
+
+
+
+    // Remove low coverage vertices.
+    // Don't allow removing entrances and exits.
+    {
+        vector<vertex_descriptor> verticesToBeRemoved;
+        BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+            const TangleGraphVertex& vertex = tangleGraph[v];
+            if(vertex.coverage() < minVertexCoverage) {
+                const AnchorId anchorId = vertex.anchorId;
+                if(not (isEntrance(anchorId) or isExit(anchorId))) {
+                    verticesToBeRemoved.push_back(v);
+                }
+            }
+        }
+        for(const vertex_descriptor v: verticesToBeRemoved) {
+            boost::remove_vertex(v, tangleGraph);
+        }
+
+        // We also need to recreate the vertexTable.
+        vertexTable.clear();
+        BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+            vertexTable.push_back(make_pair(tangleGraph[v].anchorId, v));
+        }
+        sort(vertexTable.begin(), vertexTable.end());
+    }
+
+
+
+
+    // Now we can fill in the tangleJourney of each OrientedReadInfo.
+    for(OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
+        const OrientedReadId orientedReadId = orientedReadInfo.orientedReadId;
+        const auto globalJourney = anchors.journeys[orientedReadId.getValue()];
+
+        // Loop over the portion of the global journey we selected for this oriented read.
+        const uint64_t begin = orientedReadInfo.journeyBegin;
+        const uint64_t end = orientedReadInfo.journeyEnd;
+        SHASTA_ASSERT(begin < end);
         for(uint64_t positionInJourney=begin; positionInJourney!=end; positionInJourney++) {
             const AnchorId anchorId = globalJourney[positionInJourney];
             const vertex_descriptor v = getVertex(anchorId);
             if(v != null_vertex()) {
                 orientedReadInfo.tangleJourney.push_back(v);
-                ++tangleGraph[v].coverage;
             }
         }
 
-        if(debug) {
+        if(false) {
             cout << "The tangle journey for " << orientedReadId <<
                 " has " << orientedReadInfo.tangleJourney.size() << " anchors." << endl;
         }
@@ -840,9 +782,10 @@ TangleGraph::vertex_descriptor TangleGraph::getVertex(AnchorId anchorId) const
 
 void TangleGraph::createEdges()
 {
-    TangleGraph& graph = *this;
+    TangleGraph& tangleGraph = *this;
 
     for(const OrientedReadInfo& orientedReadInfo: orientedReadInfos) {
+        const OrientedReadId orientedReadId = orientedReadInfo.orientedReadId;
         const vector<vertex_descriptor>& tangleJourney = orientedReadInfo.tangleJourney;
 
         for(uint64_t i1=1; i1<tangleJourney.size(); i1++) {
@@ -850,17 +793,18 @@ void TangleGraph::createEdges()
             const vertex_descriptor v0 = tangleJourney[i0];
             const vertex_descriptor v1 = tangleJourney[i1];
 
+            // Find this edge, and create it if necessary.
             edge_descriptor e;
             bool edgeWasFound = false;
-            tie(e, edgeWasFound) = boost::edge(v0, v1, graph);
-            if(edgeWasFound) {
-                ++graph[e].coverage;
-            } else {
+            tie(e, edgeWasFound) = boost::edge(v0, v1, tangleGraph);
+            if(not edgeWasFound) {
                 bool edgeWasAdded = false;
-                tie(e, edgeWasAdded) = add_edge(v0, v1, graph);
+                tie(e, edgeWasAdded) = add_edge(v0, v1, tangleGraph);
                 SHASTA_ASSERT(edgeWasAdded);
-                graph[e].coverage = 1;
             }
+
+            // Store this OrientedReadId in the edge.
+            tangleGraph[e].orientedReadIds.push_back(orientedReadId);
         }
     }
 }
@@ -868,10 +812,10 @@ void TangleGraph::createEdges()
 
 
 
-void TangleGraph::writeGraphviz() const
+void TangleGraph::writeGraphviz(const string& name) const
 {
     const TangleGraph& tangleGraph = *this;
-    ofstream dot("TangleGraph-" + to_string(tangleId) + ".dot");
+    ofstream dot("TangleGraph-" + to_string(tangleId) + "-" + name + ".dot");
     dot << "digraph TangleGraph" << tangleId << "{\n";
 
     BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
@@ -886,22 +830,23 @@ void TangleGraph::writeGraphviz() const
 
         // Label.
         dot << "label=\"";
-        dot << anchorIdToString(anchorId) << "\\n";
-
-        if(vertex.entranceIndex == invalid<uint64_t>) {
-            dot << "N";
-        } else {
-            dot << vertex.entranceIndex;
-        }
-        dot << ",";
-        if(vertex.exitIndex == invalid<uint64_t>) {
-            dot << "N";
-        } else {
-            dot << vertex.exitIndex;
-        }
-
-        // End of label.
+        dot << anchorIdToString(anchorId) << "\\n" << vertex.coverage() << "\\n";
         dot << "\"";
+
+
+
+        // Color.
+        const bool vertexIsEntrance = isEntrance(anchorId);
+        const bool vertexIsExit = isExit(anchorId);
+        if(vertexIsEntrance and not vertexIsExit) {
+            dot << " style=filled color=green fillcolor=green";
+        }
+        if(vertexIsExit and not vertexIsEntrance) {
+            dot << " style=filled color=red fillcolor=red";
+        }
+        if(vertexIsEntrance and vertexIsExit) {
+            dot << " style=filled color=magenta fillcolor=magenta";
+        }
 
 
 
@@ -926,7 +871,16 @@ void TangleGraph::writeGraphviz() const
         // Begin attributes.
         dot << " [";
 
-        dot << "penwidth=" << 0.5 * double(edge.coverage);
+        // Tooltip.
+        dot <<
+            "tooltip=\"" <<
+            anchorIdToString(anchorId0) << "->" <<
+            anchorIdToString(anchorId1) << " " <<
+            edge.coverage() << " " <<
+            edgeLoss(e) << "\"";
+
+        // Thickness.
+        dot << "penwidth=" << 0.5 * double(edge.coverage());
 
         // End attributes.
         dot << "]";
@@ -936,4 +890,355 @@ void TangleGraph::writeGraphviz() const
     }
 
     dot << "}\n";
+}
+
+
+
+// Remove edges for which loss = (commonCount - coverage) / commonCount > maxLoss
+// This is similar to AnchorGraph::removeWeakEdges.
+void TangleGraph::removeWeakEdges(double maxLoss)
+{
+    TangleGraph& tangleGraph = *this;
+
+    // Find the edges we are going to remove.
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, tangleGraph, TangleGraph) {
+        if(edgeLoss(e) > maxLoss) {
+            edgesToBeRemoved.push_back(e);
+        }
+    }
+
+    // Remove the edges we found.
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, tangleGraph);
+    }
+
+    if(debug) {
+        cout << "Removed " << edgesToBeRemoved.size() << " weak edges." << endl;
+    }
+
+}
+
+
+
+
+double TangleGraph::edgeLoss(edge_descriptor e) const
+{
+    const TangleGraph& tangleGraph = *this;
+
+    const TangleGraphEdge& edge = tangleGraph[e];
+    const vertex_descriptor v0 = source(e, tangleGraph);
+    const vertex_descriptor v1 = target(e, tangleGraph);
+
+    // Find the number of common oriented reads between the two vertices.
+    const vector<OrientedReadId>& orientedReadIds0 = tangleGraph[v0].orientedReadIds;
+    const vector<OrientedReadId>& orientedReadIds1 = tangleGraph[v1].orientedReadIds;
+    vector<OrientedReadId> commonOrientedReadIds;
+    std::set_intersection(
+        orientedReadIds0.begin(), orientedReadIds0.end(),
+        orientedReadIds1.begin(), orientedReadIds1.end(),
+        back_inserter(commonOrientedReadIds));
+    const uint64_t commonCount = commonOrientedReadIds.size();
+
+    return double(commonCount - edge.coverage()) / double(commonCount);
+}
+
+
+
+// Remove cross-edges.
+// This removes an edge v0->v1 if the following are all true:
+// - Its coverage is at most lowCoverageThreshold.
+// - v0 has at least one out-edge with coverage at least highCoverageThreshold
+// - v1 has at least one in-edge with coverage at least highCoverageThreshold.
+void TangleGraph::removeCrossEdges(
+    uint64_t lowCoverageThreshold,
+    uint64_t highCoverageThreshold)
+{
+    TangleGraph& tangleGraph = *this;
+
+    // Find the edges we are going to remove.
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, tangleGraph, TangleGraph) {
+        const TangleGraphEdge& edge = tangleGraph[e];
+
+        // Check coverage.
+        if(edge.coverage() > lowCoverageThreshold) {
+            continue;
+        }
+
+        // Check out-edges of v0.
+        const vertex_descriptor v0 = source(e, tangleGraph);
+        bool v0HasStrongOutEdge = false;
+        BGL_FORALL_OUTEDGES(v0, e0, tangleGraph, TangleGraph) {
+            if(tangleGraph[e0].coverage() >= highCoverageThreshold) {
+                v0HasStrongOutEdge = true;
+                break;
+            }
+        }
+        if(not v0HasStrongOutEdge) {
+            continue;
+        }
+
+        // Check in-edges of v1.
+        const vertex_descriptor v1 = target(e, tangleGraph);
+        bool v1HasStrongOutEdge = false;
+        BGL_FORALL_INEDGES(v1, e1, tangleGraph, TangleGraph) {
+            if(tangleGraph[e1].coverage() >= highCoverageThreshold) {
+                v1HasStrongOutEdge = true;
+                break;
+            }
+        }
+        if(not v1HasStrongOutEdge) {
+            continue;
+        }
+
+        // If all above checks passed, this edge will be removed.
+        edgesToBeRemoved.push_back(e);
+    }
+
+    // Remove the edges we found.
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        if(debug) {
+            const vertex_descriptor v0 = source(e, tangleGraph);
+            const vertex_descriptor v1 = target(e, tangleGraph);
+            cout << "Removed cross edge " << anchorIdToString(tangleGraph[v0].anchorId) <<
+                " -> " << anchorIdToString(tangleGraph[v1].anchorId) << endl;
+        }
+        boost::remove_edge(e, tangleGraph);
+    }
+    if(debug) {
+        cout << "Removed " << edgesToBeRemoved.size() << " cross edges." << endl;
+    }
+}
+
+
+
+void TangleGraph::getChains(vector< vector<AnchorId> >& anchorChains) const
+{
+    const TangleGraph& tangleGraph = *this;
+
+    // Find chains of edges (linear paths).
+    vector< vector<edge_descriptor> > edgeChains;
+    findLinearChains(tangleGraph, 1, edgeChains);
+    const uint64_t chainCount = edgeChains.size();
+
+
+
+    // Create the corresponding chains of AnchorIds.
+    anchorChains.clear();
+    vector<AnchorId> anchorChain;
+    vector<uint64_t> splitPoints;
+    for(uint64_t i=0; i<chainCount; i++) {
+        const vector<edge_descriptor>& edgeChain = edgeChains[i];
+
+        // Fill in the AnchorIds corresponding to this chain.
+        anchorChain.clear();
+        // Add the source AnchorId for the first edge.
+        const vertex_descriptor v = source(edgeChain.front(), tangleGraph);
+        anchorChain.push_back(tangleGraph[v].anchorId);
+        // Add the target AnchorId for all the edges.
+        for(const edge_descriptor e: edgeChain) {
+            const vertex_descriptor v = target(e, tangleGraph);
+            anchorChain.push_back(tangleGraph[v].anchorId);
+        }
+
+
+        // If any of the internal AnchorIds of this chain correspond to an
+        // Entrance or Exit, we have to split it.
+        splitPoints.clear();
+        for(uint64_t i=1; i<anchorChain.size()-1; i++) {
+            const AnchorId anchorId = anchorChain[i];
+            if(isEntrance(anchorId) or isExit(anchorId)) {
+                splitPoints.push_back(i);
+            }
+        }
+
+        if(splitPoints.empty()) {
+            anchorChains.push_back(anchorChain);
+        } else {
+
+            if(debug) {
+                cout << "Splitting chain " << anchorChain.front() << "..." << anchorChain.back() << endl;
+            }
+
+            // Add a split chain from the beginning to the first split point.
+            anchorChains.resize(anchorChains.size() + 1);
+            vector<AnchorId>& firstSplitChain = anchorChains.back();
+            for(uint64_t j=0; j<=splitPoints.front(); j++) {
+                firstSplitChain.push_back(anchorChain[j]);
+            }
+            // Add split chains in-between split points.
+            for(uint64_t i1=1; i1<splitPoints.size(); i1++) {
+                const uint64_t i0 = i1 - 1;
+                const uint64_t j0 = splitPoints[i0];
+                const uint64_t j1 = splitPoints[i1];
+                anchorChains.resize(anchorChains.size() + 1);
+                vector<AnchorId>& splitChain = anchorChains.back();
+                for(uint64_t j=j0; j<=j1; j++) {
+                    splitChain.push_back(anchorChain[j]);
+                }
+            }
+            // Add a split chain from the last split point to the end.
+            anchorChains.resize(anchorChains.size() + 1);
+            vector<AnchorId>& lastSplitChain = anchorChains.back();
+            for(uint64_t j=splitPoints.back(); j<anchorChain.size(); j++) {
+                lastSplitChain.push_back(anchorChain[j]);
+            }
+        }
+    }
+
+}
+
+
+
+// Find out if a given AnchorId is an entrance.
+bool TangleGraph::isEntrance(AnchorId anchorId) const
+{
+    for(const Entrance& entrance: entrances) {
+        if(entrance.anchorId == anchorId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+
+// Find out if a given AnchorId is an exit.
+bool TangleGraph::isExit(AnchorId anchorId) const
+{
+    for(const Exit& exit: exits) {
+        if(exit.anchorId == anchorId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+
+bool TangleGraph::removeUnreachable()
+{
+    TangleGraph& tangleGraph = *this;
+
+    // Clear the BFS flags for all vertices.
+    BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+        tangleGraph[v].wasSeenByForwardBfs = false;
+        tangleGraph[v].wasSeenByBackwardBfs = false;
+    }
+
+    // Do a forward BFS starting at the entrances.
+    std::queue<vertex_descriptor> q;
+    for(const Entrance& entrance: entrances) {
+        const vertex_descriptor v = getVertex(entrance.anchorId);
+        SHASTA_ASSERT(v != null_vertex());
+        tangleGraph[v].wasSeenByForwardBfs = true;
+        q.push(v);
+    }
+    while(not q.empty()) {
+        const vertex_descriptor v0 = q.front();
+        q.pop();
+        BGL_FORALL_OUTEDGES(v0, e, tangleGraph, TangleGraph) {
+            const vertex_descriptor v1 = target(e, tangleGraph);
+            TangleGraphVertex& vertex1 = tangleGraph[v1];
+            if(not vertex1.wasSeenByForwardBfs) {
+                vertex1.wasSeenByForwardBfs = true;
+                q.push(v1);
+            }
+        }
+    }
+
+
+
+    // Do a backward BFS starting at the exits.
+    SHASTA_ASSERT(q.empty());
+    for(const Exit& exit: exits) {
+        const vertex_descriptor v = getVertex(exit.anchorId);
+        SHASTA_ASSERT(v != null_vertex());
+        tangleGraph[v].wasSeenByBackwardBfs = true;
+        q.push(v);
+    }
+    while(not q.empty()) {
+        const vertex_descriptor v0 = q.front();
+        q.pop();
+        BGL_FORALL_INEDGES(v0, e, tangleGraph, TangleGraph) {
+            const vertex_descriptor v1 = source(e, tangleGraph);
+            TangleGraphVertex& vertex1 = tangleGraph[v1];
+            if(not vertex1.wasSeenByBackwardBfs) {
+                vertex1.wasSeenByBackwardBfs = true;
+                q.push(v1);
+            }
+        }
+    }
+
+
+
+    // Remove vertices that were not seen by both BFSs.
+    // If this includes any entrance or exit, give up.
+    vector<vertex_descriptor> verticesToBeRemoved;
+    BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+        const TangleGraphVertex& vertex = tangleGraph[v];
+        const AnchorId anchorId = vertex.anchorId;
+        if(vertex.wasSeenByForwardBfs and vertex.wasSeenByBackwardBfs) {
+            continue;
+        }
+        if(isEntrance(anchorId)) {
+            return false;
+        }
+        if(isExit(anchorId)) {
+            return false;
+        }
+        verticesToBeRemoved.push_back(v);
+    }
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        boost::clear_vertex(v, tangleGraph);
+        boost::remove_vertex(v, tangleGraph);
+    }
+
+    // Recreate the vertex table.
+    vertexTable.clear();
+    BGL_FORALL_VERTICES(v, tangleGraph, TangleGraph) {
+        vertexTable.push_back(make_pair(tangleGraph[v].anchorId, v));
+    }
+    deduplicate(vertexTable);
+
+
+    return true;
+}
+
+
+
+// Return true if successful, that is, all Entrances are
+// connecte to at least one Exit, and all Exits are
+// connected to at least one Entrance.
+bool TangleGraph::isSuccessful() const
+{
+    const TangleGraph& tangleGraph = *this;
+    if(failure) {
+        return false;
+    }
+
+    for(const Entrance& entrance: entrances) {
+        const AnchorId anchorId = entrance.anchorId;
+        const vertex_descriptor v = getVertex(anchorId);
+        const TangleGraphVertex& vertex = tangleGraph[v];
+        if(vertex.wasSeenByForwardBfs and vertex.wasSeenByBackwardBfs) {
+            continue;
+        } else {
+            return false;
+        }
+    }
+
+    for(const Exit& exit: exits) {
+        const AnchorId anchorId = exit.anchorId;
+        const vertex_descriptor v = getVertex(anchorId);
+        const TangleGraphVertex& vertex = tangleGraph[v];
+        if(vertex.wasSeenByForwardBfs and vertex.wasSeenByBackwardBfs) {
+            continue;
+        } else {
+            return false;
+        }
+    }
+
+    return true;
 }

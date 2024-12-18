@@ -45,6 +45,33 @@ Tangle::Tangle(
         writeExits();
     }
 
+    // If an AnchorId is both an entrance and an exit, don't do anything
+    // and leave success at false.
+    for(const Entrance& entrance: entrances) {
+        if(isExit(entrance.anchorId)) {
+            if(debug) {
+                cout << "Not detangling because anchorId " << anchorIdToString(entrance.anchorId) <<
+                    " is both an entrance and an exit." << endl;
+            }
+            return;
+        }
+    }
+
+
+}
+
+
+
+void Tangle::detangle(
+    bool debug,
+    uint64_t tangleId,
+    AssemblyGraph& assemblyGraph,
+    double maxLoss,
+    uint64_t lowCoverageThreshold,
+    uint64_t highCoverageThreshold,
+    vector< vector<AnchorId> >& anchorChains)
+{
+
     // Create the TangleGraph.
     vector<AnchorId> entranceAnchorIds;
     for(const Entrance& entrance: entrances) {
@@ -56,7 +83,31 @@ Tangle::Tangle(
     }
     const bool bidirectional = false;
     TangleGraph tangleGraph(debug, tangleId, assemblyGraph.anchors,
-        entranceAnchorIds, exitAnchorIds, bidirectional);
+        entranceAnchorIds, exitAnchorIds, bidirectional, maxLoss,
+        lowCoverageThreshold, highCoverageThreshold);
+
+    tangleGraph.getChains(anchorChains);
+
+    success = tangleGraph.isSuccessful();
+
+    if(debug) {
+        cout << "Found " << anchorChains.size() << " chains:" << endl;
+        for(const vector<AnchorId>& anchorChain: anchorChains) {
+            cout << "Chain with " << anchorChain.size() << " anchors:";
+            for(const AnchorId anchorId: anchorChain) {
+                cout << " " << anchorIdToString(anchorId);
+            }
+            cout << endl;
+        }
+    }
+
+    if(debug) {
+        if(success) {
+            cout << "Detangling was successful." << endl;
+        } else {
+            cout << "Detangling failed." << endl;
+        }
+    }
 }
 
 
@@ -345,7 +396,7 @@ void Tangle::findExits()
         }
     }
 }
-
+#endif
 
 
 bool Tangle::isEntrance(AssemblyGraph::edge_descriptor e) const
@@ -369,8 +420,30 @@ bool Tangle::isExit(AssemblyGraph::edge_descriptor e) const
     }
     return false;
 }
-#endif
 
+
+
+bool Tangle::isEntrance(AnchorId anchorId) const
+{
+    for(const Entrance& entrance: entrances) {
+        if(entrance.anchorId == anchorId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+
+bool Tangle::isExit(AnchorId anchorId) const
+{
+    for(const Exit& exit: exits) {
+        if(exit.anchorId == anchorId) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void Tangle::writeEntrances() const
 {
@@ -514,3 +587,17 @@ void Tangle::readFollowingFromExit(Exit& exit)
 
 #endif
 
+
+
+// Find Assembly graph edges that are both an entrance and an exit.
+void Tangle::findEntranceExits(vector<AssemblyGraph::edge_descriptor>& entranceExits) const
+{
+    entranceExits.clear();
+    for(const Entrance& entrance: entrances)
+    {
+        const AssemblyGraph::edge_descriptor e = entrance.e;
+        if(isExit(e)) {
+            entranceExits.push_back(e);
+        }
+    }
+}

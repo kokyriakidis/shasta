@@ -294,20 +294,36 @@ public:
         const Anchors&,
         uint64_t componentId,
         uint64_t k,
-        const vector<OrientedReadId>&,
-        const vector<AnchorId>&,
+        span<const OrientedReadId>,
+        span<const AnchorId>,
         uint64_t threadCount,
         const Mode3AssemblyOptions& options,
         bool assembleSequence,
         bool debug);
 
     // Constructor from binary data, for postprocessing.
-    // Uxsed by AssemblyGraphPostprocessor in the http server.
+    // Used by AssemblyGraphPostprocessor in the http server.
     AssemblyGraph(
         const string& assemblyStage,
         uint64_t componentId,
+        span<const OrientedReadId>,
+        span<const AnchorId>,
         const Anchors&,
         const Mode3AssemblyOptions&);
+
+    // Constructor from a vector of vectors of AnchorIds representing Chains.
+    // Used for detangling with read following.
+    AssemblyGraph(
+        const Anchors&,
+        uint64_t componentId,
+        uint64_t k,
+        span<const OrientedReadId>,
+        span<const AnchorId>,
+        const vector< vector<AnchorId> >& anchorChains,
+        uint64_t threadCount,
+        const Mode3AssemblyOptions& options,
+        bool debug);
+
 
     // Hide Base defined by the base class.
     using Base = shasta::Base;
@@ -320,7 +336,7 @@ public:
 
     // The OrientedReadIds of the connected component that generated this AssemblyGraph.
     // These are sorted.
-    vector<OrientedReadId> orientedReadIds;
+    span<const OrientedReadId> orientedReadIds;
 
     // Get the index of an OrientedReadId in the orientedReadIds sorted vector.
     uint64_t getOrientedReadIndex(OrientedReadId) const;
@@ -328,7 +344,7 @@ public:
     // The AnchorIds of the anchors
     // of the connected component that generated this AssemblyGraph.
     // These are sorted.
-    vector<AnchorId> anchorIds;
+    span<const AnchorId> anchorIds;
 
     // Get the index of a AnchorId in the anchorIds vector.
     uint64_t getAnchorIndex(AnchorId) const;
@@ -403,6 +419,8 @@ private:
     // For optimal results it is best to call compressBubbleChains before expand.
     void expand();
 
+    uint64_t totalChainCount() const;
+
     // Compute the tangle matrix given in-edges and out-edges.
     // The last bubble of each in-edge and the first bubble
     // of each out-edge must be haploid.
@@ -414,8 +432,8 @@ private:
 
     // Low level primitives used in detangling.
     // See the implementation for details.
-    vertex_descriptor cloneAndTruncateAtEnd(edge_descriptor);
-    vertex_descriptor cloneAndTruncateAtBeginning(edge_descriptor);
+    vertex_descriptor cloneAndTruncateAtEnd(bool debug, edge_descriptor);
+    vertex_descriptor cloneAndTruncateAtBeginning(bool debug, edge_descriptor);
 
     // Vertex detangling.
     bool detangleVertices(bool debug,
@@ -582,13 +600,18 @@ private:
     // Detangle with read following.
     void detangleSuperbubblesWithReadFollowing(
         bool debug,
-        uint64_t maxOffset);
+        uint64_t maxOffset,
+        double maxLoss,
+        uint64_t lowCoverageThreshold,
+        uint64_t highCoverageThreshold);
     void detangleSuperbubbleWithReadFollowing(
         bool debug,
         const Superbubbles&,
         uint64_t superbubbleId,
-        uint64_t maxOffset);
-
+        uint64_t maxOffset,
+        double maxLoss,
+        uint64_t lowCoverageThreshold,
+        uint64_t highCoverageThreshold);
 
     // Cleanup/simplify superbubbles that are likely to be caused by errors,
     // completely or in part.
@@ -947,8 +970,6 @@ private:
         ar & k;
         ar & sequenceWasAssembled;
         ar & nextEdgeId;
-        ar & anchorIds;
-        ar & orientedReadIds;
     }
     void save(ostream&) const;
     void load(istream&);

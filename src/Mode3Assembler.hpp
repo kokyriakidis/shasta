@@ -85,28 +85,30 @@ public:
     const Mode3AssemblyOptions& options;
 private:
 
+
+
     // The oriented reads present in each anchor
     // define a bipartite graph. We want to compute connected components
     // of this bipartite graph and process them one at a time.
-    // These are also connected components of the global primary graph
+    // These are also connected components of the global anchor graph
     // (with one vertex for each anchor, and edges created by following the reads).
-    class ConnectedComponent {
-    public:
-        // The oriented reads in this connected component.
-        vector<OrientedReadId> orientedReadIds;
 
-        // The anchors (marker graph edge ids) in this connected component.
-        vector<mode3::AnchorId> anchorIds;
+    // The OrientedReadIds in each component. Indexed by componentId.
+    MemoryMapped::VectorOfVectors<OrientedReadId, uint64_t> componentOrientedReadIds;
 
-        bool isSelfComplementary() const;
-        void checkIsValid() const;  // SHASTA_ASSERT if not valid.
-    };
-    vector<ConnectedComponent> connectedComponents;
+    // The anchorIds in each component. Indexed by componentId.
+    MemoryMapped::VectorOfVectors<mode3::AnchorId, uint64_t> componentAnchorIds;
+
+    bool isSelfComplementaryComponent(uint64_t componentId) const;
+    void checkComponentIsValid(uint64_t componentId) const;
+
     void computeConnectedComponents();
 
     // Debug output of connected components.
     void writeConnectedComponents() const;
     void writeConnectedComponent(uint64_t componentId) const;
+
+
 
     // For each oriented read, store which ConnectedComponent it belongs to,
     // and at what position.
