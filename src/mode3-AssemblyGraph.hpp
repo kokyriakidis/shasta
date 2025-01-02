@@ -344,10 +344,8 @@ public:
     // The AnchorIds of the anchors
     // of the connected component that generated this AssemblyGraph.
     // These are sorted.
+    // An index in this vector is called a local anchor id.
     span<const AnchorId> anchorIds;
-
-    // Get the index of a AnchorId in the anchorIds vector.
-    uint64_t getAnchorIndex(AnchorId) const;
 
     bool sequenceWasAssembled = false;
 

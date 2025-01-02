@@ -7990,17 +7990,6 @@ uint64_t AssemblyGraph::getOrientedReadIndex(OrientedReadId orientedReadId) cons
 }
 
 
-// Get the index of a AnchorId in the anchorIds vector.
-uint64_t AssemblyGraph::getAnchorIndex(AnchorId anchorId) const
-{
-    auto it = std::lower_bound(anchorIds.begin(), anchorIds.end(), anchorId);
-    SHASTA_ASSERT(it != anchorIds.end());
-    SHASTA_ASSERT(*it == anchorId);
-    return it - anchorIds.begin();
-
-}
-
-
 void AssemblyGraph::save(ostream& s) const
 {
     boost::archive::binary_oarchive archive(s);
