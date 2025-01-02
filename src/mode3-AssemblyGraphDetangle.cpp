@@ -13,8 +13,9 @@ using namespace mode3;
 // Detangle with read following.
 // This requires all bubble chains to be trivial
 // (that is, to consist of just one haploid bubble).
-void AssemblyGraph::detangleSuperbubblesWithReadFollowing(
+uint64_t AssemblyGraph::detangleSuperbubblesWithReadFollowing(
     bool debug,
+    SuperbubbleCreationMethod superbubbleCreationMethod,
     uint64_t maxOffset,
     double maxLoss,
     uint64_t lowCoverageThreshold,
@@ -24,6 +25,10 @@ void AssemblyGraph::detangleSuperbubblesWithReadFollowing(
 
     // Check that all bubble chains are trivial.
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        if(not assemblyGraph[e].isSimpleChain()) {
+            cout << "Assertion failure for " << bubbleChainStringId(e) << endl;
+            write("Failure");
+        }
         SHASTA_ASSERT(assemblyGraph[e].isSimpleChain());
     }
 
@@ -33,28 +38,43 @@ void AssemblyGraph::detangleSuperbubblesWithReadFollowing(
     }
 
     // Find the superbubbles.
-    Superbubbles superbubbles(assemblyGraph, maxOffset);
+    shared_ptr<Superbubbles> superbubbles;
+    if(superbubbleCreationMethod == SuperbubbleCreationMethod::ByLength) {
+        superbubbles = make_shared<Superbubbles>(assemblyGraph, maxOffset);
+        // cout << "Found " << superbubbles->size() << " superbubbles for detangling." << endl;
+    } else if(superbubbleCreationMethod == SuperbubbleCreationMethod::SingleEdges) {
+        superbubbles = make_shared<Superbubbles>(assemblyGraph, Superbubbles::FromEdges());
+        // cout << "Found " << superbubbles->size() <<
+        //     " superbubbles for detangling, each consisting of a single edge." << endl;
+    } else {
+        SHASTA_ASSERT(0);
+    }
     if(debug) {
-        cout << "Found " << superbubbles.size() << " superbubbles." << endl;
+        cout << "Found " << superbubbles->size() << " superbubbles." << endl;
     }
 
     // Loop over the superbubbles.
-    for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        detangleSuperbubbleWithReadFollowing(debug, superbubbles, superbubbleId, maxOffset, maxLoss,
-            lowCoverageThreshold, highCoverageThreshold);
-        writeGraphviz("Z-" + to_string(superbubbleId), false);
-        writeGfa("Z-" + to_string(superbubbleId));
+    uint64_t successCount = 0;
+    for(uint64_t superbubbleId=0; superbubbleId<superbubbles->size(); superbubbleId++) {
+        if(detangleSuperbubbleWithReadFollowing(debug, *superbubbles, superbubbleId, maxOffset, maxLoss,
+            lowCoverageThreshold, highCoverageThreshold)) {
+            ++successCount;
+        }
+        if(debug) {
+            writeGraphviz("Z-" + to_string(superbubbleId), false);
+            writeGfa("Z-" + to_string(superbubbleId));
+        }
     }
 
     if(debug) {
         cout << "Superbubble detangling with read following ends." << endl;
     }
-
+    return successCount;
 }
 
 
 
-void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
+bool AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     bool debug,
     const Superbubbles& superbubbles,
     uint64_t superbubbleId,
@@ -76,9 +96,10 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
     vector<edge_descriptor> entranceExits;
     tangle->findEntranceExits(entranceExits);
 
+
+
     // If there are any entrance/exits, we have to split them and recreate the Tangle.
     if(not entranceExits.empty()) {
-        // For now just give up.
         if(debug) {
             cout << "Found the following entrance/exits:";
             for(const AssemblyGraph::edge_descriptor e: entranceExits) {
@@ -86,8 +107,75 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
             }
             cout << endl;
         }
-        return;
+
+        // If all of them are at least 4 anchors long, we can split them,
+        // then recreate the tangle. Otherwise we have to give up.
+        bool canDo = true;
+        for(const edge_descriptor e: entranceExits) {
+            const Chain& chain = assemblyGraph[e].getOnlyChain();
+            if(chain.size() < 4) {
+                canDo = false;
+                if(debug) {
+                    cout << "Chain for " << bubbleChainStringId(e) <<
+                        " is only " << chain.size() << " anchors long. Cannot split." << endl;
+                }
+                break;
+            }
+        }
+        if(not canDo) {
+            if(debug) {
+                cout << "Cannot split all entrances which are also exits. "
+                    " Skipping detangling for superbubble " << superbubbleId << endl;
+            }
+            return false;
+        }
+
+        // Split in two all the entrances that are also exits.
+        for(const edge_descriptor e: entranceExits) {
+            const vertex_descriptor v0 = source(e, assemblyGraph);
+            const vertex_descriptor v1 = target(e, assemblyGraph);
+            const Chain& chain = assemblyGraph[e].getOnlyChain();
+            auto splitPosition = chain.begin() + chain.size() / 2;
+            // The AnchorId at splitPosition will be included in both chainA and chainB.
+            Chain chainA;
+            copy(chain.begin(), splitPosition + 1, back_inserter(chainA));
+            Chain chainB;
+            copy(splitPosition, chain.end(), back_inserter(chainB));
+            const vertex_descriptor vMiddle = add_vertex(AssemblyGraphVertex(*splitPosition), assemblyGraph);
+
+            // Add an edge for chainA
+            edge_descriptor eA;
+            tie(eA, ignore) = add_edge(v0, vMiddle, assemblyGraph);
+            AssemblyGraphEdge& edgeA = assemblyGraph[eA];
+            edgeA.id = nextEdgeId++;
+            BubbleChain& bubbleChainA = edgeA;
+            bubbleChainA.resize(1);
+            Bubble& bubbleA = bubbleChainA.front();
+            bubbleA.resize(1);
+            bubbleA.front() = chainA;
+
+            // Add an edge for chainB
+            edge_descriptor eB;
+            tie(eB, ignore) = add_edge(vMiddle, v1, assemblyGraph);
+            AssemblyGraphEdge& edgeB = assemblyGraph[eB];
+            edgeB.id = nextEdgeId++;
+            BubbleChain& bubbleChainB = edgeB;
+            bubbleChainB.resize(1);
+            Bubble& bubbleB = bubbleChainB.front();
+            bubbleB.resize(1);
+            bubbleB.front() = chainB;
+
+            // Remove the edge we split.
+            boost::remove_edge(e, assemblyGraph);
+        }
+
+        // Now we can recreate the Tangle.
+        tangle = make_shared<Tangle>(debug, superbubbleId, *this, maxOffset, superbubble);
+        tangle->findEntranceExits(entranceExits);
+        SHASTA_ASSERT(entranceExits.empty());
     }
+
+
 
     vector< vector<AnchorId> > anchorChains;
     tangle->detangle(debug, superbubbleId, *this, maxLoss,
@@ -98,7 +186,7 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
         if(debug) {
             cout << "Could not detangle superbubble " << superbubbleId << endl;
         }
-        return;
+        return false;
     }
 
     // Create a local AssemblyGraph from the detangled anchorChains.
@@ -130,6 +218,7 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
             );
         localAssemblyGraph.compressBubbleChains();
         localAssemblyGraph.compress();
+#if 0
         localAssemblyGraph.cleanupSuperbubbles(false,
             options.assemblyGraphOptions.superbubbleLengthThreshold1,
             options.assemblyGraphOptions.chainTerminalCommonThreshold);
@@ -139,6 +228,7 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
             options.assemblyGraphOptions.superbubbleLengthThreshold3);
         localAssemblyGraph.compress();
         localAssemblyGraph.compressBubbleChains();
+#endif
 
         if(num_edges(localAssemblyGraph) == oldEdgeCount) {
             break;
@@ -239,4 +329,8 @@ void AssemblyGraph::detangleSuperbubbleWithReadFollowing(
         remove_vertex(v, assemblyGraph);
     }
 
+    if(debug) {
+        cout << "Successfully complete detangling for superbubble " << superbubbleId << endl;
+    }
+    return true;
 }

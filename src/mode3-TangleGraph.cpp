@@ -33,6 +33,7 @@ TangleGraph::TangleGraph(
 {
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t minVertexCoverage = 5;
+    const uint64_t anchorCoverageThreshold = 3;
 
 
     if(debug) {
@@ -55,7 +56,10 @@ TangleGraph::TangleGraph(
     constructExits(exitAnchors);
     gatherOrientedReads();
 
-    createVertices(minVertexCoverage);
+    if(not createVertices(anchorCoverageThreshold, minVertexCoverage)) {
+        failure = true;
+        return;
+    }
     createEdges();
     if(debug) {
         cout << "The initial tangle graph has " << num_vertices(*this) <<
@@ -572,10 +576,9 @@ void TangleGraph::computeTangleMatrix()
 
 
 
-void TangleGraph::createVertices(uint64_t minVertexCoverage)
+bool TangleGraph::createVertices(uint64_t anchorCoverageThreshold, uint64_t minVertexCoverage)
 {
     TangleGraph& tangleGraph = *this;
-
 
     // Gather the AnchorIds in the journeys of oriented reads that appear in each entrance.
     vector< vector<AnchorId> > entranceAnchorIds(entrances.size());
@@ -596,16 +599,19 @@ void TangleGraph::createVertices(uint64_t minVertexCoverage)
     }
 
     // Deduplicate the AnchorIds for each entrance.
+    // Only keep the ones that appear in at least anchorCoverageThreshold oriented reads.
+    vector<uint64_t> count;
     for(auto& v: entranceAnchorIds) {
-        deduplicate(v);
+        deduplicateAndCountWithThreshold(v, count, anchorCoverageThreshold);
     }
 
-    // Gather them all together, then keep only the ones encountered from exactly one entrance.
-    vector<AnchorId> allEntranceAnchorIds;
+
+    // Now find the AnchorIds that are in more than one entrance.
+    vector<AnchorId> duplicateEntranceAnchorIds;
     for(auto& v: entranceAnchorIds) {
-        copy(v.begin(), v.end(), back_inserter(allEntranceAnchorIds));
+        copy(v.begin(), v.end(), back_inserter(duplicateEntranceAnchorIds));
     }
-    deduplicateAndCountAndKeepUnique(allEntranceAnchorIds);
+    deduplicateAndCountWithThreshold(duplicateEntranceAnchorIds, count, 2UL);
 
 
 
@@ -628,39 +634,63 @@ void TangleGraph::createVertices(uint64_t minVertexCoverage)
             back_inserter(exitAnchorIds[exitIndex]));
     }
 
-    // Deduplicate the AnchorIds for each entrance.
+    // Deduplicate the AnchorIds for each exit.
     for(auto& v: exitAnchorIds) {
-        deduplicate(v);
+        deduplicateAndCountWithThreshold(v, count, anchorCoverageThreshold);
     }
 
-    // Gather them all together, then keep only the ones encountered from exactly one entrance.
-    vector<AnchorId> allExitAnchorIds;
+    // Now find the AnchorIds that are in more than one exit.
+    vector<AnchorId> duplicateExitAnchorIds;
     for(auto& v: exitAnchorIds) {
-        copy(v.begin(), v.end(), back_inserter(allExitAnchorIds));
+        copy(v.begin(), v.end(), back_inserter(duplicateExitAnchorIds));
     }
-    deduplicateAndCountAndKeepUnique(allExitAnchorIds);
+    deduplicateAndCountWithThreshold(duplicateExitAnchorIds, count, 2UL);
 
 
 
-    // The allowedAnchorIds are the union set of
-    // allEntranceAnchorIds and allExitAnchorIds.
-    vector<AnchorId> allowedAnchorIds;
+    // The forbiddenAnchorIds are the union set of
+    // duplicateEntranceAnchorIds and duplicateExitAnchorIds.
+    vector<AnchorId> forbiddenAnchorIds;
     std::set_union(
-        allEntranceAnchorIds.begin(), allEntranceAnchorIds.end(),
-        allExitAnchorIds.begin(), allExitAnchorIds.end(),
+        duplicateEntranceAnchorIds.begin(), duplicateEntranceAnchorIds.end(),
+        duplicateExitAnchorIds.begin(), duplicateExitAnchorIds.end(),
+        back_inserter(forbiddenAnchorIds));
+
+
+    // Generate the set of all allowed anchorIds.
+    vector<AnchorId> allAnchorIds;
+    for(auto& v: entranceAnchorIds) {
+        copy(v.begin(), v.end(), back_inserter(allAnchorIds));
+    }
+    for(auto& v: exitAnchorIds) {
+        copy(v.begin(), v.end(), back_inserter(allAnchorIds));
+    }
+    deduplicate(allAnchorIds);
+    vector<AnchorId> allowedAnchorIds;
+    std::set_difference(
+        allAnchorIds.begin(), allAnchorIds.end(),
+        forbiddenAnchorIds.begin(), forbiddenAnchorIds.end(),
         back_inserter(allowedAnchorIds));
 
-
-
-
-    // Sanity check: all entrances and exits must be in allowedAnchorIds.
+    // If an entrance or exit is not in this allowed set, give up.
     for(const Entrance& entrance: entrances) {
-        SHASTA_ASSERT(binary_search(allowedAnchorIds.begin(), allowedAnchorIds.end(), entrance.anchorId));
+        if(not binary_search(allowedAnchorIds.begin(), allowedAnchorIds.end(), entrance.anchorId)) {
+            if(debug) {
+                cout << "Giving up because entrance anchor " << anchorIdToString(entrance.anchorId) <<
+                    " is not in the allowed set." << endl;
+            }
+            return false;
+        }
     }
     for(const Exit& exit: exits) {
-        SHASTA_ASSERT(binary_search(allowedAnchorIds.begin(), allowedAnchorIds.end(), exit.anchorId));
+        if(not binary_search(allowedAnchorIds.begin(), allowedAnchorIds.end(), exit.anchorId)) {
+            if(debug) {
+                cout << "Giving up because exit anchor " << anchorIdToString(exit.anchorId) <<
+                    " is not in the allowed set." << endl;
+            }
+            return false;
+        }
     }
-
 
 
 
@@ -757,6 +787,8 @@ void TangleGraph::createVertices(uint64_t minVertexCoverage)
                 " has " << orientedReadInfo.tangleJourney.size() << " anchors." << endl;
         }
     }
+
+    return true;
 }
 
 

@@ -170,7 +170,7 @@ private:
     void gatherOrientedReads();
     OrientedReadInfo* getOrientedReadInfo(OrientedReadId);
 
-    void createVertices(uint64_t minVertexCoverage);
+    bool createVertices(uint64_t anchorCoverageThreshold, uint64_t minVertexCoverage);
     void createEdges();
 
     // The vertexTable contains pairs of AnchorIds with the corresponding
