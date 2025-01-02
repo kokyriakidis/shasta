@@ -6,18 +6,8 @@
 namespace shasta {
     namespace mode3 {
         class AssemblyGraphPostprocessor;
-        class ChainIdentifier;
     }
 }
-
-
-
-class shasta::mode3::ChainIdentifier {
-public:
-    AssemblyGraph::edge_descriptor e;
-    uint64_t positionInBubbleChain;
-    uint64_t indexInBubble;
-};
 
 
 

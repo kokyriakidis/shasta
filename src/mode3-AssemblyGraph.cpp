@@ -8073,3 +8073,62 @@ uint64_t AssemblyGraph::totalChainCount() const
     }
     return count;
 }
+
+
+
+void AssemblyGraph::annotateAnchors()
+{
+    const AssemblyGraph& assemblyGraph = *this;
+
+    anchorAnnotations.clear();
+    anchorAnnotations.resize(anchorIds.size());
+
+    // Loop over all vertices.
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        const AnchorId anchorId = assemblyGraph[v].anchorId;
+        const uint64_t localAnchorId = anchors.getLocalAnchorIdInComponent(anchorId);
+        SHASTA_ASSERT(anchorIds[localAnchorId] == anchorId);
+        anchorAnnotations[localAnchorId].vertices.push_back(v);
+    }
+
+    // Loop over all BubbleChains.
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        const BubbleChain& bubbleChain = assemblyGraph[e];
+
+        // Loop over all Bubbles of this BubbleChain.
+        for(uint64_t positionInBubbleChain=0; positionInBubbleChain<bubbleChain.size(); positionInBubbleChain++) {
+            const Bubble& bubble = bubbleChain[positionInBubbleChain];
+
+            // Loop over all Chains of this Bubble.
+            for(uint64_t indexInBubble=0; indexInBubble<bubble.size(); indexInBubble++) {
+                const Chain& chain = bubble[indexInBubble];
+                SHASTA_ASSERT(chain.size() > 1);
+                const ChainIdentifier chainIdentifier(e, positionInBubbleChain, indexInBubble);
+
+                // First anchor of this Chain.
+                {
+                    const AnchorId anchorId = chain.front();
+                    const uint64_t localAnchorId = anchors.getLocalAnchorIdInComponent(anchorId);
+                    SHASTA_ASSERT(anchorIds[localAnchorId] == anchorId);
+                    anchorAnnotations[localAnchorId].chainsFirstAnchor.push_back(chainIdentifier);
+                }
+
+                // Last anchor of this Chain.
+                {
+                    const AnchorId anchorId = chain.back();
+                    const uint64_t localAnchorId = anchors.getLocalAnchorIdInComponent(anchorId);
+                    SHASTA_ASSERT(anchorIds[localAnchorId] == anchorId);
+                    anchorAnnotations[localAnchorId].chainsLastAnchor.push_back(chainIdentifier);
+                }
+
+                // Internal anchors of this Chain.
+                for(uint64_t positionInChain=1; positionInChain<chain.size()-1; positionInChain++) {
+                    const AnchorId anchorId = chain[positionInChain];
+                    const uint64_t localAnchorId = anchors.getLocalAnchorIdInComponent(anchorId);
+                    SHASTA_ASSERT(anchorIds[localAnchorId] == anchorId);
+                    anchorAnnotations[localAnchorId].internalChainInfo.push_back(make_pair(chainIdentifier, positionInChain));
+                }
+            }
+        }
+    }
+}

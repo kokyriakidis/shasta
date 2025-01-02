@@ -56,6 +56,8 @@ namespace shasta {
             AssemblyGraphVertex,
             AssemblyGraphEdge>;
 
+        class ChainIdentifier;
+
         class AnchorGraph;
         class Anchors;
     }
@@ -236,6 +238,26 @@ public:
     {
         ar & boost::serialization::base_object< vector<Bubble> >(*this);
     }
+
+};
+
+
+
+class shasta::mode3::ChainIdentifier {
+public:
+    AssemblyGraphBaseClass::edge_descriptor e;
+    uint64_t positionInBubbleChain;
+    uint64_t indexInBubble;
+
+    ChainIdentifier() {}
+    ChainIdentifier(
+        AssemblyGraphBaseClass::edge_descriptor e,
+        uint64_t positionInBubbleChain,
+        uint64_t indexInBubble) :
+        e(e),
+        positionInBubbleChain(positionInBubbleChain),
+        indexInBubble(indexInBubble)
+        {}
 
 };
 
@@ -794,6 +816,40 @@ private:
         double bubbleErrorThreshold,
         uint64_t longBubbleThreshold);
 
+public:
+
+
+    // Anchor annotations.
+    // We keep track of:
+    // - Which AssemblyGraph vertices contain a given AnchorId.
+    // - Which Chains contain a given AnchorId at its beginning or end.
+    // - Which Chains contain a given AnchorId internally, and at what position.
+    //   "Internally" means that we don't consider the first and last AnchorIds
+    //   of each chain (those correspond to an AssemblyGraph vertex).
+    class AnchorAnnotation {
+    public:
+
+        // The vertices that contain this AnchorId.
+        vector<vertex_descriptor> vertices;
+
+        // The Chains that contain this AnchorId at the beginning.
+        vector<ChainIdentifier> chainsFirstAnchor;
+
+        // The Chains that contain this AnchorId at the end.
+        vector<ChainIdentifier> chainsLastAnchor;
+
+        // The Chains that contain this AnchorId internally, and the corresponding
+        // position of the AnchorId in each Chain.
+        // This stores pairs(ChaiIdentifier, positionInChain).
+        vector< pair<ChainIdentifier, uint64_t> > internalChainInfo;
+    };
+
+    // Vector of AnchorAnnotations for all anchors in this component, indexed by local anchor id.
+    // This is not maintained. It is only created when needed.
+    vector<AnchorAnnotation> anchorAnnotations;
+    void annotateAnchors();
+
+private:
 
 
     // Optimize chains before assembly, to remove assembly steps with

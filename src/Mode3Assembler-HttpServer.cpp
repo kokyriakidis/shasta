@@ -31,22 +31,58 @@ namespace shasta {
 
 void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
 {
-    // Get the AnchorId.
+    // Get the request parameters.
     string anchorIdString;
     const bool anchorIdStringIsPresent = HttpServer::getParameterValue(request, "anchorIdString", anchorIdString);
 
-    // Write the form.
+    string annotateString;
+    const bool annotate = HttpServer::getParameterValue(request,
+        "annotate", annotateString);
+
+    string assemblyStage = "Final";
+    HttpServer::getParameterValue(request, "assemblyStage", assemblyStage);
+
+
+    // Begin the form.
     html <<
+        "<h2>Anchor information</h2>"
         "<form>"
-        "<input type=submit value='Show details for anchor'> "
-        "<input type=text name=anchorIdString required";
+        "<table>"
+
+    // AnchorId
+        "<tr><th class=left>Anchor id<td class=centered>"
+        "<input type=text name=anchorIdString required style='text-align:center'";
     if(anchorIdStringIsPresent) {
         html << " value='" << anchorIdString + "'";
     }
     html <<
         " size=8 title='Enter an anchor id between 0 and " <<
         anchors().size() / 2 - 1 << " followed by + or -.'>";
-    html << "</form>";
+
+    // Annotation.
+    html <<
+        "<tr>"
+        "<th class=left>Assembly graph annotations"
+        "<td class=centered><input type=checkbox name=annotate" <<
+        (annotate ? " checked" : "") << ">";
+
+    // Assembly stage for annotation.
+    html <<
+        "<tr>"
+        "<th class=left>Assembly stage for annotations"
+        "<td class=centered><input type=text name=assemblyStage style='text-align:center'";
+    if(not assemblyStage.empty()) {
+        html << " value='" << assemblyStage + "'";
+    }
+    html << " size=8>";
+
+    // End the form.
+    html <<
+        "</table>"
+        "<input type=submit value='Show anchor details'> "
+        "</form>";
+
+
 
     // If the anchor id missing or invalid, stop here.
     if(not anchorIdStringIsPresent) {
@@ -63,6 +99,7 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
 
     html << "<h1>Anchor " << anchorIdString << "</h1>";
 
+    const uint64_t componentId = anchors().getComponent(anchorId);
     const auto markerIntervals = anchors()[anchorId];
     const uint64_t coverage = markerIntervals.size();
     const auto sequence = anchors().anchorSequences[anchorId];
@@ -78,6 +115,13 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
     // Write a summary table.
     html <<
         "<table>"
+        "<tr><th class=left>Component<td class=centered>";
+    if(componentId == invalid<uint32_t>) {
+        html << "None";
+    } else {
+        html << componentId;
+    }
+    html <<
         "<tr><th class=left>Coverage<td class=centered>" << coverage <<
         "<tr><th class=left>Sequence length<td class=centered>" << sequence.size() <<
         "<tr><th class=left>Sequence<td class=centered style='font-family:courier'>";
@@ -113,6 +157,70 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
 
 
     html << "</table>";
+
+
+
+    // Assembly graph annotations.
+    if(annotate and (componentId != invalid<uint32_t>)) {
+
+        // Get the AssemblyGraph for this stage and component.
+        const AssemblyGraphPostprocessor& assemblyGraph = getAssemblyGraph(assemblyStage, componentId);
+
+        // Get the annotations for this AnchorId.
+        const uint64_t localAnchorId = anchors().getLocalAnchorIdInComponent(anchorId);
+        const AssemblyGraph::AnchorAnnotation& anchorAnnotation = assemblyGraph.anchorAnnotations[localAnchorId];
+
+        html <<
+            "<h2>Assembly graph annotations for assembly stage " << assemblyStage << "</h2>"
+            "<p>The table lists the occurrences of anchor " << anchorIdToString(anchorId) <<
+            " in the assembly graph at assembly stage " << assemblyStage <<
+            "<p>"
+            "<table>";
+
+
+        // Occurrences of this AnchorId in vertices.
+        /*
+        for(const AssemblyGraph::vertex_descriptor v: anchorAnnotation.vertices) {
+            html << "<tr><td>Vertex " << v;
+        }
+        */
+
+        // Occurrences of this AnchorId at the beginning of a Chain.
+        for(const auto& chainInfo: anchorAnnotation.chainsFirstAnchor) {
+            const ChainIdentifier& chainIdentifier = chainInfo;
+            const string chainStringId = assemblyGraph.chainStringId(
+                chainIdentifier.e, chainIdentifier.positionInBubbleChain, chainIdentifier.indexInBubble);
+            html <<
+                "<tr><td>First anchor of segment " << chainStringId;
+        }
+
+        // Occurrences of this AnchorId at the end of a Chain.
+        for(const auto& chainInfo: anchorAnnotation.chainsLastAnchor) {
+            const ChainIdentifier& chainIdentifier = chainInfo;
+            const string chainStringId = assemblyGraph.chainStringId(
+                chainIdentifier.e, chainIdentifier.positionInBubbleChain, chainIdentifier.indexInBubble);
+            html <<
+                "<tr><td>Last anchor of segment " << chainStringId;
+        }
+
+
+        // Occurrences of this AnchorId internal to Chains.
+        for(const auto& chainInfo: anchorAnnotation.internalChainInfo) {
+            const ChainIdentifier& chainIdentifier = chainInfo.first;
+            const BubbleChain& bubbleChain = assemblyGraph[chainIdentifier.e];
+            const Bubble& bubble = bubbleChain[chainIdentifier.positionInBubbleChain];
+            const Chain& chain = bubble[chainIdentifier.indexInBubble];
+            const uint64_t positionInChain = chainInfo.second;
+            SHASTA_ASSERT(chain[positionInChain] == anchorId);
+            const string chainStringId = assemblyGraph.chainStringId(
+                chainIdentifier.e, chainIdentifier.positionInBubbleChain, chainIdentifier.indexInBubble);
+            html <<
+                "<tr><td>Internal to segment " << chainStringId <<
+                " at position " << positionInChain;
+        }
+
+        html << "</table>";
+    }
 
 
 
@@ -1018,7 +1126,9 @@ void Mode3Assembler::exploreSegment(
             html <<
                 "<tr><td class=centered>" << positionInChain <<
                 "<td class=centered>" <<
-                "<a href='exploreAnchor?anchorIdString=" << HttpServer::urlEncode(anchorIdString) << "'>" <<
+                "<a href='exploreAnchor?anchorIdString=" << HttpServer::urlEncode(anchorIdString) <<
+                "&annotate=on&assemblyStage=" << assemblyStage <<
+                "'>" <<
                 anchorIdString << "</a>"
                 "<td class=centered>" <<
                 "<a href='exploreLocalAnchorGraph?anchorIdsString=" << HttpServer::urlEncode(anchorIdString) <<
