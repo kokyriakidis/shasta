@@ -19,6 +19,7 @@ AssemblyGraphPostprocessor::AssemblyGraphPostprocessor(
     AssemblyGraph(assemblyStage, componentId, orientedReadIds, anchorIds, anchors, options)
 {
     createEdgeIdMap();
+    annotateAnchors();
 }
 
 

@@ -250,6 +250,10 @@ public:
             anchorInfo.componentId =  componentId;
             anchorInfo.localAnchorIdInComponent =  localAnchorIdInComponent;
         }
+        uint64_t getComponent(AnchorId anchorId) const
+        {
+            return anchorInfos[anchorId].componentId;
+        }
         uint64_t getLocalAnchorIdInComponent(AnchorId anchorId) const
         {
             return anchorInfos[anchorId].localAnchorIdInComponent;
