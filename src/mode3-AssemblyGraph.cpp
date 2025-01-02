@@ -218,7 +218,6 @@ void AssemblyGraph::run(
     performanceLog << timestamp << "Detangling begins." << endl;
     while(compressSequentialEdges());
     compressBubbleChains();
-#if 1
     detangleEdges(false,
         options.assemblyGraphOptions.detangleToleranceLow,
         options.assemblyGraphOptions.detangleToleranceHigh,
@@ -256,45 +255,6 @@ void AssemblyGraph::run(
         options.assemblyGraphOptions.epsilon,
         options.assemblyGraphOptions.minLogP,
         6);
-#else
-    renumberEdges();    // To simplify debugging.
-    while(compressSequentialEdges());
-    write("P");
-    for(uint64_t iteration=0; iteration<10; iteration++) {
-        // if(iteration == 2) write("X");
-        const uint64_t success0 = detangleSuperbubblesWithReadFollowing(
-            false,
-            SuperbubbleCreationMethod::SingleEdges,
-            options.assemblyGraphOptions.superbubbleLengthThreshold4,
-            options.primaryGraphOptions.maxLoss,
-            options.primaryGraphOptions.crossEdgesLowCoverageThreshold,
-            options.primaryGraphOptions.crossEdgesHighCoverageThreshold);
-        // if(iteration == 2) write("Y");
-        cout << "At detangle iteration " << iteration << ", " << success0 <<
-            " edges were successfully detangled. The assembly graph now has " <<
-            num_edges(*this) << " edges." << endl;
-        while(compressSequentialEdges());
-        compressBubbleChains();
-        const uint64_t success1 = detangleSuperbubblesWithReadFollowing(
-            false,
-            SuperbubbleCreationMethod::ByLength,
-            options.assemblyGraphOptions.superbubbleLengthThreshold4,
-            options.primaryGraphOptions.maxLoss,
-            options.primaryGraphOptions.crossEdgesLowCoverageThreshold,
-            options.primaryGraphOptions.crossEdgesHighCoverageThreshold);
-        cout << "At detangle iteration " << iteration << ", " << success1 <<
-            " superbubbles were successfully detangled. The assembly graph now has " <<
-            num_edges(*this) << " edges." << endl;
-        while(compressSequentialEdges());
-        compressBubbleChains();
-        if((success0 == 0) and (success1 == 0)) {
-            break;
-        }
-    }
-    write("Q");
-    throw runtime_error("Forced early termination for debugging.");
-#endif
-
     performanceLog << timestamp << "Detangling ends." << endl;
 
     compress();
