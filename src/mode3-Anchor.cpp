@@ -918,7 +918,11 @@ void Anchors::followOrientedReads(
     anchorInfos.clear();
     for(const AnchorId anchorId1: anchorIds) {
         AnchorPairInfo info;
-        analyzeAnchorPair(anchorId0, anchorId1, info);
+        if(direction == 0) {
+            analyzeAnchorPair(anchorId0, anchorId1, info);
+        } else {
+            analyzeAnchorPair(anchorId1, anchorId0, info);
+        }
         if(info.common < minCommonCount) {
             continue;
         }
