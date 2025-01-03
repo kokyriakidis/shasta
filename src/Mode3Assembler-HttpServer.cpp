@@ -172,7 +172,7 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
 
         html <<
             "<h2>Assembly graph annotations for assembly stage " << assemblyStage << "</h2>"
-            "<p>The table lists the occurrences of anchor " << anchorIdToString(anchorId) <<
+            "<p>Occurrences of anchor " << anchorIdToString(anchorId) <<
             " in the assembly graph at assembly stage " << assemblyStage <<
             "<p>"
             "<table>";
@@ -515,6 +515,58 @@ void Mode3Assembler::exploreJourney(const vector<string>& request, ostream& html
     }
 
     html << "</table>";
+}
+
+
+
+void Mode3Assembler::exploreReadFollowing(const vector<string>& request, ostream& html)
+{
+    html << "<h2>Read following</h2>";
+
+    const string anchorId0String = "20665+";
+    const AnchorId anchorId0 = anchorIdFromString(anchorId0String);
+
+    if((anchorId0 == invalid<AnchorId>) or (anchorId0 >= anchors().size())) {
+        html << "<p>Invalid anchor id. Must be a number between 0 and " <<
+            anchors().size() / 2 - 1 << " followed by + or -.";
+        return;
+    }
+
+    const uint64_t direction = 0;
+    const uint64_t minCommon = 4;
+    const double minJaccard = 0.;
+    const double minCorrectedJaccard = 0.8;
+
+    // Do the read following.
+    vector< pair<AnchorId, AnchorPairInfo> > anchorInfos;
+    anchors().followOrientedReads(
+        anchorId0,
+        direction,
+        minCommon,
+        minJaccard,
+        minCorrectedJaccard,
+        anchorInfos);
+
+    // Write out the results.
+    html << "<p>Found " << anchorInfos.size() << " anchors.";
+    html <<
+        "<p><table>"
+        "<tr><th>AnchorId>th>Offset<th>Common<th>Jaccard<th>Corrected<br>Jaccard";
+    for(const auto& p: anchorInfos) {
+        const AnchorId anchorId1 = p.first;
+        const AnchorPairInfo& info = p.second;
+
+        html <<
+            "<tr>"
+            "<td class=centered>" << anchorIdToString(anchorId1) <<
+            "<td class=centered>" << info.offsetInBases <<
+            "<td class=centered>" << info.common <<
+            "<td class=centered>" << info.jaccard() <<
+            "<td class=centered>" << info.correctedJaccard();
+    }
+
+    html << "</table>";
+
 }
 
 
