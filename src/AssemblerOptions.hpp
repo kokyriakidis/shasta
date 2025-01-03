@@ -349,14 +349,14 @@ public:
 
 // Assembly options that are specific to Mode 3 assembly.
 // See source code in the mode3 namespace
-// (source files with a mode3-) prefix for more information
+// (source files with a mode3- prefix) for more information
 class shasta::Mode3AssemblyOptions {
 public:
 
     string anchorCreationMethod;
 
-    uint64_t minPrimaryCoverage;
-    uint64_t maxPrimaryCoverage;
+    uint64_t minAnchorCoverage;
+    uint64_t maxAnchorCoverage;
 
     // Options used to clean up the PrimaryGraph.
     class PrimaryGraphOptions {

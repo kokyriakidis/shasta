@@ -1048,7 +1048,7 @@ void AssemblerOptions::addConfigurableOptions()
         "Can be: FromMarkerGraphEdges, FromMarkerKmers, FromJson.")
 
         ("Assembly.mode3.minAnchorCoverage",
-        value<uint64_t>(&assemblyOptions.mode3Options.minPrimaryCoverage)->
+        value<uint64_t>(&assemblyOptions.mode3Options.minAnchorCoverage)->
         default_value(0),
         "Minimum anchor coverage. "
         "If minAnchorCoverage and maxAnchorCoverage are both 0, "
@@ -1056,7 +1056,7 @@ void AssemblerOptions::addConfigurableOptions()
         "Only used with --Assembly.mode 3.")
 
         ("Assembly.mode3.maxAnchorCoverage",
-        value<uint64_t>(&assemblyOptions.mode3Options.maxPrimaryCoverage)->
+        value<uint64_t>(&assemblyOptions.mode3Options.maxAnchorCoverage)->
         default_value(0),
         "Maximum anchor coverage. "
         "If minAnchorCoverage and maxAnchorCoverage are both 0, "
@@ -1459,8 +1459,8 @@ void Mode2AssemblyOptions::write(ostream& s) const
 void Mode3AssemblyOptions::write(ostream& s) const
 {
     s << "mode3.anchorCreationMethod = " << anchorCreationMethod << "\n";
-    s << "mode3.minAnchorCoverage = " << minPrimaryCoverage << "\n";
-    s << "mode3.maxAnchorCoverage = " << maxPrimaryCoverage << "\n";
+    s << "mode3.minAnchorCoverage = " << minAnchorCoverage << "\n";
+    s << "mode3.maxAnchorCoverage = " << maxAnchorCoverage << "\n";
     primaryGraphOptions.write(s);
     assemblyGraphOptions.write(s);
     localAssemblyOptions.write(s);
