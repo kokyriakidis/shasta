@@ -1161,7 +1161,13 @@ void shasta::main::mode3Assembly(
     uint64_t maxPrimaryCoverage = assemblerOptions.assemblyOptions.mode3Options.maxAnchorCoverage;
     if((minPrimaryCoverage == 0) and (maxPrimaryCoverage == 0)) {
         tie(minPrimaryCoverage, maxPrimaryCoverage) = assembler.getPrimaryCoverageRange();
-        cout << "Set automatically: minAnchorCoverage = " << minPrimaryCoverage <<
+        cout << "Automatically determined: minAnchorCoverage = " << minPrimaryCoverage <<
+            ", maxAnchorCoverage = " << maxPrimaryCoverage << endl;
+        minPrimaryCoverage = uint64_t(std::round(
+            double(minPrimaryCoverage) * assemblerOptions.assemblyOptions.mode3Options.minAnchorCoverageMultiplier));
+        maxPrimaryCoverage = uint64_t(std::round(
+            double(maxPrimaryCoverage) * assemblerOptions.assemblyOptions.mode3Options.maxAnchorCoverageMultiplier));
+        cout << "After applying specified multipliers: minAnchorCoverage = " << minPrimaryCoverage <<
             ", maxAnchorCoverage = " << maxPrimaryCoverage << endl;
     } else {
         cout << "Using minAnchorCoverage = " << minPrimaryCoverage <<

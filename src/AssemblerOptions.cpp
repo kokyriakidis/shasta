@@ -1063,6 +1063,20 @@ void AssemblerOptions::addConfigurableOptions()
         "they are set automatically to appropriate values using a simple heuristic."
         "Only used with --Assembly.mode 3.")
 
+        ("Assembly.mode3.minAnchorCoverageMultiplier",
+        value<double>(&assemblyOptions.mode3Options.minAnchorCoverageMultiplier)->
+        default_value(1.),
+        "Multiplier applied to heuristically determined minimum anchor coverage "
+        "if minAnchorCoverage and maxAnchorCoverage are both 0. "
+        "Only used with --Assembly.mode 3.")
+
+        ("Assembly.mode3.maxAnchorCoverageMultiplier",
+        value<double>(&assemblyOptions.mode3Options.maxAnchorCoverageMultiplier)->
+        default_value(1.),
+        "Multiplier applied to heuristically determined maximum anchor coverage "
+        "if minAnchorCoverage and maxAnchorCoverage are both 0. "
+        "Only used with --Assembly.mode 3.")
+
         ("Assembly.mode3.primaryGraph.maxLoss",
         value<double>(&assemblyOptions.mode3Options.primaryGraphOptions.maxLoss)->
         default_value(0.1),
@@ -1461,6 +1475,8 @@ void Mode3AssemblyOptions::write(ostream& s) const
     s << "mode3.anchorCreationMethod = " << anchorCreationMethod << "\n";
     s << "mode3.minAnchorCoverage = " << minAnchorCoverage << "\n";
     s << "mode3.maxAnchorCoverage = " << maxAnchorCoverage << "\n";
+    s << "mode3.minAnchorCoverageMultiplier = " << minAnchorCoverageMultiplier << "\n";
+    s << "mode3.maxAnchorCoverageMultiplier = " << maxAnchorCoverageMultiplier << "\n";
     primaryGraphOptions.write(s);
     assemblyGraphOptions.write(s);
     localAssemblyOptions.write(s);

@@ -357,6 +357,8 @@ public:
 
     uint64_t minAnchorCoverage;
     uint64_t maxAnchorCoverage;
+    double minAnchorCoverageMultiplier;
+    double maxAnchorCoverageMultiplier;
 
     // Options used to clean up the PrimaryGraph.
     class PrimaryGraphOptions {
