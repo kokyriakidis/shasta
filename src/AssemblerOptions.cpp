@@ -1055,22 +1055,12 @@ void AssemblerOptions::addConfigurableOptions()
         "they are set automatically to appropriate values using a simple heuristic. "
         "Only used with --Assembly.mode 3.")
 
-        ("Assembly.mode3.minPrimaryCoverage",
-        value<uint64_t>(&assemblyOptions.mode3Options.minPrimaryCoverage),
-        "Alias for Assembly.mode3.minAnchorCoverage. "
-        "Only used with --Assembly.mode 3.")
-
         ("Assembly.mode3.maxAnchorCoverage",
         value<uint64_t>(&assemblyOptions.mode3Options.maxPrimaryCoverage)->
         default_value(0),
         "Maximum anchor coverage. "
         "If minAnchorCoverage and maxAnchorCoverage are both 0, "
         "they are set automatically to appropriate values using a simple heuristic."
-        "Only used with --Assembly.mode 3.")
-
-        ("Assembly.mode3.maxPrimaryCoverage",
-        value<uint64_t>(&assemblyOptions.mode3Options.maxPrimaryCoverage),
-        "Alias for Assembly.mode3.maxAnchorCoverage. "
         "Only used with --Assembly.mode 3.")
 
         ("Assembly.mode3.primaryGraph.maxLoss",

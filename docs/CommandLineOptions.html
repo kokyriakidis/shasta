@@ -986,17 +986,21 @@ Can be one of:
 <li><code>FromJson</code>
 </ul>
 
-<tr id='Assembly.mode3.minPrimaryCoverage'>
-<td><code>--Assembly.mode3.minPrimaryCoverage</code><td class=centered><code>0</code><td>
-Minimum primary coverage.
-If <code>minPrimaryCoverage</code> and <code>maxPrimaryCoverage</code> are both 0, 
+<tr id='Assembly.mode3.minAnchorCoverage'>
+<td><code>--Assembly.mode3.minAnchorCoverage</code><br>
+(<code>--Assembly.mode3.minPrimaryCoverage</code> up to release 0.13.0)
+<td class=centered><code>0</code><td>
+Minimum anchor coverage.
+If <code>minAnchorCoverage</code> and <code>maxAnchorCoverage</code> are both 0, 
 they are set automatically to appropriate values using a simple heuristic.
 Only used with <code>--Assembly.mode 3</code>.
 
-<tr id='Assembly.mode3.maxPrimaryCoverage'>
-<td><code>--Assembly.mode3.maxPrimaryCoverage</code><td class=centered><code>0</code><td>
-Maximum primary coverage.
-If <code>minPrimaryCoverage</code> and <code>maxPrimaryCoverage</code> are both 0, 
+<tr id='Assembly.mode3.maxAnchorCoverage'>
+<td><code>--Assembly.mode3.maxAnchorCoverage</code><br>
+(<code>--Assembly.mode3.maxPrimaryCoverage</code> up to release 0.13.0)
+<td class=centered><code>0</code><td>
+Maximum anchor coverage.
+If <code>minAnchorCoverage</code> and <code>maxAnchorCoverage</code> are both 0, 
 they are set automatically to appropriate values using a simple heuristic.
 Only used with <code>--Assembly.mode 3</code>.
 
