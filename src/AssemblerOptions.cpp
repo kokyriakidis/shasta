@@ -1069,16 +1069,16 @@ void AssemblerOptions::addConfigurableOptions()
         "Use for weak edge removal in the primary graph. "
         "(Mode 3 assembly only).")
 
-        ("Assembly.mode3.primaryGraph.crossEdgesLowCoverageThreshold",
+        ("Assembly.mode3.anchorGraph.crossEdgesLowCoverageThreshold",
         value<uint64_t>(&assemblyOptions.mode3Options.primaryGraphOptions.crossEdgesLowCoverageThreshold)->
         default_value(1),
-        "Low coverage threshold for cross edge removal in the primary graph. "
+        "Low coverage threshold for cross edge removal in the anchor graph. "
         "(Mode 3 assembly only).")
 
-        ("Assembly.mode3.primaryGraph.crossEdgesHighCoverageThreshold",
+        ("Assembly.mode3.anchorGraph.crossEdgesHighCoverageThreshold",
         value<uint64_t>(&assemblyOptions.mode3Options.primaryGraphOptions.crossEdgesHighCoverageThreshold)->
         default_value(3),
-        "High coverage threshold for cross edge removal in the primary graph. "
+        "High coverage threshold for cross edge removal in the anchor graph. "
         "(Mode 3 assembly only).")
 
         ("Assembly.mode3.assemblyGraph.detangleToleranceLow",
@@ -1471,8 +1471,8 @@ void Mode3AssemblyOptions::write(ostream& s) const
 void Mode3AssemblyOptions::PrimaryGraphOptions::write(ostream& s) const
 {
     s << "mode3.primaryGraph.maxLoss = " << maxLoss << "\n";
-    s << "mode3.primaryGraph.crossEdgesLowCoverageThreshold = " << crossEdgesLowCoverageThreshold << "\n";
-    s << "mode3.primaryGraph.crossEdgesHighCoverageThreshold = " << crossEdgesHighCoverageThreshold << "\n";
+    s << "mode3.anchorGraph.crossEdgesLowCoverageThreshold = " << crossEdgesLowCoverageThreshold << "\n";
+    s << "mode3.anchorGraph.crossEdgesHighCoverageThreshold = " << crossEdgesHighCoverageThreshold << "\n";
 
 }
 
