@@ -1047,20 +1047,30 @@ void AssemblerOptions::addConfigurableOptions()
         "Selects the method used to create anchors for mode 3 assembly. "
         "Can be: FromMarkerGraphEdges, FromMarkerKmers, FromJson.")
 
-        ("Assembly.mode3.minPrimaryCoverage",
+        ("Assembly.mode3.minAnchorCoverage",
         value<uint64_t>(&assemblyOptions.mode3Options.minPrimaryCoverage)->
         default_value(0),
-        "Minimum primary coverage. "
-        "If minPrimaryCoverage and maxPrimaryCoverage are both 0, "
+        "Minimum anchor coverage. "
+        "If minAnchorCoverage and maxAnchorCoverage are both 0, "
+        "they are set automatically to appropriate values using a simple heuristic. "
+        "Only used with --Assembly.mode 3.")
+
+        ("Assembly.mode3.minPrimaryCoverage",
+        value<uint64_t>(&assemblyOptions.mode3Options.minPrimaryCoverage),
+        "Alias for Assembly.mode3.minAnchorCoverage. "
+        "Only used with --Assembly.mode 3.")
+
+        ("Assembly.mode3.maxAnchorCoverage",
+        value<uint64_t>(&assemblyOptions.mode3Options.maxPrimaryCoverage)->
+        default_value(0),
+        "Maximum anchor coverage. "
+        "If minAnchorCoverage and maxAnchorCoverage are both 0, "
         "they are set automatically to appropriate values using a simple heuristic."
         "Only used with --Assembly.mode 3.")
 
         ("Assembly.mode3.maxPrimaryCoverage",
-        value<uint64_t>(&assemblyOptions.mode3Options.maxPrimaryCoverage)->
-        default_value(0),
-        "Maximum primary coverage. "
-        "If minPrimaryCoverage and maxPrimaryCoverage are both 0, "
-        "they are set automatically to appropriate values using a simple heuristic."
+        value<uint64_t>(&assemblyOptions.mode3Options.maxPrimaryCoverage),
+        "Alias for Assembly.mode3.maxAnchorCoverage. "
         "Only used with --Assembly.mode 3.")
 
         ("Assembly.mode3.primaryGraph.maxLoss",
@@ -1459,8 +1469,8 @@ void Mode2AssemblyOptions::write(ostream& s) const
 void Mode3AssemblyOptions::write(ostream& s) const
 {
     s << "mode3.anchorCreationMethod = " << anchorCreationMethod << "\n";
-    s << "mode3.minPrimaryCoverage = " << minPrimaryCoverage << "\n";
-    s << "mode3.maxPrimaryCoverage = " << maxPrimaryCoverage << "\n";
+    s << "mode3.minAnchorCoverage = " << minPrimaryCoverage << "\n";
+    s << "mode3.maxAnchorCoverage = " << maxPrimaryCoverage << "\n";
     primaryGraphOptions.write(s);
     assemblyGraphOptions.write(s);
     localAssemblyOptions.write(s);
