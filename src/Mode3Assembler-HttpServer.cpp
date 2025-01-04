@@ -172,7 +172,7 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
 
         html <<
             "<h2>Assembly graph annotations for assembly stage " << assemblyStage << "</h2>"
-            "<p>The table lists the occurrences of anchor " << anchorIdToString(anchorId) <<
+            "<p>Occurrences of anchor " << anchorIdToString(anchorId) <<
             " in the assembly graph at assembly stage " << assemblyStage <<
             "<p>"
             "<table>";
@@ -515,6 +515,184 @@ void Mode3Assembler::exploreJourney(const vector<string>& request, ostream& html
     }
 
     html << "</table>";
+}
+
+
+
+void Mode3Assembler::exploreReadFollowing(const vector<string>& request, ostream& html)
+{
+    // Get the request parameters.
+    string anchorIdString;
+    const bool anchorIdStringIsPresent = HttpServer::getParameterValue(request, "anchorIdString", anchorIdString);
+
+    uint64_t direction = 0;
+    HttpServer::getParameterValue(request, "direction", direction);
+
+    uint64_t minCommon = 4;
+    HttpServer::getParameterValue(request, "minCommon", minCommon);
+
+    double minJaccard = 0.;
+    HttpServer::getParameterValue(request, "minJaccard", minJaccard);
+
+    double minCorrectedJaccard = 0.7;
+    HttpServer::getParameterValue(request, "minCorrectedJaccard", minCorrectedJaccard);
+
+    string annotateString;
+    const bool annotate = HttpServer::getParameterValue(request,
+        "annotate", annotateString);
+
+    string assemblyStage = "Final";
+    HttpServer::getParameterValue(request, "assemblyStage", assemblyStage);
+
+
+    // Begin the form.
+    html <<
+        "<h2>Read following</h2>"
+        "<form>"
+        "<table>"
+
+    // AnchorId
+        "<tr><th class=left>Anchor id<td class=centered>"
+        "<input type=text name=anchorIdString required style='text-align:center'";
+    if(anchorIdStringIsPresent) {
+        html << " value='" << anchorIdString + "'";
+    }
+    html <<
+        " size=8 title='Enter an anchor id between 0 and " <<
+        anchors().size() / 2 - 1 << " followed by + or -.'>";
+
+    // Rea following parameters
+    html <<
+        "<tr><th class=left>Direction"
+        "<td class=centered><input type=text name=direction size=8 value='" << direction << "' style='text-align:center'>"
+        "<tr><th class=left>minCommon"
+        "<td class=centered><input type=text name=minCommon size=8 value='" << minCommon << "' style='text-align:center'>"
+        "<tr><th class=left>minJaccard"
+        "<td class=centered><input type=text name=minJaccard size=8 value='" << minJaccard << "' style='text-align:center'>"
+        "<tr><th class=left>minCorrectedJaccard"
+        "<td class=centered><input type=text name=minCorrectedJaccard size=8 value='" << minCorrectedJaccard << "' style='text-align:center'>";
+
+    // Annotation.
+    html <<
+        "<tr>"
+        "<th class=left>Assembly graph annotations"
+        "<td class=centered><input type=checkbox name=annotate" <<
+        (annotate ? " checked" : "") << ">";
+
+    // Assembly stage for annotation.
+    html <<
+        "<tr>"
+        "<th class=left>Assembly stage for annotations"
+        "<td class=centered><input type=text name=assemblyStage style='text-align:center'";
+    if(not assemblyStage.empty()) {
+        html << " value='" << assemblyStage + "'";
+    }
+    html << " size=8>";
+
+    // End the form.
+    html <<
+        "</table>"
+        "<input type=submit value='Show anchor details'> "
+        "</form>";
+
+
+
+    // If the anchor id missing or invalid, stop here.
+    if(not anchorIdStringIsPresent) {
+        return;
+    }
+    const AnchorId anchorId0 = anchorIdFromString(anchorIdString);
+
+    if((anchorId0 == invalid<AnchorId>) or (anchorId0 >= anchors().size())) {
+        html << "<p>Invalid anchor id. Must be a number between 0 and " <<
+            anchors().size() / 2 - 1 << " followed by + or -.";
+        return;
+    }
+
+
+    html << "<h2>Read following</h2>";
+    const uint64_t componentId0 = anchors().getComponent(anchorId0);
+
+    // Do the read following.
+    vector< pair<AnchorId, AnchorPairInfo> > anchorInfos;
+    anchors().followOrientedReads(
+        anchorId0,
+        direction,
+        minCommon,
+        minJaccard,
+        minCorrectedJaccard,
+        anchorInfos);
+
+
+
+    // Write out the results.
+    html << "<p>Found " << anchorInfos.size() << " anchors.";
+    html <<
+        "<p><table>"
+        "<tr><th>AnchorId<th>Offset<th>Common<th>Jaccard<th>Corrected<br>Jaccard";
+    if(annotate) {
+        html << "<th>Segment<th>Position";
+    }
+
+    const AssemblyGraphPostprocessor* assemblyGraph = 0;
+    if(annotate) {
+        assemblyGraph = &getAssemblyGraph(assemblyStage, componentId0);
+    }
+
+    vector<string> chainsEncountered;
+    string lastChainEncountered;
+
+    for(const auto& p: anchorInfos) {
+        const AnchorId anchorId1 = p.first;
+        const AnchorPairInfo& info = p.second;
+
+        SHASTA_ASSERT(anchors().getComponent(anchorId1) == componentId0);
+
+        html <<
+            "<tr>"
+            "<td class=centered>" << anchorIdToString(anchorId1) <<
+            "<td class=centered>" << info.offsetInBases <<
+            "<td class=centered>" << info.common <<
+            "<td class=centered>" << info.jaccard() <<
+            "<td class=centered>" << info.correctedJaccard();
+
+        if(annotate) {
+            const uint64_t localAnchorId1 = anchors().getLocalAnchorIdInComponent(anchorId1);
+            const AssemblyGraph::AnchorAnnotation& anchorAnnotation = assemblyGraph->anchorAnnotations[localAnchorId1];
+            const auto& internalChainInfo = anchorAnnotation.internalChainInfo;
+
+            if(internalChainInfo.size() == 0) {
+                html << "<td><td>";
+            } else if(internalChainInfo.size() > 1) {
+                html << "<td class=centered>Multiple<td>";
+            } else {
+                const auto& p = internalChainInfo.front();
+                const ChainIdentifier& chainIdentifier = p.first;
+                const uint64_t position = p.second;
+                const string chainStringId = assemblyGraph->chainStringId(
+                    chainIdentifier.e, chainIdentifier.positionInBubbleChain, chainIdentifier.indexInBubble);
+                html <<
+                    "<td class=centered>" << chainStringId <<
+                    "<td class=centered>" << position;
+
+                if(chainStringId != lastChainEncountered) {
+                    chainsEncountered.push_back(chainStringId);
+                    lastChainEncountered = chainStringId;
+                }
+            }
+
+        }
+    }
+
+    html << "</table>";
+
+    if(annotate) {
+        html << "<p>Sequence of segments encountered:";
+        for(const string& s: chainsEncountered) {
+            html << "<br>" << s;
+        }
+    }
+
 }
 
 

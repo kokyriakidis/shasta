@@ -258,6 +258,18 @@ public:
         {
             return anchorInfos[anchorId].localAnchorIdInComponent;
         }
+
+
+        // Read following.
+        void followOrientedReads(
+            AnchorId,
+            uint64_t direction,                         // 0 = forward, 1 = backward
+            uint64_t minCommonCount,
+            double minJaccard,
+            double minCorrectedJaccard,
+            vector< pair<AnchorId, AnchorPairInfo> >&
+            ) const;
+
 private:
 
 

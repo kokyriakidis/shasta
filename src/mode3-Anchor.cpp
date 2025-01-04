@@ -870,3 +870,82 @@ void Anchors::writeCoverageHistogram() const
         csv << coverage << "," << histogram[coverage] << "\n";
     }
 }
+
+
+
+// Read following.
+void Anchors::followOrientedReads(
+    AnchorId anchorId0,
+    uint64_t direction,                         // 0 = forward, 1 = backward
+    uint64_t minCommonCount,
+    double minJaccard,
+    double minCorrectedJaccard,
+    vector< pair<AnchorId, AnchorPairInfo> >& anchorInfos
+    ) const
+{
+    const Anchor anchor0 = (*this)[anchorId0];
+
+    // Gather all AnchorIds reached by the forward or backward portions of the
+    // journeys of the oriented reads on this anchor.
+    vector<AnchorId> anchorIds;
+    for(const AnchorMarkerInterval& anchorMarkerInterval: anchor0) {
+        const OrientedReadId orientedReadId = anchorMarkerInterval.orientedReadId;
+        const uint64_t position0 = anchorMarkerInterval.positionInJourney;
+        const auto journey = journeys[orientedReadId.getValue()];
+
+        // Figure out the forward or backward portion of the journey.
+        uint64_t begin;
+        uint64_t end;
+        if(direction == 0) {
+            begin = position0 + 1;
+            end = journey.size();
+        } else {
+            begin = 0;
+            end = position0;
+        }
+
+        // Copy the AnchorIds on this portion of the journey.
+        copy(journey.begin() + begin, journey.begin() + end, back_inserter(anchorIds));
+    }
+
+    // Only keep the ones we saw at least minCommonCount times.
+    vector<uint64_t> count;
+    deduplicateAndCountWithThreshold(anchorIds, count, minCommonCount);
+
+
+
+    // Gather the ones that satisfy our criteria.
+    anchorInfos.clear();
+    for(const AnchorId anchorId1: anchorIds) {
+        AnchorPairInfo info;
+        if(direction == 0) {
+            analyzeAnchorPair(anchorId0, anchorId1, info);
+        } else {
+            analyzeAnchorPair(anchorId1, anchorId0, info);
+        }
+        if(info.common < minCommonCount) {
+            continue;
+        }
+        if(info.jaccard() < minJaccard) {
+            continue;
+        }
+        if(info.correctedJaccard() < minCorrectedJaccard) {
+            continue;
+        }
+        anchorInfos.push_back(make_pair(anchorId1, info));
+    }
+
+
+    // Sort them by offset.
+    class SortHelper {
+    public:
+        bool operator()(
+            const pair<AnchorId, AnchorPairInfo>& x,
+            const pair<AnchorId, AnchorPairInfo>& y
+            ) const
+        {
+            return x.second.offsetInBases < y.second.offsetInBases;
+        }
+    };
+    sort(anchorInfos.begin(), anchorInfos.end(), SortHelper());
+}

@@ -1047,20 +1047,34 @@ void AssemblerOptions::addConfigurableOptions()
         "Selects the method used to create anchors for mode 3 assembly. "
         "Can be: FromMarkerGraphEdges, FromMarkerKmers, FromJson.")
 
-        ("Assembly.mode3.minPrimaryCoverage",
-        value<uint64_t>(&assemblyOptions.mode3Options.minPrimaryCoverage)->
+        ("Assembly.mode3.minAnchorCoverage",
+        value<uint64_t>(&assemblyOptions.mode3Options.minAnchorCoverage)->
         default_value(0),
-        "Minimum primary coverage. "
-        "If minPrimaryCoverage and maxPrimaryCoverage are both 0, "
+        "Minimum anchor coverage. "
+        "If minAnchorCoverage and maxAnchorCoverage are both 0, "
+        "they are set automatically to appropriate values using a simple heuristic. "
+        "Only used with --Assembly.mode 3.")
+
+        ("Assembly.mode3.maxAnchorCoverage",
+        value<uint64_t>(&assemblyOptions.mode3Options.maxAnchorCoverage)->
+        default_value(0),
+        "Maximum anchor coverage. "
+        "If minAnchorCoverage and maxAnchorCoverage are both 0, "
         "they are set automatically to appropriate values using a simple heuristic."
         "Only used with --Assembly.mode 3.")
 
-        ("Assembly.mode3.maxPrimaryCoverage",
-        value<uint64_t>(&assemblyOptions.mode3Options.maxPrimaryCoverage)->
-        default_value(0),
-        "Maximum primary coverage. "
-        "If minPrimaryCoverage and maxPrimaryCoverage are both 0, "
-        "they are set automatically to appropriate values using a simple heuristic."
+        ("Assembly.mode3.minAnchorCoverageMultiplier",
+        value<double>(&assemblyOptions.mode3Options.minAnchorCoverageMultiplier)->
+        default_value(1.),
+        "Multiplier applied to heuristically determined minimum anchor coverage "
+        "if minAnchorCoverage and maxAnchorCoverage are both 0. "
+        "Only used with --Assembly.mode 3.")
+
+        ("Assembly.mode3.maxAnchorCoverageMultiplier",
+        value<double>(&assemblyOptions.mode3Options.maxAnchorCoverageMultiplier)->
+        default_value(1.),
+        "Multiplier applied to heuristically determined maximum anchor coverage "
+        "if minAnchorCoverage and maxAnchorCoverage are both 0. "
         "Only used with --Assembly.mode 3.")
 
         ("Assembly.mode3.primaryGraph.maxLoss",
@@ -1069,16 +1083,16 @@ void AssemblerOptions::addConfigurableOptions()
         "Use for weak edge removal in the primary graph. "
         "(Mode 3 assembly only).")
 
-        ("Assembly.mode3.primaryGraph.crossEdgesLowCoverageThreshold",
+        ("Assembly.mode3.anchorGraph.crossEdgesLowCoverageThreshold",
         value<uint64_t>(&assemblyOptions.mode3Options.primaryGraphOptions.crossEdgesLowCoverageThreshold)->
         default_value(1),
-        "Low coverage threshold for cross edge removal in the primary graph. "
+        "Low coverage threshold for cross edge removal in the anchor graph. "
         "(Mode 3 assembly only).")
 
-        ("Assembly.mode3.primaryGraph.crossEdgesHighCoverageThreshold",
+        ("Assembly.mode3.anchorGraph.crossEdgesHighCoverageThreshold",
         value<uint64_t>(&assemblyOptions.mode3Options.primaryGraphOptions.crossEdgesHighCoverageThreshold)->
         default_value(3),
-        "High coverage threshold for cross edge removal in the primary graph. "
+        "High coverage threshold for cross edge removal in the anchor graph. "
         "(Mode 3 assembly only).")
 
         ("Assembly.mode3.assemblyGraph.detangleToleranceLow",
@@ -1459,8 +1473,10 @@ void Mode2AssemblyOptions::write(ostream& s) const
 void Mode3AssemblyOptions::write(ostream& s) const
 {
     s << "mode3.anchorCreationMethod = " << anchorCreationMethod << "\n";
-    s << "mode3.minPrimaryCoverage = " << minPrimaryCoverage << "\n";
-    s << "mode3.maxPrimaryCoverage = " << maxPrimaryCoverage << "\n";
+    s << "mode3.minAnchorCoverage = " << minAnchorCoverage << "\n";
+    s << "mode3.maxAnchorCoverage = " << maxAnchorCoverage << "\n";
+    s << "mode3.minAnchorCoverageMultiplier = " << minAnchorCoverageMultiplier << "\n";
+    s << "mode3.maxAnchorCoverageMultiplier = " << maxAnchorCoverageMultiplier << "\n";
     primaryGraphOptions.write(s);
     assemblyGraphOptions.write(s);
     localAssemblyOptions.write(s);
@@ -1471,8 +1487,8 @@ void Mode3AssemblyOptions::write(ostream& s) const
 void Mode3AssemblyOptions::PrimaryGraphOptions::write(ostream& s) const
 {
     s << "mode3.primaryGraph.maxLoss = " << maxLoss << "\n";
-    s << "mode3.primaryGraph.crossEdgesLowCoverageThreshold = " << crossEdgesLowCoverageThreshold << "\n";
-    s << "mode3.primaryGraph.crossEdgesHighCoverageThreshold = " << crossEdgesHighCoverageThreshold << "\n";
+    s << "mode3.anchorGraph.crossEdgesLowCoverageThreshold = " << crossEdgesLowCoverageThreshold << "\n";
+    s << "mode3.anchorGraph.crossEdgesHighCoverageThreshold = " << crossEdgesHighCoverageThreshold << "\n";
 
 }
 

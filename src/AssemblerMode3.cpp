@@ -548,6 +548,15 @@ void Assembler::exploreJourney(const vector<string>& request, ostream& html)
 
 
 
+void Assembler::exploreReadFollowing(const vector<string>& request, ostream& html)
+{
+    SHASTA_ASSERT(assemblerInfo->readRepresentation == 0);
+    SHASTA_ASSERT(assemblerInfo->assemblyMode == 3);
+    mode3Assembler->exploreReadFollowing(request, html);
+}
+
+
+
 void Assembler::exploreLocalAssembly(const vector<string>& request, ostream& html)
 {
     mode3Assembler->exploreLocalAssembly(request, html);
@@ -593,8 +602,8 @@ void Assembler::alignmentFreeAssembly(
                 getReads(),
                 assemblerInfo->k,
                 markers,
-                mode3Options.minPrimaryCoverage,
-                mode3Options.maxPrimaryCoverage,
+                mode3Options.minAnchorCoverage,
+                mode3Options.maxAnchorCoverage,
                 threadCount);
     } else if(mode3Options.anchorCreationMethod == "FromJson") {
         anchorsPointer =
@@ -604,8 +613,8 @@ void Assembler::alignmentFreeAssembly(
                 assemblerInfo->k,
                 markers,
                 anchorFileAbsolutePaths,
-                mode3Options.minPrimaryCoverage,
-                mode3Options.maxPrimaryCoverage,
+                mode3Options.minAnchorCoverage,
+                mode3Options.maxAnchorCoverage,
                 threadCount);
     } else {
         throw runtime_error("Invalid value for --Assembly.mode3.anchorCreationMethod.");

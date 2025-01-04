@@ -2507,6 +2507,7 @@ public:
     void exploreAnchor(const vector<string>&, ostream&);
     void exploreAnchorPair(const vector<string>&, ostream&);
     void exploreJourney(const vector<string>&, ostream&);
+    void exploreReadFollowing(const vector<string>&, ostream&);
     void exploreLocalAssembly(const vector<string>&, ostream&);
     void exploreLocalAnchorGraph(const vector<string>&, ostream&);
     void exploreMode3AssemblyGraph(const vector<string>&, ostream&);
