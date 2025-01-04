@@ -683,7 +683,8 @@ void ReadGraph4AllAlignments::findNeighborsEarlyStopWhenReachEndNode(
         // If this is not the starting vertex and it's in a different component,
         // add it to neighbors
         if (distance > 0) {
-            if (finalDeadEndReadsWithNoIncomingNodesPlusDistanceNeighbors[OrientedReadId::fromValue(currentVertex).getValue()]) {
+            // OrientedReadId::fromValue(currentVertex).getValue()
+            if (finalDeadEndReadsWithNoIncomingNodesPlusDistanceNeighbors[currentVertex]) {
                 neighbors.push_back(OrientedReadId::fromValue(currentVertex));
                 return;
             }
@@ -696,7 +697,8 @@ void ReadGraph4AllAlignments::findNeighborsEarlyStopWhenReachEndNode(
             BGL_FORALL_OUTEDGES(currentVertex, edge, *this, ReadGraph4AllAlignments) {
                 vertex_descriptor targetVertex = target(edge, *this);
                 if (!visitedVertices.contains(targetVertex)) {
-                    if (finalDeadEndReadsWithNoIncomingNodesPlusDistanceNeighbors[OrientedReadId::fromValue(targetVertex).getValue()]) {
+                    // OrientedReadId::fromValue(targetVertex).getValue()
+                    if (finalDeadEndReadsWithNoIncomingNodesPlusDistanceNeighbors[targetVertex]) {
                         neighbors.push_back(OrientedReadId::fromValue(targetVertex));
                         return;
                     }
@@ -1560,15 +1562,27 @@ void Assembler::createReadGraph4withStrandSeparation(
         // logQ(n) = αn - δL
         const double logQ = alpha * double(nRLE) - delta * L;
 
-
+        // logQ <= logWThreshold8
         if (logQ <= logWThreshold8) {
             alignmentTable.push_back(make_pair(alignmentId, logQ));
             readUsed[readId0] = true;
             readUsed[readId1] = true;
         } else if(logQ <= logWThresholdForBreaks){
+            // if(logQ <= logWThresholdForBreaks)
             alignmentTableNotPassFilter.push_back(make_pair(alignmentId, logQ));
             keepAlignmentsForBreaks[alignmentId] = true;
         }
+
+        // if(logQ <= logWThresholdForBreaks){
+        //     // if(logQ <= logWThresholdForBreaks)
+        //     alignmentTableNotPassFilter.push_back(make_pair(alignmentId, logQ));
+        //     keepAlignmentsForBreaks[alignmentId] = true;
+        // }
+        // } else if(logQ <= logWThresholdForBreaks){
+        //     // if(logQ <= logWThresholdForBreaks)
+        //     alignmentTableNotPassFilter.push_back(make_pair(alignmentId, logQ));
+        //     keepAlignmentsForBreaks[alignmentId] = true;
+        // }
 
     }
 
@@ -1576,8 +1590,10 @@ void Assembler::createReadGraph4withStrandSeparation(
 
     sort(alignmentTable.begin(), alignmentTable.end(), OrderPairsBySecondOnly<uint64_t, double>());
     sort(alignmentTableNotPassFilter.begin(), alignmentTableNotPassFilter.end(), OrderPairsBySecondOnly<uint64_t, double>());
+    cout << "########################################################################################################################" << endl;
     cout << "The alignmentTable has " << alignmentTable.size() << " entries." << endl;
     cout << "The alignmentTableNotPassFilter has " << alignmentTableNotPassFilter.size() << " entries." << endl;
+    cout << "########################################################################################################################" << endl;
 
     
 
@@ -1609,9 +1625,10 @@ void Assembler::createReadGraph4withStrandSeparation(
             disjointSets.make_set(OrientedReadId(readId, strand).getValue());
         }
     }
-    
+    cout << "########################################################################################################################" << endl;
     cout << "Number of reads: " << readCount << endl;
     cout << "Number of oriented reads: " << orientedReadCount << endl;
+    cout << "########################################################################################################################" << endl;
 
 
     // Flag all alignments as not to be kept.
@@ -1733,7 +1750,9 @@ void Assembler::createReadGraph4withStrandSeparation(
 
     // Print how many alignments were kept in this step
     const size_t keepCountR1 = count(keepAlignment.begin(), keepAlignment.end(), true);
+    cout << "########################################################################################################################" << endl;
     cout << "Finding strict disjointSets step: Keeping " << keepCountR1 << " alignments of " << keepAlignment.size() << endl;
+    cout << "########################################################################################################################" << endl;
 
 
 
@@ -1880,7 +1899,9 @@ void Assembler::createReadGraph4withStrandSeparation(
 
     // count the number of potential dead end reads
     uint64_t potentialDeadEndReadCount = count(potentialDeadEndReads.begin(), potentialDeadEndReads.end(), true);
+    cout << "########################################################################################################################" << endl;
     cout << "Found " << potentialDeadEndReadCount << " potential dead end reads." << endl;
+    cout << "########################################################################################################################" << endl;
 
     // // Print dead end Oriented reads
     // // iterate over all oriented reads
@@ -2095,6 +2116,267 @@ void Assembler::createReadGraph4withStrandSeparation(
             SHASTA_ASSERT(nodeOrientedReadId.getValue() == node);
             endNodesWithNoIncomingNodes[node] = true;
         }
+
+        
+        // Find neighbors in the forward direction of the ALL ALIGNMENTS read graph 
+        // starting from orientedReadId which is an endNode with no outgoing nodes in the filtered read graph. 
+        // Early stop when we reach an endNode with no incoming nodes (a node with endNodesWithNoIncomingNodes set to true).
+        vector<OrientedReadId> forwardNeighbors;
+        readGraphAllAlignments.findNeighborsEarlyStopWhenReachEndNode(orientedReadId, endNodesWithNoIncomingNodes, 5, forwardNeighbors);
+
+
+        // create a std::set of the forwardNeighbors for easy contain check
+        std::set<OrientedReadId> forwardNeighborsSet(forwardNeighbors.begin(), forwardNeighbors.end());
+        
+
+        if(forwardNeighbors.empty()) {
+            cout << "Did not connect endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " with any other endNode with no incoming nodes" << endl;
+            cout << "No forward neighbors found" << endl;
+            continue;
+        }
+
+
+        // Get the last item from forwardNeighbors. It contains the first encountered dead end node with no INCOMING nodes
+        // OR a non speficic node if we exceeded maxDistance
+        OrientedReadId lastNode = forwardNeighbors.back();
+
+
+        bool success = false;
+
+
+        // First check if the last node is a potential dead end node with no INCOMING nodes
+        if(endNodesWithNoIncomingNodes[lastNode.getValue()]) {
+
+            cout << "Test 1" << endl;
+
+            cout << "The last node is: " << lastNode.getReadId() << " strand " << lastNode.getStrand() << endl;
+            
+            const OrientedReadId A0 = orientedReadId;
+            const OrientedReadId B0 = lastNode;
+            const OrientedReadId A1 = OrientedReadId(A0.getReadId(), A0.getStrand() == 0 ? 1 : 0);
+            const OrientedReadId B1 = OrientedReadId(B0.getReadId(), B0.getStrand() == 0 ? 1 : 0);
+
+            SHASTA_ASSERT(A0.getReadId() == A1.getReadId());
+            SHASTA_ASSERT(B0.getReadId() == B1.getReadId());
+            SHASTA_ASSERT(A0.getStrand() == 1 - A1.getStrand());
+            SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
+
+            // Get the connected components that these oriented reads are in.
+            const uint32_t a0 = disjointSets.find_set(A0.getValue());
+            const uint32_t b0 = disjointSets.find_set(B0.getValue());
+            const uint32_t a1 = disjointSets.find_set(A1.getValue());
+            const uint32_t b1 = disjointSets.find_set(B1.getValue());
+
+
+            for(uint64_t index=0; index<alignmentTableNotPassFilter.size(); index++) {
+            // for(uint64_t alignmentId=0; alignmentId<alignmentData.size(); alignmentId++) {
+
+                const pair<uint64_t, double>& p = alignmentTableNotPassFilter[index];
+                const uint64_t alignmentId = p.first;
+                const double logQ = p.second;
+
+                const bool keepThisAlignment = keepAlignment[alignmentId];
+
+                const bool keepThisBreaksAlignment = keepAlignmentsForBreaks[alignmentId];
+
+                if(keepThisAlignment) {
+                    continue;
+                }
+
+                if(not keepThisBreaksAlignment) {
+                    continue;
+                }
+
+                AlignmentData& alignment = alignmentData[alignmentId];
+            
+                // Get the OrientedReadIds.
+                OrientedReadId alignmentOrientedReadId0(alignment.readIds[0], 0);
+                OrientedReadId alignmentOrientedReadId1(alignment.readIds[1], alignment.isSameStrand ? 0 : 1);
+                SHASTA_ASSERT(alignmentOrientedReadId0 < alignmentOrientedReadId1);
+
+                // Swap them if necessary, depending on the average alignment offset at center.
+                if(alignment.info.offsetAtCenter() < 0.) {
+                    swap(alignmentOrientedReadId0, alignmentOrientedReadId1);
+                }
+
+
+                if(alignmentOrientedReadId0.getValue() == orientedReadId.getValue() || forwardNeighborsSet.contains(alignmentOrientedReadId0) || forwardNeighborsSet.contains(alignmentOrientedReadId1) ){
+                    
+                    // Get the alignment data
+                    ReadId readId0v2 = alignment.readIds[0];
+                    ReadId readId1v2 = alignment.readIds[1];
+                    const bool isSameStrandv2 = alignment.isSameStrand;
+                    SHASTA_ASSERT(readId0v2 < readId1v2);
+                    OrientedReadId A0v2 = OrientedReadId(readId0v2, 0);
+                    OrientedReadId B0v2 = OrientedReadId(readId1v2, isSameStrandv2 ? 0 : 1);
+                    OrientedReadId A1v2 = OrientedReadId(readId0v2, 1);
+                    OrientedReadId B1v2 = OrientedReadId(readId1v2, isSameStrandv2 ? 1 : 0);
+
+                    SHASTA_ASSERT(A0v2.getReadId() == A1v2.getReadId());
+                    SHASTA_ASSERT(B0v2.getReadId() == B1v2.getReadId());
+                    SHASTA_ASSERT(A0v2.getStrand() == 1 - A1v2.getStrand());
+                    SHASTA_ASSERT(B0v2.getStrand() == 1 - B1v2.getStrand());
+
+                    // Get the connected components that these oriented reads are in.
+                    const uint32_t a0v2 = disjointSets.find_set(A0v2.getValue());
+                    const uint32_t b0v2 = disjointSets.find_set(B0v2.getValue());
+                    const uint32_t a1v2 = disjointSets.find_set(A1v2.getValue());
+                    const uint32_t b1v2 = disjointSets.find_set(B1v2.getValue());
+
+
+                    // If the alignment breaks strand separation, it is skipped.
+                    // If A0 and B1 are in the same connected component,
+                    // A1 and B0 also must be in the same connected component.
+                    // Adding this pair of edges would create a self-complementary
+                    // connected component containing A0, B0, A1, and B1,
+                    // and to ensure strand separation we don't want to do that.
+                    // So we mark these edges as cross-strand edges
+                    // and don't use them to update the disjoint set data structure.
+                    if(a0v2 == b1v2) {
+                        SHASTA_ASSERT(a1v2 == b0v2);
+                        crossStrandEdgeCount += 2;
+                        continue;
+                    }
+
+                    // Add the alignment to the read graph.
+                    keepAlignment[alignmentId] = true;
+                    alignment.info.isInReadGraph = 1;
+
+                    // Update vertex degrees
+                    verticesDegree[A0v2.getValue()]++;
+                    verticesDegree[B0v2.getValue()]++;
+                    verticesDegree[A1v2.getValue()]++;
+                    verticesDegree[B1v2.getValue()]++;
+                    
+
+                    // Update disjoint sets
+                    disjointSets.union_set(a0v2, b0v2);
+                    disjointSets.union_set(a1v2, b1v2);
+
+                    // Make sure all alignments added are not considered as dead ends anymore
+                    finalDeadEndReadsWithNoOutgoingNodes[A0v2.getValue()] = false;
+                    finalDeadEndReadsWithNoOutgoingNodes[A1v2.getValue()] = false;
+                    finalDeadEndReadsWithNoIncomingNodes[B0v2.getValue()] = false;
+                    finalDeadEndReadsWithNoIncomingNodes[B1v2.getValue()] = false;
+
+                    // Make sure the start and last nodes are not considered as dead ends anymore
+                    finalDeadEndReadsWithNoOutgoingNodes[A0.getValue()] = false;
+                    finalDeadEndReadsWithNoOutgoingNodes[A1.getValue()] = false;
+                    finalDeadEndReadsWithNoIncomingNodes[B0.getValue()] = false;
+                    finalDeadEndReadsWithNoIncomingNodes[B1.getValue()] = false;
+
+                    success = true;
+
+                    // cout << "Adding alignment " << alignmentId << " between " << alignmentOrientedReadId0.getReadId() << " and " << alignmentOrientedReadId1.getReadId() << endl;
+
+                    // Create the edge.
+                    add_edge(alignmentOrientedReadId0.getValue(), alignmentOrientedReadId1.getValue(), ReadGraph4Edge(alignmentId), readGraph);
+
+                    // Also create the reverse complemented edge.
+                    alignmentOrientedReadId0.flipStrand();
+                    alignmentOrientedReadId1.flipStrand();
+                    add_edge(alignmentOrientedReadId1.getValue(), alignmentOrientedReadId0.getValue(), ReadGraph4Edge(alignmentId), readGraph);
+
+
+                }
+
+            }
+
+            // If the endNode with no outgoing nodes and the endNode with no incoming nodes are not set to false,
+            // it means that we have connected them with alignments.
+            if(success) {
+                cout << "Connected endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with endNode with no incoming nodes ReadID " << B0.getReadId() << " strand " << B0.getStrand() << endl;
+            }
+
+            // // If the endNode with no outgoing nodes and the endNode with no incoming nodes are not set to false,
+            // // it means that we have connected them with alignments.
+            // if(finalDeadEndReadsWithNoOutgoingNodes[A0.getValue()] == false and finalDeadEndReadsWithNoIncomingNodes[B0.getValue()] == false) {
+            //     cout << "Connected endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with endNode with no incoming nodes ReadID " << B0.getReadId() << " strand " << B0.getStrand() << endl;
+            // } else {
+            //     cout << "Did not connect endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with any other endNode with no incoming nodes" << endl;
+            // }
+
+        }
+
+        if(!success) {
+            cout << "Did not connect endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " with any other endNode with no incoming nodes" << endl;
+            cout << "No alignments added" << endl;
+        }
+
+            
+    }
+
+
+    // Print how many alignments were kept
+    const size_t keepCountR2 = count(keepAlignment.begin(), keepAlignment.end(), true);
+    cout << "########################################################################################################################" << endl;
+    cout << "Adding alignments for break bridging to connect endNodes in the same disjointSet: Keeping " << keepCountR2 << " alignments of " << keepAlignment.size() << endl;
+    cout << "########################################################################################################################" << endl;
+
+
+
+
+
+    
+    // Case 2: the NoOut deadEnd node will be mapped to at least 2 NoIn deadEnd nodes in the same disjointSet.
+    // Other NoIn deadEnd nodes will be in a different disjointSet.
+    //
+    //  NoIn - - - - | - - - - -  - - - - - - - - - - -
+    //  NoIn - - - - | - - NoOut     
+    //                                     NoIn - - - - - - - (Other disjointSet)
+
+    // Case 3: Breaks in a haploid chromosome (chrX chrY).
+    //
+    //  NoIn - - - - - - NoOut
+    //                             NoIn - - - - - - - (Other disjointSet) 
+
+
+    std::unordered_map<uint32_t, vector<uint32_t>> endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesDifferentDisjointSet;
+
+    // Now, we try to find EndNodesWithNoIncomingNodes that are in different disjointSets than EndNodesWithNoOutgoingNodes.
+    for (ReadId readId = 0; readId < readCount; readId++) {
+        for (Strand strand = 0; strand < 2; strand++) {
+            OrientedReadId orientedReadId(readId, strand);
+
+            // check if the orientedReadId is an endNode with no outgoing nodes
+            if(finalDeadEndReadsWithNoOutgoingNodes[orientedReadId.getValue()]){
+                // Get it's disjointSet
+                uint32_t deadEndReadWithNoOutgoingNodesDisjointSetId = disjointSets.find_set(orientedReadId.getValue());
+
+                // Find all EndNodesWithNoIncomingNodes that are in different disjointSet
+                for(uint32_t id=0; id<orientedReadCount; id++) {
+                    // check if the id is an endNode with no incoming nodes
+                    if(finalDeadEndReadsWithNoIncomingNodes[id]){
+                        // get the disjointSet of the id
+                        uint32_t endNodeWithNoIncomingNodesDisjointSetId = disjointSets.find_set(id);
+                        // check if the disjointSet of the id is different from the disjointSet of the endNode with no outgoing nodes
+                        if(deadEndReadWithNoOutgoingNodesDisjointSetId != endNodeWithNoIncomingNodesDisjointSetId){
+                            endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesDifferentDisjointSet[orientedReadId.getValue()].push_back(id);
+                            endNodesWithNoOutgoingNodesConsidered[orientedReadId.getValue()] = true;
+                        }
+                    }
+                }
+
+            }
+        }
+    }
+
+
+    for(auto& p : endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesDifferentDisjointSet) {
+        uint32_t value = p.first;
+        OrientedReadId orientedReadId = OrientedReadId::fromValue(value);
+        SHASTA_ASSERT(orientedReadId.getValue() == value);
+        const ReadId readId = orientedReadId.getReadId();
+        const Strand strand = orientedReadId.getStrand();
+
+        cout << "EndNodeWithNoOutgoingNodes ReadID " << readId << " and strand " << strand << " is mapped to these NoIn deadEnd nodes in a different disjointSet: " << endl;
+        vector<bool> endNodesWithNoIncomingNodes(orientedReadCount, false);
+        for(auto& node : p.second) {
+            OrientedReadId nodeOrientedReadId = OrientedReadId::fromValue(node);
+            cout << "ReadID " << nodeOrientedReadId.getReadId() << " strand " << nodeOrientedReadId.getStrand() << endl;
+            SHASTA_ASSERT(nodeOrientedReadId.getValue() == node);
+            endNodesWithNoIncomingNodes[node] = true;
+        }
         
         // Find neighbors in the forward direction of the ALL ALIGNMENTS read graph 
         // starting from orientedReadId which is an endNode with no outgoing nodes in the filtered read graph. 
@@ -2257,261 +2539,14 @@ void Assembler::createReadGraph4withStrandSeparation(
             // it means that we have connected them with alignments.
             if(success) {
                 cout << "Connected endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with endNode with no incoming nodes ReadID " << B0.getReadId() << " strand " << B0.getStrand() << endl;
-            } else {
-                cout << "Did not connect endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with any other endNode with no incoming nodes" << endl;
-                cout << "No alignments added" << endl;
             }
 
-            // // If the endNode with no outgoing nodes and the endNode with no incoming nodes are not set to false,
-            // // it means that we have connected them with alignments.
-            // if(finalDeadEndReadsWithNoOutgoingNodes[A0.getValue()] == false and finalDeadEndReadsWithNoIncomingNodes[B0.getValue()] == false) {
-            //     cout << "Connected endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with endNode with no incoming nodes ReadID " << B0.getReadId() << " strand " << B0.getStrand() << endl;
-            // } else {
-            //     cout << "Did not connect endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with any other endNode with no incoming nodes" << endl;
-            // }
 
         }
 
-            
-    }
-
-
-    // Print how many alignments were kept
-    const size_t keepCountR2 = count(keepAlignment.begin(), keepAlignment.end(), true);
-    cout << "Adding alignments for break bridging to connect endNodes in the same disjointSet: Keeping " << keepCountR2 << " alignments of " << keepAlignment.size() << endl;
-
-
-
-
-
-    
-    // Case 2: the NoOut deadEnd node will be mapped to at least 2 NoIn deadEnd nodes in the same disjointSet.
-    // Other NoIn deadEnd nodes will be in a different disjointSet.
-    //
-    //  NoIn - - - - | - - - - -  - - - - - - - - - - -
-    //  NoIn - - - - | - - NoOut     
-    //                                     NoIn - - - - - - - (Other disjointSet)
-
-    // Case 3: Breaks in a haploid chromosome (chrX chrY).
-    //
-    //  NoIn - - - - - - NoOut
-    //                             NoIn - - - - - - - (Other disjointSet) 
-
-
-    std::unordered_map<uint32_t, vector<uint32_t>> endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesDifferentDisjointSet;
-
-    // Now, we try to find EndNodesWithNoIncomingNodes that are in different disjointSets than EndNodesWithNoOutgoingNodes.
-    for (ReadId readId = 0; readId < readCount; readId++) {
-        for (Strand strand = 0; strand < 2; strand++) {
-            OrientedReadId orientedReadId(readId, strand);
-
-            // check if the orientedReadId is an endNode with no outgoing nodes
-            if(finalDeadEndReadsWithNoOutgoingNodes[orientedReadId.getValue()]){
-                // Get it's disjointSet
-                uint32_t deadEndReadWithNoOutgoingNodesDisjointSetId = disjointSets.find_set(orientedReadId.getValue());
-
-                // Find all EndNodesWithNoIncomingNodes that are in different disjointSet
-                for(uint32_t id=0; id<orientedReadCount; id++) {
-                    // check if the id is an endNode with no incoming nodes
-                    if(finalDeadEndReadsWithNoIncomingNodes[id]){
-                        // get the disjointSet of the id
-                        uint32_t endNodeWithNoIncomingNodesDisjointSetId = disjointSets.find_set(id);
-                        // check if the disjointSet of the id is different from the disjointSet of the endNode with no outgoing nodes
-                        if(deadEndReadWithNoOutgoingNodesDisjointSetId != endNodeWithNoIncomingNodesDisjointSetId){
-                            endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesDifferentDisjointSet[orientedReadId.getValue()].push_back(id);
-                            endNodesWithNoOutgoingNodesConsidered[orientedReadId.getValue()] = true;
-                        }
-                    }
-                }
-
-            }
-        }
-    }
-
-
-    for(auto& p : endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesDifferentDisjointSet) {
-        uint32_t value = p.first;
-        OrientedReadId orientedReadId = OrientedReadId::fromValue(value);
-        SHASTA_ASSERT(orientedReadId.getValue() == value);
-        const ReadId readId = orientedReadId.getReadId();
-        const Strand strand = orientedReadId.getStrand();
-
-        cout << "EndNodeWithNoOutgoingNodes ReadID " << readId << " and strand " << strand << " is mapped to these NoIn deadEnd nodes in a different disjointSet: " << endl;
-        vector<bool> endNodesWithNoIncomingNodes(orientedReadCount, false);
-        for(auto& node : p.second) {
-            OrientedReadId nodeOrientedReadId = OrientedReadId::fromValue(node);
-            cout << "ReadID " << nodeOrientedReadId.getReadId() << " strand " << nodeOrientedReadId.getStrand() << endl;
-            SHASTA_ASSERT(nodeOrientedReadId.getValue() == node);
-            endNodesWithNoIncomingNodes[node] = true;
-        }
-        
-        // Find neighbors in the forward direction of the ALL ALIGNMENTS read graph 
-        // starting from orientedReadId which is an endNode with no outgoing nodes in the filtered read graph. 
-        // Early stop when we reach an endNode with no incoming nodes (a node with endNodesWithNoIncomingNodes set to true).
-        vector<OrientedReadId> forwardNeighbors;
-        readGraphAllAlignments.findNeighborsEarlyStopWhenReachEndNode(orientedReadId, endNodesWithNoIncomingNodes, 5, forwardNeighbors);
-
-        // create a std::set of the forwardNeighbors for easy contain check
-        std::set<OrientedReadId> forwardNeighborsSet(forwardNeighbors.begin(), forwardNeighbors.end());
-        
-
-        if(forwardNeighbors.empty()) {
+        if(!success) {
             cout << "Did not connect endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " with any other endNode with no incoming nodes" << endl;
-            cout << "No forward neighbors found" << endl;
-            continue;
-        }
-
-        // Get the last item from forwardNeighbors. It contains the first encountered dead end node with no INCOMING nodes
-        // OR a non speficic node if we exceeded maxDistance
-        OrientedReadId lastNode = forwardNeighbors.back();
-
-        bool success = false;
-
-        // First check if the last node is a potential dead end node with no INCOMING nodes
-        if(endNodesWithNoIncomingNodes[lastNode.getValue()]) {
-            
-            const OrientedReadId A0 = orientedReadId;
-            const OrientedReadId B0 = lastNode;
-            const OrientedReadId A1 = OrientedReadId(A0.getReadId(), A0.getStrand() == 0 ? 1 : 0);
-            const OrientedReadId B1 = OrientedReadId(B0.getReadId(), B0.getStrand() == 0 ? 1 : 0);
-
-            SHASTA_ASSERT(A0.getReadId() == A1.getReadId());
-            SHASTA_ASSERT(B0.getReadId() == B1.getReadId());
-            SHASTA_ASSERT(A0.getStrand() == 1 - A1.getStrand());
-            SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
-
-            // Get the connected components that these oriented reads are in.
-            const uint32_t a0 = disjointSets.find_set(A0.getValue());
-            const uint32_t b0 = disjointSets.find_set(B0.getValue());
-            const uint32_t a1 = disjointSets.find_set(A1.getValue());
-            const uint32_t b1 = disjointSets.find_set(B1.getValue());
-
-
-            // for(uint64_t index=0; index<alignmentTableNotPassFilter.size(); index++) {
-            for(uint64_t alignmentId=0; alignmentId<alignmentData.size(); alignmentId++) {
-
-                // const pair<uint64_t, double>& p = alignmentTableNotPassFilter[index];
-                // const uint64_t alignmentId = p.first;
-                // const double logQ = p.second;
-
-                const bool keepThisAlignment = keepAlignment[alignmentId];
-
-                const bool keepThisBreaksAlignment = keepAlignmentsForBreaks[alignmentId];
-
-                if(keepThisAlignment) {
-                    continue;
-                }
-
-                if(not keepThisBreaksAlignment) {
-                    continue;
-                }
-
-                AlignmentData& alignment = alignmentData[alignmentId];
-            
-                // Get the OrientedReadIds.
-                OrientedReadId alignmentOrientedReadId0(alignment.readIds[0], 0);
-                OrientedReadId alignmentOrientedReadId1(alignment.readIds[1], alignment.isSameStrand ? 0 : 1);
-                SHASTA_ASSERT(alignmentOrientedReadId0 < alignmentOrientedReadId1);
-
-                // Swap them if necessary, depending on the average alignment offset at center.
-                if(alignment.info.offsetAtCenter() < 0.) {
-                    swap(alignmentOrientedReadId0, alignmentOrientedReadId1);
-                }
-
-
-                if(alignmentOrientedReadId0.getValue() == orientedReadId.getValue() || forwardNeighborsSet.contains(alignmentOrientedReadId0) || forwardNeighborsSet.contains(alignmentOrientedReadId1) ){
-                    
-                    // Get the alignment data
-                    ReadId readId0v2 = alignment.readIds[0];
-                    ReadId readId1v2 = alignment.readIds[1];
-                    const bool isSameStrandv2 = alignment.isSameStrand;
-                    SHASTA_ASSERT(readId0v2 < readId1v2);
-                    OrientedReadId A0v2 = OrientedReadId(readId0v2, 0);
-                    OrientedReadId B0v2 = OrientedReadId(readId1v2, isSameStrandv2 ? 0 : 1);
-                    OrientedReadId A1v2 = OrientedReadId(readId0v2, 1);
-                    OrientedReadId B1v2 = OrientedReadId(readId1v2, isSameStrandv2 ? 1 : 0);
-
-                    SHASTA_ASSERT(A0v2.getReadId() == A1v2.getReadId());
-                    SHASTA_ASSERT(B0v2.getReadId() == B1v2.getReadId());
-                    SHASTA_ASSERT(A0v2.getStrand() == 1 - A1v2.getStrand());
-                    SHASTA_ASSERT(B0v2.getStrand() == 1 - B1v2.getStrand());
-
-                    // Get the connected components that these oriented reads are in.
-                    const uint32_t a0v2 = disjointSets.find_set(A0v2.getValue());
-                    const uint32_t b0v2 = disjointSets.find_set(B0v2.getValue());
-                    const uint32_t a1v2 = disjointSets.find_set(A1v2.getValue());
-                    const uint32_t b1v2 = disjointSets.find_set(B1v2.getValue());
-
-
-                    // If the alignment breaks strand separation, it is skipped.
-                    // If A0 and B1 are in the same connected component,
-                    // A1 and B0 also must be in the same connected component.
-                    // Adding this pair of edges would create a self-complementary
-                    // connected component containing A0, B0, A1, and B1,
-                    // and to ensure strand separation we don't want to do that.
-                    // So we mark these edges as cross-strand edges
-                    // and don't use them to update the disjoint set data structure.
-                    if(a0v2 == b1v2) {
-                        SHASTA_ASSERT(a1v2 == b0v2);
-                        crossStrandEdgeCount += 2;
-                        continue;
-                    }
-
-                    // Add the alignment to the read graph.
-                    keepAlignment[alignmentId] = true;
-                    alignment.info.isInReadGraph = 1;
-
-                    // Update vertex degrees
-                    verticesDegree[A0v2.getValue()]++;
-                    verticesDegree[B0v2.getValue()]++;
-                    verticesDegree[A1v2.getValue()]++;
-                    verticesDegree[B1v2.getValue()]++;
-                    
-
-                    // Update disjoint sets
-                    disjointSets.union_set(a0v2, b0v2);
-                    disjointSets.union_set(a1v2, b1v2);
-
-                    // Make sure all alignments added are not considered as dead ends anymore
-                    finalDeadEndReadsWithNoOutgoingNodes[A0v2.getValue()] = false;
-                    finalDeadEndReadsWithNoOutgoingNodes[A1v2.getValue()] = false;
-                    finalDeadEndReadsWithNoIncomingNodes[B0v2.getValue()] = false;
-                    finalDeadEndReadsWithNoIncomingNodes[B1v2.getValue()] = false;
-
-                    // Make sure the start and last nodes are not considered as dead ends anymore
-                    finalDeadEndReadsWithNoOutgoingNodes[A0.getValue()] = false;
-                    finalDeadEndReadsWithNoOutgoingNodes[A1.getValue()] = false;
-                    finalDeadEndReadsWithNoIncomingNodes[B0.getValue()] = false;
-                    finalDeadEndReadsWithNoIncomingNodes[B1.getValue()] = false;
-
-                    success = true;
-
-
-                    // cout << "Adding alignment " << alignmentId << " between " << alignmentOrientedReadId0.getReadId() << " and " << alignmentOrientedReadId1.getReadId() << endl;
-
-                    // Create the edge.
-                    add_edge(alignmentOrientedReadId0.getValue(), alignmentOrientedReadId1.getValue(), ReadGraph4Edge(alignmentId), readGraph);
-
-                    // Also create the reverse complemented edge.
-                    alignmentOrientedReadId0.flipStrand();
-                    alignmentOrientedReadId1.flipStrand();
-                    add_edge(alignmentOrientedReadId1.getValue(), alignmentOrientedReadId0.getValue(), ReadGraph4Edge(alignmentId), readGraph);
-
-
-                }
-
-            }
-
-            // If the endNode with no outgoing nodes and the endNode with no incoming nodes are not set to false,
-            // it means that we have connected them with alignments.
-            if(success) {
-                cout << "Connected endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with endNode with no incoming nodes ReadID " << B0.getReadId() << " strand " << B0.getStrand() << endl;
-            } else {
-                cout << "Did not connect endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with any other endNode with no incoming nodes" << endl;
-                cout << "No alignments added" << endl;
-            }
-
-
+            cout << "No alignments added" << endl;
         }
 
             
@@ -2520,8 +2555,9 @@ void Assembler::createReadGraph4withStrandSeparation(
 
     // Print how many alignments were kept
     const size_t keepCountR3 = count(keepAlignment.begin(), keepAlignment.end(), true);
+    cout << "########################################################################################################################" << endl;
     cout << "Adding alignments for break bridging to connect endNodes in different disjointSets: Keeping " << keepCountR3 << " alignments of " << keepAlignment.size() << endl;
-
+    cout << "########################################################################################################################" << endl;
 
 
 
