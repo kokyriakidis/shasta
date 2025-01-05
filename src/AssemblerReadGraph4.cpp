@@ -706,6 +706,19 @@ void ReadGraph4AllAlignments::findNeighborsEarlyStopWhenReachEndNode(
                     q.push(make_pair(targetVertex, distance + 1));
                 }
             }
+
+            // Process incoming edges
+            BGL_FORALL_INEDGES(currentVertex, edge, *this, ReadGraph4AllAlignments) {
+                vertex_descriptor sourceVertex = source(edge, *this);
+                if (!visitedVertices.contains(sourceVertex)) {
+                    if (finalDeadEndReadsWithNoIncomingNodesPlusDistanceNeighbors[sourceVertex]) {
+                        neighbors.push_back(OrientedReadId::fromValue(sourceVertex));
+                        return;
+                    }
+                    visitedVertices.insert(sourceVertex);
+                    q.push(make_pair(sourceVertex, distance + 1));
+                }
+            }
         }
     }
 }
@@ -757,7 +770,8 @@ void ReadGraph4AllAlignments::findNeighborsEarlyStopWhenReachEndNode(
                 uint32_t alignmentId = readGraphAllAlignments[edge].alignmentId;
                 if (!visitedVertices.contains(targetVertex)) {
                     neighborsAlignmentIds.push_back(alignmentId);
-                    if (finalDeadEndReadsWithNoIncomingNodesPlusDistanceNeighbors[OrientedReadId::fromValue(targetVertex).getValue()]) {
+                    // OrientedReadId::fromValue(targetVertex).getValue()
+                    if (finalDeadEndReadsWithNoIncomingNodesPlusDistanceNeighbors[targetVertex]) {
                         neighbors.push_back(OrientedReadId::fromValue(targetVertex));
                         return;
                     }
@@ -1496,7 +1510,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     const double logWThreshold2 = log(WThreshold2);
 
 
-    const double WThresholdForBreaks = 1e+5;
+    const double WThresholdForBreaks = 1e+2;
     const double logWThresholdForBreaks = log(WThresholdForBreaks);
 
 
@@ -1572,17 +1586,6 @@ void Assembler::createReadGraph4withStrandSeparation(
             alignmentTableNotPassFilter.push_back(make_pair(alignmentId, logQ));
             keepAlignmentsForBreaks[alignmentId] = true;
         }
-
-        // if(logQ <= logWThresholdForBreaks){
-        //     // if(logQ <= logWThresholdForBreaks)
-        //     alignmentTableNotPassFilter.push_back(make_pair(alignmentId, logQ));
-        //     keepAlignmentsForBreaks[alignmentId] = true;
-        // }
-        // } else if(logQ <= logWThresholdForBreaks){
-        //     // if(logQ <= logWThresholdForBreaks)
-        //     alignmentTableNotPassFilter.push_back(make_pair(alignmentId, logQ));
-        //     keepAlignmentsForBreaks[alignmentId] = true;
-        // }
 
     }
 
@@ -2124,6 +2127,12 @@ void Assembler::createReadGraph4withStrandSeparation(
         vector<OrientedReadId> forwardNeighbors;
         readGraphAllAlignments.findNeighborsEarlyStopWhenReachEndNode(orientedReadId, endNodesWithNoIncomingNodes, 5, forwardNeighbors);
 
+        // // print the forward neighbors
+        // cout << "Forward neighbors of the endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " are:" << endl;
+        // for(auto& neighbor : forwardNeighbors) {
+        //     cout << "ReadID " << neighbor.getReadId() << " strand " << neighbor.getStrand() << endl;
+        // }
+
 
         // create a std::set of the forwardNeighbors for easy contain check
         std::set<OrientedReadId> forwardNeighborsSet(forwardNeighbors.begin(), forwardNeighbors.end());
@@ -2146,8 +2155,6 @@ void Assembler::createReadGraph4withStrandSeparation(
 
         // First check if the last node is a potential dead end node with no INCOMING nodes
         if(endNodesWithNoIncomingNodes[lastNode.getValue()]) {
-
-            cout << "Test 1" << endl;
 
             cout << "The last node is: " << lastNode.getReadId() << " strand " << lastNode.getStrand() << endl;
             
@@ -2393,6 +2400,12 @@ void Assembler::createReadGraph4withStrandSeparation(
             cout << "No forward neighbors found" << endl;
             continue;
         }
+
+        // // print the forward neighbors
+        // cout << "Forward neighbors of the endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " are:" << endl;
+        // for(auto& neighbor : forwardNeighbors) {
+        //     cout << "ReadID " << neighbor.getReadId() << " strand " << neighbor.getStrand() << endl;
+        // }
 
         // Get the last item from forwardNeighbors. It contains the first encountered dead end node with no INCOMING nodes
         // OR a non speficic node if we exceeded maxDistance
