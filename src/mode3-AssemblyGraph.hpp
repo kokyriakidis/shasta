@@ -29,6 +29,7 @@
 
 namespace shasta {
 
+    class Assembler;
     class Mode3AssemblyOptions;
     class OrientedReadId;
 
@@ -331,6 +332,15 @@ public:
         span<const OrientedReadId>,
         span<const AnchorId>,
         const Anchors&,
+        const Mode3AssemblyOptions&);
+
+    // Another constructor from binary data, used in the Python API.
+    // This is similar to the previous constructor, but gets the
+    // orientedReadIds, anchorIds, and Anchors from the Mode3AssemblyGraph in the Assembler.
+    AssemblyGraph(
+        const string& assemblyStage,
+        uint64_t componentId,
+        const Assembler&,
         const Mode3AssemblyOptions&);
 
     // Constructor from a vector of vectors of AnchorIds representing Chains.
@@ -642,6 +652,11 @@ private:
         double maxLoss,
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold);
+
+    // Detangling with path following. Python callable.
+public:
+    void detangle2();
+private:
 
     // Cleanup/simplify superbubbles that are likely to be caused by errors,
     // completely or in part.

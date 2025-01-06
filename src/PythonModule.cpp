@@ -20,6 +20,7 @@
 #include "mappedCopy.hpp"
 #include "MedianConsensusCaller.hpp"
 #include "MemoryMappedAllocator.hpp"
+#include "mode3-AssemblyGraph.hpp"
 #include "MultithreadedObject.hpp"
 #include "performanceLog.hpp"
 #include "Reads.hpp"
@@ -628,6 +629,8 @@ PYBIND11_MODULE(shasta, shastaModule)
         // Assembly mode 3.
         .def("mode3Reassembly",
             &Assembler::mode3Reassembly)
+        .def("accessMode3Assembler",
+            &Assembler::accessMode3Assembler)
 
         // Consensus caller.
         .def("setupConsensusCaller",
@@ -679,6 +682,12 @@ PYBIND11_MODULE(shasta, shastaModule)
         ;
     class_<Mode3AssemblyOptions>(shastaModule, "Mode3AssemblyOptions");
 
+
+
+    // Expose chass mode3AssemblyGraph to Python.
+    class_<mode3::AssemblyGraph>(shastaModule, "Mode3AssemblyGraph")
+        .def(pybind11::init<const string&, uint64_t, const Assembler&, const Mode3AssemblyOptions&>())
+        .def("detangle2", &mode3::AssemblyGraph::detangle2);
 
 
     // Constants.
