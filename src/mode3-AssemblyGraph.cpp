@@ -3,6 +3,8 @@
 #include "mode3-LocalAssembly.hpp"
 #include "mode3-AnchorGraph.hpp"
 #include "mode3-PhasingTable.hpp"
+#include "Mode3Assembler.hpp"
+#include "Assembler.hpp"
 #include "AssemblerOptions.hpp"
 #include "copyNumber.hpp"
 #include "deduplicate.hpp"
@@ -86,6 +88,27 @@ AssemblyGraph::AssemblyGraph(
     options(options),
     orientedReadIds(orientedReadIds),
     anchorIds(anchorIds)
+{
+    load(assemblyStage, componentIdArgument);
+    SHASTA_ASSERT(componentId == componentIdArgument);
+}
+
+
+
+// Another constructor from binary data, used in the Python API.
+// This is similar to the previous constructor, but gets the
+// orientedReadIds, anchorIds, and Anchors from the Mode3Assembler.
+AssemblyGraph::AssemblyGraph(
+    const string& assemblyStage,
+    uint64_t componentIdArgument,
+    const Assembler& assembler,
+    const Mode3AssemblyOptions& options) :
+    MultithreadedObject<AssemblyGraph>(*this),
+    MappedMemoryOwner(assembler),
+    anchors(assembler.mode3Assembler->anchors()),
+    options(options),
+    orientedReadIds(assembler.mode3Assembler->componentOrientedReadIds[componentIdArgument]),
+    anchorIds(assembler.mode3Assembler->componentAnchorIds[componentIdArgument])
 {
     load(assemblyStage, componentIdArgument);
     SHASTA_ASSERT(componentId == componentIdArgument);

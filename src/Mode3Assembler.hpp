@@ -83,7 +83,6 @@ public:
     }
 
     const Mode3AssemblyOptions& options;
-private:
 
 
 
@@ -98,6 +97,8 @@ private:
 
     // The anchorIds in each component. Indexed by componentId.
     MemoryMapped::VectorOfVectors<mode3::AnchorId, uint64_t> componentAnchorIds;
+
+public:
 
     bool isSelfComplementaryComponent(uint64_t componentId) const;
     void checkComponentIsValid(uint64_t componentId) const;
