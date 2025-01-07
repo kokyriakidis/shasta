@@ -242,84 +242,6 @@ void Assembler::createReadGraphUsingSelectedAlignments(vector<bool>& keepAlignme
 
 
 
-
-
-
-// This is called for ReadGraph.creationMethod 0 and 2.
-void Assembler::createReadGraphUsingAllAlignments(vector<bool>& keepAllAlignments)
-{
-
-
-    // Now we can create the read graph.
-    // Only the alignments we marked as "keep" generate edges in the read graph.
-    readGraphAllAlignments.edges.createNew(largeDataName("ReadGraphEdges"), largeDataPageSize);
-    for(size_t alignmentId=0; alignmentId<alignmentData.size(); alignmentId++) {
-
-        // Record whether this alignment is used in the read graph.
-        const bool keepThisAlignment = keepAllAlignments[alignmentId];
-        AlignmentData& alignment = alignmentData[alignmentId];
-        alignment.info.isInReadGraph = uint8_t(keepThisAlignment);
-
-        // If this alignment is not used in the read graph, we are done.
-        if(not keepThisAlignment) {
-            continue;
-        }
-
-        // Create the edge corresponding to this alignment.
-        ReadGraphEdge edge;
-        edge.alignmentId = alignmentId & 0x3fff'ffff'ffff'ffff;
-        edge.crossesStrands = 0;
-        edge.hasInconsistentAlignment = 0;
-        edge.orientedReadIds[0] = OrientedReadId(alignment.readIds[0], 0);
-        edge.orientedReadIds[1] = OrientedReadId(alignment.readIds[1], alignment.isSameStrand ? 0 : 1);
-        SHASTA_ASSERT(edge.orientedReadIds[0] < edge.orientedReadIds[1]);
-        readGraphAllAlignments.edges.push_back(edge);
-
-        // Also create the reverse complemented edge.
-        edge.orientedReadIds[0].flipStrand();
-        edge.orientedReadIds[1].flipStrand();
-        SHASTA_ASSERT(edge.orientedReadIds[0] < edge.orientedReadIds[1]);
-        readGraphAllAlignments.edges.push_back(edge);
-    }
-
-    // Release unused allocated memory
-    readGraphAllAlignments.unreserve();
-
-    // Create read graph connectivity.
-    readGraphAllAlignments.connectivity.createNew(largeDataName("ReadGraphConnectivity"), largeDataPageSize);
-    readGraphAllAlignments.connectivity.beginPass1(2 * reads->readCount());
-    for(const ReadGraphEdge& edge: readGraphAllAlignments.edges) {
-        readGraphAllAlignments.connectivity.incrementCount(edge.orientedReadIds[0].getValue());
-        readGraphAllAlignments.connectivity.incrementCount(edge.orientedReadIds[1].getValue());
-    }
-    readGraphAllAlignments.connectivity.beginPass2();
-    for(size_t i=0; i<readGraphAllAlignments.edges.size(); i++) {
-        const ReadGraphEdge& edge = readGraphAllAlignments.edges[i];
-        readGraphAllAlignments.connectivity.store(edge.orientedReadIds[0].getValue(), uint32_t(i));
-        readGraphAllAlignments.connectivity.store(edge.orientedReadIds[1].getValue(), uint32_t(i));
-    }
-    readGraphAllAlignments.connectivity.endPass2();
-
-    // Count the number of isolated reads and their bases.
-    uint64_t isolatedReadCount = 0;
-    uint64_t isolatedReadBaseCount = 0;
-    for(ReadId readId=0; readId<reads->readCount(); readId++) {
-        const OrientedReadId orientedReadId(readId, 0);
-        const uint64_t neighborCount = readGraphAllAlignments.connectivity.size(orientedReadId.getValue());
-        if(neighborCount > 0) {
-            continue;
-        }
-        ++isolatedReadCount;
-        isolatedReadBaseCount += reads->getReadRawSequenceLength(readId);
-    }
-    assemblerInfo->isolatedReadCount = isolatedReadCount;
-    assemblerInfo->isolatedReadBaseCount = isolatedReadBaseCount;
-}
-
-
-
-
-
 void Assembler::accessReadGraph()
 {
     readGraph.edges.accessExistingReadOnly(largeDataName("ReadGraphEdges"));
@@ -336,28 +258,6 @@ void Assembler::checkReadGraphIsOpen() const
         throw runtime_error("Read graph edges are not accessible.");
     }
     if(!readGraph.connectivity.isOpen()) {
-        throw runtime_error("Read graph connectivity is not accessible.");
-    }
-
-}
-
-
-void Assembler::accessreadGraphAllAlignments()
-{
-    readGraphAllAlignments.edges.accessExistingReadOnly(largeDataName("ReadGraphEdges"));
-    readGraphAllAlignments.connectivity.accessExistingReadOnly(largeDataName("ReadGraphConnectivity"));
-}
-void Assembler::accessreadGraphAllAlignmentsReadWrite()
-{
-    readGraphAllAlignments.edges.accessExistingReadWrite(largeDataName("ReadGraphEdges"));
-    readGraphAllAlignments.connectivity.accessExistingReadWrite(largeDataName("ReadGraphConnectivity"));
-}
-void Assembler::checkreadGraphAllAlignmentsIsOpen() const
-{
-    if(!readGraphAllAlignments.edges.isOpen) {
-        throw runtime_error("Read graph edges are not accessible.");
-    }
-    if(!readGraphAllAlignments.connectivity.isOpen()) {
         throw runtime_error("Read graph connectivity is not accessible.");
     }
 
@@ -2253,4 +2153,3 @@ void Assembler::flagInconsistentAlignmentsThreadFunction2(size_t threadId)
     }
     deduplicate(inconsistentEdgeIds);
 }
-
