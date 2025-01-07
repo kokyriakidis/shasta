@@ -1885,6 +1885,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     // If no such path is found, the orientedReadId is kept as a potential dead end node.
     //
     //*
+    uint64_t finalNumberOfPotentialDeadEndNodes = 0;
     vector<bool> finalDeadEndReadsWithNoOutgoingNodes(orientedReadCount, false);
     vector<bool> finalDeadEndReadsWithNoIncomingNodes(orientedReadCount, false);
     for (ReadId readId = 0; readId < readCount; readId++) {
@@ -1929,12 +1930,18 @@ void Assembler::createReadGraph4withStrandSeparation(
                 //     cout << endl;
                 // }
             } else if (result == 0) {
-                cout << "Did not find a path for the orientedRead with ReadID " << orientedReadId.getReadId() << " and strand " << orientedReadId.getStrand() << " with positive offset. Keeping it as a potential dead end read." << endl;
+                finalNumberOfPotentialDeadEndNodes++;
+                // cout << "Did not find a path for the orientedRead with ReadID " << orientedReadId.getReadId() << " and strand " << orientedReadId.getStrand() << " with positive offset. Keeping it as a potential dead end read." << endl;
                 finalDeadEndReadsWithNoOutgoingNodes[orientedReadId.getValue()] = true;
                 finalDeadEndReadsWithNoIncomingNodes[reverseOrientedReadId.getValue()] = true;
             }
         }
     }
+
+    cout << "########################################################################################################################" << endl;
+    cout << "After filtering we are left with " << finalNumberOfPotentialDeadEndNodes << " potential dead end reads." << endl;
+    cout << "########################################################################################################################" << endl;
+
 
 
     // // print dead end Oriented reads
@@ -2067,11 +2074,11 @@ void Assembler::createReadGraph4withStrandSeparation(
         const ReadId readId = orientedReadId.getReadId();
         const Strand strand = orientedReadId.getStrand();
 
-        cout << "EndNodeWithNoOutgoingNodes ReadID " << readId << " and strand " << strand << " is mapped to these NoIn deadEnd nodes in the same disjointSet:" << endl;
+        // cout << "EndNodeWithNoOutgoingNodes ReadID " << readId << " and strand " << strand << " is mapped to these NoIn deadEnd nodes in the same disjointSet:" << endl;
         vector<bool> endNodesWithNoIncomingNodes(orientedReadCount, false);
         for(auto& node : p.second) {
             OrientedReadId nodeOrientedReadId = OrientedReadId::fromValue(node);
-            cout << "ReadID " << nodeOrientedReadId.getReadId() << " strand " << nodeOrientedReadId.getStrand() << endl;
+            // cout << "ReadID " << nodeOrientedReadId.getReadId() << " strand " << nodeOrientedReadId.getStrand() << endl;
             SHASTA_ASSERT(nodeOrientedReadId.getValue() == node);
             endNodesWithNoIncomingNodes[node] = true;
         }
@@ -2095,8 +2102,8 @@ void Assembler::createReadGraph4withStrandSeparation(
         
 
         if(forwardNeighbors.empty()) {
-            cout << "Did not connect endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " with any other endNode with no incoming nodes" << endl;
-            cout << "No forward neighbors found" << endl;
+            // cout << "Did not connect endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " with any other endNode with no incoming nodes" << endl;
+            // cout << "No forward neighbors found" << endl;
             continue;
         }
 
@@ -2112,7 +2119,7 @@ void Assembler::createReadGraph4withStrandSeparation(
         // First check if the last node is a potential dead end node with no INCOMING nodes
         if(endNodesWithNoIncomingNodes[lastNode.getValue()]) {
 
-            cout << "The last node is: " << lastNode.getReadId() << " strand " << lastNode.getStrand() << endl;
+            // cout << "The last node is: " << lastNode.getReadId() << " strand " << lastNode.getStrand() << endl;
             
             const OrientedReadId A0 = orientedReadId;
             const OrientedReadId B0 = lastNode;
@@ -2248,7 +2255,7 @@ void Assembler::createReadGraph4withStrandSeparation(
             // If the endNode with no outgoing nodes and the endNode with no incoming nodes are not set to false,
             // it means that we have connected them with alignments.
             if(success) {
-                cout << "Connected endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with endNode with no incoming nodes ReadID " << B0.getReadId() << " strand " << B0.getStrand() << endl;
+                // cout << "Connected endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with endNode with no incoming nodes ReadID " << B0.getReadId() << " strand " << B0.getStrand() << endl;
             }
 
             // // If the endNode with no outgoing nodes and the endNode with no incoming nodes are not set to false,
@@ -2262,8 +2269,8 @@ void Assembler::createReadGraph4withStrandSeparation(
         }
 
         if(!success) {
-            cout << "Did not connect endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " with any other endNode with no incoming nodes" << endl;
-            cout << "No alignments added" << endl;
+           // cout << "Did not connect endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " with any other endNode with no incoming nodes" << endl;
+           // cout << "No alignments added" << endl;
         }
 
             
@@ -2332,11 +2339,11 @@ void Assembler::createReadGraph4withStrandSeparation(
         const ReadId readId = orientedReadId.getReadId();
         const Strand strand = orientedReadId.getStrand();
 
-        cout << "EndNodeWithNoOutgoingNodes ReadID " << readId << " and strand " << strand << " is mapped to these NoIn deadEnd nodes in a different disjointSet: " << endl;
+        // cout << "EndNodeWithNoOutgoingNodes ReadID " << readId << " and strand " << strand << " is mapped to these NoIn deadEnd nodes in a different disjointSet: " << endl;
         vector<bool> endNodesWithNoIncomingNodes(orientedReadCount, false);
         for(auto& node : p.second) {
             OrientedReadId nodeOrientedReadId = OrientedReadId::fromValue(node);
-            cout << "ReadID " << nodeOrientedReadId.getReadId() << " strand " << nodeOrientedReadId.getStrand() << endl;
+            // cout << "ReadID " << nodeOrientedReadId.getReadId() << " strand " << nodeOrientedReadId.getStrand() << endl;
             SHASTA_ASSERT(nodeOrientedReadId.getValue() == node);
             endNodesWithNoIncomingNodes[node] = true;
         }
@@ -2352,8 +2359,8 @@ void Assembler::createReadGraph4withStrandSeparation(
         
 
         if(forwardNeighbors.empty()) {
-            cout << "Did not connect endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " with any other endNode with no incoming nodes" << endl;
-            cout << "No forward neighbors found" << endl;
+            // cout << "Did not connect endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " with any other endNode with no incoming nodes" << endl;
+            // cout << "No forward neighbors found" << endl;
             continue;
         }
 
@@ -2507,15 +2514,15 @@ void Assembler::createReadGraph4withStrandSeparation(
             // If the endNode with no outgoing nodes and the endNode with no incoming nodes are not set to false,
             // it means that we have connected them with alignments.
             if(success) {
-                cout << "Connected endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with endNode with no incoming nodes ReadID " << B0.getReadId() << " strand " << B0.getStrand() << endl;
+                // cout << "Connected endNode with no outgoing nodes ReadID " << A0.getReadId() << " strand " << A0.getStrand() << " with endNode with no incoming nodes ReadID " << B0.getReadId() << " strand " << B0.getStrand() << endl;
             }
 
 
         }
 
         if(!success) {
-            cout << "Did not connect endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " with any other endNode with no incoming nodes" << endl;
-            cout << "No alignments added" << endl;
+            // cout << "Did not connect endNode with no outgoing nodes ReadID " << orientedReadId.getReadId() << " strand " << orientedReadId.getStrand() << " with any other endNode with no incoming nodes" << endl;
+            // cout << "No alignments added" << endl;
         }
 
             
