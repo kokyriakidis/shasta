@@ -1026,9 +1026,9 @@ public:
     void createReadGraph4withStrandSeparation(uint32_t maxAlignmentCount);
     void removeReadGraph();
 
-    void accessreadGraphAllAlignments();
-    void accessreadGraphAllAlignmentsReadWrite();
-    void checkreadGraphAllAlignmentsIsOpen() const;
+    void accessReadGraphAllAlignments();
+    void accessReadGraphAllAlignmentsReadWrite();
+    void checkReadGraphAllAlignmentsIsOpen() const;
 
 
 
