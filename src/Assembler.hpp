@@ -991,6 +991,7 @@ private:
     // For more information, see comments in ReadGraph.hpp.
 public:
     ReadGraph readGraph;
+    ReadGraph readGraphAllAlignments;
     void createReadGraph(
         uint32_t maxAlignmentCount,
         bool preferAlignedFraction);
@@ -1021,6 +1022,14 @@ public:
 
     void createReadGraph3(uint64_t maxAlignmentCount);
     void createReadGraph4(uint32_t maxAlignmentCount);
+
+    void createReadGraph4AllAlignments(uint32_t maxAlignmentCount);
+    void createReadGraph4withStrandSeparation(uint32_t maxAlignmentCount);
+    void removeReadGraph();
+
+    void accessReadGraphAllAlignments();
+    void accessReadGraphAllAlignmentsReadWrite();
+    void checkReadGraphAllAlignmentsIsOpen() const;
 
 
 
@@ -1126,12 +1135,15 @@ public:
 
     // Strict strand separation in the read graph.
     void flagCrossStrandReadGraphEdges2();
+    void flagCrossStrandReadGraphEdges4();
+    void flagCrossStrandReadGraphEdges5();
 
 
 
     // Create the ReadGraph given a bool vector that specifies which
     // alignments should be used in the read graph.
     void createReadGraphUsingSelectedAlignments(vector<bool>& keepAlignment);
+    void createReadGraphUsingAllAlignments(vector<bool>& keepAlignment);
 
 
 

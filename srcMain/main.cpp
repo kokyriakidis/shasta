@@ -303,6 +303,11 @@ void shasta::main::assemble(
         throw runtime_error("--Assembly.mode 2 requires --ReadGraph.strandSeparationMethod 2.");
     }
 
+    if(assemblerOptions.readGraphOptions.creationMethod == 4 and
+        assemblerOptions.readGraphOptions.strandSeparationMethod != 0) {
+        throw runtime_error("--ReadGraph.creationMethod 4 requires --ReadGraph.strandSeparationMethod 0.");
+    }
+
     // Find absolute paths of the input files.
     // We will use them below after changing directory to the output directory.
     vector<string> inputFileAbsolutePaths;
@@ -736,7 +741,7 @@ void shasta::main::assemble(
             assembler.createReadGraph3(
                 assemblerOptions.readGraphOptions.maxAlignmentCount);
         } else if(assemblerOptions.readGraphOptions.creationMethod == 4) {
-            assembler.createReadGraph4(
+            assembler.createReadGraph4withStrandSeparation(
                 assemblerOptions.readGraphOptions.maxAlignmentCount);
         }
 
