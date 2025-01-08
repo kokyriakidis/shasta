@@ -1022,6 +1022,7 @@ public:
 
     void createReadGraph3(uint64_t maxAlignmentCount);
     void createReadGraph4(uint32_t maxAlignmentCount);
+
     void createReadGraph4AllAlignments(uint32_t maxAlignmentCount);
     void createReadGraph4withStrandSeparation(uint32_t maxAlignmentCount);
     void removeReadGraph();
@@ -1136,6 +1137,7 @@ public:
     void flagCrossStrandReadGraphEdges2();
     void flagCrossStrandReadGraphEdges4();
     void flagCrossStrandReadGraphEdges5();
+
 
 
     // Create the ReadGraph given a bool vector that specifies which

@@ -284,17 +284,10 @@ void AssemblyGraph::run(
     compressBubbleChains();
     if(debug) write("F");
 
-    // removeChainsInBubblesWithNoInternalAnchors(debug);
-    // compress();
-    // compressBubbleChains();
-    // if(debug) write("G");
-
-    
-
     removeCrossEdgesInAssemblyGraph(debug);
     compress();
     compressBubbleChains();
-    if(debug) write("I");
+    if(debug) write("G");
 
     haplotizeWronglyPolyploidBubbles(debug);
     compress();
@@ -305,9 +298,7 @@ void AssemblyGraph::run(
     prune(debug, options.assemblyGraphOptions.pruneLength);
     compress();
     compressBubbleChains();
-    if(debug) write("J");
-
-    
+    if(debug) write("I");
 
 
 #if 0

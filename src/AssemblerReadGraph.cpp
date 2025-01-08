@@ -2153,3 +2153,4 @@ void Assembler::flagInconsistentAlignmentsThreadFunction2(size_t threadId)
     }
     deduplicate(inconsistentEdgeIds);
 }
+
