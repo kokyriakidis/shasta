@@ -653,10 +653,31 @@ private:
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold);
 
+
+
     // Detangling with path following. Python callable.
 public:
     void detangle2();
 private:
+
+    // This attempts to detangle the e0 Chain by finding a forward path
+    // that connects it to another Chain e1.
+    // If successful, it stitches e0 and e1 together to create
+    // a new Chain eNew and returns true.
+    // Otherwise, it returns false and e1 and eNew are not set.
+    bool detangle2Chain(
+        edge_descriptor e0,
+        edge_descriptor& e1,
+        edge_descriptor& eNew,
+        const std::set<edge_descriptor>& longChains
+    );
+    void detangle2PathFollowing(
+        edge_descriptor e0,
+        uint64_t direction,
+        const std::set<edge_descriptor>& longChains,
+        std::set<edge_descriptor>& longChainsFound
+        ) const;
+
 
     // Cleanup/simplify superbubbles that are likely to be caused by errors,
     // completely or in part.
