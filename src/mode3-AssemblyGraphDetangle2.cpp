@@ -119,7 +119,7 @@ void AssemblyGraph::detangle2()
 
     dot << "}\n";
 }
-#endif
+#else
 
 
 
@@ -129,7 +129,7 @@ void AssemblyGraph::detangle2()
     AssemblyGraph& assemblyGraph = *this;
 
     // EXPOSE WHEN CODE STABILIZES.
-    const uint64_t chainLengthThreshold = 300000;
+    const uint64_t chainLengthThreshold = 100000;
 
     cout << "AssemblyGraph::detangle2 called." << endl;
     cout << "Component " << componentId << endl;
@@ -186,44 +186,37 @@ bool AssemblyGraph::detangle2Chain(
     edge_descriptor& /* eNew */,
     const std::set<edge_descriptor>& longChains)
 {
-    cout << "Working on " << bubbleChainStringId(e0) << endl;
+    // cout << "Working on " << bubbleChainStringId(e0) << endl;
 
-    // Forward path following starting at the end of e0.
+
+    // Forward path following.
     std::set<edge_descriptor> longChainsFound0;
     detangle2PathFollowing(e0, 0, longChains, longChainsFound0);
-    cout << "Forward path following from " << bubbleChainStringId(e0) << " found:";
+    // cout << "Forward path following from " << bubbleChainStringId(e0) << " found:";
     if(longChainsFound0.empty()) {
-        cout << " nothing";
+        // cout << " nothing";
     } else {
-        for(const edge_descriptor e1: longChainsFound0) {
-            cout << " " << bubbleChainStringId(e1);
+        for(const edge_descriptor e: longChainsFound0) {
+            // cout << " " << bubbleChainStringId(e);
+            cout << "\"" << bubbleChainStringId(e0) << "\"->\"" << bubbleChainStringId(e) << "\";\n";
         }
     }
-    cout << endl;
+    // cout << endl;
 
-    if(longChainsFound0.size() != 1) {
-        return false;
-    }
-    const edge_descriptor e1 = *(longChainsFound0.begin());
-
-    // Backward path following starting at the beginning of e1.
+    // Backward path following.
     std::set<edge_descriptor> longChainsFound1;
-    detangle2PathFollowing(e1, 1, longChains, longChainsFound1);
-    cout << "Backward path following from " << bubbleChainStringId(e1) << " found:";
+    detangle2PathFollowing(e0, 1, longChains, longChainsFound1);
+    // cout << "Backward path following from " << bubbleChainStringId(e0) << " found:";
     if(longChainsFound1.empty()) {
-        cout << " nothing";
+        // cout << " nothing";
     } else {
-        for(const edge_descriptor e0: longChainsFound1) {
-            cout << " " << bubbleChainStringId(e0);
+        for(const edge_descriptor e: longChainsFound1) {
+            // cout << " " << bubbleChainStringId(e);
+            cout << "\"" << bubbleChainStringId(e) << "\"->\"" << bubbleChainStringId(e0) << "\";\n";
         }
     }
-    cout << endl;
+    // cout << endl;
 
-    if(longChainsFound1.size() == 1) {
-        cout << "Success " <<
-            bubbleChainStringId(*(longChainsFound1.begin())) << "->" <<
-            bubbleChainStringId(*(longChainsFound0.begin())) << endl;
-    }
 
     return false;
 }
@@ -243,10 +236,10 @@ void AssemblyGraph::detangle2PathFollowing(
     cout << bubbleChainStringId(e0) << ((direction==0) ? " forward" : " backward") << endl;
 
     // EXPOSE WHEN CODE STABILIZES.
-    const uint64_t seedAnchorCount = 3;
+    const uint64_t seedAnchorCount = 10;
     uint64_t minCommonCount = 4;
     double minJaccard = 0;
-    double minCorrectedJaccard = 0.7;
+    double minCorrectedJaccard = 0.8;
 
     class AnchorInfo {
     public:
@@ -327,9 +320,11 @@ void AssemblyGraph::detangle2PathFollowing(
                     const edge_descriptor e1 = chainIdentifier.e;
                     if((e1 != e0) and longChains.contains(e1)) {
                         longChainsFound.insert(e1);
-                        foundLongChain = true;
-                        cout << "Reached " << bubbleChainStringId(e1) << " at offset " << offset0 + info1.offsetInBases << endl;
-                        break;
+                        // cout << "Reached " << bubbleChainStringId(e1) << " at offset " << offset0 + info1.offsetInBases << endl;
+                        if(longChainsFound.size() >= 1) {
+                            foundLongChain = true;
+                            break;
+                        }
                     }
                 }
 
@@ -349,3 +344,4 @@ void AssemblyGraph::detangle2PathFollowing(
 
 }
 
+#endif
