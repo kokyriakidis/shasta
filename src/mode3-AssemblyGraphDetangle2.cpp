@@ -1,6 +1,7 @@
 // Shasta.
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-Detangle2.hpp"
+#include "findLinearChains.hpp"
 using namespace shasta;
 using namespace mode3;
 
@@ -40,7 +41,10 @@ void AssemblyGraph::detangle2()
     // Create the Detangle2Graph.
     Detangle2Graph detangle2Graph(assemblyGraph, chainLengthThreshold);
     detangle2Graph.addEdges();
-    detangle2Graph.writeGraphviz();
+    detangle2Graph.writeGraphviz("Detangle2Graph-Initial.dot");
+    detangle2Graph.removeWeakEdges();
+    detangle2Graph.writeGraphviz("Detangle2Graph-Final.dot");
+    detangle2Graph.findLinearChains();
 }
 
 
@@ -110,8 +114,6 @@ void Detangle2Graph::findPath(vertex_descriptor v0, uint64_t direction)
     const AssemblyGraph::edge_descriptor e0 = detangle2Graph[v0].e;
     const Chain& chain = assemblyGraph[e0].getOnlyChain();
 
-    std::set<edge_descriptor> longChainsFound;
-
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t seedAnchorCount = 10;
     uint64_t minCommonCount = 4;
@@ -150,6 +152,8 @@ void Detangle2Graph::findPath(vertex_descriptor v0, uint64_t direction)
     // Main recursive loop.
     vector< pair<AnchorId, AnchorPairInfo> > anchorIds1;
     while(not h.empty()) {
+
+        // Get from h the AnchorId with the lowest total offset.
         std::pop_heap(h.begin(), h.end());
         const AnchorInfo& anchorInfo0 = h.back();
         const AnchorId anchorId0 = anchorInfo0.anchorId;
@@ -160,16 +164,20 @@ void Detangle2Graph::findPath(vertex_descriptor v0, uint64_t direction)
         assemblyGraph.anchors.followOrientedReads(anchorId0, direction,
             minCommonCount, minJaccard, minCorrectedJaccard, anchorIds1);
 
-        bool foundLongChain = false;
+        // Check all the AnchorIds we reached.
         for(const auto& p: anchorIds1) {
             const AnchorId anchorId1 = p.first;
             const AnchorPairInfo& info1 = p.second;
+
             if(not anchorIdsEncountered.contains(anchorId1)) {
                 anchorIdsEncountered.insert(anchorId1);
 
-                // Check the annotation for this anchor.
+                // Get the annotation for this anchor.
                 const uint64_t localAnchorId1 = assemblyGraph.anchors.getLocalAnchorIdInComponent(anchorId1);
                 const auto& internalChainInfo = assemblyGraph.anchorAnnotations[localAnchorId1].internalChainInfo;
+
+                // If this AnchorId is internal to a single Chain,
+                // add a new edge to the Detangle2 graph.
                 if(internalChainInfo.size() == 1)  {
                     const pair<ChainIdentifier, uint64_t>& p = internalChainInfo.front();
                     const ChainIdentifier& chainIdentifier = p.first;
@@ -177,19 +185,25 @@ void Detangle2Graph::findPath(vertex_descriptor v0, uint64_t direction)
                     SHASTA_ASSERT(chainIdentifier.indexInBubble == 0);
                     const edge_descriptor e1 = chainIdentifier.e;
                     if((e1 != e0) and vertexMap.contains(e1)) {
-                        longChainsFound.insert(e1);
-                        if(longChainsFound.size() >= 1) {
-                            const auto it1 = vertexMap.find(e1);
-                            SHASTA_ASSERT(it1 != vertexMap.end());
-                            const vertex_descriptor v1 = it1->second;
-                            if(direction == 0) {
-                                add_edge(v0, v1, detangle2Graph);
-                            } else {
-                                add_edge(v1, v0, detangle2Graph);
-                            }
-                            foundLongChain = true;
-                            break;
+                        const auto it1 = vertexMap.find(e1);
+                        SHASTA_ASSERT(it1 != vertexMap.end());
+                        const vertex_descriptor v1 = it1->second;
+
+                        vertex_descriptor u0 = v0;
+                        vertex_descriptor u1 = v1;
+                        if(direction == 1) {
+                            std::swap(u0, u1);
                         }
+
+                        edge_descriptor e;
+                        bool edgeWasFound = false;
+                        tie(e, edgeWasFound) = boost::edge(u0, u1, detangle2Graph);
+                        if(not edgeWasFound) {
+                            tie(e, ignore) = add_edge(u0, u1, detangle2Graph);
+                        }
+                        detangle2Graph[e].found[direction] = true;
+
+                        return;
                     }
                 }
 
@@ -197,12 +211,6 @@ void Detangle2Graph::findPath(vertex_descriptor v0, uint64_t direction)
                 std::push_heap(h.begin(), h.end());
 
             }
-            if(foundLongChain) {
-                break;
-            }
-        }
-        if(foundLongChain) {
-            break;
         }
     }
 
@@ -211,11 +219,11 @@ void Detangle2Graph::findPath(vertex_descriptor v0, uint64_t direction)
 
 
 
-void Detangle2Graph::writeGraphviz() const
+void Detangle2Graph::writeGraphviz(const string& fileName) const
 {
     const Detangle2Graph& detangle2Graph = *this;
 
-    ofstream dot("Detangle2.dot");
+    ofstream dot(fileName);
     dot << "digraph Detangle2 {\n";
 
     BGL_FORALL_VERTICES(v, detangle2Graph, Detangle2Graph) {
@@ -224,14 +232,90 @@ void Detangle2Graph::writeGraphviz() const
     }
 
     BGL_FORALL_EDGES(e, detangle2Graph, Detangle2Graph) {
+        const Detangle2GraphEdge& edge = detangle2Graph[e];
+
         const vertex_descriptor v0 = source(e, detangle2Graph);
         const vertex_descriptor v1 = target(e, detangle2Graph);
         const AssemblyGraph::edge_descriptor ae0 = detangle2Graph[v0].e;
         const AssemblyGraph::edge_descriptor ae1 = detangle2Graph[v1].e;
         dot << "\"" << assemblyGraph.bubbleChainStringId(ae0) << "\""
-            "->\"" << assemblyGraph.bubbleChainStringId(ae1) << "\";\n";
+            "->\"" << assemblyGraph.bubbleChainStringId(ae1) << "\"";
+
+        if(edge.found[0] and (not edge.found[1])) {
+            dot << " [style=dashed color=green]";
+        }
+        if(edge.found[1] and (not edge.found[0])) {
+            dot << " [style=dashed color=red]";
+        }
+
+        dot << ";\n";
     }
 
     dot << "}\n";
+
+}
+
+
+
+// Remove edges found in one direction only.
+void Detangle2Graph::removeWeakEdges()
+{
+    Detangle2Graph& detangle2Graph = *this;
+
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, detangle2Graph, Detangle2Graph) {
+        const Detangle2GraphEdge& edge = detangle2Graph[e];
+        if(not (edge.found[0] and edge.found[1])) {
+            edgesToBeRemoved.push_back(e);
+        }
+    }
+
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, detangle2Graph);
+    }
+}
+
+
+
+void Detangle2Graph::findLinearChains()
+{
+    const Detangle2Graph& detangle2Graph = *this;
+
+    vector< vector<edge_descriptor> > chains;
+    shasta::findLinearChains(detangle2Graph, 1, chains);
+
+    cout << "Found " << chains.size() << " linear chains:" << endl;
+
+    for(const auto& chain: chains) {
+        SHASTA_ASSERT(not chain.empty());
+
+        const edge_descriptor eFirst = chain.front();
+        const vertex_descriptor vFirst = source(eFirst, detangle2Graph);
+        cout << assemblyGraph.bubbleChainStringId(detangle2Graph[vFirst].e);
+
+        for(const edge_descriptor e: chain) {
+            const vertex_descriptor v = target(e, detangle2Graph);
+            cout << " " << assemblyGraph.bubbleChainStringId(detangle2Graph[v].e);
+        }
+        cout << endl;
+    }
+
+
+    // By construction, each vertex should only appear in a single linear chain.
+    // Check that this is the case.
+    vector<vertex_descriptor> chainVertices;
+    for(const auto& chain: chains) {
+        SHASTA_ASSERT(not chain.empty());
+        const edge_descriptor eFirst = chain.front();
+        const vertex_descriptor vFirst = source(eFirst, detangle2Graph);
+        chainVertices.push_back(vFirst);
+
+        for(const edge_descriptor e: chain) {
+            const vertex_descriptor v = target(e, detangle2Graph);
+            chainVertices.push_back(v);
+        }
+    }
+    sort(chainVertices.begin(), chainVertices.end());
+    SHASTA_ASSERT(std::adjacent_find(chainVertices.begin(), chainVertices.end()) == chainVertices.end());
 
 }

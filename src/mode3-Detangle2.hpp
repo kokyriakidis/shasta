@@ -66,7 +66,13 @@ public:
         const AssemblyGraph&,
         uint64_t chainLengthThreshold);
     void addEdges();
-    void writeGraphviz() const;
+
+    // Remove edges found in one direction only.
+    void removeWeakEdges();
+
+    void findLinearChains();
+
+    void writeGraphviz(const string& fileName) const;
 
 private:
     const AssemblyGraph& assemblyGraph;
