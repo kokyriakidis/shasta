@@ -30,7 +30,7 @@ const uint64_t haploidLengthThreshold = 5000000;
  * @param pruneLength The length threshold below which hanging chains are removed
  */
 void AssemblyGraph::prune(
-    bool debug,
+    bool /* debug */,
     uint64_t pruneLength)
 {
     AssemblyGraph& assemblyGraph = *this;
