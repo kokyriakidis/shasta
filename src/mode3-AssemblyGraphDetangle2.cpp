@@ -22,7 +22,7 @@ void AssemblyGraph::detangle2()
     AssemblyGraph& assemblyGraph = *this;
 
     // EXPOSE WHEN CODE STABILIZES.
-    const uint64_t chainLengthThreshold = 100000;
+    const uint64_t chainLengthThreshold = 500000;
 
     cout << "AssemblyGraph::detangle2 called." << endl;
     cout << "Component " << componentId << endl;
@@ -74,6 +74,8 @@ Detangle2Graph::Detangle2Graph(
             vertexMap.insert(make_pair(e, v));
         }
     }
+
+    cout << "The Detangle2Graph has " << num_vertices(detangle2Graph) << " vertices." << endl;
 }
 
 
@@ -83,7 +85,6 @@ void Detangle2Graph::addEdges()
     Detangle2Graph& detangle2Graph = *this;
 
     BGL_FORALL_VERTICES(v, detangle2Graph, Detangle2Graph) {
-        cout << "Working on " << assemblyGraph.bubbleChainStringId(detangle2Graph[v].e) << endl;
         findForwardPath(v);
         findBackwardPath(v);
     }
@@ -113,6 +114,10 @@ void Detangle2Graph::findPath(vertex_descriptor v0, uint64_t direction)
 
     const AssemblyGraph::edge_descriptor e0 = detangle2Graph[v0].e;
     const Chain& chain = assemblyGraph[e0].getOnlyChain();
+
+    cout << "Looking for a " <<
+        (direction == 0 ? "forward" : "backward") <<
+        " path starting at " << assemblyGraph.bubbleChainStringId(detangle2Graph[v0].e) << endl;
 
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t seedAnchorCount = 10;
@@ -151,13 +156,14 @@ void Detangle2Graph::findPath(vertex_descriptor v0, uint64_t direction)
 
     // Main recursive loop.
     vector< pair<AnchorId, AnchorPairInfo> > anchorIds1;
+    std::map<AnchorId, AnchorId> predecessorMap;
     while(not h.empty()) {
 
         // Get from h the AnchorId with the lowest total offset.
         std::pop_heap(h.begin(), h.end());
         const AnchorInfo& anchorInfo0 = h.back();
         const AnchorId anchorId0 = anchorInfo0.anchorId;
-        const uint64_t offset0 = anchorInfo0.offset;
+        const uint64_t totalOffset0 = anchorInfo0.totalOffset;
         h.pop_back();
 
         // Path following starting at anchorId0;
@@ -171,20 +177,24 @@ void Detangle2Graph::findPath(vertex_descriptor v0, uint64_t direction)
 
             if(not anchorIdsEncountered.contains(anchorId1)) {
                 anchorIdsEncountered.insert(anchorId1);
+                predecessorMap.insert(make_pair(anchorId1, anchorId0));
 
                 // Get the annotation for this anchor.
                 const uint64_t localAnchorId1 = assemblyGraph.anchors.getLocalAnchorIdInComponent(anchorId1);
                 const auto& internalChainInfo = assemblyGraph.anchorAnnotations[localAnchorId1].internalChainInfo;
 
                 // If this AnchorId is internal to a single Chain,
-                // add a new edge to the Detangle2 graph.
+                // we have found a good path that joins the long Chains
+                // corresponding to two vertices of the Detangle2Graph.
                 if(internalChainInfo.size() == 1)  {
                     const pair<ChainIdentifier, uint64_t>& p = internalChainInfo.front();
                     const ChainIdentifier& chainIdentifier = p.first;
                     SHASTA_ASSERT(chainIdentifier.positionInBubbleChain == 0);
                     SHASTA_ASSERT(chainIdentifier.indexInBubble == 0);
-                    const edge_descriptor e1 = chainIdentifier.e;
+                    const AssemblyGraph::edge_descriptor e1 = chainIdentifier.e;
                     if((e1 != e0) and vertexMap.contains(e1)) {
+
+                        cout << "Reached " << assemblyGraph.bubbleChainStringId(e1) << endl;
                         const auto it1 = vertexMap.find(e1);
                         SHASTA_ASSERT(it1 != vertexMap.end());
                         const vertex_descriptor v1 = it1->second;
@@ -201,20 +211,43 @@ void Detangle2Graph::findPath(vertex_descriptor v0, uint64_t direction)
                         if(not edgeWasFound) {
                             tie(e, ignore) = add_edge(u0, u1, detangle2Graph);
                         }
-                        detangle2Graph[e].found[direction] = true;
+                        Detangle2GraphEdge& edge = detangle2Graph[e];
+                        edge.found[direction] = true;
+
+                        // Walk back the predecessor map to find the path that led us here.
+                        vector<AnchorId> path;
+                        AnchorId pathAnchorId = anchorId1;
+                        while(true) {
+                            path.push_back(pathAnchorId);
+                            auto it = predecessorMap.find(pathAnchorId);
+                            if(it == predecessorMap.end()) {
+                                break;
+                            } else
+                            {
+                                pathAnchorId = it->second;
+                            }
+                        }
+                        if(direction == 0) {
+                            reverse(path.begin(), path.end());
+                        }
+                        cout << "Found a path with " << path.size() << " anchors starting at " <<
+                            anchorIdToString(path.front()) << " and ending at " <<
+                            anchorIdToString(path.back()) << endl;
+
+                        edge.paths[direction] = path;
 
                         return;
                     }
                 }
 
-                h.push_back(AnchorInfo(anchorId1, offset0 + info1.offsetInBases));
+                h.push_back(AnchorInfo(anchorId1, totalOffset0 + info1.offsetInBases));
                 std::push_heap(h.begin(), h.end());
 
             }
         }
     }
 
-
+    cout << "No path found." << endl;
 }
 
 

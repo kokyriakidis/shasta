@@ -54,6 +54,9 @@ public:
 
     // Flags to indicate if we found the forward path and/or the backward path.
     array<bool, 2> found = {false, false};
+
+    // The forward and backward paths found for this edge.
+    array< vector<AnchorId>, 2> paths;
 };
 
 
@@ -84,13 +87,25 @@ private:
     void findBackwardPath(vertex_descriptor);
     void findPath(vertex_descriptor, uint64_t direction);
 
+
+    // This is used by findPath.
     class AnchorInfo {
     public:
         AnchorId anchorId;
-        uint64_t offset;
-        AnchorInfo(AnchorId anchorId, uint64_t offset) : anchorId(anchorId), offset(offset) {}
+
+        uint64_t totalOffset;   // Relative to the start anchors.
+
+        AnchorInfo(
+            AnchorId anchorId,
+            uint64_t totalOffset) :
+            anchorId(anchorId),
+            totalOffset(totalOffset)
+            {}
+
+        // This controls the queueing order in findPath.
+        // Not clear if < or > is better.
         bool operator<(const AnchorInfo& that) const {
-            return offset > that.offset;
+            return totalOffset < that.totalOffset;
         }
     };
 };
