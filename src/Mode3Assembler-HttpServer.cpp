@@ -216,7 +216,7 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
                 chainIdentifier.e, chainIdentifier.positionInBubbleChain, chainIdentifier.indexInBubble);
             html <<
                 "<tr><td>Internal to segment " << chainStringId <<
-                " at position " << positionInChain;
+                " at position " << positionInChain << " of " << chain.size();
         }
 
         html << "</table>";
