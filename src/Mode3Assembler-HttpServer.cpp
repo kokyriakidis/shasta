@@ -12,6 +12,14 @@
 using namespace shasta;
 using namespace mode3;
 
+// Boost libraries.
+#include <boost/graph/iteration_macros.hpp>
+
+// Standard library.
+#include <queue>
+
+
+
 namespace shasta {
     // Write an html form to select strand.
     void writeStrandSelection(
@@ -534,7 +542,7 @@ void Mode3Assembler::exploreReadFollowing(const vector<string>& request, ostream
     double minJaccard = 0.;
     HttpServer::getParameterValue(request, "minJaccard", minJaccard);
 
-    double minCorrectedJaccard = 0.7;
+    double minCorrectedJaccard = 0.8;
     HttpServer::getParameterValue(request, "minCorrectedJaccard", minCorrectedJaccard);
 
     string annotateString;
@@ -1357,4 +1365,222 @@ const AssemblyGraphPostprocessor& Mode3Assembler::getAssemblyGraph(
         SHASTA_ASSERT(assemblyGraphPointer->componentId == componentId);
         return *assemblyGraphPointer;
     }
+}
+
+
+
+void Mode3Assembler::exploreReadFollowingAssemblyGraph(const vector<string>& request, ostream& html)
+{
+    string assemblyStage = "Final";
+    HttpServer::getParameterValue(request, "assemblyStage", assemblyStage);
+
+    string segmentName;
+    HttpServer::getParameterValue(request, "segmentName", segmentName);
+
+    uint64_t direction = 0;
+    HttpServer::getParameterValue(request, "direction", direction);
+
+    uint64_t minCommon = 4;
+    HttpServer::getParameterValue(request, "minCommon", minCommon);
+
+    double minJaccard = 0.;
+    HttpServer::getParameterValue(request, "minJaccard", minJaccard);
+
+    double minCorrectedJaccard = 0.8;
+    HttpServer::getParameterValue(request, "minCorrectedJaccard", minCorrectedJaccard);
+
+    // Begin the form.
+    html <<
+        "<h2>Read following</h2>"
+        "<form>"
+        "<table>";
+
+    // Assembly stage.
+    html <<
+        "<tr>"
+        "<th class=left>Assembly stage"
+        "<td class=centered><input type=text name=assemblyStage style='text-align:center' required";
+    if(not assemblyStage.empty()) {
+        html << " value='" << assemblyStage + "'";
+    }
+    html << " size=30>";
+
+    // Segment name.
+    html <<
+        "<tr>"
+        "<th class=left>Segment name"
+        "<td class=centered><input type=text name=segmentName style='text-align:center' required";
+    if(not segmentName.empty()) {
+        html << " value='" << segmentName + "'";
+    }
+    html << " title='Enter a segment name of the form a-b-c-d-Pn' size=30>";
+
+    // Read following parameters
+    html <<
+        "<tr><th class=left>Direction"
+        "<td class=centered><input type=text name=direction size=8 value='" << direction << "' style='text-align:center'>"
+        "<tr><th class=left>minCommon"
+        "<td class=centered><input type=text name=minCommon size=8 value='" << minCommon << "' style='text-align:center'>"
+        "<tr><th class=left>minJaccard"
+        "<td class=centered><input type=text name=minJaccard size=8 value='" << minJaccard << "' style='text-align:center'>"
+        "<tr><th class=left>minCorrectedJaccard"
+        "<td class=centered><input type=text name=minCorrectedJaccard size=8 value='" << minCorrectedJaccard << "' style='text-align:center'>";
+
+    // End the form.
+    html <<
+        "</table>"
+        "<input type=submit value='Read following'> "
+        "</form>";
+
+    if(segmentName.empty()) {
+        return;
+    }
+
+    // Parse the segment name.
+    uint64_t componentId;
+    uint64_t bubbleChainId;
+    uint64_t positionInBubbleChain;
+    uint64_t indexInBubble;
+    uint64_t bubblePloidy;
+    AssemblyGraphPostprocessor::parseChainStringId(
+        segmentName,
+        componentId,
+        bubbleChainId,
+        positionInBubbleChain,
+        indexInBubble,
+        bubblePloidy);
+
+    // Get the AssemblyGraph for this component.
+    const AssemblyGraphPostprocessor& assemblyGraph = getAssemblyGraph(assemblyStage, componentId);
+
+    // Extract the Chain (Segment) we want.
+    AssemblyGraph::edge_descriptor e0;
+    try {
+        e0 = assemblyGraph.getEdge(bubbleChainId);
+    } catch(const std::exception&) {
+        html << "<p>Segment not found at this assembly stage." << endl;
+        return;
+    }
+    const BubbleChain& bubbleChain0 = assemblyGraph[e0];
+    if(not bubbleChain0.isSimpleChain()) {
+        html << "<p>Read following on the assemby graph is only supported when all bubble chains are trivial.";
+        return;
+    }
+    const Chain& chain0 = bubbleChain0.getOnlyChain();
+
+    if(chain0.size() < 3) {
+        html << "<br>" << assemblyGraph.chainStringId(e0, 0, 0) << " has no internal anchors.";
+        return;
+    }
+
+    // Get the last internal AnchorId.
+    const AnchorId anchorId0 = (direction == 0) ? chain0[chain0.size() - 2] : chain0[1];
+
+    html << "<h2>" <<
+        (direction == 0 ? "Forward" : "Backward") <<
+        " read following on assembly graph segment " << segmentName <<
+        " at assembly stage " << assemblyStage <<
+        "</h2>";
+
+    html << "<table>"
+        "<tr><th>Segment<th>AnchorId<th>Common<th>Offset<th>J<th>J'<th>Read following";
+
+    // Start a BFS on the assembly graph.
+    std::queue<AssemblyGraph::edge_descriptor> q;
+    q.push(e0);
+    std::set<AssemblyGraph::edge_descriptor> s;
+    s.insert(e0);
+
+    // Main BFS loop.
+    while(not q.empty()) {
+        const AssemblyGraph::edge_descriptor e1 = q.front();
+        q.pop();
+        const BubbleChain& bubbleChain1 = assemblyGraph[e1];
+        if(not bubbleChain1.isSimpleChain()) {
+            html << "<p>Read following on the assembly graph is only supported when all bubble chains are trivial.";
+            return;
+        }
+        const Chain& chain1 = bubbleChain1.getOnlyChain();
+        bool hasInternalAnchors = (chain1.size() > 2);
+        AnchorPairInfo info;
+        info.common = 0;
+        if(not hasInternalAnchors) {
+            html << "<tr><td class=centered>" << assemblyGraph.chainStringId(e1, 0, 0) <<
+                "<td class=centered colspan=6>No internal anchors";
+        } else {
+
+            // Get the first or last internal AnchorId.
+            const AnchorId anchorId1 = (direction == 0) ? chain1[1] : chain1[chain1.size() - 2];
+
+            if(direction == 0) {
+                anchors().analyzeAnchorPair(anchorId0, anchorId1, info);
+            } else {
+                anchors().analyzeAnchorPair(anchorId1, anchorId0, info);
+            }
+            const double jaccard = info.jaccard();
+            const double correctedJaccard = info.correctedJaccard();
+
+            const bool isGood =
+                (info.common >= minCommon) and
+                (jaccard >=minJaccard) and
+                (correctedJaccard >= minCorrectedJaccard);
+
+            if(e1 != e0) {
+                html << "<tr";
+                if(isGood) {
+                    html << " style='background-color:Pink'";
+                }
+                html << ">";
+
+
+                html <<
+                    "<td class=centered>" << assemblyGraph.chainStringId(e1, 0, 0) <<
+                    "<td class=centered>" << anchorIdToString(anchorId1) <<
+                    "<td class=centered>" << info.common;
+                if(info.common) {
+                    html <<
+                        "<td class=centered>" << info.offsetInBases <<
+                        "<td class=centered>" << jaccard <<
+                        "<td class=centered>" << correctedJaccard;
+                } else {
+                    html << "<td><td><td>";
+                }
+
+                const string url =
+                    "exploreReadFollowingAssemblyGraph?"
+                    "assemblyStage=" + assemblyStage +
+                    "&segmentName=" + assemblyGraph.chainStringId(e1, 0, 0) +
+                    "&direction=0" + to_string(direction) +
+                    "&minCommon=" + to_string(minCommon) +
+                    "&minJaccard=" + to_string(minJaccard) +
+                    "&minCorrectedJaccard=" + to_string(minCorrectedJaccard);
+                html << "<td class=centered><a href='" << url << "'>&#x22B6;</a>";
+            }
+        }
+
+        // If there are common reads, enqueue the following assembly graph edges.
+        if((e1 == e0) or info.common or(not hasInternalAnchors)) {
+            if(direction == 0) {
+                const AssemblyGraph::vertex_descriptor v2 = target(e1, assemblyGraph);
+                BGL_FORALL_OUTEDGES(v2, e2, assemblyGraph, AssemblyGraph) {
+                    if(not s.contains(e2)) {
+                        q.push(e2);
+                        s.insert(e2);
+                    }
+                }
+            } else {
+                const AssemblyGraph::vertex_descriptor v2 = source(e1, assemblyGraph);
+                BGL_FORALL_INEDGES(v2, e2, assemblyGraph, AssemblyGraph) {
+                    if(not s.contains(e2)) {
+                        q.push(e2);
+                        s.insert(e2);
+                    }
+                }
+
+            }
+        }
+    }
+
+    html << "</table>";
+
 }

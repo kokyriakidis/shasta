@@ -585,6 +585,15 @@ void Assembler::exploreSegment(const vector<string>& request, ostream& html)
 
 
 
+void Assembler::exploreReadFollowingAssemblyGraph(const vector<string>& request, ostream& html)
+{
+    SHASTA_ASSERT(assemblerInfo->readRepresentation == 0);
+    SHASTA_ASSERT(assemblerInfo->assemblyMode == 3);
+    mode3Assembler->exploreReadFollowingAssemblyGraph(request, html);
+}
+
+
+
 // Alignment-free version of mode 3 assembly.
 void Assembler::alignmentFreeAssembly(
     const Mode3AssemblyOptions& mode3Options,

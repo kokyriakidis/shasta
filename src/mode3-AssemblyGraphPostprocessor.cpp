@@ -77,6 +77,21 @@ void AssemblyGraphPostprocessor::createEdgeIdMap()
 
 
 
+AssemblyGraph::edge_descriptor AssemblyGraphPostprocessor::getEdge(
+    uint64_t edgeId) const
+{
+
+    // Look it up in our map.
+    auto it = edgeIdMap.find(edgeId);
+    if(it == edgeIdMap.end()) {
+        throw runtime_error("Invalid bubble chain id " + to_string(edgeId));
+    }
+
+    return it->second;
+}
+
+
+
 const BubbleChain& AssemblyGraphPostprocessor::getBubbleChain(
     uint64_t edgeId) const
 {
