@@ -57,6 +57,15 @@ public:
 
     // The forward and backward paths found for this edge.
     array< vector<AnchorId>, 2> paths;
+    const vector<AnchorId>& shortestPath() const
+    {
+        SHASTA_ASSERT(found[0] and found[1]);
+        if(paths[0].size() < paths[1].size()) {
+            return paths[0];
+        } else {
+            return paths[1];
+        }
+    }
 };
 
 
@@ -66,7 +75,7 @@ public:
 
     // Construct the vertices from the long Chains of the AssemblyGraph.
     Detangle2Graph(
-        const AssemblyGraph&,
+        AssemblyGraph&,
         uint64_t chainLengthThreshold);
     void addEdges();
 
@@ -74,11 +83,16 @@ public:
     void removeWeakEdges();
 
     void findLinearChains();
+    vector< vector<edge_descriptor> > linearChains;
+
+    // Use each linear chain to create a new Chain in the assembly graph.
+    void createChains();
+    void createChain(const vector<edge_descriptor>&);
 
     void writeGraphviz(const string& fileName) const;
 
 private:
-    const AssemblyGraph& assemblyGraph;
+    AssemblyGraph& assemblyGraph;
     std::map<AssemblyGraph::edge_descriptor, vertex_descriptor> vertexMap;
 
     // Find forward and backward paths starting at the Chain corresponding
@@ -105,7 +119,7 @@ private:
         // This controls the queueing order in findPath.
         // Not clear if < or > is better.
         bool operator<(const AnchorInfo& that) const {
-            return totalOffset < that.totalOffset;
+            return totalOffset > that.totalOffset;
         }
     };
 };

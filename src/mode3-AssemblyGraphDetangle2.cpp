@@ -22,7 +22,7 @@ void AssemblyGraph::detangle2()
     AssemblyGraph& assemblyGraph = *this;
 
     // EXPOSE WHEN CODE STABILIZES.
-    const uint64_t chainLengthThreshold = 500000;
+    const uint64_t chainLengthThreshold = 50000;
 
     cout << "AssemblyGraph::detangle2 called." << endl;
     cout << "Component " << componentId << endl;
@@ -45,13 +45,16 @@ void AssemblyGraph::detangle2()
     detangle2Graph.removeWeakEdges();
     detangle2Graph.writeGraphviz("Detangle2Graph-Final.dot");
     detangle2Graph.findLinearChains();
+    detangle2Graph.createChains();
+
+    assemblyGraph.write("Detangle2");
 }
 
 
 
 // Construct the vertices from the long Chains of the AssemblyGraph.
 Detangle2Graph::Detangle2Graph(
-    const AssemblyGraph& assemblyGraph,
+    AssemblyGraph& assemblyGraph,
     uint64_t chainLengthThreshold) :
     assemblyGraph(assemblyGraph)
 {
@@ -123,7 +126,7 @@ void Detangle2Graph::findPath(vertex_descriptor v0, uint64_t direction)
     const uint64_t seedAnchorCount = 10;
     uint64_t minCommonCount = 4;
     double minJaccard = 0;
-    double minCorrectedJaccard = 0.8;
+    double minCorrectedJaccard = 0.7;
 
     // We do a recursive search starting from the last/first seedAnchorCount internal anchors of e0.
     std::vector<AnchorInfo> h;
@@ -314,12 +317,11 @@ void Detangle2Graph::findLinearChains()
 {
     const Detangle2Graph& detangle2Graph = *this;
 
-    vector< vector<edge_descriptor> > chains;
-    shasta::findLinearChains(detangle2Graph, 1, chains);
+    shasta::findLinearChains(detangle2Graph, 1, linearChains);
 
-    cout << "Found " << chains.size() << " linear chains:" << endl;
+    cout << "Found " << linearChains.size() << " linear chains:" << endl;
 
-    for(const auto& chain: chains) {
+    for(const auto& chain: linearChains) {
         SHASTA_ASSERT(not chain.empty());
 
         const edge_descriptor eFirst = chain.front();
@@ -337,7 +339,7 @@ void Detangle2Graph::findLinearChains()
     // By construction, each vertex should only appear in a single linear chain.
     // Check that this is the case.
     vector<vertex_descriptor> chainVertices;
-    for(const auto& chain: chains) {
+    for(const auto& chain: linearChains) {
         SHASTA_ASSERT(not chain.empty());
         const edge_descriptor eFirst = chain.front();
         const vertex_descriptor vFirst = source(eFirst, detangle2Graph);
@@ -351,4 +353,159 @@ void Detangle2Graph::findLinearChains()
     sort(chainVertices.begin(), chainVertices.end());
     SHASTA_ASSERT(std::adjacent_find(chainVertices.begin(), chainVertices.end()) == chainVertices.end());
 
+}
+
+
+
+// Use each linear chain to create a new Chain in the assembly graph.
+void Detangle2Graph::createChains()
+{
+    for(const vector<edge_descriptor>& linearChain: linearChains) {
+        createChain(linearChain);
+    }
+}
+
+
+
+void Detangle2Graph::createChain(const vector<edge_descriptor>& linearChain)
+{
+    Detangle2Graph& detangle2Graph = *this;
+
+    // Gather the vertices of the linear chain.
+    vector<vertex_descriptor> linearChainVertices;
+    linearChainVertices.push_back(source(linearChain.front(), detangle2Graph));
+    for(const edge_descriptor e: linearChain) {
+        linearChainVertices.push_back(target(e, detangle2Graph));
+    }
+
+    Chain newChain;
+    for(uint64_t i=0; /* Check later */; i++) {
+        const bool isFirstVertex = (i == 0);
+        const bool isLastVertex = (i == linearChainVertices.size() - 1);
+        const vertex_descriptor v = linearChainVertices[i];
+        const Detangle2GraphVertex& vertex = detangle2Graph[v];
+        const Chain& oldChain = assemblyGraph[vertex.e].getOnlyChain();
+
+
+
+        // Add the AnchorIds of the AssemblyGraph Chain corresponding to this vertex,
+        // but excluding the AnchorIds in the preceding and following edges, if they exist.
+        if(isFirstVertex) {
+
+            // This is the first vertex.
+            // We have to exclude the AnchorIds of the next edge.
+            const edge_descriptor eNext = linearChain[i];
+            const vector<AnchorId>& nextPath = detangle2Graph[eNext].shortestPath();
+            const AnchorId nextAnchorId = nextPath.front();
+            const uint64_t nextLocalAnchorId =
+                assemblyGraph.anchors.getLocalAnchorIdInComponent(nextAnchorId);
+            const auto& nextInternalChainInfo = assemblyGraph.anchorAnnotations[nextLocalAnchorId].internalChainInfo;
+            SHASTA_ASSERT(nextInternalChainInfo.size() == 1);
+            const pair<ChainIdentifier, uint64_t>& pNext = nextInternalChainInfo.front();
+            SHASTA_ASSERT(pNext.first.e == vertex.e);
+            const uint64_t nextPosition = pNext.second;
+
+            copy(oldChain.begin(), oldChain.begin() + nextPosition, back_inserter(newChain));
+
+        } else if(isLastVertex) {
+
+            // This is the last vertex.
+            // We have to exclude the AnchorIds of the preceding edge.
+            const edge_descriptor ePrevious = linearChain[i-1];
+            const vector<AnchorId>& previousPath = detangle2Graph[ePrevious].shortestPath();
+            const AnchorId previousAnchorId = previousPath.back();
+            const uint64_t previousLocalAnchorId =
+                assemblyGraph.anchors.getLocalAnchorIdInComponent(previousAnchorId);
+            const auto& previousInternalChainInfo = assemblyGraph.anchorAnnotations[previousLocalAnchorId].internalChainInfo;
+            SHASTA_ASSERT(previousInternalChainInfo.size() == 1);
+            const pair<ChainIdentifier, uint64_t>& pPrevious = previousInternalChainInfo.front();
+            SHASTA_ASSERT(pPrevious.first.e == vertex.e);
+            const uint64_t previousPosition = pPrevious.second;
+
+            copy(oldChain.begin() + previousPosition + 1, oldChain.end(), back_inserter(newChain));
+
+
+        } else {
+
+            // This is a vertex internal to the linear chain.
+            // We have to exclude AnchorIds in the preceding and following edge.
+            const edge_descriptor ePrevious = linearChain[i-1];
+            const edge_descriptor eNext = linearChain[i];
+
+            const vector<AnchorId>& previousPath = detangle2Graph[ePrevious].shortestPath();
+            const vector<AnchorId>& nextPath = detangle2Graph[eNext].shortestPath();
+
+            const AnchorId previousAnchorId = previousPath.back();
+            const AnchorId nextAnchorId = nextPath.front();
+
+            const uint64_t previousLocalAnchorId =
+                assemblyGraph.anchors.getLocalAnchorIdInComponent(previousAnchorId);
+            const uint64_t nextLocalAnchorId =
+                assemblyGraph.anchors.getLocalAnchorIdInComponent(nextAnchorId);
+
+            const auto& previousInternalChainInfo = assemblyGraph.anchorAnnotations[previousLocalAnchorId].internalChainInfo;
+            const auto& nextInternalChainInfo = assemblyGraph.anchorAnnotations[nextLocalAnchorId].internalChainInfo;
+
+            SHASTA_ASSERT(previousInternalChainInfo.size() == 1);
+            SHASTA_ASSERT(nextInternalChainInfo.size() == 1);
+
+            const pair<ChainIdentifier, uint64_t>& pPrevious = previousInternalChainInfo.front();
+            const pair<ChainIdentifier, uint64_t>& pNext = nextInternalChainInfo.front();
+
+            SHASTA_ASSERT(pPrevious.first.e == vertex.e);
+            SHASTA_ASSERT(pNext.first.e == vertex.e);
+
+            const uint64_t previousPosition = pPrevious.second;
+            const uint64_t nextPosition = pNext.second;
+            SHASTA_ASSERT(nextPosition >= previousPosition);
+
+            copy(oldChain.begin() + previousPosition + 1, oldChain.begin() + nextPosition, back_inserter(newChain));
+
+        }
+
+
+
+        // If this is the last vertex, there is no following edge and we are done.
+        if(isLastVertex) {
+            break;
+        }
+
+        // Add the AnchorIds of one of the path found in this DetangleGraphEdge.
+        const edge_descriptor e = linearChain[i];
+        const Detangle2GraphEdge& edge = detangle2Graph[e];
+        const vector<AnchorId>& path = edge.shortestPath();
+        copy(path.begin(), path.end(), back_inserter(newChain));
+    }
+
+
+
+    // Add this chain to the assembly graph.
+    {
+        // Find the source and target AssemblyGraph vertices.
+        const vertex_descriptor v0 = linearChainVertices.front();
+        const vertex_descriptor v1 = linearChainVertices.back();
+        const AssemblyGraph::edge_descriptor ae0 = detangle2Graph[v0].e;
+        const AssemblyGraph::edge_descriptor ae1 = detangle2Graph[v1].e;
+        const AssemblyGraph::vertex_descriptor av0 = source(ae0, assemblyGraph);
+        const AssemblyGraph::vertex_descriptor av1 = target(ae1, assemblyGraph);
+
+        // Add the edge to the AssemblyGraph.
+        AssemblyGraph::edge_descriptor aeNew;
+        tie(aeNew, ignore) = boost::add_edge(av0, av1, assemblyGraph);
+        AssemblyGraphEdge& newEdge = assemblyGraph[aeNew];
+        newEdge.id = assemblyGraph.nextEdgeId++;
+
+        // Store the Chain in the edge.
+        BubbleChain& bubbleChain = newEdge;
+        bubbleChain.resize(1);
+        Bubble& bubble = bubbleChain.front();
+        bubble.resize(1);
+        bubble.front().swap(newChain);
+    }
+
+    // Now we can remove the old Chains.
+    for(const vertex_descriptor v: linearChainVertices) {
+        const AssemblyGraph::edge_descriptor e = detangle2Graph[v].e;
+        boost::remove_edge(e, assemblyGraph);
+    }
 }

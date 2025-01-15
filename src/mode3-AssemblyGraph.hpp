@@ -395,7 +395,9 @@ private:
     // Each linear chain of edges in the AnchorGraph after transitive reduction generates
     // an AssemblyGraphEdge (BubbleChain) consisting of a single haploid bubble.
     void create(const AnchorGraph&, bool debug);
+public:
     uint64_t nextEdgeId = 0;
+private:
     void renumberEdges();
 
     // Return the vertex corresponding to a given AnchorId,
