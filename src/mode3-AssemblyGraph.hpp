@@ -389,6 +389,12 @@ private:
         bool assembleSequence,
         bool debug);
 
+    // Alternate version for testing.
+    void run3(
+        uint64_t threadCount,
+        bool assembleSequence,
+        bool debug);
+
 
 
     // Initial creation from the AnchorGraph.
@@ -655,10 +661,11 @@ private:
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold);
 
-    // Detangling with path following. Python callable.
+    // Detangling with path following.
 public:
-    void detangle2();
+    void detangle2(); // Python callable.
 private:
+    void detangle3();
 
     // Cleanup/simplify superbubbles that are likely to be caused by errors,
     // completely or in part.
