@@ -71,6 +71,18 @@ class shasta::mode3::Detangle3GraphEdge {
 public:
     AnchorPairInfo info;
     Detangle3GraphEdge(const AnchorPairInfo& info) : info(info) {}
+
+    // hasMinimumOffset[0] gets set if this the edge with minimum
+    // offset among all edges with the same source vertex.
+    // hasMinimumOffset[1] gets set if this the edge with minimum
+    // offset among all edges with the same target vertex.
+    array<bool, 2> hasMinimumOffset = {false, false};
+
+    // hasMaximumCommon[0] gets set if this the edge with maximum
+    // number of common oriented reads among all edges with the same source vertex.
+    // hasMaximumCommon[1] gets set if this the edge with maximum
+    // number of common oriented reads among all edges with the same target vertex.
+    array<bool, 2> hasMaximumCommon = {false, false};
 };
 
 

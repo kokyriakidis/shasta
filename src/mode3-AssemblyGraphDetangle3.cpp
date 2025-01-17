@@ -1,6 +1,7 @@
 // Shasta.
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-Detangle3.hpp"
+#include "orderPairs.hpp"
 using namespace shasta;
 using namespace mode3;
 
@@ -43,9 +44,40 @@ void AssemblyGraph::detangle3()
 Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     assemblyGraph(assemblyGraph)
 {
+    Detangle3Graph& detangle3Graph = *this;
+
     createVertices();
     createEdges();
+    writeGraphviz("Detangle3Graph-Complete.dot");
+
+    // Remove edges that have either or both hasMaximumCommon flags set to false.
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, detangle3Graph, Detangle3Graph) {
+        const Detangle3GraphEdge& edge = detangle3Graph[e];
+        if(not (edge.hasMaximumCommon[0] and edge.hasMaximumCommon[1])) {
+            edgesToBeRemoved.push_back(e);
+        }
+    }
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, detangle3Graph);
+    }
+
+    // Remove isolated vertices.
+    vector<vertex_descriptor> verticesToBeRemoved;
+    BGL_FORALL_VERTICES(v, detangle3Graph, Detangle3Graph) {
+        if(
+            (in_degree(v, detangle3Graph) == 0) and
+            (out_degree(v, detangle3Graph) == 0)) {
+            verticesToBeRemoved.push_back(v);
+        }
+    }
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        boost::remove_vertex(v, detangle3Graph);
+    }
+
+
     writeGraphviz("Detangle3Graph.dot");
+
 }
 
 
@@ -80,6 +112,90 @@ void Detangle3Graph::createEdges()
         createEdges(v0, 1);
     }
 
+
+
+    // Set the hasMinimumOffset and hasMaximumCommon flags.
+    array<vector<edge_descriptor>, 2> edges;
+    vector< pair<edge_descriptor, uint64_t> > edgesWithOffsets;
+    vector< pair<edge_descriptor, uint64_t> > edgesWithCommonCount;
+    BGL_FORALL_VERTICES(v0, detangle3Graph, Detangle3Graph) {
+
+        // Gather the out-edges (direction=0) and in-edges (direction=1).
+        edges[0].clear();
+        BGL_FORALL_OUTEDGES(v0, e, detangle3Graph, Detangle3Graph) {
+            edges[0].push_back(e);
+        }
+        edges[1].clear();
+        BGL_FORALL_INEDGES(v0, e, detangle3Graph, Detangle3Graph) {
+            edges[1].push_back(e);
+        }
+
+        // Loop over both directions.
+        for(uint64_t direction=0; direction<2; direction++) {
+            if(edges[direction].empty()) {
+                continue;
+            }
+            edgesWithOffsets.clear();
+            edgesWithCommonCount.clear();
+            for(const edge_descriptor e: edges[direction]) {
+                const Detangle3GraphEdge& edge = detangle3Graph[e];
+                const uint64_t offset = edge.info.offsetInBases;
+                const uint64_t common = edge.info.common;
+                edgesWithOffsets.push_back(make_pair(e, offset));
+                edgesWithCommonCount.push_back(make_pair(e, common));
+            }
+
+            sort(edgesWithOffsets.begin(), edgesWithOffsets.end(),
+                OrderPairsBySecondOnly<edge_descriptor, uint64_t>());
+            const uint64_t minOffset = edgesWithOffsets.front().second;
+            for(const auto& p: edgesWithOffsets) {
+                if(p.second > minOffset) {
+                    break;
+                }
+                detangle3Graph[p.first].hasMinimumOffset[direction] = true;
+            }
+
+            sort(edgesWithCommonCount.begin(), edgesWithCommonCount.end(),
+                OrderPairsBySecondOnlyGreater<edge_descriptor, uint64_t>());
+            const uint64_t maxCommon = edgesWithCommonCount.front().second;
+            for(const auto& p: edgesWithCommonCount) {
+                if(p.second < maxCommon) {
+                    break;
+                }
+                detangle3Graph[p.first].hasMaximumCommon[direction] = true;
+
+            }
+        }
+    }
+
+#if 0
+        edgesWithOffsets.clear();
+        edgesWithCommonCount.clear();
+        BGL_FORALL_OUTEDGES(v0, e, detangle3Graph, Detangle3Graph) {
+            const Detangle3GraphEdge& edge = detangle3Graph[e];
+            const uint64_t offset = edge.info.offsetInBases;
+            const uint64_t common = edge.info.common;
+            edgesWithOffsets.push_back(make_pair(e, offset));
+            edgesWithCommonCount.push_back(make_pair(e, common));
+        }
+        if(not edgesWithOffsets.empty()) {
+            sort(edgesWithOffsets.begin(), edgesWithOffsets.end(),
+                OrderPairsBySecondOnly<edge_descriptor, uint64_t>());
+            const uint64_t minOffset = edgesWithOffsets.front().second;
+            for(const auto& p: edgesWithOffsets) {
+                if(p.second > minOffset) {
+                    break;
+                }
+                detangle3Graph[p.first].hasMinimumOffset[0] = true;
+            }
+
+            sort(edgesWithCommonCount.begin(), edgesWithCommonCount.end(),
+                OrderPairsBySecondOnlyGreater<edge_descriptor, uint64_t>());
+            const edge_descriptor eMaxCommon = edgesWithCommonCount.front().first;
+            detangle3Graph[eMaxCommon].hasMaximumCommon[0] = true;
+        }
+#endif
+
 }
 
 
@@ -91,9 +207,9 @@ void Detangle3Graph::createEdges()
 void Detangle3Graph::createEdges(vertex_descriptor v0, uint64_t direction)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    uint64_t minCommon = 6;
+    uint64_t minCommon = 4;
     double minJaccard = 0.;
-    double minCorrectedJaccard = 0.9;
+    double minCorrectedJaccard = 0.8;
 
     Detangle3Graph& detangle3Graph = *this;
     const Detangle3GraphVertex& vertex0 = detangle3Graph[v0];
@@ -214,12 +330,46 @@ void Detangle3Graph::writeGraphviz(const string& fileName) const
     }
 
     BGL_FORALL_EDGES(e, detangle3Graph, Detangle3Graph) {
+        const Detangle3GraphEdge& edge = detangle3Graph[e];
         const vertex_descriptor v0 = source(e, detangle3Graph);
         const vertex_descriptor v1 = target(e, detangle3Graph);
         const AssemblyGraph::edge_descriptor e0 = detangle3Graph[v0].e;
         const AssemblyGraph::edge_descriptor e1 = detangle3Graph[v1].e;
+
+        // Write the source and target vertices.
         dot << "\"" << assemblyGraph.bubbleChainStringId(e0) <<
-            "\"->\"" << assemblyGraph.bubbleChainStringId(e1) << "\";\n";
+            "\"->\"" << assemblyGraph.bubbleChainStringId(e1) << "\"";
+
+        // Begin attributes.
+        dot << "[";
+
+        // Label.
+        dot << "label=\"" <<
+            edge.info.common << "\\n" <<
+            std::fixed << std::setprecision(2)  << edge.info.correctedJaccard() << "\\n" <<
+            edge.info.offsetInBases <<
+            "\"";
+
+        // Style.
+        if(edge.hasMaximumCommon[0]) {
+            if(edge.hasMaximumCommon[1]) {
+                // Leave if black.
+            } else {
+                dot << " color=green";
+            }
+        } else {
+            if(edge.hasMaximumCommon[1]) {
+                dot << " color=blue";
+            } else {
+                dot << " color=red";
+            }
+        }
+
+        // End attributes.
+        dot << "]";
+
+        // End the line for this edge.
+        dot << ";\n";
     }
 
     dot << "}\n";
