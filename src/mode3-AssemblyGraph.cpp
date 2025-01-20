@@ -68,7 +68,7 @@ AssemblyGraph::AssemblyGraph(
     create(anchorGraph, debug);
 
     performanceLog << timestamp << "Processing the assembly graph for component " << componentId << endl;
-    run3(threadCount, assembleSequence, debug);
+    run(threadCount, assembleSequence, debug);
     performanceLog << timestamp << "Done with the assembly graph for component " << componentId << endl;
 }
 
