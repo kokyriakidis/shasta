@@ -122,8 +122,10 @@ private:
     void createEdges();
 
     // Graph cleanup functions.
+    void removeStrongComponents();
     void removeWeakEdges();
     void removeIsolatedVertices();
+    void transitiveReduction();
 
     // Create the edges starting at v0:
     // If direction is 0, move forward in the AssemblyGraph.

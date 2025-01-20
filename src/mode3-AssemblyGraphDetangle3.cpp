@@ -2,11 +2,13 @@
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-Detangle3.hpp"
 #include "orderPairs.hpp"
+#include "transitiveReduction.hpp"
 using namespace shasta;
 using namespace mode3;
 
 // Boost libraries.
 #include <boost/graph/iteration_macros.hpp>
+#include <boost/graph/strong_components.hpp>
 
 // Standard library.
 #include <queue>
@@ -54,8 +56,10 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     writeGraphviz("Detangle3Graph-Complete.dot");
 
     // Graph cleanup.
+    removeStrongComponents();
     removeWeakEdges();
     removeIsolatedVertices();
+    transitiveReduction();
     writeGraphviz("Detangle3Graph.dot");
 
 }
@@ -94,6 +98,54 @@ void Detangle3Graph::removeIsolatedVertices()
     for(const vertex_descriptor v: verticesToBeRemoved) {
         boost::remove_vertex(v, detangle3Graph);
     }
+}
+
+
+
+void Detangle3Graph::removeStrongComponents()
+{
+    Detangle3Graph& detangle3Graph = *this;
+
+    // Map the vertices to integers.
+    // This is needed for the computation of strong components below.
+    uint64_t vertexIndex = 0;
+    std::map<vertex_descriptor, uint64_t> vertexIndexMap;
+    BGL_FORALL_VERTICES(v, detangle3Graph, Detangle3Graph) {
+        vertexIndexMap.insert({v, vertexIndex++});
+    }
+
+    // Compute strong components.
+    std::map<vertex_descriptor, uint64_t> componentMap;
+    boost::strong_components(
+        detangle3Graph,
+        boost::make_assoc_property_map(componentMap),
+        boost::vertex_index_map(boost::make_assoc_property_map(vertexIndexMap)));
+
+    // Gather the vertices in each strong component.
+    vector< vector<vertex_descriptor> > strongComponents(vertexIndexMap.size());
+    for(const auto& p: componentMap) {
+        const vertex_descriptor v = p.first;
+        const uint64_t componentId = p.second;
+        strongComponents[componentId].push_back(v);
+    }
+
+    // Remove the vertices in the non-trivial strong components.
+    uint64_t strongComponentCount = 0;
+    uint64_t removedCount = 0;
+    for(const vector<vertex_descriptor>& strongComponent: strongComponents) {
+        if(strongComponent.size() > 1) {
+            ++strongComponentCount;
+            for(const vertex_descriptor v: strongComponent) {
+                ++removedCount;
+                const AssemblyGraph::edge_descriptor e = detangle3Graph[v].e;
+                vertexMap.erase(e);
+                boost::remove_vertex(v, detangle3Graph);
+            }
+        }
+    }
+    cout << "Removed " << removedCount <<
+        " vertices in " << strongComponentCount <<
+        " strongly connected components." << endl;
 }
 
 
@@ -375,6 +427,13 @@ void Detangle3Graph::createEdges(vertex_descriptor v0, uint64_t direction)
         }
     }
 
+}
+
+
+
+void Detangle3Graph::transitiveReduction()
+{
+    transitiveReductionAny(*this);
 }
 
 
