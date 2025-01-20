@@ -56,17 +56,33 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     createVertices(minCoverage, maxCoverage);
     createEdges();
     setHasMaximumCommonFlags();
-
-    writeGraphviz("Detangle3Graph-Complete.dot");
-
-    // Graph cleanup.
-    removeStrongComponents();
-    removeWeakEdges();
-    removeIsolatedVertices();
-    transitiveReduction();
-    prune(maxPruneLength);
-
     writeGraphviz("Detangle3Graph.dot");
+
+    // Make a copy that will be used to find the strong chains.
+    Detangle3Graph simplifiedDetagleGraph(*this);
+    simplifiedDetagleGraph.removeStrongComponents();
+    simplifiedDetagleGraph.removeWeakEdges();
+    simplifiedDetagleGraph.removeIsolatedVertices();
+    simplifiedDetagleGraph.transitiveReduction();
+    simplifiedDetagleGraph.prune(maxPruneLength);
+
+    simplifiedDetagleGraph.writeGraphviz("SimplifiedDetangle3Graph.dot");
+
+}
+
+
+
+// Copy constructor.
+Detangle3Graph::Detangle3Graph(const Detangle3Graph& that) :
+    Detangle3GraphBaseClass(that),
+    assemblyGraph(that.assemblyGraph)
+{
+    Detangle3Graph& detangle3Graph = *this;
+
+    // Create the vertexMap.
+    BGL_FORALL_VERTICES(v, detangle3Graph, Detangle3Graph) {
+        vertexMap.insert(make_pair(detangle3Graph[v].e, v));
+    }
 
 }
 

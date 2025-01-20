@@ -73,6 +73,9 @@ public:
         coverage(coverage),
         offset(offset)
         {}
+
+    Detangle3GraphVertex() = default;
+    Detangle3GraphVertex(const Detangle3GraphVertex&) = default;
 };
 
 
@@ -85,6 +88,8 @@ public:
     AnchorPairInfo info;
 
     Detangle3GraphEdge(const AnchorPairInfo& info) : info(info) {}
+    Detangle3GraphEdge() = default;
+    Detangle3GraphEdge(const Detangle3GraphEdge&) = default;
 
     // hasMaximumCommon[0] gets set if this the edge with maximum
     // number of common oriented reads among all edges with the same source vertex.
@@ -109,6 +114,7 @@ class shasta::mode3::Detangle3Graph : public Detangle3GraphBaseClass {
 public:
 
     Detangle3Graph(AssemblyGraph&);
+    Detangle3Graph(const Detangle3Graph&);
 
 private:
     AssemblyGraph& assemblyGraph;
