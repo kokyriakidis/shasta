@@ -44,29 +44,45 @@ void AssemblyGraph::detangle3()
 Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     assemblyGraph(assemblyGraph)
 {
-    Detangle3Graph& detangle3Graph = *this;
-
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t minCoverage = 5;
     const uint64_t maxCoverage = 25;
 
+    // Create the graph.
     createVertices(minCoverage, maxCoverage);
     createEdges();
     writeGraphviz("Detangle3Graph-Complete.dot");
 
-    // Remove edges that have either or both hasMaximumCommon flags set to false.
+    // Graph cleanup.
+    removeWeakEdges();
+    removeIsolatedVertices();
+    writeGraphviz("Detangle3Graph.dot");
+
+}
+
+
+
+void Detangle3Graph::removeWeakEdges()
+{
+    Detangle3Graph& detangle3Graph = *this;
+
     vector<edge_descriptor> edgesToBeRemoved;
     BGL_FORALL_EDGES(e, detangle3Graph, Detangle3Graph) {
         const Detangle3GraphEdge& edge = detangle3Graph[e];
-        if(not (edge.hasMaximumCommon[0] and edge.hasMaximumCommon[1])) {
+        if(not edge.isStrong()) {
             edgesToBeRemoved.push_back(e);
         }
     }
     for(const edge_descriptor e: edgesToBeRemoved) {
         boost::remove_edge(e, detangle3Graph);
     }
+}
 
-    // Remove isolated vertices.
+
+void Detangle3Graph::removeIsolatedVertices()
+{
+    Detangle3Graph& detangle3Graph = *this;
+
     vector<vertex_descriptor> verticesToBeRemoved;
     BGL_FORALL_VERTICES(v, detangle3Graph, Detangle3Graph) {
         if(
@@ -78,10 +94,6 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     for(const vertex_descriptor v: verticesToBeRemoved) {
         boost::remove_vertex(v, detangle3Graph);
     }
-
-
-    writeGraphviz("Detangle3Graph.dot");
-
 }
 
 

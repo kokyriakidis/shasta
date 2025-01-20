@@ -97,6 +97,11 @@ public:
     // hasMaximumCommon[1] gets set if this the edge with maximum
     // number of common oriented reads among all edges with the same target vertex.
     array<bool, 2> hasMaximumCommon = {false, false};
+
+    bool isStrong() const
+    {
+        return hasMaximumCommon[0] and hasMaximumCommon[1];
+    }
 };
 
 
@@ -115,6 +120,10 @@ private:
 
     // Create all edges.
     void createEdges();
+
+    // Graph cleanup functions.
+    void removeWeakEdges();
+    void removeIsolatedVertices();
 
     // Create the edges starting at v0:
     // If direction is 0, move forward in the AssemblyGraph.
