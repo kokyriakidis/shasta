@@ -46,7 +46,11 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
 {
     Detangle3Graph& detangle3Graph = *this;
 
-    createVertices();
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t minCoverage = 5;
+    const uint64_t maxCoverage = 25;
+
+    createVertices(minCoverage, maxCoverage);
     createEdges();
     writeGraphviz("Detangle3Graph-Complete.dot");
 
@@ -84,16 +88,19 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
 
 // Each assembly graph edge, which must consist of a single chain, can generate
 // a vertex of the Detangle3Graph.
-void Detangle3Graph::createVertices()
+void Detangle3Graph::createVertices(uint64_t minCoverage, uint64_t maxCoverage)
 {
     BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
-        createVertex(e);
+        createVertex(e, minCoverage, maxCoverage);
     }
 }
 
 
 
-void Detangle3Graph::createVertex(AssemblyGraph::edge_descriptor e)
+void Detangle3Graph::createVertex(
+    AssemblyGraph::edge_descriptor e,
+    uint64_t minCoverage,
+    uint64_t maxCoverage)
 {
 
     Detangle3Graph& detangle3Graph = *this;
@@ -116,6 +123,11 @@ void Detangle3Graph::createVertex(AssemblyGraph::edge_descriptor e)
     }
     sum /= double(chain.size() - 2);
     const uint64_t coverage = uint64_t(std::round(sum));
+
+    // If coverage is not in the requested range, don't generate a vertex.
+    if((coverage < minCoverage) or (coverage>maxCoverage)) {
+        return;
+    }
 
     // Compute the total offset between the first and last internal anchors.
     uint64_t offset = 0;
@@ -277,55 +289,56 @@ void Detangle3Graph::createEdges(vertex_descriptor v0, uint64_t direction)
         // generate an edge v0->v1 (if direction is 0) or v1->v0 (if direction is 1).
         if((e1 != e0) and hasInternalAnchors) {
             const auto it1 = vertexMap.find(e1);
-            SHASTA_ASSERT(it1 != vertexMap.end());
-            const vertex_descriptor v1 = it1->second;
-            const Detangle3GraphVertex& vertex1 = detangle3Graph[v1];
 
-            const AnchorId anchorId1 = (direction == 0) ? vertex1.firstInternalAncorId : vertex1.lastInternalAncorId;
+            if(it1 != vertexMap.end()) {
+                const vertex_descriptor v1 = it1->second;
+                const Detangle3GraphVertex& vertex1 = detangle3Graph[v1];
 
-            // Analyze this pair of anchors.
-            AnchorPairInfo info;
-            if(direction == 0) {
-                assemblyGraph.anchors.analyzeAnchorPair(anchorId0, anchorId1, info);
-            } else {
-                assemblyGraph.anchors.analyzeAnchorPair(anchorId1, anchorId0, info);
-            }
+                const AnchorId anchorId1 = (direction == 0) ? vertex1.firstInternalAncorId : vertex1.lastInternalAncorId;
 
-
-
-            // If good enough, generate an edge if we don't already have it.
-            if(
-                (info.common >= minCommon) and
-                (info.jaccard() >= minJaccard) and
-                (info.correctedJaccard() >= minCorrectedJaccard)
-                ) {
-
+                // Analyze this pair of anchors.
+                AnchorPairInfo info;
                 if(direction == 0) {
-                    // Generate an edge v0->v1 if we don't already have it.
-                    edge_descriptor e;
-                    bool edgeExists = false;
-                    tie(e, edgeExists) = boost::edge(v0, v1, detangle3Graph);
-                    if(not edgeExists) {
-                        add_edge(v0, v1, Detangle3GraphEdge(info), detangle3Graph);
-                    }
+                    assemblyGraph.anchors.analyzeAnchorPair(anchorId0, anchorId1, info);
                 } else {
-                    // Generate an edge v1->v0 if we don't already have it.
-                    edge_descriptor e;
-                    bool edgeExists = false;
-                    tie(e, edgeExists) = boost::edge(v1, v0, detangle3Graph);
-                    if(not edgeExists) {
-                        add_edge(v1, v0, Detangle3GraphEdge(info), detangle3Graph);
-                    }
+                    assemblyGraph.anchors.analyzeAnchorPair(anchorId1, anchorId0, info);
                 }
 
-            }
 
-            // If there are no common reads with anchorId0, don't continue the BFS past this point
-            // (but AssemblyGraph edges still in the queue will continue to be processed.
-            if(info.common == 0) {
-                continue;
-            }
 
+                // If good enough, generate an edge if we don't already have it.
+                if(
+                    (info.common >= minCommon) and
+                    (info.jaccard() >= minJaccard) and
+                    (info.correctedJaccard() >= minCorrectedJaccard)
+                    ) {
+
+                    if(direction == 0) {
+                        // Generate an edge v0->v1 if we don't already have it.
+                        edge_descriptor e;
+                        bool edgeExists = false;
+                        tie(e, edgeExists) = boost::edge(v0, v1, detangle3Graph);
+                        if(not edgeExists) {
+                            add_edge(v0, v1, Detangle3GraphEdge(info), detangle3Graph);
+                        }
+                    } else {
+                        // Generate an edge v1->v0 if we don't already have it.
+                        edge_descriptor e;
+                        bool edgeExists = false;
+                        tie(e, edgeExists) = boost::edge(v1, v0, detangle3Graph);
+                        if(not edgeExists) {
+                            add_edge(v1, v0, Detangle3GraphEdge(info), detangle3Graph);
+                        }
+                    }
+
+                }
+
+                // If there are no common reads with anchorId0, don't continue the BFS past this point
+                // (but AssemblyGraph edges still in the queue will continue to be processed.
+                if(info.common == 0) {
+                    continue;
+                }
+            }
         }
 
 

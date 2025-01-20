@@ -109,8 +109,8 @@ public:
 private:
     AssemblyGraph& assemblyGraph;
 
-    void createVertices();
-    void createVertex(AssemblyGraph::edge_descriptor e);
+    void createVertices(uint64_t minCoverage, uint64_t maxCoverage);
+    void createVertex(AssemblyGraph::edge_descriptor e, uint64_t minCoverage, uint64_t maxCoverage);
     std::map<AssemblyGraph::edge_descriptor, vertex_descriptor> vertexMap;
 
     // Create all edges.
