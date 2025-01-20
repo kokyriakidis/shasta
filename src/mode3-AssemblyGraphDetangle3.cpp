@@ -1,6 +1,7 @@
 // Shasta.
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-Detangle3.hpp"
+#include "findLinearChains.hpp"
 #include "orderPairs.hpp"
 #include "transitiveReduction.hpp"
 using namespace shasta;
@@ -49,10 +50,12 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     // EXPOSE WHEN CODE STABILIZES.
     const uint64_t minCoverage = 5;
     const uint64_t maxCoverage = 25;
+    const uint64_t maxPruneLength = 10000;
 
     // Create the graph.
     createVertices(minCoverage, maxCoverage);
     createEdges();
+
     writeGraphviz("Detangle3Graph-Complete.dot");
 
     // Graph cleanup.
@@ -60,6 +63,8 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     removeWeakEdges();
     removeIsolatedVertices();
     transitiveReduction();
+    prune(maxPruneLength);
+
     writeGraphviz("Detangle3Graph.dot");
 
 }
@@ -96,6 +101,8 @@ void Detangle3Graph::removeIsolatedVertices()
         }
     }
     for(const vertex_descriptor v: verticesToBeRemoved) {
+        const AssemblyGraph::edge_descriptor e = detangle3Graph[v].e;
+        vertexMap.erase(e);
         boost::remove_vertex(v, detangle3Graph);
     }
 }
@@ -436,6 +443,14 @@ void Detangle3Graph::transitiveReduction()
     transitiveReductionAny(*this);
 }
 
+string Detangle3Graph::vertexStringId(vertex_descriptor v) const
+{
+    const Detangle3Graph& detangle3Graph = *this;
+    const Detangle3GraphVertex& vertex = detangle3Graph[v];
+    const AssemblyGraph::edge_descriptor e = vertex.e;
+    return assemblyGraph.bubbleChainStringId(e);
+
+}
 
 
 void Detangle3Graph::writeGraphviz(const string& fileName) const
@@ -453,14 +468,14 @@ void Detangle3Graph::writeGraphviz(const string& fileName) const
         const AssemblyGraph::edge_descriptor e = vertex.e;
         const Chain& chain = assemblyGraph[e].getOnlyChain();
 
-        dot << "\"" << assemblyGraph.bubbleChainStringId(e) << "\"";
+        dot << "\"" << vertexStringId(v) << "\"";
 
         // Begin attributes.
         dot << "[";
 
         // Label
         dot << "label=\"" <<
-            assemblyGraph.bubbleChainStringId(e) << "\\n" <<
+            vertexStringId(v) << "\\n" <<
             "n = " << chain.size() - 2 << "\\n" <<
             "c = " << vertex.coverage << "\\n" <<
             "o = " << vertex.offset <<
@@ -480,12 +495,10 @@ void Detangle3Graph::writeGraphviz(const string& fileName) const
         const Detangle3GraphEdge& edge = detangle3Graph[e];
         const vertex_descriptor v0 = source(e, detangle3Graph);
         const vertex_descriptor v1 = target(e, detangle3Graph);
-        const AssemblyGraph::edge_descriptor e0 = detangle3Graph[v0].e;
-        const AssemblyGraph::edge_descriptor e1 = detangle3Graph[v1].e;
 
         // Write the source and target vertices.
-        dot << "\"" << assemblyGraph.bubbleChainStringId(e0) <<
-            "\"->\"" << assemblyGraph.bubbleChainStringId(e1) << "\"";
+        dot << "\"" << vertexStringId(v0) <<
+            "\"->\"" << vertexStringId(v1) << "\"";
 
         // Begin attributes.
         dot << "[";
@@ -520,4 +533,129 @@ void Detangle3Graph::writeGraphviz(const string& fileName) const
     }
 
     dot << "}\n";
+}
+
+
+
+void Detangle3Graph::prune(uint64_t maxLength)
+{
+    for(uint64_t iteration=0; ; ++iteration) {
+        writeGraphviz("Detangle3Graph-BeforePruneIteration-" + to_string(iteration) + ".dot");
+        cout << "Prune iteration " << iteration << " begins." << endl;
+        if(not pruneIteration(maxLength)) {
+            break;
+        }
+    }
+}
+
+
+
+bool Detangle3Graph::pruneIteration(uint64_t maxLength)
+{
+    Detangle3Graph& detangle3Graph = *this;
+    const bool debug = true;
+
+    // Find linear chains.
+    vector< vector<edge_descriptor> > linearChains;
+    findLinearChains(detangle3Graph, 0, linearChains);
+
+    std::set<vertex_descriptor> verticesToBeRemoved;
+    vector<edge_descriptor> edgesToBeRemoved;
+
+    // Loop over al linear chains.
+    for(const vector<edge_descriptor>& linearChain: linearChains) {
+
+        // Gather the chain vertices.
+        vector<vertex_descriptor> linearChainVertices;
+        linearChainVertices.push_back(source(linearChain.front(), detangle3Graph));
+        for(const edge_descriptor e: linearChain) {
+            linearChainVertices.push_back(target(e, detangle3Graph));
+        }
+        const vertex_descriptor v0 = linearChainVertices.front();
+        const vertex_descriptor v1 = linearChainVertices.back();
+
+        if(debug) {
+            cout << "Found a linear chain that begins at " << vertexStringId(v0) <<
+                " and ends at " << vertexStringId(v1) << endl;
+        }
+
+        // Check if it is hanging.
+        const bool isHangingBackward = (in_degree(v0, detangle3Graph) == 0) and (out_degree(v0, detangle3Graph) == 1);
+        const bool isHangingForward = (out_degree(v1, detangle3Graph) == 0) and (in_degree(v1, detangle3Graph) == 1);
+
+        if(debug) {
+            cout << "Hanging flags: " << int(isHangingBackward) << int(isHangingForward) << endl;
+        }
+
+        // If it is not hanging, skip it.
+        if(not (isHangingBackward or isHangingForward)) {
+            continue;
+        }
+
+        // Compute the length of the hanging portion. This is the sum of all offsets of the chain edges
+        // plus the offsets of its vertices.
+        // But the first vertex is excluded if the chain is hanging forward and not backward,
+        // and the last vertex is excluded if the chain is hanging backward but not forward.
+        uint64_t hangingLength = 0;
+        for(const edge_descriptor e: linearChain) {
+            hangingLength += detangle3Graph[e].info.offsetInBases;
+        }
+        for(uint64_t i=0; i<linearChainVertices.size(); i++) {
+            if(isHangingForward and not isHangingBackward and (i == 0)) {
+                continue;
+            }
+            if(isHangingBackward and not isHangingForward and (i == linearChainVertices.size() - 1)) {
+                continue;
+            }
+            const vertex_descriptor v = linearChainVertices[i];
+            hangingLength += detangle3Graph[v].offset;
+        }
+        if(debug) {
+            cout << "Hanging length is " << hangingLength << endl;
+        }
+
+        // If the hanging length is more than maxLength, don't prune it.
+        if(hangingLength > maxLength) {
+            continue;
+        }
+
+        if(debug) {
+            cout << "Pruning linear chain " << vertexStringId(v0) <<
+                "..." << vertexStringId(v1) <<
+                " with hanging length " << hangingLength << endl;
+        }
+
+        // Flag vertices and edges to be removed.
+        copy(linearChain.begin(), linearChain.end(), back_inserter(edgesToBeRemoved));
+        for(uint64_t i=0; i<linearChainVertices.size(); i++) {
+            if(isHangingForward and not isHangingBackward and (i == 0)) {
+                continue;
+            }
+            if(isHangingBackward and not isHangingForward and (i == linearChainVertices.size() - 1)) {
+                continue;
+            }
+            const vertex_descriptor v = linearChainVertices[i];
+            if(verticesToBeRemoved.contains(v)) {
+                cout << "Assertion failing for " << vertexStringId(v) << endl;
+            }
+            SHASTA_ASSERT(not verticesToBeRemoved.contains(v));
+            verticesToBeRemoved.insert(v);
+        }
+    }
+
+    // Remove all the vertices and edges we flagged to be removed.
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, detangle3Graph);
+    }
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        if(debug) {
+            cout << "Removing " << vertexStringId(v) << endl;
+        }
+        boost::clear_vertex(v, detangle3Graph);
+        const AssemblyGraph::edge_descriptor e = detangle3Graph[v].e;
+        vertexMap.erase(e);
+        boost::remove_vertex(v, detangle3Graph);
+    }
+
+    return not (verticesToBeRemoved.empty() and edgesToBeRemoved.empty());
 }

@@ -121,17 +121,20 @@ private:
     // Create all edges.
     void createEdges();
 
-    // Graph cleanup functions.
-    void removeStrongComponents();
-    void removeWeakEdges();
-    void removeIsolatedVertices();
-    void transitiveReduction();
-
     // Create the edges starting at v0:
     // If direction is 0, move forward in the AssemblyGraph.
     // If direction is 1, move backward in the AssemblyGraph.
     void createEdges(vertex_descriptor v0, uint64_t direction);
 
+    // Graph cleanup functions.
+    void removeStrongComponents();
+    void removeWeakEdges();
+    void removeIsolatedVertices();
+    void transitiveReduction();
+    void prune(uint64_t maxLength);
+    bool pruneIteration(uint64_t maxLength);
+
+    string vertexStringId(vertex_descriptor) const;
     void writeGraphviz(const string& fileName) const;
 };
 
