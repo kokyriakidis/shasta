@@ -82,23 +82,60 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
 
 
 
+// Each assembly graph edge, which must consist of a single chain, can generate
+// a vertex of the Detangle3Graph.
 void Detangle3Graph::createVertices()
+{
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        createVertex(e);
+    }
+}
+
+
+
+void Detangle3Graph::createVertex(AssemblyGraph::edge_descriptor e)
 {
 
     Detangle3Graph& detangle3Graph = *this;
 
-    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
-        const BubbleChain& bubbleChain = assemblyGraph[e];
-        SHASTA_ASSERT(bubbleChain.isSimpleChain());
-        const Chain& chain = bubbleChain.getOnlyChain();
-        if(chain.size() > 2) {
-            const AnchorId firstInternalAncorId = chain[1];
-            const AnchorId lastInternalAncorId = chain[chain.size() - 2];
-            const vertex_descriptor v = add_vertex(
-                Detangle3GraphVertex(e, firstInternalAncorId, lastInternalAncorId), detangle3Graph);
-            vertexMap.insert(make_pair(e, v));
-        }
+    const BubbleChain& bubbleChain = assemblyGraph[e];
+    SHASTA_ASSERT(bubbleChain.isSimpleChain());
+    const Chain& chain = bubbleChain.getOnlyChain();
+
+    // A Chain must have at least one internal anchor to generate
+    // a vertex of the Detangle3Graph.
+    if(chain.size() <= 2) {
+        return;
     }
+
+    // Compute average coverage of the internal anchors.
+    double sum = 0.;
+    for(uint64_t i=1; i<chain.size()-1; i++) {
+        const AnchorId anchorId = chain[i];
+        sum += double(assemblyGraph.anchors[anchorId].size());
+    }
+    sum /= double(chain.size() - 2);
+    const uint64_t coverage = uint64_t(std::round(sum));
+
+    // Compute the total offset between the first and last internal anchors.
+    uint64_t offset = 0;
+    for(uint64_t i=1; i<chain.size()-2; i++) {
+        const AnchorId anchorId0 = chain[i];
+        const AnchorId anchorId1 = chain[i + 1];
+        AnchorPairInfo info;
+        assemblyGraph.anchors.analyzeAnchorPair(anchorId0, anchorId1, info);
+        offset += info.offsetInBases;
+    }
+
+    // Add the vertex.
+    const AnchorId firstInternalAncorId = chain[1];
+    const AnchorId lastInternalAncorId = chain[chain.size() - 2];
+    const vertex_descriptor v = add_vertex(
+        Detangle3GraphVertex(e, firstInternalAncorId, lastInternalAncorId, coverage, offset),
+        detangle3Graph);
+
+    // Store it in the vertexMap.
+    vertexMap.insert(make_pair(e, v));
 }
 
 
@@ -324,11 +361,37 @@ void Detangle3Graph::writeGraphviz(const string& fileName) const
     ofstream dot(fileName);
     dot << "digraph detangle3Graph {\n";
 
+
+
+    // Write the vertices.
     BGL_FORALL_VERTICES(v, detangle3Graph, Detangle3Graph) {
-        const AssemblyGraph::edge_descriptor e = detangle3Graph[v].e;
-        dot << "\"" << assemblyGraph.bubbleChainStringId(e) << "\";\n";
+        const Detangle3GraphVertex& vertex = detangle3Graph[v];
+        const AssemblyGraph::edge_descriptor e = vertex.e;
+        const Chain& chain = assemblyGraph[e].getOnlyChain();
+
+        dot << "\"" << assemblyGraph.bubbleChainStringId(e) << "\"";
+
+        // Begin attributes.
+        dot << "[";
+
+        // Label
+        dot << "label=\"" <<
+            assemblyGraph.bubbleChainStringId(e) << "\\n" <<
+            "n = " << chain.size() - 2 << "\\n" <<
+            "c = " << vertex.coverage << "\\n" <<
+            "o = " << vertex.offset <<
+            "\"";
+
+        // End attributes.
+        dot << "]";
+
+        // End the line for this vertex.
+        dot <<";\n";
     }
 
+
+
+    // Write the edges.
     BGL_FORALL_EDGES(e, detangle3Graph, Detangle3Graph) {
         const Detangle3GraphEdge& edge = detangle3Graph[e];
         const vertex_descriptor v0 = source(e, detangle3Graph);

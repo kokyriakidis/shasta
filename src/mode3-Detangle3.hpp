@@ -54,14 +54,24 @@ public:
     AnchorId firstInternalAncorId;
     AnchorId lastInternalAncorId;
 
+    // Average coverage of the internal anchors.
+    uint64_t coverage;
+
+    // The total offset between the first and last internal anchors.
+    uint64_t offset;
+
     Detangle3GraphVertex(
         AssemblyGraph::edge_descriptor e,
         AnchorId firstInternalAncorId,
-        AnchorId lastInternalAncorId
+        AnchorId lastInternalAncorId,
+        uint64_t coverage,
+        uint64_t offset
         ) :
         e(e),
         firstInternalAncorId(firstInternalAncorId),
-        lastInternalAncorId(lastInternalAncorId)
+        lastInternalAncorId(lastInternalAncorId),
+        coverage(coverage),
+        offset(offset)
         {}
 };
 
@@ -69,7 +79,11 @@ public:
 
 class shasta::mode3::Detangle3GraphEdge {
 public:
+
+    // AnchorPairInfo between the last internal anchor of the source
+    // vertex and the first internal anchor of the target vertex.
     AnchorPairInfo info;
+
     Detangle3GraphEdge(const AnchorPairInfo& info) : info(info) {}
 
     // hasMinimumOffset[0] gets set if this the edge with minimum
@@ -96,6 +110,7 @@ private:
     AssemblyGraph& assemblyGraph;
 
     void createVertices();
+    void createVertex(AssemblyGraph::edge_descriptor e);
     std::map<AssemblyGraph::edge_descriptor, vertex_descriptor> vertexMap;
 
     // Create all edges.
