@@ -55,6 +55,7 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     // Create the graph.
     createVertices(minCoverage, maxCoverage);
     createEdges();
+    setHasMaximumCommonFlags();
 
     writeGraphviz("Detangle3Graph-Complete.dot");
 
@@ -232,47 +233,42 @@ void Detangle3Graph::createEdges()
         createEdges(v0, 1);
     }
 
+}
 
 
-    // Set the hasMinimumOffset and hasMaximumCommon flags.
-    array<vector<edge_descriptor>, 2> edges;
-    vector< pair<edge_descriptor, uint64_t> > edgesWithOffsets;
+
+// Set the hasMaximumCommon on all edges.
+void Detangle3Graph::setHasMaximumCommonFlags()
+{
+    Detangle3Graph& detangle3Graph = *this;
+
+    array<vector<edge_descriptor>, 2> adjacentEdges;
+    BGL_FORALL_EDGES(e, detangle3Graph, Detangle3Graph) {
+        detangle3Graph[e].resetHasMinimumOffsetFlags();
+    }
     vector< pair<edge_descriptor, uint64_t> > edgesWithCommonCount;
     BGL_FORALL_VERTICES(v0, detangle3Graph, Detangle3Graph) {
 
         // Gather the out-edges (direction=0) and in-edges (direction=1).
-        edges[0].clear();
+        adjacentEdges[0].clear();
         BGL_FORALL_OUTEDGES(v0, e, detangle3Graph, Detangle3Graph) {
-            edges[0].push_back(e);
+            adjacentEdges[0].push_back(e);
         }
-        edges[1].clear();
+        adjacentEdges[1].clear();
         BGL_FORALL_INEDGES(v0, e, detangle3Graph, Detangle3Graph) {
-            edges[1].push_back(e);
+            adjacentEdges[1].push_back(e);
         }
 
         // Loop over both directions.
         for(uint64_t direction=0; direction<2; direction++) {
-            if(edges[direction].empty()) {
+            if(adjacentEdges[direction].empty()) {
                 continue;
             }
-            edgesWithOffsets.clear();
             edgesWithCommonCount.clear();
-            for(const edge_descriptor e: edges[direction]) {
+            for(const edge_descriptor e: adjacentEdges[direction]) {
                 const Detangle3GraphEdge& edge = detangle3Graph[e];
-                const uint64_t offset = edge.info.offsetInBases;
                 const uint64_t common = edge.info.common;
-                edgesWithOffsets.push_back(make_pair(e, offset));
                 edgesWithCommonCount.push_back(make_pair(e, common));
-            }
-
-            sort(edgesWithOffsets.begin(), edgesWithOffsets.end(),
-                OrderPairsBySecondOnly<edge_descriptor, uint64_t>());
-            const uint64_t minOffset = edgesWithOffsets.front().second;
-            for(const auto& p: edgesWithOffsets) {
-                if(p.second > minOffset) {
-                    break;
-                }
-                detangle3Graph[p.first].hasMinimumOffset[direction] = true;
             }
 
             sort(edgesWithCommonCount.begin(), edgesWithCommonCount.end(),
@@ -287,35 +283,6 @@ void Detangle3Graph::createEdges()
             }
         }
     }
-
-#if 0
-        edgesWithOffsets.clear();
-        edgesWithCommonCount.clear();
-        BGL_FORALL_OUTEDGES(v0, e, detangle3Graph, Detangle3Graph) {
-            const Detangle3GraphEdge& edge = detangle3Graph[e];
-            const uint64_t offset = edge.info.offsetInBases;
-            const uint64_t common = edge.info.common;
-            edgesWithOffsets.push_back(make_pair(e, offset));
-            edgesWithCommonCount.push_back(make_pair(e, common));
-        }
-        if(not edgesWithOffsets.empty()) {
-            sort(edgesWithOffsets.begin(), edgesWithOffsets.end(),
-                OrderPairsBySecondOnly<edge_descriptor, uint64_t>());
-            const uint64_t minOffset = edgesWithOffsets.front().second;
-            for(const auto& p: edgesWithOffsets) {
-                if(p.second > minOffset) {
-                    break;
-                }
-                detangle3Graph[p.first].hasMinimumOffset[0] = true;
-            }
-
-            sort(edgesWithCommonCount.begin(), edgesWithCommonCount.end(),
-                OrderPairsBySecondOnlyGreater<edge_descriptor, uint64_t>());
-            const edge_descriptor eMaxCommon = edgesWithCommonCount.front().first;
-            detangle3Graph[eMaxCommon].hasMaximumCommon[0] = true;
-        }
-#endif
-
 }
 
 
@@ -553,7 +520,7 @@ void Detangle3Graph::prune(uint64_t maxLength)
 bool Detangle3Graph::pruneIteration(uint64_t maxLength)
 {
     Detangle3Graph& detangle3Graph = *this;
-    const bool debug = true;
+    const bool debug = false;
 
     // Find linear chains.
     vector< vector<edge_descriptor> > linearChains;

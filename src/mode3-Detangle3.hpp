@@ -86,12 +86,6 @@ public:
 
     Detangle3GraphEdge(const AnchorPairInfo& info) : info(info) {}
 
-    // hasMinimumOffset[0] gets set if this the edge with minimum
-    // offset among all edges with the same source vertex.
-    // hasMinimumOffset[1] gets set if this the edge with minimum
-    // offset among all edges with the same target vertex.
-    array<bool, 2> hasMinimumOffset = {false, false};
-
     // hasMaximumCommon[0] gets set if this the edge with maximum
     // number of common oriented reads among all edges with the same source vertex.
     // hasMaximumCommon[1] gets set if this the edge with maximum
@@ -101,6 +95,11 @@ public:
     bool isStrong() const
     {
         return hasMaximumCommon[0] and hasMaximumCommon[1];
+    }
+
+    void resetHasMinimumOffsetFlags()
+    {
+        hasMaximumCommon = {false, false};
     }
 };
 
@@ -120,6 +119,9 @@ private:
 
     // Create all edges.
     void createEdges();
+
+    // Set the hasMaximumCommon on all edges.
+    void setHasMaximumCommonFlags();
 
     // Create the edges starting at v0:
     // If direction is 0, move forward in the AssemblyGraph.
