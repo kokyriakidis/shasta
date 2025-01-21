@@ -142,11 +142,11 @@ public:
     void computeShortPath(
         OrientedReadId orientedReadId0,
         OrientedReadId orientedReadId1,
-        size_t maxDistance,
-        vector<uint32_t>& path,
-        vector<uint32_t>& distance,
+        uint64_t maxDistance,
+        vector<uint64_t>& path,
+        vector<uint64_t>& distance,
         vector<OrientedReadId>& reachedVertices,
-        vector<uint32_t>& parentEdges,
+        vector<uint64_t>& parentEdges,
         MemoryMapped::Vector<AlignmentData>& alignmentData,
         ReadGraph4AllAlignments& readGraph);
     void findNeighborsUndirectedGraph(OrientedReadId orientedReadId, uint64_t maxDistance, vector<OrientedReadId>& neighbors);
@@ -201,11 +201,11 @@ public:
 void ReadGraph4AllAlignments::computeShortPath(
     OrientedReadId orientedReadId0,
     OrientedReadId orientedReadId1,
-    size_t maxDistance,
-    vector<uint32_t>& path,
-    vector<uint32_t>& distance,
+    uint64_t maxDistance,
+    vector<uint64_t>& path,
+    vector<uint64_t>& distance,
     vector<OrientedReadId>& reachedVertices,
-    vector<uint32_t>& parentEdges,
+    vector<uint64_t>& parentEdges,
     MemoryMapped::Vector<AlignmentData>& alignmentData,
     ReadGraph4AllAlignments& readGraph)
 {
@@ -226,8 +226,8 @@ void ReadGraph4AllAlignments::computeShortPath(
     while(!queuedVertices.empty()) {
         const OrientedReadId vertex0 = queuedVertices.front();
         queuedVertices.pop();
-        const uint32_t distance0 = distance[vertex0.getValue()];
-        const uint32_t distance1 = distance0 + 1;
+        const uint64_t distance0 = distance[vertex0.getValue()];
+        const uint64_t distance1 = distance0 + 1;
 
         if(distance1 > maxDistance) {
             continue;
@@ -239,10 +239,10 @@ void ReadGraph4AllAlignments::computeShortPath(
             vertex_descriptor targetVertex = target(edge, *this);
             const OrientedReadId vertex1 = OrientedReadId::fromValue(targetVertex);
 
-            uint32_t alignmentId = readGraph[edge].alignmentId;
+            uint64_t alignmentId = readGraph[edge].alignmentId;
             AlignmentData alignment = alignmentData[alignmentId];
 
-            //uint32_t alignmentId = ReadGraph4AllAlignments[edge].alignmentId;
+            //uint64_t alignmentId = ReadGraph4AllAlignments[edge].alignmentId;
 
             // Process new vertices
             if(distance[vertex1.getValue()] == ReadGraph::infiniteDistance) {
@@ -256,7 +256,7 @@ void ReadGraph4AllAlignments::computeShortPath(
                     // Reconstruct path
                     OrientedReadId vertex = vertex1;
                     while(vertex != orientedReadId0) {
-                        const uint32_t alignmentId = parentEdges[vertex.getValue()];
+                        const uint64_t alignmentId = parentEdges[vertex.getValue()];
                         path.push_back(alignmentId);
                         AlignmentData alignment = alignmentData[alignmentId];
                         const ReadId readId0 = alignment.readIds[0];
@@ -280,7 +280,7 @@ void ReadGraph4AllAlignments::computeShortPath(
 
         }
 
-        // for(const uint32_t edgeId: connectivity[vertex0.getValue()]) {
+        // for(const uint64_t edgeId: connectivity[vertex0.getValue()]) {
         //     const ReadGraphEdge& edge = edges[edgeId];
         //     if(edge.crossesStrands) {
         //         continue;
@@ -299,7 +299,7 @@ void ReadGraph4AllAlignments::computeShortPath(
         //             // Reconstruct path
         //             OrientedReadId vertex = vertex1;
         //             while(vertex != orientedReadId0) {
-        //                 const uint32_t edgeId = parentEdges[vertex.getValue()];
+        //                 const uint64_t edgeId = parentEdges[vertex.getValue()];
         //                 path.push_back(edgeId);
         //                 vertex = edges[edgeId].getOther(vertex);
         //             }
@@ -1461,11 +1461,11 @@ uint64_t ReadGraph4AllAlignments::findAllPathsToNode(
 
 
 
-//class AlignmentStats{public: double errorRateRle; uint32_t alignedRange; uint32_t rightUnaligned; uint32_t leftUnaligned; uint32_t alignmentId;};
+//class AlignmentStats{public: double errorRateRle; uint64_t alignedRange; uint64_t rightUnaligned; uint64_t leftUnaligned; uint64_t alignmentId;};
 
 
 void Assembler::createReadGraph4withStrandSeparation(
-    uint32_t maxAlignmentCount,
+    uint64_t maxAlignmentCount,
     double epsilon,
     double delta,
     double WThreshold,
@@ -1509,8 +1509,8 @@ void Assembler::createReadGraph4withStrandSeparation(
     
 
     // Get stats about the reads
-    const size_t readCount = reads->readCount();
-    const size_t orientedReadCount = 2*readCount;
+    const uint64_t readCount = reads->readCount();
+    const uint64_t orientedReadCount = 2*readCount;
     
     // Keep track of which readIds were used in alignments
     vector<bool> readUsed(readCount, false);
@@ -1539,8 +1539,8 @@ void Assembler::createReadGraph4withStrandSeparation(
         const OrientedReadId orientedReadId1(readId1, isSameStrand ? 0 : 1);   // On strand 0 or 1.
 
         // Store this pair of edges in our edgeTable.
-        const uint32_t range0 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId0, 0, markers);
-        const uint32_t range1 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId1, 1, markers);
+        const uint64_t range0 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId0, 0, markers);
+        const uint64_t range1 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId1, 1, markers);
         const double L = (range0 + range1)/2;
         // const uint64_t n = thisAlignmentData.info.mismatchCountRle;
         const double errorRateRle = thisAlignmentData.info.errorRateRle;
@@ -1629,10 +1629,10 @@ void Assembler::createReadGraph4withStrandSeparation(
             SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
 
             // Get the connected components that these oriented reads are in.
-            const uint32_t a0 = disjointSets.find_set(A0.getValue());
-            const uint32_t b0 = disjointSets.find_set(B0.getValue());
-            const uint32_t a1 = disjointSets.find_set(A1.getValue());
-            const uint32_t b1 = disjointSets.find_set(B1.getValue());
+            const uint64_t a0 = disjointSets.find_set(A0.getValue());
+            const uint64_t b0 = disjointSets.find_set(B0.getValue());
+            const uint64_t a1 = disjointSets.find_set(A1.getValue());
+            const uint64_t b1 = disjointSets.find_set(B1.getValue());
 
 
             // If the alignment breaks strand separation, it is skipped.
@@ -1694,13 +1694,13 @@ void Assembler::createReadGraph4withStrandSeparation(
 
     // Track the size of each set in the disjoint sets
     vector<uint64_t> setSizes(orientedReadCount, 0);
-    for (std::size_t i = 0; i < orientedReadCount; ++i) {
+    for (std::uint64_t i = 0; i < orientedReadCount; ++i) {
         setSizes[disjointSets.find_set(i)]++;
     }
 
 
     // Print how many alignments were kept in this step
-    const size_t keepCountR1 = count(keepAlignment.begin(), keepAlignment.end(), true);
+    const uint64_t keepCountR1 = count(keepAlignment.begin(), keepAlignment.end(), true);
     cout << "Finding strict disjointSets step: Keeping " << keepCountR1 << " alignments of " << keepAlignment.size() << endl;
 
 
@@ -1895,14 +1895,14 @@ void Assembler::createReadGraph4withStrandSeparation(
             if(result == 1) {
                 // cout << "Found a path for the orientedRead with ReadID " << orientedReadId.getReadId() << " and strand " << orientedReadId.getStrand() << " with positive offset" << endl;
                 // //print the paths and then the pathsOffsets
-                // for (size_t i = 0; i < paths.size(); i++) {
+                // for (uint64_t i = 0; i < paths.size(); i++) {
                 //     cout << "Path " << i << ": ";
-                //     for (size_t j = 0; j < paths[i].size(); j++) {
+                //     for (uint64_t j = 0; j < paths[i].size(); j++) {
                 //         cout << paths[i][j].getReadId() << " ";
                 //     }
                 //     cout << endl;
                 //     cout << "PathOffsets " << i << ": ";
-                //     for (size_t j = 0; j < pathsOffsets[i].size(); j++) {
+                //     for (uint64_t j = 0; j < pathsOffsets[i].size(); j++) {
                 //         cout << pathsOffsets[i][j] << " ";
                 //     }
                 //     cout << endl;
@@ -2008,7 +2008,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     //  NoIn - - - - | - - - - -  - - - - - - | - - - - -
     //  NoIn - - - - | - - NoOut     NoIn - - | - - - - -
 
-    std::unordered_map<uint32_t, vector<uint32_t>> endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesSameDisjointSet;
+    std::unordered_map<uint64_t, vector<uint64_t>> endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesSameDisjointSet;
     vector<bool> endNodesWithNoOutgoingNodesConsidered(orientedReadCount, false);
 
     // First, we try to find EndNodesWithNoIncomingNodes that are in the same connected component
@@ -2021,14 +2021,14 @@ void Assembler::createReadGraph4withStrandSeparation(
             // check if the orientedReadId is an endNode with no outgoing nodes
             if(finalDeadEndReadsWithNoOutgoingNodes[orientedReadId.getValue()]){
                 // Get it's disjointSet
-                uint32_t deadEndReadWithNoOutgoingNodesDisjointSetId = disjointSets.find_set(orientedReadId.getValue());
+                uint64_t deadEndReadWithNoOutgoingNodesDisjointSetId = disjointSets.find_set(orientedReadId.getValue());
 
                 // Find all EndNodesWithNoIncomingNodes that are in the same disjointSet
-                for(uint32_t id=0; id<orientedReadCount; id++) {
+                for(uint64_t id=0; id<orientedReadCount; id++) {
                     // check if the id is an endNode with no incoming nodes
                     if(finalDeadEndReadsWithNoIncomingNodes[id]){
                         // get the disjointSet of the id
-                        uint32_t endNodeWithNoIncomingNodesDisjointSetId = disjointSets.find_set(id);
+                        uint64_t endNodeWithNoIncomingNodesDisjointSetId = disjointSets.find_set(id);
                         // check if the disjointSet of the id is the same as the disjointSet of the endNode with no outgoing nodes
                         if(deadEndReadWithNoOutgoingNodesDisjointSetId == endNodeWithNoIncomingNodesDisjointSetId){
                             endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesSameDisjointSet[orientedReadId.getValue()].push_back(id);
@@ -2043,7 +2043,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
     for(auto& p : endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesSameDisjointSet) {
-        uint32_t value = p.first;
+        uint64_t value = p.first;
         OrientedReadId orientedReadId = OrientedReadId::fromValue(value);
         SHASTA_ASSERT(orientedReadId.getValue() == value);
         // const ReadId readId = orientedReadId.getReadId();
@@ -2107,10 +2107,10 @@ void Assembler::createReadGraph4withStrandSeparation(
             SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
 
             // Get the connected components that these oriented reads are in.
-            // const uint32_t a0 = disjointSets.find_set(A0.getValue());
-            // const uint32_t b0 = disjointSets.find_set(B0.getValue());
-            // const uint32_t a1 = disjointSets.find_set(A1.getValue());
-            // const uint32_t b1 = disjointSets.find_set(B1.getValue());
+            // const uint64_t a0 = disjointSets.find_set(A0.getValue());
+            // const uint64_t b0 = disjointSets.find_set(B0.getValue());
+            // const uint64_t a1 = disjointSets.find_set(A1.getValue());
+            // const uint64_t b1 = disjointSets.find_set(B1.getValue());
 
 
             for(uint64_t index=0; index<alignmentTableNotPassFilter.size(); index++) {
@@ -2163,10 +2163,10 @@ void Assembler::createReadGraph4withStrandSeparation(
                     SHASTA_ASSERT(B0v2.getStrand() == 1 - B1v2.getStrand());
 
                     // Get the connected components that these oriented reads are in.
-                    const uint32_t a0v2 = disjointSets.find_set(A0v2.getValue());
-                    const uint32_t b0v2 = disjointSets.find_set(B0v2.getValue());
-                    const uint32_t a1v2 = disjointSets.find_set(A1v2.getValue());
-                    const uint32_t b1v2 = disjointSets.find_set(B1v2.getValue());
+                    const uint64_t a0v2 = disjointSets.find_set(A0v2.getValue());
+                    const uint64_t b0v2 = disjointSets.find_set(B0v2.getValue());
+                    const uint64_t a1v2 = disjointSets.find_set(A1v2.getValue());
+                    const uint64_t b1v2 = disjointSets.find_set(B1v2.getValue());
 
 
                     // If the alignment breaks strand separation, it is skipped.
@@ -2253,7 +2253,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
     // Print how many alignments were kept
-    const size_t keepCountR2 = count(keepAlignment.begin(), keepAlignment.end(), true);
+    const uint64_t keepCountR2 = count(keepAlignment.begin(), keepAlignment.end(), true);
     cout << "Adding alignments for break bridging to connect endNodes in the same disjointSet: Keeping " << keepCountR2 << " alignments of " << keepAlignment.size() << endl;
 
 
@@ -2273,7 +2273,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     //                             NoIn - - - - - - - (Other disjointSet) 
 
 
-    std::unordered_map<uint32_t, vector<uint32_t>> endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesDifferentDisjointSet;
+    std::unordered_map<uint64_t, vector<uint64_t>> endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesDifferentDisjointSet;
 
     // Now, we try to find EndNodesWithNoIncomingNodes that are in different disjointSets than EndNodesWithNoOutgoingNodes.
     for (ReadId readId = 0; readId < readCount; readId++) {
@@ -2283,14 +2283,14 @@ void Assembler::createReadGraph4withStrandSeparation(
             // check if the orientedReadId is an endNode with no outgoing nodes
             if(finalDeadEndReadsWithNoOutgoingNodes[orientedReadId.getValue()]){
                 // Get it's disjointSet
-                uint32_t deadEndReadWithNoOutgoingNodesDisjointSetId = disjointSets.find_set(orientedReadId.getValue());
+                uint64_t deadEndReadWithNoOutgoingNodesDisjointSetId = disjointSets.find_set(orientedReadId.getValue());
 
                 // Find all EndNodesWithNoIncomingNodes that are in different disjointSet
-                for(uint32_t id=0; id<orientedReadCount; id++) {
+                for(uint64_t id=0; id<orientedReadCount; id++) {
                     // check if the id is an endNode with no incoming nodes
                     if(finalDeadEndReadsWithNoIncomingNodes[id]){
                         // get the disjointSet of the id
-                        uint32_t endNodeWithNoIncomingNodesDisjointSetId = disjointSets.find_set(id);
+                        uint64_t endNodeWithNoIncomingNodesDisjointSetId = disjointSets.find_set(id);
                         // check if the disjointSet of the id is different from the disjointSet of the endNode with no outgoing nodes
                         if(deadEndReadWithNoOutgoingNodesDisjointSetId != endNodeWithNoIncomingNodesDisjointSetId){
                             endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesDifferentDisjointSet[orientedReadId.getValue()].push_back(id);
@@ -2305,7 +2305,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
     for(auto& p : endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesDifferentDisjointSet) {
-        uint32_t value = p.first;
+        uint64_t value = p.first;
         OrientedReadId orientedReadId = OrientedReadId::fromValue(value);
         SHASTA_ASSERT(orientedReadId.getValue() == value);
         // const ReadId readId = orientedReadId.getReadId();
@@ -2362,10 +2362,10 @@ void Assembler::createReadGraph4withStrandSeparation(
             SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
 
             // Get the connected components that these oriented reads are in.
-            // const uint32_t a0 = disjointSets.find_set(A0.getValue());
-            // const uint32_t b0 = disjointSets.find_set(B0.getValue());
-            // const uint32_t a1 = disjointSets.find_set(A1.getValue());
-            // const uint32_t b1 = disjointSets.find_set(B1.getValue());
+            // const uint64_t a0 = disjointSets.find_set(A0.getValue());
+            // const uint64_t b0 = disjointSets.find_set(B0.getValue());
+            // const uint64_t a1 = disjointSets.find_set(A1.getValue());
+            // const uint64_t b1 = disjointSets.find_set(B1.getValue());
 
 
             for(uint64_t index=0; index<alignmentTableNotPassFilter.size(); index++) {
@@ -2418,10 +2418,10 @@ void Assembler::createReadGraph4withStrandSeparation(
                     SHASTA_ASSERT(B0v2.getStrand() == 1 - B1v2.getStrand());
 
                     // Get the connected components that these oriented reads are in.
-                    const uint32_t a0v2 = disjointSets.find_set(A0v2.getValue());
-                    const uint32_t b0v2 = disjointSets.find_set(B0v2.getValue());
-                    const uint32_t a1v2 = disjointSets.find_set(A1v2.getValue());
-                    const uint32_t b1v2 = disjointSets.find_set(B1v2.getValue());
+                    const uint64_t a0v2 = disjointSets.find_set(A0v2.getValue());
+                    const uint64_t b0v2 = disjointSets.find_set(B0v2.getValue());
+                    const uint64_t a1v2 = disjointSets.find_set(A1v2.getValue());
+                    const uint64_t b1v2 = disjointSets.find_set(B1v2.getValue());
 
 
                     // If the alignment breaks strand separation, it is skipped.
@@ -2502,7 +2502,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
     // Print how many alignments were kept
-    const size_t keepCountR3 = count(keepAlignment.begin(), keepAlignment.end(), true);
+    const uint64_t keepCountR3 = count(keepAlignment.begin(), keepAlignment.end(), true);
     cout << "Adding alignments for break bridging to connect endNodes in different disjointSets: Keeping " << keepCountR3 << " alignments of " << keepAlignment.size() << endl;
 
 
@@ -2597,10 +2597,10 @@ void Assembler::createReadGraph4withStrandSeparation(
     //                 SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
 
     //                 // Get the connected components that these oriented reads are in.
-    //                 const uint32_t a0 = disjointSets.find_set(A0.getValue());
-    //                 const uint32_t b0 = disjointSets.find_set(B0.getValue());
-    //                 const uint32_t a1 = disjointSets.find_set(A1.getValue());
-    //                 const uint32_t b1 = disjointSets.find_set(B1.getValue());
+    //                 const uint64_t a0 = disjointSets.find_set(A0.getValue());
+    //                 const uint64_t b0 = disjointSets.find_set(B0.getValue());
+    //                 const uint64_t a1 = disjointSets.find_set(A1.getValue());
+    //                 const uint64_t b1 = disjointSets.find_set(B1.getValue());
 
 
     //                 // If the last node belongs to the disjoint set of the other strand
@@ -2663,10 +2663,10 @@ void Assembler::createReadGraph4withStrandSeparation(
     //                         SHASTA_ASSERT(B0v2.getStrand() == 1 - B1v2.getStrand());
 
     //                         // Get the connected components that these oriented reads are in.
-    //                         const uint32_t a0v2 = disjointSets.find_set(A0v2.getValue());
-    //                         const uint32_t b0v2 = disjointSets.find_set(B0v2.getValue());
-    //                         const uint32_t a1v2 = disjointSets.find_set(A1v2.getValue());
-    //                         const uint32_t b1v2 = disjointSets.find_set(B1v2.getValue());
+    //                         const uint64_t a0v2 = disjointSets.find_set(A0v2.getValue());
+    //                         const uint64_t b0v2 = disjointSets.find_set(B0v2.getValue());
+    //                         const uint64_t a1v2 = disjointSets.find_set(A1v2.getValue());
+    //                         const uint64_t b1v2 = disjointSets.find_set(B1v2.getValue());
 
     //                         // If the alignment breaks strand separation, it is skipped.
     //                         // If A0 and B1 are in the same connected component,
@@ -2792,12 +2792,12 @@ void Assembler::createReadGraph4withStrandSeparation(
 
     // Sort the components by decreasing size (number of reads).
     // componentTable contains pairs(size, componentId as key in componentMap).
-    vector< pair<size_t, uint32_t> > componentTable;
+    vector< pair<uint64_t, uint64_t> > componentTable;
     for(const auto& p: componentMap) {
         const vector<OrientedReadId>& component = p.second;
         componentTable.push_back(make_pair(component.size(), p.first));
     }
-    sort(componentTable.begin(), componentTable.end(), std::greater<pair<size_t, uint32_t>>());
+    sort(componentTable.begin(), componentTable.end(), std::greater<pair<uint64_t, uint64_t>>());
 
 
 
@@ -2815,7 +2815,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     csv << "Component,RepresentingRead,OrientedReadCount,"
         "AccumulatedOrientedReadCount,"
         "AccumulatedOrientedReadCountFraction\n";
-    size_t accumulatedOrientedReadCount = 0;
+    uint64_t accumulatedOrientedReadCount = 0;
     for(ReadId componentId=0; componentId<components.size(); componentId++) {
         const vector<OrientedReadId>& component = components[componentId];
 
@@ -2899,7 +2899,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
 void Assembler::createReadGraph4(
-    uint32_t /* maxAlignmentCount */)
+    uint64_t /* maxAlignmentCount */)
 {
     // const bool debug = false;
 
@@ -2953,8 +2953,8 @@ void Assembler::createReadGraph4(
             const OrientedReadId orientedReadId0(readId0, 0);   // On strand 0.
             const OrientedReadId orientedReadId1(readId1, isSameStrand ? 0 : 1);   // On strand 0 or 1.
 
-            const uint32_t range0 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId0, 0, markers);
-            const uint32_t range1 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId1, 1, markers);
+            const uint64_t range0 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId0, 0, markers);
+            const uint64_t range1 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId1, 1, markers);
             const double L = (range0 + range1)/2;
             const uint64_t n = thisAlignmentData.info.mismatchCountRle;
             const double errorRateRle = double(n)/(2.0*L);;
@@ -2972,7 +2972,7 @@ void Assembler::createReadGraph4(
 
         cout << timestamp << "Done processing alignments." << endl;
 
-        const size_t keepCount = count(keepAlignment.begin(), keepAlignment.end(), true);
+        const uint64_t keepCount = count(keepAlignment.begin(), keepAlignment.end(), true);
         cout << "Keeping " << keepCount << " alignments of " << keepAlignment.size() << endl;
 
         // Create the read graph using the alignments we selected.
@@ -3052,8 +3052,8 @@ void Assembler::flagCrossStrandReadGraphEdges4()
 
 
         // // Store this pair of edges in our edgeTable.
-        // const uint32_t range0 = alignment.info.baseRange(assemblerInfo->k, edge.orientedReadIds[0], 0, markers);
-        // const uint32_t range1 = alignment.info.baseRange(assemblerInfo->k, edge.orientedReadIds[1], 1, markers);
+        // const uint64_t range0 = alignment.info.baseRange(assemblerInfo->k, edge.orientedReadIds[0], 0, markers);
+        // const uint64_t range1 = alignment.info.baseRange(assemblerInfo->k, edge.orientedReadIds[1], 1, markers);
         // const double L = (range0 + range1) / 2;
         // const uint64_t n = alignment.info.mismatchCountRle;
         // const double m = L * 0.0001;
@@ -3099,14 +3099,14 @@ void Assembler::flagCrossStrandReadGraphEdges4()
     // Print out top 100 alignments by Q value
     cout << "Top 100 alignments by Q value:" << endl;
     cout << "EdgeId\tQ\tMarkerCount\tErrorRateRleNew\tErrorRateRleOld\tL\tn" << endl;
-    for(size_t i = 0; i < min(size_t(100), edgeTable.size()); i++) {
+    for(uint64_t i = 0; i < min(uint64_t(100), edgeTable.size()); i++) {
         const auto& p = edgeTable[i];
         const uint64_t edgeId = p.first;
         const double q = p.second;
         const AlignmentData& alignment = alignmentData[readGraph.edges[edgeId].alignmentId];
         const uint64_t markerCount = alignment.info.markerCount;
-        const uint32_t range0 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[0], 0, markers);
-        const uint32_t range1 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[1], 1, markers);
+        const uint64_t range0 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[0], 0, markers);
+        const uint64_t range1 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[1], 1, markers);
         const double L = (range0 + range1)/2;
         const uint64_t n = alignment.info.mismatchCountRle;
         const double errorRateRleNew = double(n)/(2.0*L);;
@@ -3119,8 +3119,8 @@ void Assembler::flagCrossStrandReadGraphEdges4()
 
 
     // Create and initialize the disjoint sets data structure needed below.
-    const size_t readCount = reads->readCount();
-    const size_t orientedReadCount = 2*readCount;
+    const uint64_t readCount = reads->readCount();
+    const uint64_t orientedReadCount = 2*readCount;
     SHASTA_ASSERT(readGraph.connectivity.size() == orientedReadCount);
     vector<ReadId> rank(orientedReadCount);
     vector<ReadId> parent(orientedReadCount);
@@ -3162,10 +3162,10 @@ void Assembler::flagCrossStrandReadGraphEdges4()
         SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
 
         // Get the connected components that these oriented reads are in.
-        const uint32_t a0 = disjointSets.find_set(A0.getValue());
-        const uint32_t b0 = disjointSets.find_set(B0.getValue());
-        const uint32_t a1 = disjointSets.find_set(A1.getValue());
-        const uint32_t b1 = disjointSets.find_set(B1.getValue());
+        const uint64_t a0 = disjointSets.find_set(A0.getValue());
+        const uint64_t b0 = disjointSets.find_set(B0.getValue());
+        const uint64_t a1 = disjointSets.find_set(A1.getValue());
+        const uint64_t b1 = disjointSets.find_set(B1.getValue());
 
         // If A0 and B0 are in the same connected component,
         // A1 and B1 also must be in the same connected component.
@@ -3230,12 +3230,12 @@ void Assembler::flagCrossStrandReadGraphEdges4()
 
     // Sort the components by decreasing size (number of reads).
     // componentTable contains pairs(size, componentId as key in componentMap).
-    vector< pair<size_t, uint32_t> > componentTable;
+    vector< pair<uint64_t, uint64_t> > componentTable;
     for(const auto& p: componentMap) {
         const vector<OrientedReadId>& component = p.second;
         componentTable.push_back(make_pair(component.size(), p.first));
     }
-    sort(componentTable.begin(), componentTable.end(), std::greater<pair<size_t, uint32_t>>());
+    sort(componentTable.begin(), componentTable.end(), std::greater<pair<uint64_t, uint64_t>>());
 
 
 
@@ -3253,7 +3253,7 @@ void Assembler::flagCrossStrandReadGraphEdges4()
     csv << "Component,RepresentingRead,OrientedReadCount,"
         "AccumulatedOrientedReadCount,"
         "AccumulatedOrientedReadCountFraction\n";
-    size_t accumulatedOrientedReadCount = 0;
+    uint64_t accumulatedOrientedReadCount = 0;
     for(ReadId componentId=0; componentId<components.size(); componentId++) {
         const vector<OrientedReadId>& component = components[componentId];
 
@@ -3384,8 +3384,8 @@ void Assembler::flagCrossStrandReadGraphEdges5()
         // Q(n) = (1 + δ/2ε)^n * e-δL
         // ε = 1e-4, δ = 5e-4
         // Store this pair of edges in our edgeTable.
-        const uint32_t range0 = alignment.info.baseRange(assemblerInfo->k, edge.orientedReadIds[0], 0, markers);
-        const uint32_t range1 = alignment.info.baseRange(assemblerInfo->k, edge.orientedReadIds[1], 1, markers);
+        const uint64_t range0 = alignment.info.baseRange(assemblerInfo->k, edge.orientedReadIds[0], 0, markers);
+        const uint64_t range1 = alignment.info.baseRange(assemblerInfo->k, edge.orientedReadIds[1], 1, markers);
         const double L = (range0 + range1)/2;
         const uint64_t n = alignment.info.mismatchCountRle;     
 
@@ -3402,14 +3402,14 @@ void Assembler::flagCrossStrandReadGraphEdges5()
     // Print out top 100 alignments by Q value
     cout << "Top 100 alignments by logQ value:" << endl;
     cout << "EdgeId\tlogQ\tMarkerCount\tErrorRateRle\tL\tn" << endl;
-    for(size_t i = 0; i < min(size_t(100), edgeTable.size()); i++) {
+    for(uint64_t i = 0; i < min(uint64_t(100), edgeTable.size()); i++) {
         const auto& p = edgeTable[i];
         const uint64_t edgeId = p.first;
         const double logQ = p.second;
         const AlignmentData& alignment = alignmentData[readGraph.edges[edgeId].alignmentId];
         const uint64_t markerCount = alignment.info.markerCount;
-        const uint32_t range0 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[0], 0, markers);
-        const uint32_t range1 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[1], 1, markers);
+        const uint64_t range0 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[0], 0, markers);
+        const uint64_t range1 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[1], 1, markers);
         const double L = (range0 + range1)/2;
         const uint64_t n = alignment.info.mismatchCountRle;
         const double errorRateRle = double(n)/(2.0*L);;
@@ -3420,8 +3420,8 @@ void Assembler::flagCrossStrandReadGraphEdges5()
 
 
     // Create and initialize the disjoint sets data structure needed below.
-    const size_t readCount = reads->readCount();
-    const size_t orientedReadCount = 2*readCount;
+    const uint64_t readCount = reads->readCount();
+    const uint64_t orientedReadCount = 2*readCount;
     SHASTA_ASSERT(readGraph.connectivity.size() == orientedReadCount);
     vector<ReadId> rank(orientedReadCount);
     vector<ReadId> parent(orientedReadCount);
@@ -3463,10 +3463,10 @@ void Assembler::flagCrossStrandReadGraphEdges5()
         SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
 
         // Get the connected components that these oriented reads are in.
-        const uint32_t a0 = disjointSets.find_set(A0.getValue());
-        const uint32_t b0 = disjointSets.find_set(B0.getValue());
-        const uint32_t a1 = disjointSets.find_set(A1.getValue());
-        const uint32_t b1 = disjointSets.find_set(B1.getValue());
+        const uint64_t a0 = disjointSets.find_set(A0.getValue());
+        const uint64_t b0 = disjointSets.find_set(B0.getValue());
+        const uint64_t a1 = disjointSets.find_set(A1.getValue());
+        const uint64_t b1 = disjointSets.find_set(B1.getValue());
 
         // If A0 and B0 are in the same connected component,
         // A1 and B1 also must be in the same connected component.
@@ -3531,12 +3531,12 @@ void Assembler::flagCrossStrandReadGraphEdges5()
 
     // Sort the components by decreasing size (number of reads).
     // componentTable contains pairs(size, componentId as key in componentMap).
-    vector< pair<size_t, uint32_t> > componentTable;
+    vector< pair<uint64_t, uint64_t> > componentTable;
     for(const auto& p: componentMap) {
         const vector<OrientedReadId>& component = p.second;
         componentTable.push_back(make_pair(component.size(), p.first));
     }
-    sort(componentTable.begin(), componentTable.end(), std::greater<pair<size_t, uint32_t>>());
+    sort(componentTable.begin(), componentTable.end(), std::greater<pair<uint64_t, uint64_t>>());
 
 
 
@@ -3554,7 +3554,7 @@ void Assembler::flagCrossStrandReadGraphEdges5()
     csv << "Component,RepresentingRead,OrientedReadCount,"
         "AccumulatedOrientedReadCount,"
         "AccumulatedOrientedReadCountFraction\n";
-    size_t accumulatedOrientedReadCount = 0;
+    uint64_t accumulatedOrientedReadCount = 0;
     for(ReadId componentId=0; componentId<components.size(); componentId++) {
         const vector<OrientedReadId>& component = components[componentId];
 
