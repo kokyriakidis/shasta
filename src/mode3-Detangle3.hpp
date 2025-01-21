@@ -142,6 +142,10 @@ private:
     void prune(uint64_t maxLength);
     bool pruneIteration(uint64_t maxLength);
 
+    void findLinearChains(vector< vector<vertex_descriptor> >&) const;
+    void findLinearChains(vector< vector<edge_descriptor> >&) const;
+    void findLinearChains(vector< vector<vertex_descriptor> >&, vector< vector<edge_descriptor> >&) const;
+
     string vertexStringId(vertex_descriptor) const;
     void writeGraphviz(const string& fileName) const;
 };

@@ -56,7 +56,7 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     createVertices(minCoverage, maxCoverage);
     createEdges();
     setHasMaximumCommonFlags();
-    writeGraphviz("Detangle3Graph.dot");
+    writeGraphviz("Detangle3Graph-A.dot");
 
     // Make a copy that will be used to find the strong chains.
     Detangle3Graph simplifiedDetagleGraph(*this);
@@ -66,8 +66,15 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     simplifiedDetagleGraph.transitiveReduction();
     simplifiedDetagleGraph.prune(maxPruneLength);
 
-    simplifiedDetagleGraph.writeGraphviz("SimplifiedDetangle3Graph.dot");
+    simplifiedDetagleGraph.writeGraphviz("Detangle3Graph-B.dot");
 
+
+    // This is used for debugging only when we are all done.
+    removeIsolatedVertices();
+    prune(maxPruneLength);
+    removeStrongComponents();
+    transitiveReduction();
+    writeGraphviz("Detangle3Graph-C.dot");
 }
 
 
@@ -539,21 +546,17 @@ bool Detangle3Graph::pruneIteration(uint64_t maxLength)
     const bool debug = false;
 
     // Find linear chains.
-    vector< vector<edge_descriptor> > linearChains;
-    findLinearChains(detangle3Graph, 0, linearChains);
+    vector< vector<vertex_descriptor> > linearChainsVertices;
+    vector< vector<edge_descriptor> > linearChainsEdges;
+    findLinearChains(linearChainsVertices, linearChainsEdges);
 
     std::set<vertex_descriptor> verticesToBeRemoved;
     vector<edge_descriptor> edgesToBeRemoved;
 
-    // Loop over al linear chains.
-    for(const vector<edge_descriptor>& linearChain: linearChains) {
-
-        // Gather the chain vertices.
-        vector<vertex_descriptor> linearChainVertices;
-        linearChainVertices.push_back(source(linearChain.front(), detangle3Graph));
-        for(const edge_descriptor e: linearChain) {
-            linearChainVertices.push_back(target(e, detangle3Graph));
-        }
+    // Loop over all linear chains.
+    for(uint64_t i=0; i<linearChainsVertices.size(); i++) {
+        const vector<vertex_descriptor>& linearChainVertices = linearChainsVertices[i];
+        const vector<edge_descriptor>& linearChainEdges = linearChainsEdges[i];
         const vertex_descriptor v0 = linearChainVertices.front();
         const vertex_descriptor v1 = linearChainVertices.back();
 
@@ -580,7 +583,7 @@ bool Detangle3Graph::pruneIteration(uint64_t maxLength)
         // But the first vertex is excluded if the chain is hanging forward and not backward,
         // and the last vertex is excluded if the chain is hanging backward but not forward.
         uint64_t hangingLength = 0;
-        for(const edge_descriptor e: linearChain) {
+        for(const edge_descriptor e: linearChainEdges) {
             hangingLength += detangle3Graph[e].info.offsetInBases;
         }
         for(uint64_t i=0; i<linearChainVertices.size(); i++) {
@@ -609,7 +612,7 @@ bool Detangle3Graph::pruneIteration(uint64_t maxLength)
         }
 
         // Flag vertices and edges to be removed.
-        copy(linearChain.begin(), linearChain.end(), back_inserter(edgesToBeRemoved));
+        copy(linearChainEdges.begin(), linearChainEdges.end(), back_inserter(edgesToBeRemoved));
         for(uint64_t i=0; i<linearChainVertices.size(); i++) {
             if(isHangingForward and not isHangingBackward and (i == 0)) {
                 continue;
@@ -641,4 +644,45 @@ bool Detangle3Graph::pruneIteration(uint64_t maxLength)
     }
 
     return not (verticesToBeRemoved.empty() and edgesToBeRemoved.empty());
+}
+
+
+
+void Detangle3Graph::findLinearChains(
+    vector< vector<vertex_descriptor> >& linearChainsVertices) const
+{
+    vector< vector<edge_descriptor> >linearChainsEdges;
+    findLinearChains(linearChainsVertices, linearChainsEdges);
+}
+
+
+
+void Detangle3Graph::findLinearChains(
+    vector< vector<edge_descriptor> >& linearChainsEdges) const
+{
+    shasta::findLinearChains(*this, 0, linearChainsEdges);
+}
+
+
+
+void Detangle3Graph::findLinearChains(
+    vector< vector<vertex_descriptor> >& linearChainsVertices,
+    vector< vector<edge_descriptor> >& linearChainsEdges) const
+{
+    const Detangle3Graph& detangle3Graph = *this;
+
+    // Find the edges of the linear chains.
+    findLinearChains(linearChainsEdges);
+
+    // Gather the vertices of each linear chain.
+    linearChainsVertices.clear();
+    for(const vector<edge_descriptor>& linearChainEdges: linearChainsEdges) {
+
+        linearChainsVertices.resize(linearChainsVertices.size() + 1);
+        vector<vertex_descriptor>& linearChainVertices = linearChainsVertices.back();
+        linearChainVertices.push_back(source(linearChainEdges.front(), detangle3Graph));
+        for(const edge_descriptor e: linearChainEdges) {
+            linearChainVertices.push_back(target(e, detangle3Graph));
+        }
+    }
 }
