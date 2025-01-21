@@ -742,7 +742,12 @@ void shasta::main::assemble(
                 assemblerOptions.readGraphOptions.maxAlignmentCount);
         } else if(assemblerOptions.readGraphOptions.creationMethod == 4) {
             assembler.createReadGraph4withStrandSeparation(
-                assemblerOptions.readGraphOptions.maxAlignmentCount);
+            assemblerOptions.readGraphOptions.maxAlignmentCount,
+            assemblerOptions.readGraphOptions.epsilon,
+            assemblerOptions.readGraphOptions.delta,
+            assemblerOptions.readGraphOptions.WThreshold,
+            assemblerOptions.readGraphOptions.WThresholdForBreaks
+            );
         }
 
         // Actual alignment criteria are as specified in the command line options

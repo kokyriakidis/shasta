@@ -193,11 +193,11 @@ bool hasLowCoverageOrHighLengthHaploidBubble(AssemblyGraph& assemblyGraph, const
     assemblyGraph.bubbleChainOffset(bubbleChain, avgOffset, minOffset, maxOffset);
     
     // Check if length is high
-    const double hasHighlength = (avgOffset>=haploidLengthThreshold);
+    const bool hasHighlength = (avgOffset>=haploidLengthThreshold);
     
     // Check if coverage is low
     const double coverage = assemblyGraph.primaryCoverage(chain);
-    const double hasLowCoverage = (coverage <= haploidCoverageThreshold);
+    const bool hasLowCoverage = (coverage <= haploidCoverageThreshold);
 
     return (hasHighlength or hasLowCoverage);
 }

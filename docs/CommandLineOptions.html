@@ -555,14 +555,11 @@ Strand separation method. Spwecify one of the following values:
 <td><code>--ReadGraph.crossStrandMaxDistance</code><td class=centered><code>False</code><td>
 Maximum distance (edges) for strand separation method 1.
 
-
 <tr id='ReadGraph.removeConflicts'>
 <td><code>--ReadGraph.removeConflicts</code><td class=centered><code>False</code><td>
 This is a 
 <a href="#BooleanSwitches">Boolean switch</a>.
 Remove conflicts from the read graph. Experimental - do not use.
-
-
 
 <tr id='ReadGraph.markerCountPercentile'>
 <td><code>--ReadGraph.markerCountPercentile</code>
@@ -594,8 +591,6 @@ Percentile for adaptive selection of <code>--ReadGraph.maxDrift</code>
 Percentile for adaptive selection of <code>--ReadGraph.maxTrim</code> 
 (only used when <code>--ReadGraph.creationMethod</code> is 2).
 
-
-
 <tr id='ReadGraph.flagInconsistentAlignments'>
 <td><code>--ReadGraph.flagInconsistentAlignments</code><td class=centered><code>False</code><td>
 This is a 
@@ -616,6 +611,30 @@ Only used if <code>--ReadGraph.flagInconsistentAlignments</code> is set. Experim
 <td><code>--ReadGraph.flagInconsistentAlignments.leastSquareMaxDistance</code><td class=centered><code>1</code><td>
 Least square max distance for flagging inconsistent alignments. 
 Only used if <code>--ReadGraph.flagInconsistentAlignments</code> is set. Experimental.
+
+<tr id='ReadGraph.epsilon'>
+<td><code>--ReadGraph.epsilon</code>
+<td class=centered><code>1e-4</code><td>
+Mismatch rate used for the Bayesian ranking of alignments. 
+(only used when <code>--ReadGraph.creationMethod</code> is 4). Experimental.
+
+<tr id='ReadGraph.delta'>
+<td><code>--ReadGraph.delta</code>
+<td class=centered><code>5e-4</code><td>
+Divergence rate δ (fraction of discordant bases) used for the Bayesian ranking of alignments. 
+(only used when <code>--ReadGraph.creationMethod</code> is 4). Experimental.
+
+<tr id='ReadGraph.WThreshold'>
+<td><code>--ReadGraph.WThreshold</code>
+<td class=centered><code>1e-7</code><td>
+Logarithm of probability ratio used for the Bayesian ranking of alignments. 
+(only used when <code>--ReadGraph.creationMethod</code> is 4). Experimental.
+
+<tr id='ReadGraph.WThresholdForBreaks'>
+<td><code>--ReadGraph.WThresholdForBreaks</code>
+<td class=centered><code>1e+15</code><td>
+Logarithm of probability ratio used for the Bayesian ranking of alignments to detect breaks in the read graph. 
+(only used when <code>--ReadGraph.creationMethod</code> is 4). Experimental.
 
 <tr id='MarkerGraph.minCoverage'>
 <td><code>--MarkerGraph.minCoverage</code><td class=centered><code>10</code><td>

@@ -696,6 +696,32 @@ void AssemblerOptions::addConfigurableOptions()
         "Least square max distance for flagging inconsistent alignments. "
         "Only used if --ReadGraph.flagInconsistentAlignments is set. Experimental.")
 
+        //* New readGraph4withStrandSeparation options
+
+        ("ReadGraph.epsilon",
+        value<double>(&readGraphOptions.epsilon)->
+        default_value(1e-4, "1e-4"),
+        "Mismatch rate used for the Bayesian ranking of alignments. "
+        "(only used when --ReadGraph.creationMethod is 4).")
+
+        ("ReadGraph.delta",
+        value<double>(&readGraphOptions.delta)->
+        default_value(5e-4, "5e-4"),
+        "Divergence rate δ (fraction of discordant bases) used for the Bayesian ranking of alignments. "
+        "(only used when --ReadGraph.creationMethod is 4).")
+
+        ("ReadGraph.WThreshold",
+        value<double>(&readGraphOptions.WThreshold)->
+        default_value(1e-7, "1e-7"),
+        "Logarithm of probability ratio used for the Bayesian ranking of alignments. "
+        "(only used when --ReadGraph.creationMethod is 4).")
+
+        ("ReadGraph.WThresholdForBreaks",
+        value<double>(&readGraphOptions.WThresholdForBreaks)->
+        default_value(1e+15, "1e+15"),
+        "Logarithm of probability ratio used for the Bayesian ranking of alignments to detect breaks in the read graph. "
+        "(only used when --ReadGraph.creationMethod is 4).")
+
         ("MarkerGraph.minCoverage",
         value<int>(&markerGraphOptions.minCoverage)->
         default_value(10),
@@ -1373,6 +1399,11 @@ void ReadGraphOptions::write(ostream& s) const
         flagInconsistentAlignmentsLeastSquareErrorThreshold << "\n";
     s << "flagInconsistentAlignments.leastSquareMaxDistance = " <<
         flagInconsistentAlignmentsLeastSquareMaxDistance << "\n";
+    // New readGraph4withStrandSeparation options
+    s << "epsilon = " << epsilon << "\n";
+    s << "delta = " << delta << "\n";
+    s << "WThreshold = " << WThreshold << "\n";
+    s << "WThresholdForBreaks = " << WThresholdForBreaks << "\n";
 }
 
 
