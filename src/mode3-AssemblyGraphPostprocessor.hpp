@@ -23,6 +23,7 @@ public:
         const Mode3AssemblyOptions& options);
 
     // Access functions.
+    edge_descriptor getEdge(uint64_t edgeId) const;
     const BubbleChain& getBubbleChain(uint64_t edgeId) const;
     const Bubble& getBubble(
         uint64_t edgeId,

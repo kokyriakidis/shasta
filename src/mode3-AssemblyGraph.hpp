@@ -389,13 +389,21 @@ private:
         bool assembleSequence,
         bool debug);
 
+    // Alternate version for testing.
+    void run3(
+        uint64_t threadCount,
+        bool assembleSequence,
+        bool debug);
+
 
 
     // Initial creation from the AnchorGraph.
     // Each linear chain of edges in the AnchorGraph after transitive reduction generates
     // an AssemblyGraphEdge (BubbleChain) consisting of a single haploid bubble.
     void create(const AnchorGraph&, bool debug);
+public:
     uint64_t nextEdgeId = 0;
+private:
     void renumberEdges();
 
     // Return the vertex corresponding to a given AnchorId,
@@ -653,10 +661,11 @@ private:
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold);
 
-    // Detangling with path following. Python callable.
+    // Detangling with path following.
 public:
-    void detangle2();
+    void detangle2(); // Python callable.
 private:
+    void detangle3();
 
     // Cleanup/simplify superbubbles that are likely to be caused by errors,
     // completely or in part.

@@ -1,3 +1,12 @@
+// Ignore some warnings in this file for now.
+// But they should eventually be fixed.
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wconversion"
+#pragma GCC diagnostic ignored "-Wfloat-conversion"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+
 #include "Assembler.hpp"
 #include "Reads.hpp"
 #include "performanceLog.hpp"
