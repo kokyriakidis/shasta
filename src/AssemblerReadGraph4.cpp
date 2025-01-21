@@ -1,11 +1,11 @@
 // Ignore some warnings in this file for now.
 // But they should eventually be fixed.
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wunused-but-set-variable"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wconversion"
-#pragma GCC diagnostic ignored "-Wfloat-conversion"
-#pragma GCC diagnostic ignored "-Wsign-compare"
+// #pragma GCC diagnostic ignored "-Wunused-variable"
+// #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
+// #pragma GCC diagnostic ignored "-Wunused-parameter"
+// #pragma GCC diagnostic ignored "-Wconversion"
+// #pragma GCC diagnostic ignored "-Wfloat-conversion"
+// #pragma GCC diagnostic ignored "-Wsign-compare"
 
 #include "Assembler.hpp"
 #include "Reads.hpp"
@@ -197,119 +197,120 @@ public:
 
 
 
+/*
+void ReadGraph4AllAlignments::computeShortPath(
+    OrientedReadId orientedReadId0,
+    OrientedReadId orientedReadId1,
+    size_t maxDistance,
+    vector<uint32_t>& path,
+    vector<uint32_t>& distance,
+    vector<OrientedReadId>& reachedVertices,
+    vector<uint32_t>& parentEdges,
+    MemoryMapped::Vector<AlignmentData>& alignmentData,
+    ReadGraph4AllAlignments& readGraph)
+{
+    const bool debug = false;
+    path.clear();
+    reachedVertices.clear();
 
-// void ReadGraph4AllAlignments::computeShortPath(
-//     OrientedReadId orientedReadId0,
-//     OrientedReadId orientedReadId1,
-//     size_t maxDistance,
-//     vector<uint32_t>& path,
-//     vector<uint32_t>& distance,
-//     vector<OrientedReadId>& reachedVertices,
-//     vector<uint32_t>& parentEdges,
-//     MemoryMapped::Vector<AlignmentData>& alignmentData,
-//     ReadGraph4AllAlignments& readGraph)
-// {
-//     const bool debug = false;
-//     path.clear();
-//     reachedVertices.clear();
+    // Initialize all distances to infinite
+    fill(distance.begin(), distance.end(), ReadGraph::infiniteDistance);
 
-//     // Initialize all distances to infinite
-//     fill(distance.begin(), distance.end(), ReadGraph::infiniteDistance);
+    // Initialize BFS
+    std::queue<OrientedReadId> queuedVertices;
+    queuedVertices.push(orientedReadId0);
+    distance[orientedReadId0.getValue()] = 0;
+    reachedVertices.push_back(orientedReadId0);
 
-//     // Initialize BFS
-//     std::queue<OrientedReadId> queuedVertices;
-//     queuedVertices.push(orientedReadId0);
-//     distance[orientedReadId0.getValue()] = 0;
-//     reachedVertices.push_back(orientedReadId0);
+    // Do the BFS
+    while(!queuedVertices.empty()) {
+        const OrientedReadId vertex0 = queuedVertices.front();
+        queuedVertices.pop();
+        const uint32_t distance0 = distance[vertex0.getValue()];
+        const uint32_t distance1 = distance0 + 1;
 
-//     // Do the BFS
-//     while(!queuedVertices.empty()) {
-//         const OrientedReadId vertex0 = queuedVertices.front();
-//         queuedVertices.pop();
-//         const uint32_t distance0 = distance[vertex0.getValue()];
-//         const uint32_t distance1 = distance0 + 1;
-
-//         if(distance1 > maxDistance) {
-//             continue;
-//         }
+        if(distance1 > maxDistance) {
+            continue;
+        }
 
 
-//         BGL_FORALL_OUTEDGES(vertex0.getValue(), edge, *this, ReadGraph4AllAlignments) {
+        BGL_FORALL_OUTEDGES(vertex0.getValue(), edge, *this, ReadGraph4AllAlignments) {
         
-//             vertex_descriptor targetVertex = target(edge, *this);
-//             const OrientedReadId vertex1 = OrientedReadId::fromValue(targetVertex);
+            vertex_descriptor targetVertex = target(edge, *this);
+            const OrientedReadId vertex1 = OrientedReadId::fromValue(targetVertex);
 
-//             uint32_t alignmentId = readGraph[edge].alignmentId;
-//             AlignmentData alignment = alignmentData[alignmentId];
+            uint32_t alignmentId = readGraph[edge].alignmentId;
+            AlignmentData alignment = alignmentData[alignmentId];
 
-//             //uint32_t alignmentId = ReadGraph4AllAlignments[edge].alignmentId;
+            //uint32_t alignmentId = ReadGraph4AllAlignments[edge].alignmentId;
 
-//             // Process new vertices
-//             if(distance[vertex1.getValue()] == ReadGraph::infiniteDistance) {
-//                 distance[vertex1.getValue()] = distance1;
-//                 reachedVertices.push_back(vertex1);
-//                 parentEdges[vertex1.getValue()] = alignmentId;
-//                 queuedVertices.push(vertex1);
+            // Process new vertices
+            if(distance[vertex1.getValue()] == ReadGraph::infiniteDistance) {
+                distance[vertex1.getValue()] = distance1;
+                reachedVertices.push_back(vertex1);
+                parentEdges[vertex1.getValue()] = alignmentId;
+                queuedVertices.push(vertex1);
 
-//                 // Check if we reached the target
-//                 if(vertex1 == orientedReadId1) {
-//                     // Reconstruct path
-//                     OrientedReadId vertex = vertex1;
-//                     while(vertex != orientedReadId0) {
-//                         const uint32_t alignmentId = parentEdges[vertex.getValue()];
-//                         path.push_back(alignmentId);
-//                         AlignmentData alignment = alignmentData[alignmentId];
-//                         const ReadId readId0 = alignment.readIds[0];
-//                         const ReadId readId1 = alignment.readIds[1];
-//                         const bool isSameStrand = alignment.isSameStrand;
-//                         SHASTA_ASSERT(readId0 < readId1);
-//                         const OrientedReadId A0 = OrientedReadId(readId0, 0);
-//                         const OrientedReadId B0 = OrientedReadId(readId1, isSameStrand ? 0 : 1);
+                // Check if we reached the target
+                if(vertex1 == orientedReadId1) {
+                    // Reconstruct path
+                    OrientedReadId vertex = vertex1;
+                    while(vertex != orientedReadId0) {
+                        const uint32_t alignmentId = parentEdges[vertex.getValue()];
+                        path.push_back(alignmentId);
+                        AlignmentData alignment = alignmentData[alignmentId];
+                        const ReadId readId0 = alignment.readIds[0];
+                        const ReadId readId1 = alignment.readIds[1];
+                        const bool isSameStrand = alignment.isSameStrand;
+                        SHASTA_ASSERT(readId0 < readId1);
+                        const OrientedReadId A0 = OrientedReadId(readId0, 0);
+                        const OrientedReadId B0 = OrientedReadId(readId1, isSameStrand ? 0 : 1);
 
-//                         if(vertex.getValue() == A0.getValue()) {
-//                             vertex = B0;
-//                         } else {
-//                             vertex = A0;
-//                         }
-//                     }
-//                     std::reverse(path.begin(), path.end());
-//                     return;
-//                 }
-//             }
+                        if(vertex.getValue() == A0.getValue()) {
+                            vertex = B0;
+                        } else {
+                            vertex = A0;
+                        }
+                    }
+                    std::reverse(path.begin(), path.end());
+                    return;
+                }
+            }
                 
 
-//         }
+        }
 
-//         // for(const uint32_t edgeId: connectivity[vertex0.getValue()]) {
-//         //     const ReadGraphEdge& edge = edges[edgeId];
-//         //     if(edge.crossesStrands) {
-//         //         continue;
-//         //     }
-//         //     const OrientedReadId vertex1 = edge.getOther(vertex0);
+        // for(const uint32_t edgeId: connectivity[vertex0.getValue()]) {
+        //     const ReadGraphEdge& edge = edges[edgeId];
+        //     if(edge.crossesStrands) {
+        //         continue;
+        //     }
+        //     const OrientedReadId vertex1 = edge.getOther(vertex0);
 
-//         //     // Process new vertices
-//         //     if(distance[vertex1.getValue()] == ReadGraph::infiniteDistance) {
-//         //         distance[vertex1.getValue()] = distance1;
-//         //         reachedVertices.push_back(vertex1);
-//         //         parentEdges[vertex1.getValue()] = edgeId;
-//         //         queuedVertices.push(vertex1);
+        //     // Process new vertices
+        //     if(distance[vertex1.getValue()] == ReadGraph::infiniteDistance) {
+        //         distance[vertex1.getValue()] = distance1;
+        //         reachedVertices.push_back(vertex1);
+        //         parentEdges[vertex1.getValue()] = edgeId;
+        //         queuedVertices.push(vertex1);
 
-//         //         // Check if we reached the target
-//         //         if(vertex1 == orientedReadId1) {
-//         //             // Reconstruct path
-//         //             OrientedReadId vertex = vertex1;
-//         //             while(vertex != orientedReadId0) {
-//         //                 const uint32_t edgeId = parentEdges[vertex.getValue()];
-//         //                 path.push_back(edgeId);
-//         //                 vertex = edges[edgeId].getOther(vertex);
-//         //             }
-//         //             std::reverse(path.begin(), path.end());
-//         //             return;
-//         //         }
-//         //     }
-//         // }
-//     }
-// }
+        //         // Check if we reached the target
+        //         if(vertex1 == orientedReadId1) {
+        //             // Reconstruct path
+        //             OrientedReadId vertex = vertex1;
+        //             while(vertex != orientedReadId0) {
+        //                 const uint32_t edgeId = parentEdges[vertex.getValue()];
+        //                 path.push_back(edgeId);
+        //                 vertex = edges[edgeId].getOther(vertex);
+        //             }
+        //             std::reverse(path.begin(), path.end());
+        //             return;
+        //         }
+        //     }
+        // }
+    }
+}
+*/
 
 
 
