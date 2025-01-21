@@ -696,9 +696,7 @@ void AssemblerOptions::addConfigurableOptions()
         "Least square max distance for flagging inconsistent alignments. "
         "Only used if --ReadGraph.flagInconsistentAlignments is set. Experimental.")
 
-
-
-        // New readGraph4withStrandSeparation options
+        //* New readGraph4withStrandSeparation options
 
         ("ReadGraph.epsilon",
         value<double>(&readGraphOptions.epsilon)->
@@ -723,12 +721,6 @@ void AssemblerOptions::addConfigurableOptions()
         default_value(1e+15, "1e+15"),
         "Logarithm of probability ratio used for the Bayesian ranking of alignments to detect breaks in the read graph. "
         "(only used when --ReadGraph.creationMethod is 4).")
-
-
-
-
-
-
 
         ("MarkerGraph.minCoverage",
         value<int>(&markerGraphOptions.minCoverage)->
