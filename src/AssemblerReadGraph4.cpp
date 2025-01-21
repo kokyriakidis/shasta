@@ -340,7 +340,7 @@ void ReadGraph4::findNeighborsUndirectedGraph(
         q.pop();
 
         if (distance > 0) { // Don't add the starting vertex
-            neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+            neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
         }
 
         if (distance < maxDistance) {
@@ -379,7 +379,7 @@ void ReadGraph4::findNeighborsDirectedGraphOneSideRight(
         q.pop();
 
         if (distance > 0) { // Don't add the starting vertex
-            neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+            neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
         }
 
         if (distance < maxDistance) {
@@ -419,7 +419,7 @@ void ReadGraph4::findNeighborsDirectedGraphOneSideLeft(
         q.pop();
 
         if (distance > 0) { // Don't add the starting vertex
-            neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+            neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
         }
 
         if (distance < maxDistance) {
@@ -461,7 +461,7 @@ void ReadGraph4::findNeighborsDirectedGraphBothSides(
         q.pop();
 
         if (distance > 0) { // Don't add the starting vertex
-            neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+            neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
         }
 
         if (distance < maxDistance) {
@@ -510,7 +510,7 @@ void ReadGraph4AllAlignments::findNeighborsUndirectedGraph(
         q.pop();
 
         if (distance > 0) { // Don't add the starting vertex
-            neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+            neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
         }
 
         if (distance < maxDistance) {
@@ -550,7 +550,7 @@ void ReadGraph4AllAlignments::findNeighborsDirectedGraphOneSideRight(
         q.pop();
 
         if (distance > 0) { // Don't add the starting vertex
-            neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+            neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
         }
 
         if (distance < maxDistance) {
@@ -590,7 +590,7 @@ void ReadGraph4AllAlignments::findNeighborsDirectedGraphOneSideLeft(
         q.pop();
 
         if (distance > 0) { // Don't add the starting vertex
-            neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+            neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
         }
 
         if (distance < maxDistance) {
@@ -630,7 +630,7 @@ void ReadGraph4AllAlignments::findNeighborsDirectedGraphBothSides(
         q.pop();
 
         if (distance > 0) { // Don't add the starting vertex
-            neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+            neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
         }
 
         if (distance < maxDistance) {
@@ -694,10 +694,10 @@ void ReadGraph4AllAlignments::findNeighborsEarlyStopWhenReachEndNode(
         if (distance > 0) {
             // OrientedReadId::fromValue(currentVertex).getValue()
             if (finalDeadEndReadsWithNoIncomingNodesPlusDistanceNeighbors[currentVertex]) {
-                neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+                neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
                 return;
             }
-            neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+            neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
         }
 
         // Only continue exploring if we haven't hit the max distance
@@ -708,7 +708,7 @@ void ReadGraph4AllAlignments::findNeighborsEarlyStopWhenReachEndNode(
                 if (!visitedVertices.contains(targetVertex)) {
                     // OrientedReadId::fromValue(targetVertex).getValue()
                     if (finalDeadEndReadsWithNoIncomingNodesPlusDistanceNeighbors[targetVertex]) {
-                        neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(targetVertex)));
+                        neighbors.push_back(OrientedReadId::fromValue(ReadId(targetVertex)));
                         return;
                     }
                     visitedVertices.insert(targetVertex);
@@ -721,7 +721,7 @@ void ReadGraph4AllAlignments::findNeighborsEarlyStopWhenReachEndNode(
                 vertex_descriptor sourceVertex = source(edge, *this);
                 if (!visitedVertices.contains(sourceVertex)) {
                     if (finalDeadEndReadsWithNoIncomingNodesPlusDistanceNeighbors[sourceVertex]) {
-                        neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(sourceVertex)));
+                        neighbors.push_back(OrientedReadId::fromValue(ReadId(sourceVertex)));
                         return;
                     }
                     visitedVertices.insert(sourceVertex);
@@ -768,7 +768,7 @@ void ReadGraph4AllAlignments::findNeighborsEarlyStopWhenReachEndNode(
             //     neighbors.push_back(OrientedReadId::fromValue(currentVertex));
             //     return;
             // }
-            neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+            neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
         }
 
         // Only continue exploring if we haven't hit the max distance
@@ -781,7 +781,7 @@ void ReadGraph4AllAlignments::findNeighborsEarlyStopWhenReachEndNode(
                     neighborsAlignmentIds.push_back(alignmentId);
                     // OrientedReadId::fromValue(targetVertex).getValue()
                     if (finalDeadEndReadsWithNoIncomingNodesPlusDistanceNeighbors[targetVertex]) {
-                        neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(targetVertex)));
+                        neighbors.push_back(OrientedReadId::fromValue(ReadId(targetVertex)));
                         return;
                     }
                     visitedVertices.insert(targetVertex);
@@ -835,7 +835,7 @@ void ReadGraph4::findNeighborsSkipSameComponentNodes(
         if (distance > 0) {
             uint64_t currentComponentId = disjointSets.find_set(currentVertex);
             if (currentComponentId != sourceComponentId) {
-                neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+                neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
             }
         }
 
@@ -890,7 +890,7 @@ void ReadGraph4AllAlignments::findNeighborsSkipSameComponentNodes(
         if (distance > 0) {
             uint64_t currentComponentId = disjointSets.find_set(currentVertex);
             if (currentComponentId != sourceComponentId) {
-                neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+                neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
             }
         }
 
@@ -952,10 +952,10 @@ void ReadGraph4::findNeighborsEarlyStopWhenReachSameComponentNode(
             uint64_t currentComponentId = disjointSets.find_set(currentVertex);
             if (currentComponentId == sourceComponentId) {
                 // If we find a vertex in the same component, add it to the neighbors and stop
-                neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+                neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
                 return;
             }
-            neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+            neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
         }
 
         // Only continue exploring if we haven't hit the max distance
@@ -967,7 +967,7 @@ void ReadGraph4::findNeighborsEarlyStopWhenReachSameComponentNode(
                     uint64_t targetComponentId = disjointSets.find_set(targetVertex);
                     if (targetComponentId == sourceComponentId) {
                         // If we find a vertex in the same component, add it to the neighbors and stop
-                        neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(targetVertex)));
+                        neighbors.push_back(OrientedReadId::fromValue(ReadId(targetVertex)));
                         return;
                     }
                     // Only explore vertices in different components
@@ -1012,10 +1012,10 @@ void ReadGraph4AllAlignments::findNeighborsEarlyStopWhenReachSameComponentNode(
             uint64_t currentComponentId = disjointSets.find_set(currentVertex);
             if (currentComponentId == sourceComponentId) {
                 // If we find a vertex in the same component, add it to the neighbors and stop
-                neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+                neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
                 return;
             }
-            neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(currentVertex)));
+            neighbors.push_back(OrientedReadId::fromValue(ReadId(currentVertex)));
         }
 
         // Only continue exploring if we haven't hit the max distance
@@ -1027,7 +1027,7 @@ void ReadGraph4AllAlignments::findNeighborsEarlyStopWhenReachSameComponentNode(
                     uint64_t targetComponentId = disjointSets.find_set(targetVertex);
                     if (targetComponentId == sourceComponentId) {
                         // If we find a vertex in the same component, add it to the neighbors and stop
-                        neighbors.push_back(OrientedReadId::fromValue(static_cast<ReadId>(targetVertex)));
+                        neighbors.push_back(OrientedReadId::fromValue(ReadId(targetVertex)));
                         return;
                     }
                     // Only explore vertices in different components
@@ -1124,7 +1124,7 @@ uint64_t ReadGraph4::findPathWithPositiveOffset(
 
             currentPathOffset.push_back(newPathOffset);
             
-            uint64_t result = findPathWithPositiveOffset(OrientedReadId::fromValue(static_cast<ReadId>(targetVertex)), paths, pathsOffsets, currentPath, currentPathOffset, visited, maxDistance, currentDistance + 1, alignmentData, readGraph);
+            uint64_t result = findPathWithPositiveOffset(OrientedReadId::fromValue(ReadId(targetVertex)), paths, pathsOffsets, currentPath, currentPathOffset, visited, maxDistance, currentDistance + 1, alignmentData, readGraph);
 
             if(result == 1) {
                 // cout << "Finished. Target Oriented ID: " << OrientedReadId::fromValue(targetVertex) << " Target vertex ID: " << targetVertex << " Source Oriented ID: " << OrientedReadId::fromValue(currentVertex) << " Source vertex ID: " << currentVertex << " New Offset: " << offset << " Old Offset: " << lastOffset << " Final Offset: " << newPathOffset << endl;
@@ -1169,7 +1169,7 @@ uint64_t ReadGraph4::findPathWithPositiveOffset(
 
             currentPathOffset.push_back(newPathOffset);
             
-            uint64_t result = findPathWithPositiveOffset(OrientedReadId::fromValue(static_cast<ReadId>(sourceVertex)), paths, pathsOffsets, currentPath, currentPathOffset, visited, maxDistance, currentDistance + 1, alignmentData, readGraph);
+            uint64_t result = findPathWithPositiveOffset(OrientedReadId::fromValue(ReadId(sourceVertex)), paths, pathsOffsets, currentPath, currentPathOffset, visited, maxDistance, currentDistance + 1, alignmentData, readGraph);
 
             if(result == 1) {
                 // cout << "Finished! Source Oriented ID: " << OrientedReadId::fromValue(sourceVertex) << " Source vertex ID: " << sourceVertex << " Target Oriented ID: " << OrientedReadId::fromValue(currentVertex) << " Target vertex ID: " << currentVertex << " New Offset: " << offset << " Old Offset: " << lastOffset << " Final Offset: " << newPathOffset << endl;
@@ -1246,7 +1246,7 @@ uint64_t ReadGraph4AllAlignments::findShortestPathToNode(
         BGL_FORALL_OUTEDGES(current.getValue(), edge, *this, ReadGraph4AllAlignments) {
             vertex_descriptor nextVertex = target(edge, *this);
             if (visited.find(nextVertex) == visited.end()) {
-                OrientedReadId next = OrientedReadId::fromValue(static_cast<ReadId>(nextVertex));
+                OrientedReadId next = OrientedReadId::fromValue(ReadId(nextVertex));
                 visited.insert(nextVertex);
                 parent[nextVertex] = current.getValue();
                 q.push({next, currentDistance + 1});
@@ -1260,7 +1260,7 @@ uint64_t ReadGraph4AllAlignments::findShortestPathToNode(
         OrientedReadId current = endNode;
         while (current != start) {
             shortestPath.push_back(current);
-            current = OrientedReadId::fromValue(static_cast<ReadId>(parent[current.getValue()]));
+            current = OrientedReadId::fromValue(ReadId(parent[current.getValue()]));
         }
         shortestPath.push_back(start);
         
@@ -1308,7 +1308,7 @@ uint64_t ReadGraph4AllAlignments::findShortestPathToNode(
         BGL_FORALL_OUTEDGES(current.getValue(), edge, *this, ReadGraph4AllAlignments) {
             vertex_descriptor nextVertex = target(edge, *this);
             if (visited.find(nextVertex) == visited.end()) {
-                OrientedReadId next = OrientedReadId::fromValue(static_cast<ReadId>(nextVertex));
+                OrientedReadId next = OrientedReadId::fromValue(ReadId(nextVertex));
                 visited.insert(nextVertex);
                 parent[nextVertex] = current.getValue();
                 q.push(next);
@@ -1322,7 +1322,7 @@ uint64_t ReadGraph4AllAlignments::findShortestPathToNode(
         OrientedReadId current = endNode;
         while (current != start) {
             shortestPath.push_back(current);
-            current = OrientedReadId::fromValue(static_cast<ReadId>(parent[current.getValue()]));
+            current = OrientedReadId::fromValue(ReadId(parent[current.getValue()]));
         }
         shortestPath.push_back(start);
         
@@ -1367,7 +1367,7 @@ uint64_t ReadGraph4AllAlignments::findSinglePathToNode(
     BGL_FORALL_OUTEDGES(currentVertex, edge, *this, ReadGraph4AllAlignments) {
         vertex_descriptor targetVertex = target(edge, *this);
         if (!visited.contains(targetVertex)) {
-            uint64_t result = findAllPathsToNode(OrientedReadId::fromValue(static_cast<ReadId>(targetVertex)), endNode, paths, currentPath, visited, maxDistance, currentDistance + 1);
+            uint64_t result = findAllPathsToNode(OrientedReadId::fromValue(ReadId(targetVertex)), endNode, paths, currentPath, visited, maxDistance, currentDistance + 1);
             if (result == 1) {
                 return 1; // Propagate success up the call stack
             }
@@ -1420,7 +1420,7 @@ uint64_t ReadGraph4AllAlignments::findAllPathsToNode(
         vertex_descriptor targetVertex = target(edge, *this);
         if (!visited.contains(targetVertex)) {
             pathsFound += findAllPathsToNode(
-                OrientedReadId::fromValue(static_cast<ReadId>(targetVertex)), 
+                OrientedReadId::fromValue(ReadId(targetVertex)), 
                 endNode, 
                 paths, 
                 currentPath, 
