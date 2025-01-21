@@ -60,6 +60,15 @@ public:
     // The total offset between the first and last internal anchors.
     uint64_t offset;
 
+    // The strong chain that this vertex is on, if any, and its position on the strong chain.
+    uint64_t strongChainId = invalid<uint64_t>;
+    uint64_t positionInStrongChain = invalid<uint64_t>;
+    void resetStrongChain()
+    {
+        strongChainId = invalid<uint64_t>;
+        positionInStrongChain = invalid<uint64_t>;
+    }
+
     Detangle3GraphVertex(
         AssemblyGraph::edge_descriptor e,
         AnchorId firstInternalAncorId,
@@ -102,6 +111,11 @@ public:
         return hasMaximumCommon[0] and hasMaximumCommon[1];
     }
 
+    bool isVeryWeak() const
+    {
+        return (not hasMaximumCommon[0]) and (not hasMaximumCommon[1]);
+    }
+
     void resetHasMinimumOffsetFlags()
     {
         hasMaximumCommon = {false, false};
@@ -137,6 +151,7 @@ private:
     // Graph cleanup functions.
     void removeStrongComponents();
     void removeWeakEdges();
+    void removeVeryWeakEdges();
     void removeIsolatedVertices();
     void transitiveReduction();
     void prune(uint64_t maxLength);
@@ -145,6 +160,18 @@ private:
     void findLinearChains(vector< vector<vertex_descriptor> >&) const;
     void findLinearChains(vector< vector<edge_descriptor> >&) const;
     void findLinearChains(vector< vector<vertex_descriptor> >&, vector< vector<edge_descriptor> >&) const;
+
+    // Find strong chains that can be used to stitch AssemblyGraph Chains together.
+    vector< vector<vertex_descriptor> > strongChains;
+    void findStrongChains(uint64_t maxPruneLength);
+
+    // Remove edges between vertices of the same strong chain,
+    // except for the edges which form the strong chain itself.
+    void removeInternalStrongChainEdges();
+
+    // Remove edges incident on vertices that are internal to a strong chain,
+    // except for the edges of strong chains themselves.
+    void removeEdgesIncidentInsideStrongChains();
 
     string vertexStringId(vertex_descriptor) const;
     void writeGraphviz(const string& fileName) const;

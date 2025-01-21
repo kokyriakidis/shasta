@@ -55,26 +55,127 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     // Create the graph.
     createVertices(minCoverage, maxCoverage);
     createEdges();
+    removeIsolatedVertices();
+    prune(maxPruneLength);
     setHasMaximumCommonFlags();
     writeGraphviz("Detangle3Graph-A.dot");
 
-    // Make a copy that will be used to find the strong chains.
-    Detangle3Graph simplifiedDetagleGraph(*this);
-    simplifiedDetagleGraph.removeStrongComponents();
-    simplifiedDetagleGraph.removeWeakEdges();
-    simplifiedDetagleGraph.removeIsolatedVertices();
-    simplifiedDetagleGraph.transitiveReduction();
-    simplifiedDetagleGraph.prune(maxPruneLength);
+    // Find strong chains that can be used to stitch AssemblyGraph Chains together.
+    findStrongChains(maxPruneLength);
+    writeGraphviz("Detangle3Graph-C.dot");
 
-    simplifiedDetagleGraph.writeGraphviz("Detangle3Graph-B.dot");
+    // Remove edges between vertices of the same strong chain,
+    // except for the edges which form the strong chain itself.
+    removeInternalStrongChainEdges();
+    removeEdgesIncidentInsideStrongChains();
+    setHasMaximumCommonFlags();
+    writeGraphviz("Detangle3Graph-D.dot");
+    transitiveReduction();
+    writeGraphviz("Detangle3Graph-E.dot");
 
 
-    // This is used for debugging only when we are all done.
-    removeIsolatedVertices();
+#if 0
+    // Debugging only.
     prune(maxPruneLength);
     removeStrongComponents();
     transitiveReduction();
-    writeGraphviz("Detangle3Graph-C.dot");
+    setHasMaximumCommonFlags();
+    removeVeryWeakEdges();
+    transitiveReduction();
+    writeGraphviz("Detangle3Graph-Z.dot");
+#endif
+}
+
+
+
+void Detangle3Graph::findStrongChains(uint64_t maxPruneLength)
+{
+    Detangle3Graph& detangle3Graph = *this;
+
+    // Make a copy that will be used to find the strong chains.
+    Detangle3Graph simplifiedDetangle3Graph(*this);
+
+    // Clean it up.
+    simplifiedDetangle3Graph.removeStrongComponents();
+    simplifiedDetangle3Graph.removeWeakEdges();
+    simplifiedDetangle3Graph.removeIsolatedVertices();
+    simplifiedDetangle3Graph.transitiveReduction();
+    simplifiedDetangle3Graph.prune(maxPruneLength);
+
+    simplifiedDetangle3Graph.writeGraphviz("Detangle3Graph-B.dot");
+
+    // Find linear chains on the simplified graph.
+    // The strong chains will be subsets of these, to make sure
+    // no vertex ends up in more than one strong chain.
+    vector< vector<vertex_descriptor> > linearChainsVertices;
+    simplifiedDetangle3Graph.findLinearChains(linearChainsVertices);
+
+
+    // Clear any preexisting strong chains.
+    strongChains.clear();
+    BGL_FORALL_VERTICES(v, detangle3Graph, Detangle3Graph) {
+        detangle3Graph[v].resetStrongChain();
+    }
+
+    // Create the strong chains.
+    for(const vector<vertex_descriptor>& linearChainVertices: linearChainsVertices) {
+        const vertex_descriptor v0 = linearChainVertices.front();
+        const vertex_descriptor v1 = linearChainVertices.back();
+
+        // Figure out if v0 and v1 should be included in the strong chain.
+        const bool include0 = (out_degree(v0, simplifiedDetangle3Graph) < 2);
+        const bool include1 = (in_degree(v1, simplifiedDetangle3Graph) < 2);
+
+        // Compute the length of our strong chain.
+        uint64_t strongChainLength = linearChainVertices.size();
+        if(not include0) {
+            strongChainLength -= 1;
+        }
+        if(not include1) {
+            strongChainLength -= 1;
+        }
+
+        // If too short, skip it.
+        if(strongChainLength < 2) {
+            continue;
+        }
+
+        // Generate this strong chain.
+        const uint64_t strongChainId = strongChains.size();
+        strongChains.resize(strongChains.size() + 1);
+        vector<vertex_descriptor>& strongChain = strongChains.back();
+        for(uint64_t i=0; i<linearChainVertices.size(); i++) {
+
+            // Skip it if necessary.
+            if((i == 0) and not include0) {
+                continue;
+            }
+            if((i == linearChainVertices.size() - 1) and not include1) {
+                continue;
+            }
+
+            // Find the corresponding vertex in the original Detangle3Graph.
+            const vertex_descriptor u = linearChainVertices[i]; // Vertex descriptor in the simplifiedDetangle3Graph
+            const AssemblyGraph::edge_descriptor e = simplifiedDetangle3Graph[u].e;
+            auto it = vertexMap.find(e);
+            SHASTA_ASSERT(it != vertexMap.end());
+            const vertex_descriptor v = it->second;     // // Vertex descriptor in the detagle3Graph
+
+            // Store strong chain information in the vertex.
+            Detangle3GraphVertex& vertex = detangle3Graph[v];
+            vertex.strongChainId = strongChainId;
+            vertex.positionInStrongChain = strongChain.size();
+
+            // Add this vertex to the strong chain.
+            strongChain.push_back(v);
+        }
+
+        cout << "Strong chain:" << endl;
+        for(const vertex_descriptor v: strongChain) {
+            cout << vertexStringId(v) << " ";
+        }
+        cout << endl;
+    }
 }
 
 
@@ -103,6 +204,24 @@ void Detangle3Graph::removeWeakEdges()
     BGL_FORALL_EDGES(e, detangle3Graph, Detangle3Graph) {
         const Detangle3GraphEdge& edge = detangle3Graph[e];
         if(not edge.isStrong()) {
+            edgesToBeRemoved.push_back(e);
+        }
+    }
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, detangle3Graph);
+    }
+}
+
+
+
+void Detangle3Graph::removeVeryWeakEdges()
+{
+    Detangle3Graph& detangle3Graph = *this;
+
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, detangle3Graph, Detangle3Graph) {
+        const Detangle3GraphEdge& edge = detangle3Graph[e];
+        if(edge.isVeryWeak()) {
             edgesToBeRemoved.push_back(e);
         }
     }
@@ -468,8 +587,16 @@ void Detangle3Graph::writeGraphviz(const string& fileName) const
             vertexStringId(v) << "\\n" <<
             "n = " << chain.size() - 2 << "\\n" <<
             "c = " << vertex.coverage << "\\n" <<
-            "o = " << vertex.offset <<
-            "\"";
+            "o = " << vertex.offset;
+        if(vertex.strongChainId != invalid<uint64_t>) {
+            dot << "\\n" << vertex.strongChainId << ":" << vertex.positionInStrongChain;
+        }
+        dot << "\"";
+
+        // Color.
+        if(vertex.strongChainId != invalid<uint64_t>) {
+            dot << " style=filled fillcolor=pink";
+        }
 
         // End attributes.
         dot << "]";
@@ -578,14 +705,15 @@ bool Detangle3Graph::pruneIteration(uint64_t maxLength)
             continue;
         }
 
-        // Compute the length of the hanging portion. This is the sum of all offsets of the chain edges
-        // plus the offsets of its vertices.
+        // Compute the length of the hanging portion. This is the sum of the offsets of its vertices.
         // But the first vertex is excluded if the chain is hanging forward and not backward,
         // and the last vertex is excluded if the chain is hanging backward but not forward.
         uint64_t hangingLength = 0;
+        /*
         for(const edge_descriptor e: linearChainEdges) {
             hangingLength += detangle3Graph[e].info.offsetInBases;
         }
+        */
         for(uint64_t i=0; i<linearChainVertices.size(); i++) {
             if(isHangingForward and not isHangingBackward and (i == 0)) {
                 continue;
@@ -684,5 +812,116 @@ void Detangle3Graph::findLinearChains(
         for(const edge_descriptor e: linearChainEdges) {
             linearChainVertices.push_back(target(e, detangle3Graph));
         }
+    }
+}
+
+
+
+// Remove edges between vertices of the same strong chain,
+// except for the edges which form the strong chain itself.
+void Detangle3Graph::removeInternalStrongChainEdges()
+{
+    Detangle3Graph& detangle3Graph = *this;
+
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, detangle3Graph, Detangle3Graph) {
+
+        const vertex_descriptor v0 = source(e, detangle3Graph);
+        const vertex_descriptor v1 = target(e, detangle3Graph);
+
+        const Detangle3GraphVertex& vertex0 = detangle3Graph[v0];
+        const Detangle3GraphVertex& vertex1 = detangle3Graph[v1];
+
+        // If v0 and v1 are not in the same strong chain, skip this edge.
+        if(vertex0.strongChainId == invalid<uint64_t>) {
+            continue;
+        }
+        if(vertex1.strongChainId == invalid<uint64_t>) {
+            continue;
+        }
+        if(vertex0.strongChainId  != vertex1.strongChainId) {
+            continue;
+        }
+
+        // If getting here, v0 and v1 are in the same strong chain.
+        // If they are on adjacent positions, skip this edge.
+        if(vertex1.positionInStrongChain == vertex0.positionInStrongChain + 1) {
+            continue;
+        }
+
+        // If getting here, we will remove this edge.
+        edgesToBeRemoved.push_back(e);
+    }
+
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, detangle3Graph);
+    }
+
+}
+
+
+
+// Remove edges incident on vertices that are internal to a strong chain,
+// except for the edges of strong chains themselves.
+void Detangle3Graph::removeEdgesIncidentInsideStrongChains()
+{
+    Detangle3Graph& detangle3Graph = *this;
+
+    vector<edge_descriptor> edgesToBeRemoved;
+    BGL_FORALL_EDGES(e, detangle3Graph, Detangle3Graph) {
+
+        const vertex_descriptor v0 = source(e, detangle3Graph);
+        const vertex_descriptor v1 = target(e, detangle3Graph);
+
+        const Detangle3GraphVertex& vertex0 = detangle3Graph[v0];
+        const Detangle3GraphVertex& vertex1 = detangle3Graph[v1];
+
+        const uint64_t chainId0 = vertex0.strongChainId;
+        const uint64_t chainId1 = vertex1.strongChainId;
+
+        // Are v0 and v1 in strong chains?
+        const bool isInStrongChain0 = chainId0 != invalid<uint64_t>;
+        const bool isInStrongChain1 = chainId1 != invalid<uint64_t>;
+
+        // Are v0 and v1 internal to strong chains?
+        bool isInternal0 = false;
+        if(isInStrongChain0) {
+            const vector<vertex_descriptor>& strongChain = strongChains[chainId0];
+            const uint64_t position = vertex0.positionInStrongChain;
+            if((position != 0) and (position != strongChain.size() - 1)) {
+                isInternal0 = true;
+            }
+        }
+        bool isInternal1 = false;
+        if(isInStrongChain1) {
+            const vector<vertex_descriptor>& strongChain = strongChains[chainId1];
+            const uint64_t position = vertex1.positionInStrongChain;
+            if((position != 0) and (position != strongChain.size() - 1)) {
+                isInternal1 = true;
+            }
+        }
+
+        // If neither v0 nor v1 is internal to a strong chain, skip this edge so we will keep it.
+        if(not (isInternal0 or isInternal1)) {
+            continue;
+        }
+
+        // If v0 and v1 are internal to the same internal chain and at adjacent position,
+        // skip this edge so we will keep it.
+        if(isInternal0 and isInternal1 and (chainId0 == chainId1) and
+            (vertex1.positionInStrongChain == vertex0.positionInStrongChain + 1)) {
+            continue;
+        }
+
+        // If getting here, we know that at least one of v0 and v1 is internal to a strong chain,
+        // and they are not adjacent in the same strong chain.
+        // So this edge will be removed.
+        edgesToBeRemoved.push_back(e);
+    }
+
+
+
+    for(const edge_descriptor e: edgesToBeRemoved) {
+        boost::remove_edge(e, detangle3Graph);
     }
 }
