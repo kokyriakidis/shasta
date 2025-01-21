@@ -1024,7 +1024,13 @@ public:
     void createReadGraph4(uint32_t maxAlignmentCount);
 
     void createReadGraph4AllAlignments(uint32_t maxAlignmentCount);
-    void createReadGraph4withStrandSeparation(uint32_t maxAlignmentCount);
+    void createReadGraph4withStrandSeparation(
+        uint32_t maxAlignmentCount,
+        double epsilon,
+        double delta,
+        double WThreshold,
+        double WThresholdForBreaks
+        );
     void removeReadGraph();
 
     void accessReadGraphAllAlignments();

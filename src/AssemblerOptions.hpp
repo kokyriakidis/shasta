@@ -31,7 +31,7 @@ ADDING A NEW CONFIGURABLE OPTION
 
 1. Add the option to the class corresponding to the desired section.
 2. Modify the write function to that class to also write the newly added option.
-3. Modify AssemblerOptions::addCommandLineOnlyOptions to reflect the new option,
+3. Modify AssemblerOptions::addConfigurableOptions to reflect the new option,
    making sure to include a default value and at least a minimal help message.
 4. Document the option in shasta/docs/CommandLineOptions.html.
 5. If the option requires validation add it at the appropriate place in
@@ -46,7 +46,7 @@ or something to that effect.
 ADDING A NEW NON-CONFIGURABLE OPTION
 
 1. Add the option to class CommandLineOnlyOptions.
-2. Modify AssemblerOptions::addConfigurableOptions to reflect the new option,
+2. Modify AssemblerOptions::addCommandLineOnlyOptions to reflect the new option,
    making sure to include a default value and at least a minimal help message.
 3. Document the option in shasta/docs/CommandLineOptions.html.
 4. If the option requires validation add it at the appropriate place in
@@ -262,6 +262,11 @@ public:
     uint64_t flagInconsistentAlignmentsLeastSquareErrorThreshold;
     uint64_t flagInconsistentAlignmentsLeastSquareMaxDistance;
     void write(ostream& ) const;
+    // New readGraph4withStrandSeparation options
+    double epsilon;
+    double delta;
+    double WThreshold;
+    double WThresholdForBreaks;
 };
 
 
