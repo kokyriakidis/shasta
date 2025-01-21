@@ -1021,11 +1021,11 @@ public:
     void writeReadGraphEdges(bool useReadName=false) const;
 
     void createReadGraph3(uint64_t maxAlignmentCount);
-    void createReadGraph4(uint32_t maxAlignmentCount);
+    void createReadGraph4(uint64_t maxAlignmentCount);
 
     void createReadGraph4AllAlignments(uint32_t maxAlignmentCount);
     void createReadGraph4withStrandSeparation(
-        uint32_t maxAlignmentCount,
+        uint64_t maxAlignmentCount,
         double epsilon,
         double delta,
         double WThreshold,

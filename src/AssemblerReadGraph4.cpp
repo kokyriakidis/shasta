@@ -108,7 +108,7 @@ public:
 
     ReadGraph4(uint64_t n) : ReadGraph4BaseClass(n) {}
     
-    uint64_t findPathWithPositiveOffset(
+    bool findPathWithPositiveOffset(
         OrientedReadId start,
         vector<vector<OrientedReadId>>& paths,
         vector<vector<double>>& pathsOffsets,
@@ -1048,7 +1048,7 @@ void ReadGraph4AllAlignments::findNeighborsEarlyStopWhenReachSameComponentNode(
 
 
 // Function to perform DFS to find a path with a positive offset
-uint64_t ReadGraph4::findPathWithPositiveOffset(
+bool ReadGraph4::findPathWithPositiveOffset(
     OrientedReadId start,
     vector<vector<OrientedReadId>>& paths,
     vector<vector<double>>& pathsOffsets,
@@ -1125,7 +1125,7 @@ uint64_t ReadGraph4::findPathWithPositiveOffset(
 
             currentPathOffset.push_back(newPathOffset);
             
-            uint64_t result = findPathWithPositiveOffset(OrientedReadId::fromValue(ReadId(targetVertex)), paths, pathsOffsets, currentPath, currentPathOffset, visited, maxDistance, currentDistance + 1, alignmentData, readGraph);
+            bool result = findPathWithPositiveOffset(OrientedReadId::fromValue(ReadId(targetVertex)), paths, pathsOffsets, currentPath, currentPathOffset, visited, maxDistance, currentDistance + 1, alignmentData, readGraph);
 
             if(result == 1) {
                 // cout << "Finished. Target Oriented ID: " << OrientedReadId::fromValue(targetVertex) << " Target vertex ID: " << targetVertex << " Source Oriented ID: " << OrientedReadId::fromValue(currentVertex) << " Source vertex ID: " << currentVertex << " New Offset: " << offset << " Old Offset: " << lastOffset << " Final Offset: " << newPathOffset << endl;
@@ -1170,7 +1170,7 @@ uint64_t ReadGraph4::findPathWithPositiveOffset(
 
             currentPathOffset.push_back(newPathOffset);
             
-            uint64_t result = findPathWithPositiveOffset(OrientedReadId::fromValue(ReadId(sourceVertex)), paths, pathsOffsets, currentPath, currentPathOffset, visited, maxDistance, currentDistance + 1, alignmentData, readGraph);
+            bool result = findPathWithPositiveOffset(OrientedReadId::fromValue(ReadId(sourceVertex)), paths, pathsOffsets, currentPath, currentPathOffset, visited, maxDistance, currentDistance + 1, alignmentData, readGraph);
 
             if(result == 1) {
                 // cout << "Finished! Source Oriented ID: " << OrientedReadId::fromValue(sourceVertex) << " Source vertex ID: " << sourceVertex << " Target Oriented ID: " << OrientedReadId::fromValue(currentVertex) << " Target vertex ID: " << currentVertex << " New Offset: " << offset << " Old Offset: " << lastOffset << " Final Offset: " << newPathOffset << endl;
@@ -1541,7 +1541,7 @@ void Assembler::createReadGraph4withStrandSeparation(
         // Store this pair of edges in our edgeTable.
         const uint64_t range0 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId0, 0, markers);
         const uint64_t range1 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId1, 1, markers);
-        const double L = (range0 + range1)/2;
+        const double L = double(range0 + range1)/2.;
         // const uint64_t n = thisAlignmentData.info.mismatchCountRle;
         const double errorRateRle = thisAlignmentData.info.errorRateRle;
         const double nRLE = errorRateRle * 2 * L;
@@ -1888,7 +1888,7 @@ void Assembler::createReadGraph4withStrandSeparation(
             uint64_t maxDistance = 4;
             uint64_t currentDistance = 0;
 
-            uint64_t result = readGraph.findPathWithPositiveOffset(orientedReadId, paths, pathsOffsets, currentPath, currentPathOffset, visited, maxDistance, currentDistance + 1, alignmentData, readGraph);
+            bool result = readGraph.findPathWithPositiveOffset(orientedReadId, paths, pathsOffsets, currentPath, currentPathOffset, visited, maxDistance, currentDistance + 1, alignmentData, readGraph);
 
             // Check if we found a read path with positive offset.
             // If yes, the function findPathWithPositiveOffset will return 1, if not, it will return 0.
@@ -2044,7 +2044,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 
     for(auto& p : endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesSameDisjointSet) {
         uint64_t value = p.first;
-        OrientedReadId orientedReadId = OrientedReadId::fromValue(value);
+        OrientedReadId orientedReadId = OrientedReadId::fromValue(ReadId(value));
         SHASTA_ASSERT(orientedReadId.getValue() == value);
         // const ReadId readId = orientedReadId.getReadId();
         // const Strand strand = orientedReadId.getStrand();
@@ -2052,7 +2052,7 @@ void Assembler::createReadGraph4withStrandSeparation(
         // cout << "EndNodeWithNoOutgoingNodes ReadID " << readId << " and strand " << strand << " is mapped to these NoIn deadEnd nodes in the same disjointSet:" << endl;
         vector<bool> endNodesWithNoIncomingNodes(orientedReadCount, false);
         for(auto& node : p.second) {
-            OrientedReadId nodeOrientedReadId = OrientedReadId::fromValue(node);
+            OrientedReadId nodeOrientedReadId = OrientedReadId::fromValue(ReadId(node));
             // cout << "ReadID " << nodeOrientedReadId.getReadId() << " strand " << nodeOrientedReadId.getStrand() << endl;
             SHASTA_ASSERT(nodeOrientedReadId.getValue() == node);
             endNodesWithNoIncomingNodes[node] = true;
@@ -2306,7 +2306,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 
     for(auto& p : endNodesWithNoOutgoingNodesToEndNodesWithNoIncomingNodesDifferentDisjointSet) {
         uint64_t value = p.first;
-        OrientedReadId orientedReadId = OrientedReadId::fromValue(value);
+        OrientedReadId orientedReadId = OrientedReadId::fromValue(ReadId(value));
         SHASTA_ASSERT(orientedReadId.getValue() == value);
         // const ReadId readId = orientedReadId.getReadId();
         // const Strand strand = orientedReadId.getStrand();
@@ -2314,7 +2314,7 @@ void Assembler::createReadGraph4withStrandSeparation(
         // cout << "EndNodeWithNoOutgoingNodes ReadID " << readId << " and strand " << strand << " is mapped to these NoIn deadEnd nodes in a different disjointSet: " << endl;
         vector<bool> endNodesWithNoIncomingNodes(orientedReadCount, false);
         for(auto& node : p.second) {
-            OrientedReadId nodeOrientedReadId = OrientedReadId::fromValue(node);
+            OrientedReadId nodeOrientedReadId = OrientedReadId::fromValue(ReadId(node));
             // cout << "ReadID " << nodeOrientedReadId.getReadId() << " strand " << nodeOrientedReadId.getStrand() << endl;
             SHASTA_ASSERT(nodeOrientedReadId.getValue() == node);
             endNodesWithNoIncomingNodes[node] = true;
@@ -2804,7 +2804,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     // Store components in this order of decreasing size.
     vector< vector<OrientedReadId> > components;
     for(const auto& p: componentTable) {
-        components.push_back(componentMap[p.second]);
+        components.push_back(componentMap[ReadId(p.second)]);
     }
     performanceLog << timestamp << "Done computing connected components of the read graph." << endl;
 
@@ -2955,7 +2955,7 @@ void Assembler::createReadGraph4(
 
             const uint64_t range0 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId0, 0, markers);
             const uint64_t range1 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId1, 1, markers);
-            const double L = (range0 + range1)/2;
+            const double L = double(range0 + range1)/2.;
             const uint64_t n = thisAlignmentData.info.mismatchCountRle;
             const double errorRateRle = double(n)/(2.0*L);;
 
@@ -3107,7 +3107,7 @@ void Assembler::flagCrossStrandReadGraphEdges4()
         const uint64_t markerCount = alignment.info.markerCount;
         const uint64_t range0 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[0], 0, markers);
         const uint64_t range1 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[1], 1, markers);
-        const double L = (range0 + range1)/2;
+        const double L = double(range0 + range1)/2.;
         const uint64_t n = alignment.info.mismatchCountRle;
         const double errorRateRleNew = double(n)/(2.0*L);;
         const double errorRateRleOld = alignment.info.errorRateRle;
@@ -3242,7 +3242,7 @@ void Assembler::flagCrossStrandReadGraphEdges4()
     // Store components in this order of decreasing size.
     vector< vector<OrientedReadId> > components;
     for(const auto& p: componentTable) {
-        components.push_back(componentMap[p.second]);
+        components.push_back(componentMap[ReadId(p.second)]);
     }
     performanceLog << timestamp << "Done computing connected components of the read graph." << endl;
 
@@ -3386,7 +3386,7 @@ void Assembler::flagCrossStrandReadGraphEdges5()
         // Store this pair of edges in our edgeTable.
         const uint64_t range0 = alignment.info.baseRange(assemblerInfo->k, edge.orientedReadIds[0], 0, markers);
         const uint64_t range1 = alignment.info.baseRange(assemblerInfo->k, edge.orientedReadIds[1], 1, markers);
-        const double L = (range0 + range1)/2;
+        const double L = double(range0 + range1)/2.;
         const uint64_t n = alignment.info.mismatchCountRle;     
 
         // logQ(n) = αn - δL
@@ -3410,7 +3410,7 @@ void Assembler::flagCrossStrandReadGraphEdges5()
         const uint64_t markerCount = alignment.info.markerCount;
         const uint64_t range0 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[0], 0, markers);
         const uint64_t range1 = alignment.info.baseRange(assemblerInfo->k, readGraph.edges[edgeId].orientedReadIds[1], 1, markers);
-        const double L = (range0 + range1)/2;
+        const double L = double(range0 + range1)/2.;
         const uint64_t n = alignment.info.mismatchCountRle;
         const double errorRateRle = double(n)/(2.0*L);;
         const ReadId readId0 = alignment.readIds[0];
@@ -3543,7 +3543,7 @@ void Assembler::flagCrossStrandReadGraphEdges5()
     // Store components in this order of decreasing size.
     vector< vector<OrientedReadId> > components;
     for(const auto& p: componentTable) {
-        components.push_back(componentMap[p.second]);
+        components.push_back(componentMap[ReadId(p.second)]);
     }
     performanceLog << timestamp << "Done computing connected components of the read graph." << endl;
 
