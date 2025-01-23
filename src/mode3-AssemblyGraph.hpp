@@ -389,8 +389,12 @@ private:
         bool assembleSequence,
         bool debug);
 
-    // Alternate version for testing.
+    // Alternate versions for testing.
     void run3(
+        uint64_t threadCount,
+        bool assembleSequence,
+        bool debug);
+    void run4(
         uint64_t threadCount,
         bool assembleSequence,
         bool debug);
