@@ -165,6 +165,10 @@ private:
     vector< vector<vertex_descriptor> > strongChains;
     void findStrongChains(uint64_t maxPruneLength);
 
+    // Use the strong chains to update the AssemblyGraph.
+    void updateAssemblyGraph();
+    void updateAssemblyGraph(const vector<vertex_descriptor>& strongChain);
+
     // Remove edges between vertices of the same strong chain,
     // except for the edges which form the strong chain itself.
     void removeInternalStrongChainEdges();

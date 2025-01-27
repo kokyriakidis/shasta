@@ -27,8 +27,8 @@ void AssemblyGraph::run3(
     SHASTA_ASSERT(std::is_sorted(anchorIds.begin(), anchorIds.end()));
 
     write("A");
-
     detangle3();
+    write("B");
 }
 
 
@@ -48,8 +48,8 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     assemblyGraph(assemblyGraph)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    const uint64_t minCoverage = 5;
-    const uint64_t maxCoverage = 25;
+    const uint64_t minCoverage = 0;
+    const uint64_t maxCoverage = 1000000;
     const uint64_t maxPruneLength = 10000;
 
     // Create the graph.
@@ -64,6 +64,11 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     findStrongChains(maxPruneLength);
     writeGraphviz("Detangle3Graph-C.dot");
 
+    // Update the AssemblyGraph with the strong chains we found.
+    updateAssemblyGraph();
+
+#if 0
+    // Further cleanup of the Detangle3Graph.
     // Remove edges between vertices of the same strong chain,
     // except for the edges which form the strong chain itself.
     removeInternalStrongChainEdges();
@@ -72,7 +77,7 @@ Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     writeGraphviz("Detangle3Graph-D.dot");
     transitiveReduction();
     writeGraphviz("Detangle3Graph-E.dot");
-
+#endif
 
 #if 0
     // Debugging only.
@@ -925,3 +930,78 @@ void Detangle3Graph::removeEdgesIncidentInsideStrongChains()
         boost::remove_edge(e, detangle3Graph);
     }
 }
+
+
+
+// Use the strong chains to update the AssemblyGraph.
+void Detangle3Graph::updateAssemblyGraph()
+{
+    for(const vector<vertex_descriptor>& strongChain: strongChains) {
+        updateAssemblyGraph(strongChain);
+    }
+}
+
+
+
+void Detangle3Graph::updateAssemblyGraph(const vector<vertex_descriptor>& strongChain)
+{
+    Detangle3Graph& detangle3Graph = *this;
+
+    // Create the new Chain to be added to the assembly graph.
+    Chain newChain;
+    for(uint64_t i=0; i<strongChain.size(); i++) {
+
+        // Get the AssemblyGraph Chain corresponding to this vertex.
+        const vertex_descriptor v = strongChain[i];
+        const Detangle3GraphVertex& vertex = detangle3Graph[v];
+        const AssemblyGraph::edge_descriptor e = vertex.e;
+        const Chain& chain = assemblyGraph[e].getOnlyChain();
+
+        // If this is the first vertex of the strong chain, add the first AnchorId.
+        if(i == 0) {
+            newChain.push_back(chain.front());
+        }
+
+        // Add the internal AnchorIds.
+        copy(chain.begin() + 1, chain.end() -1, back_inserter(newChain));
+
+        // If this is the last vertex of the strong chain, add the last AnchorId.
+        if(i == strongChain.size() - 1) {
+            newChain.push_back(chain.back());
+        }
+    }
+
+
+
+    // Add the new Chain to the assemblyGraph.
+
+    // Find the source and target vertices for the new AssemblyGraph edge.
+    const AssemblyGraph::edge_descriptor e0 = detangle3Graph[strongChain.front()].e;
+    const AssemblyGraph::edge_descriptor e1 = detangle3Graph[strongChain.back()].e;
+    const AssemblyGraph::vertex_descriptor v0 = source(e0, assemblyGraph);
+    const AssemblyGraph::vertex_descriptor v1 = target(e1, assemblyGraph);
+
+    // Create the new AssemblyGraph edge (BubbleChain consisting of a single chain.
+    AssemblyGraph::edge_descriptor e;
+    tie(e,ignore) = add_edge(v0, v1, assemblyGraph);
+    AssemblyGraphEdge& newEdge = assemblyGraph[e];
+    newEdge.id = assemblyGraph.nextEdgeId++;
+
+    // Store out new Chain as the only Chain of this BubbleChain.
+    BubbleChain& newBubbleChain = newEdge;
+    newBubbleChain.resize(1);
+    Bubble& newBubble = newBubbleChain.front();
+    newBubble.resize(1);
+    newBubble.front().swap(newChain);
+
+    cout << "Created " << assemblyGraph.bubbleChainStringId(e) <<
+        " by stitching " << assemblyGraph.bubbleChainStringId(e0) <<
+        " ... " << assemblyGraph.bubbleChainStringId(e1) <<
+        " (" << strongChain.size() << " segments)." << endl;
+
+    // Now remove the AssemblyGraph edges containing the old Chains.
+    for(const vertex_descriptor v: strongChain) {
+        boost::remove_edge(detangle3Graph[v].e, assemblyGraph);
+    }
+}
+
