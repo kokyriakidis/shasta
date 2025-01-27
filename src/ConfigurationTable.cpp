@@ -1740,6 +1740,102 @@ mode3.assemblyGraph.phaseErrorThreshold = 0.2
 mode3.assemblyGraph.minLogP = 10
 
 
+)zzz"},
+    {"Nanopore-r10.4.1_e8.2-400bps_sup-Herro-Jan2025", R"zzz(# Shasta assembly configuration for ONT r10.4.1_e8.2-400bps_sup reads,
+# error-corrected with HERRO, as announced by Oxford Nanopore in May 2024:
+# see https://labs.epi2me.io/lc2024_t2t/
+
+[Reads]
+representation = 0
+minReadLength = 10000
+noCache = True
+palindromicReads.deltaThreshold = 300
+
+[Kmers]
+k = 50
+probability = 0.05
+
+[MinHash]
+minHashIterationCount = 50
+minBucketSize = 0
+maxBucketSize = 0
+minFrequency = 5
+
+[Align]
+alignMethod = 5
+sameChannelReadAlignment.suppressDeltaThreshold = 30
+minAlignedMarkerCount = 500
+minAlignedFraction = 0.98
+maxSkip = 50
+maxDrift = 50
+maxTrim = 50
+align5.driftRateTolerance = 0.05
+align5.minBandExtend = 10
+
+[ReadGraph]
+creationMethod = 4
+maxAlignmentCount = 10
+strandSeparationMethod = 0
+maxChimericReadDistance = 0
+epsilon = 1e-4
+delta = 5e-4
+WThreshold = 1e-8
+WThresholdForBreaks = 1e+15
+
+[Assembly]
+mode = 3
+mode3.primaryGraph.maxLoss = 0.5
+mode3.minAnchorCoverage = 0
+mode3.maxAnchorCoverage = 0
+mode3.maxAnchorCoverageMultiplier = 1.18
+mode3.assemblyGraph.pruneLength = 150000
+
+)zzz"},
+    {"Nanopore-r10.4.1_e8.2-400bps_sup-Raw-Jan2025", R"zzz(# Shasta assembly configuration for ONT r10.4.1_e8.2-400bps_sup raw reads,
+# without error correction, as announced by Oxford Nanopore in May 2024:
+# see https://labs.epi2me.io/lc2024_t2t/
+
+[Reads]
+representation = 0
+minReadLength = 10000
+noCache = True
+palindromicReads.deltaThreshold = 300
+
+[Kmers]
+k = 26
+probability = 0.04
+
+[MinHash]
+m = 10
+minHashIterationCount = 50
+minBucketSize = 0
+maxBucketSize = 0
+minFrequency = 70
+
+[Align]
+alignMethod = 6
+sameChannelReadAlignment.suppressDeltaThreshold = 30
+minAlignedMarkerCount = 500
+minAlignedFraction = 0.83
+maxSkip = 10
+maxDrift = 14
+maxTrim = 10
+align6.maxInBandCount = 1000000
+align6.maxGlobalFrequencyMultiplier = 0.6
+align6.minLowFrequencyCount = 6
+
+[ReadGraph]
+maxAlignmentCount = 20
+strandSeparationMethod = 2
+preferAlignedFraction = True
+
+[Assembly]
+mode = 3
+mode3.primaryGraph.maxLoss = 0.5
+mode3.assemblyGraph.phaseErrorThreshold = 0.2
+mode3.assemblyGraph.minLogP = 10
+
+
 )zzz"}
     };
 }

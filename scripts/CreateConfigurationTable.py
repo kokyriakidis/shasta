@@ -54,6 +54,8 @@ configurations = [
     'Nanopore-ncm23-May2024',
     'Nanopore-r10.4.1_e8.2-400bps_sup-Herro-Sep2024',
     'Nanopore-r10.4.1_e8.2-400bps_sup-Raw-Sep2024',    
+    'Nanopore-r10.4.1_e8.2-400bps_sup-Herro-Jan2025',
+    'Nanopore-r10.4.1_e8.2-400bps_sup-Raw-Jan2025',    
     ]
 
 
