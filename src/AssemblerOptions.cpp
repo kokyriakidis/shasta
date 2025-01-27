@@ -612,7 +612,7 @@ void AssemblerOptions::addConfigurableOptions()
 
         ("ReadGraph.maxAlignmentCount",
         value<int>(&readGraphOptions.maxAlignmentCount)->
-        default_value(10),
+        default_value(6),
         "The maximum number of alignments to be kept for each read.")
 
         ("ReadGraph.preferAlignedFraction",
