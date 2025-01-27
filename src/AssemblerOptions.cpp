@@ -712,7 +712,7 @@ void AssemblerOptions::addConfigurableOptions()
 
         ("ReadGraph.WThreshold",
         value<double>(&readGraphOptions.WThreshold)->
-        default_value(1e-7, "1e-7"),
+        default_value(1e-8, "1e-8"),
         "Logarithm of probability ratio used for the Bayesian ranking of alignments. "
         "(only used when --ReadGraph.creationMethod is 4).")
 
