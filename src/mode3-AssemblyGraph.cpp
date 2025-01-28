@@ -1014,6 +1014,9 @@ void AssemblyGraph::writeGfa(const string& fileNamePrefix) const
         uint64_t minOffset;
         uint64_t maxOffset;
         bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
+        if(averageOffset > 1000000000000UL) {
+            averageOffset = 1;
+        }
 
         // Record type.
         gfa << "S\t";
@@ -1106,7 +1109,10 @@ void AssemblyGraph::writeGfaSegmentsExpanded(
                     if(useSequenceLength) {
                         gfa << "LN:i:" << chain.sequence.size() << "\n";
                     } else {
-                        const uint64_t offset = chainOffset(chain);
+                        uint64_t offset = chainOffset(chain);
+                        if(offset > 1000000000000UL) {
+                            offset = 1;
+                        }
                         gfa << "LN:i:" << offset << "\n";
                     }
                 }
