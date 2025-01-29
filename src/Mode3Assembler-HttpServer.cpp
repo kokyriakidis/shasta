@@ -639,16 +639,13 @@ void Mode3Assembler::exploreReadFollowing(const vector<string>& request, ostream
         "<p><table>"
         "<tr><th>AnchorId<th>Offset<th>Common<th>Jaccard<th>Corrected<br>Jaccard";
     if(annotate) {
-        html << "<th>Segment<th>Position";
+        html << "<th>Segment:Position";
     }
 
     const AssemblyGraphPostprocessor* assemblyGraph = 0;
     if(annotate) {
         assemblyGraph = &getAssemblyGraph(assemblyStage, componentId0);
     }
-
-    vector<string> chainsEncountered;
-    string lastChainEncountered;
 
     for(const auto& p: anchorInfos) {
         const AnchorId anchorId1 = p.first;
@@ -667,39 +664,49 @@ void Mode3Assembler::exploreReadFollowing(const vector<string>& request, ostream
         if(annotate) {
             const uint64_t localAnchorId1 = anchors().getLocalAnchorIdInComponent(anchorId1);
             const AssemblyGraph::AnchorAnnotation& anchorAnnotation = assemblyGraph->anchorAnnotations[localAnchorId1];
-            const auto& internalChainInfo = anchorAnnotation.internalChainInfo;
+            html << "<td class=centered>";
 
-            if(internalChainInfo.size() == 0) {
-                html << "<td><td>";
-            } else if(internalChainInfo.size() > 1) {
-                html << "<td class=centered>Multiple<td>";
-            } else {
-                const auto& p = internalChainInfo.front();
-                const ChainIdentifier& chainIdentifier = p.first;
-                const uint64_t position = p.second;
+            bool isFirst = true;
+
+            for(const ChainIdentifier& chainIdentifier: anchorAnnotation.chainsFirstAnchor) {
+                if(isFirst) {
+                    isFirst = false;
+                } else {
+                    html << "<br>";
+                }
                 const string chainStringId = assemblyGraph->chainStringId(
                     chainIdentifier.e, chainIdentifier.positionInBubbleChain, chainIdentifier.indexInBubble);
-                html <<
-                    "<td class=centered>" << chainStringId <<
-                    "<td class=centered>" << position;
-
-                if(chainStringId != lastChainEncountered) {
-                    chainsEncountered.push_back(chainStringId);
-                    lastChainEncountered = chainStringId;
-                }
+                html << chainStringId << ":first";
             }
 
+            for(const ChainIdentifier& chainIdentifier: anchorAnnotation.chainsLastAnchor) {
+                if(isFirst) {
+                    isFirst = false;
+                } else {
+                    html << "<br>";
+                }
+                const string chainStringId = assemblyGraph->chainStringId(
+                    chainIdentifier.e, chainIdentifier.positionInBubbleChain, chainIdentifier.indexInBubble);
+                html << chainStringId << ":last";
+            }
+
+            for(const auto& p: anchorAnnotation.internalChainInfo) {
+                const ChainIdentifier& chainIdentifier = p.first;
+                const uint64_t position = p.second;
+                if(isFirst) {
+                    isFirst = false;
+                } else {
+                    html << "<br>";
+                }
+                const string chainStringId = assemblyGraph->chainStringId(
+                    chainIdentifier.e, chainIdentifier.positionInBubbleChain, chainIdentifier.indexInBubble);
+                html << chainStringId << ":" << position;
+            }
         }
     }
 
     html << "</table>";
 
-    if(annotate) {
-        html << "<p>Sequence of segments encountered:";
-        for(const string& s: chainsEncountered) {
-            html << "<br>" << s;
-        }
-    }
 
 }
 

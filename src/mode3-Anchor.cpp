@@ -926,6 +926,9 @@ void Anchors::followOrientedReads(
         if(info.common < minCommonCount) {
             continue;
         }
+        if(info.common == 0) {
+            continue;
+        }
         if(info.jaccard() < minJaccard) {
             continue;
         }
