@@ -19,8 +19,8 @@ jobs:
         tar -cvf shasta-docs.tar --transform='s/docs/shastaDocs/' docs       
         mkdir shasta-build
         cd shasta-build 
-        #cmake .. -DBUILD_ID="Shasta unreleased test build newer than release 0.14.0 at commit "$GITHUB_SHA
-        cmake .. -DBUILD_ID="Shasta Release 0.14.0" 
+        cmake .. -DBUILD_ID="Shasta unreleased test build newer than release 0.14.0 at commit "$GITHUB_SHA
+        # cmake .. -DBUILD_ID="Shasta Release 0.14.0" 
         make -j 2 all
         make install/strip
         mv shasta-install shasta-Ubuntu-22.04
@@ -56,8 +56,8 @@ jobs:
         tar -cvf shasta-docs.tar --transform='s/docs/shastaDocs/' docs       
         mkdir shasta-build
         cd shasta-build 
-        # cmake .. -DBUILD_ID="Shasta unreleased test build newer than release 0.14.0 at commit "$GITHUB_SHA
-        cmake .. -DBUILD_ID="Shasta Release 0.14.0" 
+        cmake .. -DBUILD_ID="Shasta unreleased test build newer than release 0.14.0 at commit "$GITHUB_SHA
+        # cmake .. -DBUILD_ID="Shasta Release 0.14.0" 
         make -j 2 all
         make install/strip
         mv shasta-install shasta-Ubuntu-24.04
