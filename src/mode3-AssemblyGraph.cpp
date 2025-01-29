@@ -1014,6 +1014,9 @@ void AssemblyGraph::writeGfa(const string& fileNamePrefix) const
         uint64_t minOffset;
         uint64_t maxOffset;
         bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
+        if(averageOffset > 1000000000000UL) {
+            averageOffset = 1;
+        }
 
         // Record type.
         gfa << "S\t";
@@ -1106,7 +1109,10 @@ void AssemblyGraph::writeGfaSegmentsExpanded(
                     if(useSequenceLength) {
                         gfa << "LN:i:" << chain.sequence.size() << "\n";
                     } else {
-                        const uint64_t offset = chainOffset(chain);
+                        uint64_t offset = chainOffset(chain);
+                        if(offset > 1000000000000UL) {
+                            offset = 1;
+                        }
                         gfa << "LN:i:" << offset << "\n";
                     }
                 }
@@ -1564,7 +1570,7 @@ void AssemblyGraph::getBubbleChainLengths(vector<uint64_t>& bubbleChainLengths) 
 
 
 
-// Return the total lenght of this bubble chain.
+// Return the total length of this BubbleChain.
 uint64_t BubbleChain::totalLength() const
 {
     double length = 0.;
@@ -1577,6 +1583,30 @@ uint64_t BubbleChain::totalLength() const
         length += bubbleLength;
     }
     return uint64_t(std::round(length));
+}
+
+
+
+// Return the total number of anchors in this BubbleChain.
+uint64_t BubbleChain::anchorCount() const
+{
+    const BubbleChain bubbleChain = *this;
+
+    uint64_t n = 0;
+
+    // First add the anchors internal to each Chain.
+    for(const Bubble& bubble: bubbleChain) {
+        for(const Chain& chain: bubble) {
+            n += (chain.size() - 2);
+        }
+    }
+
+    // Now add the anchors at the beginning and end of each Bubble,
+    // including the initial and final one.
+    const uint64_t bubbleCount = bubbleChain.size();
+    n += (bubbleCount + 1);
+
+    return n;
 }
 
 

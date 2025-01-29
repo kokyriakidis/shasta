@@ -13,6 +13,7 @@
 
 // Boost libraries.
 #include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/iteration_macros.hpp>
 #include <boost/serialization/vector.hpp>
 
 // Standard library
@@ -232,8 +233,11 @@ public:
 
 
 
-    // Return the total lenght of this bubble chain.
+    // Return the total length of this BubbleChain.
     uint64_t totalLength() const;
+
+    // Return the total number of anchors in this BubbleChain.
+    uint64_t anchorCount() const;
 
     template<class Archive> void serialize(Archive& ar, unsigned int /* version */)
     {
@@ -389,12 +393,8 @@ private:
         bool assembleSequence,
         bool debug);
 
-    // Alternate versions for testing.
+    // Alternate version for testing.
     void run3(
-        uint64_t threadCount,
-        bool assembleSequence,
-        bool debug);
-    void run4(
         uint64_t threadCount,
         bool assembleSequence,
         bool debug);
@@ -1050,6 +1050,25 @@ private:
     void removeCrossEdgesInAssemblyGraph(
         bool debug
         );
+
+
+
+    // Code in mode3-AssemblyGraphDetangle4.cpp.
+    void run4(
+        uint64_t threadCount,
+        bool assembleSequence,
+        bool debug);
+
+    // This requires all BubbleChains to consist of a single Chain.
+    // It returns the number of edges that were detangled.
+    uint64_t detangleEdges4(
+        bool debug,
+        uint64_t detangleToleranceHigh);
+    bool detangleEdge4(
+        bool debug,
+        std::map<uint64_t, edge_descriptor>& edgeMap,
+        std::map<uint64_t, edge_descriptor>::iterator&,
+        uint64_t detangleToleranceHigh);
 
 
 
