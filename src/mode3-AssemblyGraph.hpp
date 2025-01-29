@@ -233,8 +233,11 @@ public:
 
 
 
-    // Return the total lenght of this bubble chain.
+    // Return the total length of this BubbleChain.
     uint64_t totalLength() const;
+
+    // Return the total number of anchors in this BubbleChain.
+    uint64_t anchorCount() const;
 
     template<class Archive> void serialize(Archive& ar, unsigned int /* version */)
     {
