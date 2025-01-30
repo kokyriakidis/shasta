@@ -1,4 +1,5 @@
 #include "KmerCheckerFactory.hpp"
+#include "KmerCheckerFromFile.hpp"
 #include "Kmer.hpp"
 #include "KmerTable.hpp"
 #include "HashedKmerChecker.hpp"
@@ -19,6 +20,13 @@ std::shared_ptr<KmerChecker> KmerCheckerFactory::createNew(
         return make_shared<HashedKmerChecker>(
             kmersOptions.k,
             kmersOptions.probability,
+            mappedMemoryOwner);
+    }
+
+    // For generation method 3, always use the KmerCheckerFromFile.
+    if(kmersOptions.generationMethod == 3) {
+        return make_shared<KmerCheckerFromFile>(
+            kmersOptions.k,
             mappedMemoryOwner);
     }
 
@@ -59,11 +67,8 @@ std::shared_ptr<KmerChecker> KmerCheckerFactory::createNew(
              mappedMemoryOwner);
 
         case 3:
-        return make_shared<KmerTable3>(
-            kmersOptions.k,
-            reads.representation,
-            kmersOptions.file,
-            mappedMemoryOwner);
+            // This case was handled above.
+            SHASTA_ASSERT(0);
 
         case 4:
         return make_shared<KmerTable4>(
@@ -94,6 +99,11 @@ std::shared_ptr<shasta::KmerChecker> KmerCheckerFactory::createFromBinaryData(
         return make_shared<HashedKmerChecker>(mappedMemoryOwner);
     }
 
+    // For generation method 0, always use the KmerCheckerFromFile.
+    if(generationMethod == 3) {
+        return make_shared<KmerCheckerFromFile>(k, mappedMemoryOwner);
+    }
+
     switch(generationMethod) {
     case 0:
          return make_shared<KmerTable0>(k, mappedMemoryOwner);
@@ -105,7 +115,8 @@ std::shared_ptr<shasta::KmerChecker> KmerCheckerFactory::createFromBinaryData(
          return make_shared<KmerTable2>(k, reads, mappedMemoryOwner);
 
     case 3:
-         return make_shared<KmerTable3>(k, mappedMemoryOwner);
+        // This case was handled above.
+        SHASTA_ASSERT(0);
 
     case 4:
          return make_shared<KmerTable4>(k, reads, mappedMemoryOwner);
