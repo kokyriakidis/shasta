@@ -68,7 +68,11 @@ AssemblyGraph::AssemblyGraph(
     create(anchorGraph, debug);
 
     performanceLog << timestamp << "Processing the assembly graph for component " << componentId << endl;
-    run(threadCount, assembleSequence, debug);
+    if(options.anchorCreationMethod == "FromMarkerKmers") {
+        run4(threadCount, assembleSequence, debug);
+    } else {
+        run(threadCount, assembleSequence, debug);
+    }
     performanceLog << timestamp << "Done with the assembly graph for component " << componentId << endl;
 }
 
