@@ -236,7 +236,7 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
         html << "</table>";
     }
 
-
+    std::map<pair<AnchorId, AnchorId>, uint64_t> tangleMatrix;
 
     // Write the marker intervals of this Anchor.
     html <<
@@ -249,12 +249,15 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
         "<th>Ordinal0"
         "<th>Ordinal1"
         "<th>Position0"
-        "<th>Position1";
+        "<th>Position1"
+        "<th>Previous<br>anchor<br>in journey"
+        "<th>Next<br>anchor<br>in journey";
 
     // Loop over the marker intervals.
     for(uint64_t i=0; i<coverage; i++) {
         const AnchorMarkerInterval& markerInterval = markerIntervals[i];
         const OrientedReadId orientedReadId = markerInterval.orientedReadId;
+        const auto journey = anchors().journeys[orientedReadId.getValue()];
 
         const uint32_t ordinal0 = markerInterval.ordinal0;
         const uint32_t ordinal1 = ordinal0 + anchors().ordinalOffset(anchorId);
@@ -262,6 +265,15 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
         const auto orientedReadMarkers = markers[orientedReadId.getValue()];
         const uint32_t position0 = orientedReadMarkers[ordinal0].position;
         const uint32_t position1 = orientedReadMarkers[ordinal1].position;
+
+        AnchorId previousAnchorInJourney = invalid<AnchorId>;
+        if(markerInterval.positionInJourney > 0) {
+            previousAnchorInJourney = journey[markerInterval.positionInJourney - 1];
+        }
+        AnchorId nextAnchorInJourney = invalid<AnchorId>;
+        if(markerInterval.positionInJourney < journey.size() - 1) {
+            nextAnchorInJourney = journey[markerInterval.positionInJourney + 1];
+        }
 
         html <<
             "<tr>"
@@ -286,6 +298,48 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
             "<td class=centered>" << ordinal1 <<
             "<td class=centered>" << position0 <<
             "<td class=centered>" << position1;
+
+       // Previous anchor in journey.
+       html << "<td class=centered>";
+       if(previousAnchorInJourney != invalid<AnchorId>) {
+           html << anchorIdToString(previousAnchorInJourney);
+       }
+
+       // Next anchor in journey.
+       html << "<td class=centered>";
+       if(nextAnchorInJourney != invalid<AnchorId>) {
+           html << anchorIdToString(nextAnchorInJourney);
+       }
+
+       auto it = tangleMatrix.find(make_pair(previousAnchorInJourney, nextAnchorInJourney));
+       if(it == tangleMatrix.end()) {
+           tangleMatrix.insert(make_pair(make_pair(previousAnchorInJourney, nextAnchorInJourney), 1));
+       } else {
+           ++(it->second);
+       }
+    }
+    html << "</table>";
+
+
+
+    html << "<h2>Tangle matrix</h2>";
+    html << "<table><tr><th>In<th>Out<th>Coverage";
+    for(const auto& p: tangleMatrix) {
+        const AnchorId previousAnchorInJourney = p.first.first;
+        const AnchorId nextAnchorInJourney = p.first.second;
+        const uint64_t coverage = p.second;
+
+        html << "<tr><td class=centered>";
+        if(previousAnchorInJourney != invalid<AnchorId>) {
+            html << anchorIdToString(previousAnchorInJourney);
+        }
+
+        html << "<td class=centered>";
+        if(nextAnchorInJourney != invalid<AnchorId>) {
+            html << anchorIdToString(nextAnchorInJourney);
+        }
+
+        html << "<td class=centered>" << coverage;
     }
 }
 
