@@ -239,11 +239,13 @@ public:
     void findChildren(
         AnchorId,
         vector<AnchorId>&,
-        vector<uint64_t>& count) const;
+        vector<uint64_t>& count,
+        uint64_t minCoverage = 0) const;
     void findParents(
         AnchorId,
         vector<AnchorId>&,
-        vector<uint64_t>& count) const;
+        vector<uint64_t>& count,
+        uint64_t minCoverage = 0) const;
 
 
     // In addition to the marker intervals, we also store an AnchorInfo for each Anchor.

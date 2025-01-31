@@ -26,7 +26,8 @@ LocalAnchorGraph::LocalAnchorGraph(
     const vector<AnchorId>& anchorIds,
     uint64_t maxDistance,
     bool filterEdgesByCoverageLoss,
-    double maxCoverageLoss) :
+    double maxCoverageLoss,
+    uint64_t minCoverage) :
     anchors(anchors),
     maxDistance(maxDistance)
 {
@@ -53,7 +54,7 @@ LocalAnchorGraph::LocalAnchorGraph(
         const uint64_t distance0 = vertex0.distance;
         const uint64_t distance1 = distance0 + 1;
 
-        anchors.findChildren(anchorId0, neighbors, coverage);
+        anchors.findChildren(anchorId0, neighbors, coverage, minCoverage);
         for(uint64_t i=0; i<neighbors.size(); i++) {
             const AnchorId anchorId1 = neighbors[i];
             auto it1 = vertexMap.find(anchorId1);
@@ -78,7 +79,7 @@ LocalAnchorGraph::LocalAnchorGraph(
             }
         }
 
-        anchors.findParents(anchorId0, neighbors, coverage);
+        anchors.findParents(anchorId0, neighbors, coverage, minCoverage);
         for(uint64_t i=0; i<neighbors.size(); i++) {
             const AnchorId anchorId1 = neighbors[i];
             auto it1 = vertexMap.find(anchorId1);
@@ -111,6 +112,9 @@ LocalAnchorGraph::LocalAnchorGraph(
         const AnchorId anchorId0 = graph[v0].anchorId;
         anchors.findChildren(anchorId0, neighbors, coverage);
         for(uint64_t i=0; i<neighbors.size(); i++) {
+            if(coverage[i] < minCoverage) {
+                continue;
+            }
             const AnchorId& anchorId1 = neighbors[i];
             auto it1 = vertexMap.find(anchorId1);
             if(it1 == vertexMap.end()) {

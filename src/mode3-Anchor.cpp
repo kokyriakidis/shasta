@@ -829,7 +829,8 @@ void Anchors::computeJourneysThreadFunction4(uint64_t /* threadId */)
 void Anchors::findChildren(
     AnchorId anchorId,
     vector<AnchorId>& children,
-    vector<uint64_t>& count) const
+    vector<uint64_t>& count,
+    uint64_t minCoverage) const
 {
     children.clear();
     for(const auto& markerInterval: anchorMarkerIntervals[anchorId]) {
@@ -843,7 +844,7 @@ void Anchors::findChildren(
         }
     }
 
-    deduplicateAndCount(children, count);
+    deduplicateAndCountWithThreshold(children, count, minCoverage);
 }
 
 
@@ -854,7 +855,8 @@ void Anchors::findChildren(
 void Anchors::findParents(
     AnchorId anchorId,
     vector<AnchorId>& parents,
-    vector<uint64_t>& count) const
+    vector<uint64_t>& count,
+    uint64_t minCoverage) const
 {
     parents.clear();
     for(const auto& markerInterval: anchorMarkerIntervals[anchorId]) {
@@ -868,7 +870,7 @@ void Anchors::findParents(
         }
     }
 
-    deduplicateAndCount(parents, count);
+    deduplicateAndCountWithThreshold(parents, count, minCoverage);
 }
 
 

@@ -92,7 +92,8 @@ public:
         const vector<AnchorId>&,
         uint64_t maxDistance,
         bool filterEdgesByCoverageLoss,
-        double maxCoverageLoss);
+        double maxCoverageLoss,
+        uint64_t minCoverage);
 
     const Anchors& anchors;
     uint64_t maxDistance;

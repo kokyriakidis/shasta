@@ -953,6 +953,9 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     uint64_t distance = 10;
     HttpServer::getParameterValue(request, "distance", distance);
 
+    uint64_t minCoverage = 0;
+    HttpServer::getParameterValue(request, "minCoverage", minCoverage);
+
     string filterEdgesByCoverageLossString;
     const bool filterEdgesByCoverageLoss = HttpServer::getParameterValue(request,
         "filterEdgesByCoverageLoss", filterEdgesByCoverageLossString);
@@ -989,7 +992,12 @@ void Mode3Assembler::exploreLocalAnchorGraph(
 
     html <<
         "<tr><th>Edge filtering"
-        "<td><input type=checkbox name=filterEdgesByCoverageLoss" <<
+        "<td>"
+        "Minimum coverage "
+        "<input type=text name=minCoverage style='text-align:center' required size=8 value=" <<
+        minCoverage << ">"
+        "<br>"
+        "<input type=checkbox name=filterEdgesByCoverageLoss" <<
         (filterEdgesByCoverageLoss ? " checked" : "") <<
         ">Filter edges by coverage loss"
         "<br><input type=text name=maxCoverageLoss style='text-align:center' required size=6 value=" <<
@@ -1039,7 +1047,8 @@ void Mode3Assembler::exploreLocalAnchorGraph(
         anchorIds,
         distance,
         filterEdgesByCoverageLoss,
-        maxCoverageLoss
+        maxCoverageLoss,
+        minCoverage
         );
 
     html << "<h1>Local anchor graph</h1>";
