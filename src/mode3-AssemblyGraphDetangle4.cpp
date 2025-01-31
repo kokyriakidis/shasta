@@ -9,10 +9,12 @@ using namespace mode3;
 
 
 void AssemblyGraph::run4(
-    uint64_t threadCount,
+    uint64_t /* threadCount */,
     bool /* assembleSequence */,
     bool debug)
 {
+    // AssemblyGraph& assemblyGraph = *this;
+
     cout << "AssemblyGraph::run4 begins for component " << componentId << endl;
 
     SHASTA_ASSERT(std::is_sorted(orientedReadIds.begin(), orientedReadIds.end()));
@@ -20,6 +22,10 @@ void AssemblyGraph::run4(
 
     write("A");
 
+    detangleVertices4();
+    write("B");
+
+#if 0
     // Bubble cleanup.
     compress();
     for(uint64_t iteration=0; ; iteration ++) {
@@ -42,13 +48,14 @@ void AssemblyGraph::run4(
     cleanupSuperbubbles(false,
         options.assemblyGraphOptions.superbubbleLengthThreshold1,
         options.assemblyGraphOptions.chainTerminalCommonThreshold);
+    compressBubbleChains();
     compress();
+
+    write("C");
 
     // Edge detangling.
     expand();
-    write("B");
-
-    return;
+    write("D");
 
     for(uint64_t iteration=0; ; iteration++) {
         write("Before-" + to_string(iteration));
@@ -61,11 +68,11 @@ void AssemblyGraph::run4(
             break;
         }
     }
-    write("C");
+    write("E");
 
-    // Expand, so we can do read following on the AssemblyGraph in the http server.
-    expand();
-    write("D");
+    compressBubbleChains();
+    compress();
+    write("F");
 
     // Assemble sequence.
     assembleAllChainsMultithreaded(
@@ -73,6 +80,7 @@ void AssemblyGraph::run4(
         threadCount);
     writeAssemblyDetails();
     write("Final", true);
+#endif
 }
 
 
@@ -104,7 +112,7 @@ uint64_t AssemblyGraph::detangleEdges4(
         }
     }
 
-    if(true) {
+    if(debug) {
         cout << "Detangled " << detangleCount << " edges." << endl;
     }
 
@@ -309,9 +317,11 @@ bool AssemblyGraph::detangleEdge4(
         if(debug) {
             const edge_descriptor e0 = inEdges[i0];
             const edge_descriptor e1 = outEdges[i1];
-            cout << "Created " << bubbleChainStringId(eNew) <<
-                " by connecting " << bubbleChainStringId(e0) <<
-                " with " << bubbleChainStringId(e1) << endl;
+            if(debug) {
+                cout << "Created " << bubbleChainStringId(eNew) <<
+                    " by connecting " << bubbleChainStringId(e0) <<
+                    " with " << bubbleChainStringId(e1) << endl;
+            }
         }
     }
 
@@ -348,3 +358,139 @@ bool AssemblyGraph::detangleEdge4(
     return true;
 }
 
+
+
+void AssemblyGraph::detangleVertices4()
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    vector<vertex_descriptor> verticesToBeRemoved;
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        if(detangleVertex4(v)) {
+            verticesToBeRemoved.push_back(v);
+        }
+    }
+
+    for(const vertex_descriptor v: verticesToBeRemoved) {
+        boost::remove_vertex(v, assemblyGraph);
+    }
+}
+
+
+
+// This only detangles pathological vertices with high in-degree
+// and out-degree.
+bool AssemblyGraph::detangleVertex4(vertex_descriptor v)
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t minDegree = 5;
+    const uint64_t minCommon = 3;
+
+    const bool debug = true;
+
+    if(debug) {
+        cout << "detangleVertex4 for " << anchorIdToString(assemblyGraph[v].anchorId) <<
+            " begins." << endl;
+
+    }
+
+    if(in_degree(v, assemblyGraph) < minDegree) {
+        if(debug) {
+            cout << "Skipped because in-degree is " << in_degree(v, assemblyGraph) << endl;
+        }
+        return false;
+    }
+    if(out_degree(v, assemblyGraph) < minDegree) {
+        if(debug) {
+            cout << "Skipped because out-degree is " << out_degree(v, assemblyGraph) << endl;
+        }
+        return false;
+    }
+
+    // Gather the inEdges with their source vertices.
+    vector< pair<edge_descriptor, vertex_descriptor> > inEdges;
+    BGL_FORALL_INEDGES(v, e, assemblyGraph, AssemblyGraph) {
+        const vertex_descriptor v0 = source(e, assemblyGraph);
+        inEdges.push_back(make_pair(e, v0));
+    }
+
+    // Gather the outEdges with their target vertices.
+    vector< pair<edge_descriptor, vertex_descriptor> > outEdges;
+    BGL_FORALL_OUTEDGES(v, e, assemblyGraph, AssemblyGraph) {
+        const vertex_descriptor v0 = target(e, assemblyGraph);
+        outEdges.push_back(make_pair(e, v0));
+    }
+
+    // If there are common edges between inEdges and outEdges, don't do anything.
+    for(const auto& p0: inEdges) {
+        const edge_descriptor e0 = p0.first;
+        for(const auto& p1: outEdges) {
+            const edge_descriptor e1 = p1.first;
+            if(e0 == e1) {
+                if(debug) {
+                    cout << "detangleVertex4 for " << anchorIdToString(assemblyGraph[v].anchorId) <<
+                        ": skipped due to cycle." << endl;
+
+                }
+                return false;
+            }
+        }
+    }
+
+
+    // Loop over pairs of inEdges and outEdges.
+    // If we find common oriented reads, generate a new edge.
+    uint64_t newEdgeCount = 0;
+    for(const auto& p0: inEdges) {
+        const vertex_descriptor v0 = p0.second;
+        const AnchorId anchorId0 = assemblyGraph[v0].anchorId;
+        for(const auto& p1: outEdges) {
+            const vertex_descriptor v1 = p1.second;
+            const AnchorId anchorId1 = assemblyGraph[v1].anchorId;
+
+            if(anchors.countCommon(anchorId0, anchorId1) >= minCommon) {
+
+                // Generate the new edge.
+                // Make it of a single Chain connecting v0 to v1.
+                edge_descriptor eNew;
+                tie(eNew, ignore) = add_edge(v0, v1, assemblyGraph);
+                ++newEdgeCount;
+                AssemblyGraphEdge& newEdge = assemblyGraph[eNew];
+                newEdge.id = nextEdgeId++;
+                BubbleChain& bubbleChain = newEdge;
+                bubbleChain.resize(1);
+                Bubble& bubble = bubbleChain.front();
+                bubble.resize(1);
+                Chain& chain = bubble.front();
+                chain.push_back(anchorId0);
+                chain.push_back(anchorId1);
+            }
+        }
+    }
+
+    const int64_t deltaEdgeCount = int64_t(newEdgeCount) - int64_t(inEdges.size()) - int64_t(outEdges.size());
+
+    if(debug) {
+        cout << "detangleVertex4 for " << anchorIdToString(assemblyGraph[v].anchorId) <<
+            ": in-degree " << inEdges.size() <<
+            ", out-degree " << outEdges.size() <<
+            ", edges created " << newEdgeCount <<
+            ", delta edge count " << deltaEdgeCount << endl;
+    }
+
+
+    // Now we can remove the inEdges and outEdges.
+    // The vertex we detangled will be removed later by detangleVertices4.
+    for(const auto& p: inEdges) {
+        boost::remove_edge(p.first, assemblyGraph);
+    }
+    for(const auto& p: outEdges) {
+        boost::remove_edge(p.first, assemblyGraph);
+    }
+
+    return true;
+
+
+}

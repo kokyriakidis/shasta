@@ -1058,6 +1058,8 @@ private:
         uint64_t threadCount,
         bool assembleSequence,
         bool debug);
+    void detangleVertices4();
+    bool detangleVertex4(vertex_descriptor);
 
     // This requires all BubbleChains to consist of a single Chain.
     // It returns the number of edges that were detangled.
