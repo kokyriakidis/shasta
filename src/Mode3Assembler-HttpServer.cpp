@@ -111,6 +111,8 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
     const auto markerIntervals = anchors()[anchorId];
     const uint64_t coverage = markerIntervals.size();
     const auto sequence = anchors().anchorSequences[anchorId];
+    const vector<Base> extendedSequence = anchors().anchorExtendedSequence(anchorId);
+
 
     vector<AnchorId> parents;
     vector<uint64_t> parentsCoverage;
@@ -134,10 +136,14 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
         "<tr><th class=left>Sequence length<td class=centered>" << sequence.size() <<
         "<tr><th class=left>Sequence<td class=centered style='font-family:courier'>";
     copy(sequence.begin(), sequence.end(), ostream_iterator<Base>(html));
+    html <<
+        "<tr><th class=left>Extended sequence length<td class=centered>" << extendedSequence.size() <<
+        "<tr><th class=left>Extended sequence<td class=centered style='font-family:courier'>";
+    copy(extendedSequence.begin(), extendedSequence.end(), ostream_iterator<Base>(html));
 
     html <<
         "<tr><th class=left>Parent anchors"
-        "<td>";
+        "<td class=centered>";
     for(uint64_t i=0; i<parents.size(); i++) {
         const string parentAnchorIdString = anchorIdToString(parents[i]);
         if(i != 0) {
@@ -151,7 +157,7 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
 
     html <<
         "<tr><th class=left>Children anchors"
-        "<td>";
+        "<td class=centered>";
     for(uint64_t i=0; i<children.size(); i++) {
         const string childAnchorIdString = anchorIdToString(children[i]);
         if(i != 0) {

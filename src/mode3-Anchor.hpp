@@ -152,7 +152,15 @@ public:
     Anchor operator[](AnchorId) const;
     uint64_t size() const;
 
+
+    // This returns the sequence between the midpoint of the first marker of the
+    // anchor and the midpoint of the second marker.
+    // When anchorCreationMethod is "FromMarkerKmers", this sequence is empty.
     span<const Base> anchorSequence(AnchorId) const;
+
+    // This returns the sequence between the beginning of the first marker of the
+    // anchor and the end of the second marker.
+    vector<Base> anchorExtendedSequence(AnchorId) const;
 
     // Return the number of common oriented reads between two Anchors.
     uint64_t countCommon(AnchorId, AnchorId) const;
