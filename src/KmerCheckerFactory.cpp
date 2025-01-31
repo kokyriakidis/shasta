@@ -27,6 +27,7 @@ std::shared_ptr<KmerChecker> KmerCheckerFactory::createNew(
     if(kmersOptions.generationMethod == 3) {
         return make_shared<KmerCheckerFromFile>(
             kmersOptions.k,
+            kmersOptions.file,
             mappedMemoryOwner);
     }
 
