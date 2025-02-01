@@ -386,6 +386,11 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     ostream& orientedReadsCsv,
     bool debug)
 {
+    // EXPOSE WHEN CODE STABILIZES.
+    // Minimum anchor graph, edge coverage, only for alignment-free assembly.
+    const uint64_t minEdgeCoverageAlignmentFree = 3;
+
+
     performanceLog << timestamp << "Assembling connected component " <<
         componentId << " of " << componentOrientedReadIds.size() << endl;
     cout << timestamp << "Assembling connected component " <<
@@ -427,7 +432,10 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 
     // Now we can create the AnchorGraph for this connected component.
     // The constructor generates the vertices and edges.
-    AnchorGraph anchorGraph(anchors(), anchorIds);
+    const uint64_t minEdgeCoverage = (
+        options.anchorCreationMethod == "FromMarkerKmers" ? minEdgeCoverageAlignmentFree :
+        0);
+    AnchorGraph anchorGraph(anchors(), anchorIds, minEdgeCoverage);
 
 
      cout << "The AnchorGraph for this connected component has " <<

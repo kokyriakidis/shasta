@@ -113,7 +113,7 @@ public:
 
     // Create the AnchorGraph and its vertices and edges given the AnchorIds
     // for a conneced component of the global anchor graph.
-    AnchorGraph(const Anchors&, span<const AnchorId> anchorIds);
+    AnchorGraph(const Anchors&, span<const AnchorId> anchorIds, uint64_t minEdgeCoverage);
 
     // The AnchorIds of this AnchorGraph. Each of these corresponds to a vertex.
     // An index in this vector is called a local anchor id.

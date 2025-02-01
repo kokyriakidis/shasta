@@ -25,7 +25,7 @@ using namespace mode3;
 
 
 // Create the AnchorGraph and its vertices and edges given a vector of AnchorIds.
-AnchorGraph::AnchorGraph(const Anchors& anchors, span<const AnchorId> anchorIds) :
+AnchorGraph::AnchorGraph(const Anchors& anchors, span<const AnchorId> anchorIds, uint64_t minEdgeCoverage) :
     anchorIds(anchorIds)
 {
 
@@ -47,7 +47,7 @@ AnchorGraph::AnchorGraph(const Anchors& anchors, span<const AnchorId> anchorIds)
     vector<uint64_t> counts;
     for(uint64_t localAnchorId0=0; localAnchorId0<anchorIds.size(); localAnchorId0++) {
         const AnchorId anchorId0 = anchorIds[localAnchorId0];
-        anchors.findChildren(anchorId0, children, counts);
+        anchors.findChildren(anchorId0, children, counts, minEdgeCoverage);
         const uint64_t n = children.size();
         SHASTA_ASSERT(n == counts.size());
         for(uint64_t i=0; i<n; i++) {

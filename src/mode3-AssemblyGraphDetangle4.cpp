@@ -9,7 +9,7 @@ using namespace mode3;
 
 
 void AssemblyGraph::run4(
-    uint64_t /* threadCount */,
+    uint64_t threadCount,
     bool /* assembleSequence */,
     bool debug)
 {
@@ -22,10 +22,6 @@ void AssemblyGraph::run4(
 
     write("A");
 
-    detangleVertices4();
-    write("B");
-
-#if 0
     // Bubble cleanup.
     compress();
     for(uint64_t iteration=0; ; iteration ++) {
@@ -44,6 +40,9 @@ void AssemblyGraph::run4(
         compress();
     }
 
+    write("B");
+
+#if 0
     // Clean up short superbubbles.
     cleanupSuperbubbles(false,
         options.assemblyGraphOptions.superbubbleLengthThreshold1,
