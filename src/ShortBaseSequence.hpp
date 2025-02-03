@@ -166,6 +166,11 @@ public:
         data[1] = Int(data[1] << 1);
     }
 
+    void shiftRight() {
+        data[0] = Int(data[0] >> 1);
+        data[1] = Int(data[1] >> 1);
+    }
+
     // The data are left public to facilitate low level custom code.
     array<Int, 2> data;
 };
