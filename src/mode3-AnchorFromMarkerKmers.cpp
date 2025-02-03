@@ -67,24 +67,24 @@ Anchors::Anchors(
     buckets.endPass2(true, true);
 
     // Compute k-mer frequencies.
-    data.kmerFrequency.createNew(largeDataName("tmp-constructFromMarkerKmersData-KmerFrequency"), largeDataPageSize);
-    data.kmerFrequency.beginPass1(bucketCount);
+    data.kmerInfo.createNew(largeDataName("tmp-constructFromMarkerKmersData-KmerInfo"), largeDataPageSize);
+    data.kmerInfo.beginPass1(bucketCount);
     setupLoadBalancing(bucketCount, batchSize);
     runThreads(&Anchors::constructFromMarkerKmersComputeKmerFrequencyPass1, threadCount);
-    data.kmerFrequency.beginPass2();
+    data.kmerInfo.beginPass2();
     setupLoadBalancing(bucketCount, batchSize);
     runThreads(&Anchors::constructFromMarkerKmersComputeKmerFrequencyPass2, threadCount);
-    data.kmerFrequency.endPass2(true, true);
+    data.kmerInfo.endPass2(true, true);
 
     // Write out the high frequency k-mers.
     {
         vector< pair<Kmer, uint64_t> > kmerFrequency;
         for(uint64_t bucketId=0; bucketId<bucketCount; bucketId++) {
-            const auto bucket = data.kmerFrequency[bucketId];
-            for(const auto& p: bucket) {
-                const uint64_t frequency = p.second;
-                if(frequency > maxPrimaryCoverage) {
-                    kmerFrequency.push_back(p);
+            const auto bucket = data.kmerInfo[bucketId];
+            for(const auto& kmerInfo: bucket) {
+                if(kmerInfo.frequency > maxPrimaryCoverage) {
+                    kmerFrequency.push_back(
+                        make_pair(kmerInfo.kmer, kmerInfo.frequency));
                 }
             }
         }
@@ -111,7 +111,7 @@ Anchors::Anchors(
 
     // We no longer need the hash tables.
     buckets.remove();
-    data.kmerFrequency.remove();
+    data.kmerInfo.remove();
 
 
 
@@ -308,10 +308,13 @@ void Anchors::constructFromMarkerKmersComputeKmerFrequencyPass12(uint64_t pass)
             }
 
             if(pass == 1) {
-                data.kmerFrequency.incrementCountMultithreaded(bucketId, kmersWithFrequency.size());
+                data.kmerInfo.incrementCountMultithreaded(bucketId, kmersWithFrequency.size());
             } else {
                 for(const auto& p: kmersWithFrequency) {
-                    data.kmerFrequency.storeMultithreaded(bucketId, p);
+                    const Kmer& kmer = p.first;
+                    const uint64_t frequency = p.second;
+                    data.kmerInfo.storeMultithreaded(bucketId,
+                        ConstructFromMarkerKmersData::KmerInfo(kmer, frequency));
                 }
             }
         }

@@ -336,8 +336,24 @@ private:
         // The MarkerInfo objects for the candidate anchors found by each thread.
         vector< shared_ptr<MemoryMapped::VectorOfVectors<MarkerInfo, uint64_t> > > threadAnchors;
 
-        // Another hash table where we store pairs(Kmer, Frequency).
-        MemoryMapped::VectorOfVectors<pair<Kmer, uint64_t>, uint64_t > kmerFrequency;
+        // Another hash table where we information for each Kmer.
+        class KmerInfo {
+        public:
+            Kmer kmer;
+            uint64_t isForbidden:1;
+            uint64_t frequency:63;
+            KmerInfo(const Kmer kmer, uint64_t frequencyArgument) : kmer(kmer)
+            {
+                isForbidden = 0;
+                frequency = frequencyArgument & 0x7FFFFFFFFFFFFFFFUL;
+            }
+            KmerInfo()
+            {
+                isForbidden = 0;
+                frequency = 0;
+            }
+        };
+        MemoryMapped::VectorOfVectors<KmerInfo, uint64_t > kmerInfo;
     };
     ConstructFromMarkerKmersData constructFromMarkerKmersData;
     void constructFromMarkerKmersGatherMarkersPass1(uint64_t threadId);
