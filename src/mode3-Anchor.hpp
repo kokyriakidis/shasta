@@ -1,6 +1,7 @@
 #pragma once
 
 // Shasta.
+#include "Kmer.hpp"
 #include "invalid.hpp"
 #include "MarkerInterval.hpp"
 #include "MappedMemoryOwner.hpp"
@@ -332,14 +333,20 @@ private:
         // with a mask equal to the number of buckets minus 1.
         uint64_t mask;
 
-        // The MarkerInfo objects for the anchors found by each thread.
+        // The MarkerInfo objects for the candidate anchors found by each thread.
         vector< shared_ptr<MemoryMapped::VectorOfVectors<MarkerInfo, uint64_t> > > threadAnchors;
+
+        // Another hash table where we store pairs(Kmer, Frequency).
+        MemoryMapped::VectorOfVectors<pair<Kmer, uint64_t>, uint64_t > kmerFrequency;
     };
     ConstructFromMarkerKmersData constructFromMarkerKmersData;
     void constructFromMarkerKmersThreadFunction1(uint64_t threadId);
     void constructFromMarkerKmersThreadFunction2(uint64_t threadId);
     void constructFromMarkerKmersThreadFunction12(uint64_t pass);
     void constructFromMarkerKmersThreadFunction3(uint64_t threadId);
+    void constructFromMarkerKmersThreadFunction4(uint64_t threadId);
+    void constructFromMarkerKmersThreadFunction34(uint64_t pass);
+    void constructFromMarkerKmersThreadFunction5(uint64_t threadId);
 
 
 

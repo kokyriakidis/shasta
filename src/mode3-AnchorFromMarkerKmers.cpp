@@ -5,12 +5,14 @@
 #include "Marker.hpp"
 #include "markerAccessFunctions.hpp"
 #include "MurmurHash2.hpp"
+#include "orderPairs.hpp"
 #include "Reads.hpp"
 #include "MemoryMappedVectorOfVectors.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3;
 
+#include "fstream.hpp"
 
 
 Anchors::Anchors(
@@ -66,15 +68,53 @@ Anchors::Anchors(
     runThreads(&Anchors::constructFromMarkerKmersThreadFunction2, threadCount);
     buckets.endPass2(true, true);
 
-    // In pass 3 we process each bucket to create anchors.
+    // In passes 3 and 4 we compute the frequency of every k-mer.
+    // Here we also sort each bucket by Kmer.
+    data.kmerFrequency.createNew(largeDataName("tmp-constructFromMarkerKmersData-KmerFrequency"), largeDataPageSize);
+    data.kmerFrequency.beginPass1(bucketCount);
+    setupLoadBalancing(bucketCount, batchSize);
+    runThreads(&Anchors::constructFromMarkerKmersThreadFunction3, threadCount);
+    data.kmerFrequency.beginPass2();
+    setupLoadBalancing(bucketCount, batchSize);
+    runThreads(&Anchors::constructFromMarkerKmersThreadFunction4, threadCount);
+    data.kmerFrequency.endPass2(true, true);
+
+    // Write out the high frequency k-mers.
+    {
+        vector< pair<Kmer, uint64_t> > kmerFrequency;
+        for(uint64_t bucketId=0; bucketId<bucketCount; bucketId++) {
+            const auto bucket = data.kmerFrequency[bucketId];
+            for(const auto& p: bucket) {
+                const uint64_t frequency = p.second;
+                if(frequency > maxPrimaryCoverage) {
+                    kmerFrequency.push_back(p);
+                }
+            }
+        }
+
+        sort(kmerFrequency.begin(), kmerFrequency.end(),
+            OrderPairsBySecondOnlyGreater<Kmer, uint64_t>());
+
+        ofstream csv("HighFrequencyKmers.csv");
+        for(const auto& p: kmerFrequency) {
+            const Kmer& kmer = p.first;
+            const uint64_t frequency = p.second;
+            kmer.write(csv, k);
+            csv << "," << frequency << "\n";
+        }
+    }
+
+
+    // In pass 5 we process each bucket to create anchors.
     // Each thread stores for each anchor a vector of (OrientedReadId, ordinal)
     // (data.threadAnchors).
     data.threadAnchors.resize(threadCount);
     setupLoadBalancing(bucketCount, batchSize);
-    runThreads(&Anchors::constructFromMarkerKmersThreadFunction3, threadCount);
+    runThreads(&Anchors::constructFromMarkerKmersThreadFunction5, threadCount);
 
-    // We no longer need the hash table.
+    // We no longer need the hash tables.
     buckets.remove();
+    data.kmerFrequency.remove();
 
 
 
@@ -191,10 +231,105 @@ void Anchors::constructFromMarkerKmersThreadFunction12(uint64_t pass)
 }
 
 
+void Anchors::constructFromMarkerKmersThreadFunction3(uint64_t /* threadId */)
+{
+    constructFromMarkerKmersThreadFunction34(3);
+}
+
+
+
+void Anchors::constructFromMarkerKmersThreadFunction4(uint64_t /* threadId */)
+{
+    constructFromMarkerKmersThreadFunction34(4);
+}
+
+
+
+// Compute the frequency of every k-mer.
+void Anchors::constructFromMarkerKmersThreadFunction34(uint64_t pass)
+{
+    ConstructFromMarkerKmersData& data = constructFromMarkerKmersData;
+    auto& buckets = data.buckets;
+
+    // Vector to contain the MarkerInfos found in a bucket,
+    // together with the corresponding marker k-mers.
+    // Sorted by k-mer.
+    class MarkerInfo : public ConstructFromMarkerKmersData::MarkerInfo {
+    public:
+        Kmer kmer;
+        MarkerInfo(const ConstructFromMarkerKmersData::MarkerInfo& base, const Kmer& kmer) :
+            ConstructFromMarkerKmersData::MarkerInfo(base), kmer(kmer) {}
+        bool operator<(const MarkerInfo& that) const
+        {
+            return tie(kmer, orientedReadId, ordinal) < tie(that.kmer, that.orientedReadId, that.ordinal);
+        }
+    };
+    vector<MarkerInfo> bucketInfo;
+    vector< pair<Kmer, uint64_t> > kmersWithFrequency;
+
+    // Loop over all batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over all buckets assigned to this batch.
+        for(uint64_t bucketId=begin; bucketId!=end; ++bucketId) {
+
+            // Gather the markers in this bucket with the corresponding Kmers.
+            auto bucket = buckets[bucketId];
+            bucketInfo.clear();
+            for(const ConstructFromMarkerKmersData::MarkerInfo& markerInfo: bucket) {
+                const Kmer kmer = getOrientedReadMarkerKmer(
+                    markerInfo.orientedReadId,
+                    markerInfo.ordinal,
+                    k, reads, markers);
+                bucketInfo.push_back(MarkerInfo(markerInfo, kmer));
+            }
+
+            // Sort them by Kmer.
+            sort(bucketInfo.begin(), bucketInfo.end());
+
+
+
+            // Process each streak with the same k-mer.
+            kmersWithFrequency.clear();
+            for(uint64_t streakBegin=0; streakBegin<bucketInfo.size(); /* Increment later */) {
+                const Kmer& kmer = bucketInfo[streakBegin].kmer;
+
+                // Find the end of the streak with this k-mer.
+                uint64_t streakEnd = streakBegin + 1;
+                while(true) {
+                    if((streakEnd == bucketInfo.size()) or ( bucketInfo[streakEnd].kmer != kmer)) {
+                        break;
+                    }
+                    ++streakEnd;
+                }
+
+                kmersWithFrequency.push_back(make_pair(kmer, streakEnd - streakBegin));
+
+                // Prepare to process the next streak.
+                streakBegin = streakEnd;
+            }
+
+            if(pass == 3) {
+                data.kmerFrequency.incrementCountMultithreaded(bucketId, kmersWithFrequency.size());
+            } else {
+                for(const auto& p: kmersWithFrequency) {
+                    data.kmerFrequency.storeMultithreaded(bucketId, p);
+                }
+            }
+        }
+    }
+
+}
+
+
+
+
+
 
 // This loops over buckets and creates anchors from the MarkerInfo
 // objects stored in each bucket.
-void Anchors::constructFromMarkerKmersThreadFunction3(uint64_t threadId )
+void Anchors::constructFromMarkerKmersThreadFunction5(uint64_t threadId )
 {
     ConstructFromMarkerKmersData& data = constructFromMarkerKmersData;
     const uint64_t minPrimaryCoverage = data.minPrimaryCoverage;
