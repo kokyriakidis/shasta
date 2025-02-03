@@ -54,29 +54,26 @@ Anchors::Anchors(
 
     // Initialize the hash table.
     auto& buckets = data.buckets;
-    buckets.createNew(largeDataName("tmp-constructFromMarkerKmersData"), largeDataPageSize);
+    buckets.createNew(largeDataName("tmp-constructFromMarkerKmersData-Buckets"), largeDataPageSize);
 
-    // Pass 1 counts the markers that go to each bucket.
+    // Gather markers and store them in buckets.
     buckets.beginPass1(bucketCount);
     size_t batchSize = 10;
     setupLoadBalancing(reads.readCount(), batchSize);
-    runThreads(&Anchors::constructFromMarkerKmersThreadFunction1, threadCount);
-
-    // In pass 2 we store each marker in its assigned bucket.
+    runThreads(&Anchors::constructFromMarkerKmersGatherMarkersPass1, threadCount);
     buckets.beginPass2();
     setupLoadBalancing(reads.readCount(), batchSize);
-    runThreads(&Anchors::constructFromMarkerKmersThreadFunction2, threadCount);
+    runThreads(&Anchors::constructFromMarkerKmersGatherMarkersPass2, threadCount);
     buckets.endPass2(true, true);
 
-    // In passes 3 and 4 we compute the frequency of every k-mer.
-    // Here we also sort each bucket by Kmer.
+    // Compute k-mer frequencies.
     data.kmerFrequency.createNew(largeDataName("tmp-constructFromMarkerKmersData-KmerFrequency"), largeDataPageSize);
     data.kmerFrequency.beginPass1(bucketCount);
     setupLoadBalancing(bucketCount, batchSize);
-    runThreads(&Anchors::constructFromMarkerKmersThreadFunction3, threadCount);
+    runThreads(&Anchors::constructFromMarkerKmersComputeKmerFrequencyPass1, threadCount);
     data.kmerFrequency.beginPass2();
     setupLoadBalancing(bucketCount, batchSize);
-    runThreads(&Anchors::constructFromMarkerKmersThreadFunction4, threadCount);
+    runThreads(&Anchors::constructFromMarkerKmersComputeKmerFrequencyPass2, threadCount);
     data.kmerFrequency.endPass2(true, true);
 
     // Write out the high frequency k-mers.
@@ -110,7 +107,7 @@ Anchors::Anchors(
     // (data.threadAnchors).
     data.threadAnchors.resize(threadCount);
     setupLoadBalancing(bucketCount, batchSize);
-    runThreads(&Anchors::constructFromMarkerKmersThreadFunction5, threadCount);
+    runThreads(&Anchors::constructFromMarkerKmersCreateAnchors, threadCount);
 
     // We no longer need the hash tables.
     buckets.remove();
@@ -157,21 +154,21 @@ Anchors::Anchors(
 
 
 
-void Anchors::constructFromMarkerKmersThreadFunction1(uint64_t /* threadId */)
+void Anchors::constructFromMarkerKmersGatherMarkersPass1(uint64_t /* threadId */)
 {
-    constructFromMarkerKmersThreadFunction12(1);
+    constructFromMarkerKmersGatherMarkersPass12(1);
 }
 
 
 
-void Anchors::constructFromMarkerKmersThreadFunction2(uint64_t /* threadId */)
+void Anchors::constructFromMarkerKmersGatherMarkersPass2(uint64_t /* threadId */)
 {
-    constructFromMarkerKmersThreadFunction12(2);
+    constructFromMarkerKmersGatherMarkersPass12(2);
 }
 
 
 
-void Anchors::constructFromMarkerKmersThreadFunction12(uint64_t pass)
+void Anchors::constructFromMarkerKmersGatherMarkersPass12(uint64_t pass)
 {
     ConstructFromMarkerKmersData& data = constructFromMarkerKmersData;
     const uint64_t mask = data.mask;
@@ -231,22 +228,22 @@ void Anchors::constructFromMarkerKmersThreadFunction12(uint64_t pass)
 }
 
 
-void Anchors::constructFromMarkerKmersThreadFunction3(uint64_t /* threadId */)
+void Anchors::constructFromMarkerKmersComputeKmerFrequencyPass1(uint64_t /* threadId */)
 {
-    constructFromMarkerKmersThreadFunction34(3);
+    constructFromMarkerKmersComputeKmerFrequencyPass12(1);
 }
 
 
 
-void Anchors::constructFromMarkerKmersThreadFunction4(uint64_t /* threadId */)
+void Anchors::constructFromMarkerKmersComputeKmerFrequencyPass2(uint64_t /* threadId */)
 {
-    constructFromMarkerKmersThreadFunction34(4);
+    constructFromMarkerKmersComputeKmerFrequencyPass12(2);
 }
 
 
 
 // Compute the frequency of every k-mer.
-void Anchors::constructFromMarkerKmersThreadFunction34(uint64_t pass)
+void Anchors::constructFromMarkerKmersComputeKmerFrequencyPass12(uint64_t pass)
 {
     ConstructFromMarkerKmersData& data = constructFromMarkerKmersData;
     auto& buckets = data.buckets;
@@ -310,7 +307,7 @@ void Anchors::constructFromMarkerKmersThreadFunction34(uint64_t pass)
                 streakBegin = streakEnd;
             }
 
-            if(pass == 3) {
+            if(pass == 1) {
                 data.kmerFrequency.incrementCountMultithreaded(bucketId, kmersWithFrequency.size());
             } else {
                 for(const auto& p: kmersWithFrequency) {
@@ -329,7 +326,7 @@ void Anchors::constructFromMarkerKmersThreadFunction34(uint64_t pass)
 
 // This loops over buckets and creates anchors from the MarkerInfo
 // objects stored in each bucket.
-void Anchors::constructFromMarkerKmersThreadFunction5(uint64_t threadId )
+void Anchors::constructFromMarkerKmersCreateAnchors(uint64_t threadId )
 {
     ConstructFromMarkerKmersData& data = constructFromMarkerKmersData;
     const uint64_t minPrimaryCoverage = data.minPrimaryCoverage;

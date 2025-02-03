@@ -340,13 +340,13 @@ private:
         MemoryMapped::VectorOfVectors<pair<Kmer, uint64_t>, uint64_t > kmerFrequency;
     };
     ConstructFromMarkerKmersData constructFromMarkerKmersData;
-    void constructFromMarkerKmersThreadFunction1(uint64_t threadId);
-    void constructFromMarkerKmersThreadFunction2(uint64_t threadId);
-    void constructFromMarkerKmersThreadFunction12(uint64_t pass);
-    void constructFromMarkerKmersThreadFunction3(uint64_t threadId);
-    void constructFromMarkerKmersThreadFunction4(uint64_t threadId);
-    void constructFromMarkerKmersThreadFunction34(uint64_t pass);
-    void constructFromMarkerKmersThreadFunction5(uint64_t threadId);
+    void constructFromMarkerKmersGatherMarkersPass1(uint64_t threadId);
+    void constructFromMarkerKmersGatherMarkersPass2(uint64_t threadId);
+    void constructFromMarkerKmersGatherMarkersPass12(uint64_t pass);
+    void constructFromMarkerKmersComputeKmerFrequencyPass1(uint64_t threadId);
+    void constructFromMarkerKmersComputeKmerFrequencyPass2(uint64_t threadId);
+    void constructFromMarkerKmersComputeKmerFrequencyPass12(uint64_t pass);
+    void constructFromMarkerKmersCreateAnchors(uint64_t threadId);
 
 
 
