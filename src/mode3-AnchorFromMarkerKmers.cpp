@@ -6,8 +6,10 @@
 #include "markerAccessFunctions.hpp"
 #include "MurmurHash2.hpp"
 #include "orderPairs.hpp"
+#include "performanceLog.hpp"
 #include "Reads.hpp"
 #include "MemoryMappedVectorOfVectors.hpp"
+#include "ShortBaseSequenceEdit.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
 using namespace mode3;
@@ -76,6 +78,7 @@ Anchors::Anchors(
     runThreads(&Anchors::constructFromMarkerKmersComputeKmerFrequencyPass2, threadCount);
     data.kmerInfo.endPass2(true, true);
 
+#if 1
     // Write out the high frequency k-mers.
     {
         vector< pair<Kmer, uint64_t> > kmerFrequency;
@@ -100,11 +103,18 @@ Anchors::Anchors(
             csv << "," << frequency << "\n";
         }
     }
+#endif
+
+    // Flag forbidden k-mers.
+    performanceLog << timestamp << "Flagging forbidden k-mers." << endl;
+    setupLoadBalancing(bucketCount, batchSize);
+    runThreads(&Anchors::constructFromMarkerKmersFlagForbiddenKmers, threadCount);
 
 
-    // In pass 5 we process each bucket to create anchors.
+    // Process each bucket to create anchors.
     // Each thread stores for each anchor a vector of (OrientedReadId, ordinal)
     // (data.threadAnchors).
+    performanceLog << timestamp << "Creating anchors." << endl;
     data.threadAnchors.resize(threadCount);
     setupLoadBalancing(bucketCount, batchSize);
     runThreads(&Anchors::constructFromMarkerKmersCreateAnchors, threadCount);
@@ -116,7 +126,7 @@ Anchors::Anchors(
 
 
     // Gather the anchors found by all threads.
-    cout << timestamp << "Gathering the anchors found by all threads." << endl;
+    performanceLog << timestamp << "Gathering the anchors found by all threads." << endl;
     anchorMarkerIntervals.createNew(
             largeDataName("AnchorMarkerIntervals"),
             largeDataPageSize);
@@ -324,6 +334,59 @@ void Anchors::constructFromMarkerKmersComputeKmerFrequencyPass12(uint64_t pass)
 
 
 
+void Anchors::constructFromMarkerKmersFlagForbiddenKmers(uint64_t /* threadId */)
+{
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t veryHighFrequencyThreshold = 1000;
+
+    ConstructFromMarkerKmersData& data = constructFromMarkerKmersData;
+    const uint64_t mask = data.mask;
+
+
+    vector<Kmer> editedKmers;
+
+    // Loop over all batches assigned to this thread.
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+
+        // Loop over all buckets assigned to this batch.
+        for(uint64_t bucketId0=begin; bucketId0!=end; ++bucketId0) {
+            const auto bucket0 = constructFromMarkerKmersData.kmerInfo[bucketId0];
+
+            // Loop over all kmers in this bucket that have very high frequency.
+            for(const auto& kmerInfo: bucket0) {
+                if(kmerInfo.frequency < veryHighFrequencyThreshold) {
+                    continue;
+                }
+
+                const Kmer& kmer0 = kmerInfo.kmer;
+
+                // Apply 1-base edits.
+                applySingleEdit(kmer0, k, editedKmers);
+
+                // The edited k-mers are marked as forbidden, if present.
+                for(const Kmer& kmer1: editedKmers) {
+
+                    // Locate the bucket where kmer1 is, if present.
+                    const uint64_t hashValue = MurmurHash64A(&kmer1, sizeof(kmer1), 1241);
+                    const uint64_t bucketId1 = hashValue & mask;
+                    const auto bucket1 = constructFromMarkerKmersData.kmerInfo[bucketId1];
+
+                    // If kmer1 is present, mark it as forbidden.
+                    for(auto& kmerInfo1: bucket1) {
+                        if(kmerInfo1.kmer == kmer1) {
+                            kmerInfo1.isForbidden = true;
+                            break;
+                        }
+                    }
+
+                }
+            }
+
+        }
+    }
+
+}
 
 
 
@@ -398,6 +461,21 @@ void Anchors::constructFromMarkerKmersCreateAnchors(uint64_t threadId )
                         break;
                     }
                     ++streakEnd;
+                }
+
+                // If this k-mer is marked as forbidden, skip it.
+                const auto& kmerInfos = data.kmerInfo[bucketId];
+                bool isForbidden = false;
+                for(const auto& kmerInfo: kmerInfos) {
+                    if(kmerInfo.isForbidden) {
+                        isForbidden = true;
+                        break;
+                    }
+                }
+                if(isForbidden) {
+                    // Prepare to process the next streak.
+                    streakBegin = streakEnd;
+                    continue;
                 }
 
                 // If the first oriented read is not on strand 0, skip it.

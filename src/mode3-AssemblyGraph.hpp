@@ -1061,8 +1061,8 @@ private:
     void detangleVertices4();
     bool detangleVertex4(vertex_descriptor);
 
-    // This requires all BubbleChains to consist of a single Chain.
-    // It returns the number of edges that were detangled.
+    // These require all BubbleChains to consist of a single Chain.
+    // They returns the number of edges that were detangled.
     uint64_t detangleEdges4(
         bool debug,
         uint64_t detangleToleranceHigh);
@@ -1071,6 +1071,11 @@ private:
         std::map<uint64_t, edge_descriptor>& edgeMap,
         std::map<uint64_t, edge_descriptor>::iterator&,
         uint64_t detangleToleranceHigh);
+    uint64_t detangleEdges4Strict(bool debug);
+    bool detangleEdge4Strict(
+        bool debug,
+        std::map<uint64_t, edge_descriptor>& edgeMap,
+        std::map<uint64_t, edge_descriptor>::iterator&);
 
 
 

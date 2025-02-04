@@ -362,6 +362,7 @@ private:
     void constructFromMarkerKmersComputeKmerFrequencyPass1(uint64_t threadId);
     void constructFromMarkerKmersComputeKmerFrequencyPass2(uint64_t threadId);
     void constructFromMarkerKmersComputeKmerFrequencyPass12(uint64_t pass);
+    void constructFromMarkerKmersFlagForbiddenKmers(uint64_t threadId);
     void constructFromMarkerKmersCreateAnchors(uint64_t threadId);
 
 
