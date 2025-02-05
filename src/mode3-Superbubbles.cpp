@@ -17,13 +17,13 @@ using namespace mode3;
 
 
 Superbubbles::Superbubbles(
-    AssemblyGraph& cGraph,
+    AssemblyGraph& assemblyGraph,
     uint64_t maxOffset1     // Used to define superbubbles
     ) :
-    cGraph(cGraph)
+    assemblyGraph(assemblyGraph)
 {
-    cGraph.numberVertices();
-    const uint64_t vertexCount = num_vertices(cGraph);
+    assemblyGraph.numberVertices();
+    const uint64_t vertexCount = num_vertices(assemblyGraph);
 
     vector<uint64_t> rank(vertexCount);
     vector<uint64_t> parent(vertexCount);
@@ -33,22 +33,22 @@ Superbubbles::Superbubbles(
     for(uint64_t i=0; i<vertexCount; i++) {
         disjointSets.make_set(i);
     }
-    BGL_FORALL_EDGES(ce, cGraph, AssemblyGraph) {
+    BGL_FORALL_EDGES(ce, assemblyGraph, AssemblyGraph) {
         uint64_t averageOffset;
         uint64_t minOffset;
         uint64_t maxOffset;
-        cGraph.bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
+        assemblyGraph.bubbleChainOffset(assemblyGraph[ce], averageOffset, minOffset, maxOffset);
         if(averageOffset <= maxOffset1) {
-            const vertex_descriptor cv0 = source(ce, cGraph);
-            const vertex_descriptor cv1 = target(ce, cGraph);
-            disjointSets.union_set(cGraph[cv0].index, cGraph[cv1].index);
+            const vertex_descriptor cv0 = source(ce, assemblyGraph);
+            const vertex_descriptor cv1 = target(ce, assemblyGraph);
+            disjointSets.union_set(assemblyGraph[cv0].index, assemblyGraph[cv1].index);
         }
     }
 
     // Gather the vertices in each connected component.
     vector< vector<vertex_descriptor> > components(vertexCount);
-    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
-        const uint64_t componentId = disjointSets.find_set(cGraph[cv].index);
+    BGL_FORALL_VERTICES(cv, assemblyGraph, AssemblyGraph) {
+        const uint64_t componentId = disjointSets.find_set(assemblyGraph[cv].index);
         components[componentId].push_back(cv);
     }
 
@@ -61,13 +61,13 @@ Superbubbles::Superbubbles(
     }
 
     // Store superbubble ids in the vertices.
-    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
-        cGraph[cv].superbubbleId = invalid<uint64_t>;
+    BGL_FORALL_VERTICES(cv, assemblyGraph, AssemblyGraph) {
+        assemblyGraph[cv].superbubbleId = invalid<uint64_t>;
     }
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
         const vector<vertex_descriptor>& superbubble = getSuperbubble(superbubbleId);
         for(const vertex_descriptor cv: superbubble) {
-            cGraph[cv].superbubbleId = superbubbleId;
+            assemblyGraph[cv].superbubbleId = superbubbleId;
         }
     }
 
@@ -80,12 +80,12 @@ Superbubbles::Superbubbles(
         // Find entrances. These are superbubble vertices with in-edges
         // from outside the superbubble or average offset up to maxOffset1.
         for(const vertex_descriptor cv0: superbubble) {
-            BGL_FORALL_INEDGES(cv0, ce, cGraph, AssemblyGraph) {
+            BGL_FORALL_INEDGES(cv0, ce, assemblyGraph, AssemblyGraph) {
                 uint64_t averageOffset;
                 uint64_t minOffset;
                 uint64_t maxOffset;
-                cGraph.bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
-                const vertex_descriptor cv1 = source(ce, cGraph);
+                assemblyGraph.bubbleChainOffset(assemblyGraph[ce], averageOffset, minOffset, maxOffset);
+                const vertex_descriptor cv1 = source(ce, assemblyGraph);
                 if((not isInSuperbubble(superbubbleId, cv1)) or (averageOffset > maxOffset1)) {
                     superbubble.entrances.push_back(cv0);
                     break;
@@ -97,12 +97,12 @@ Superbubbles::Superbubbles(
         // to outside the superbubble or average offset up to maxOffset1.
         vector<vertex_descriptor> exits;
         for(const vertex_descriptor cv0: superbubble) {
-            BGL_FORALL_OUTEDGES(cv0, ce, cGraph, AssemblyGraph) {
+            BGL_FORALL_OUTEDGES(cv0, ce, assemblyGraph, AssemblyGraph) {
                 uint64_t averageOffset;
                 uint64_t minOffset;
                 uint64_t maxOffset;
-                cGraph.bubbleChainOffset(cGraph[ce], averageOffset, minOffset, maxOffset);
-                const vertex_descriptor cv1 = target(ce, cGraph);
+                assemblyGraph.bubbleChainOffset(assemblyGraph[ce], averageOffset, minOffset, maxOffset);
+                const vertex_descriptor cv1 = target(ce, assemblyGraph);
                 if((not isInSuperbubble(superbubbleId, cv1)) or (averageOffset > maxOffset1)) {
                     superbubble.exits.push_back(cv0);
                     break;
@@ -116,10 +116,12 @@ Superbubbles::Superbubbles(
 
 
 // This constructs superbubbles consisting of a single edge v0->v1
-// such that outDegree(v0)=1 and inDegree(v1)=1.
+// such that:
+// outDegree(v0) == 1, inDegree(v0)  > 1
+// inDegree (v1) == 1, outDegree(v1) > 1
 Superbubbles::Superbubbles(
     AssemblyGraph& assemblyGraph, const FromEdges&) :
-    cGraph(assemblyGraph)
+    assemblyGraph(assemblyGraph)
 {
 
     // Try all edges.
@@ -144,7 +146,7 @@ Superbubbles::Superbubbles(
             continue;
         }
 
-        // Check the number of exitss.
+        // Check the number of exits.
         const uint64_t exitCount = out_degree(v1, assemblyGraph);
         if(exitCount < 2) {
             continue;
@@ -159,13 +161,13 @@ Superbubbles::Superbubbles(
     }
 
     // Store superbubble ids in the vertices.
-    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
-        cGraph[cv].superbubbleId = invalid<uint64_t>;
+    BGL_FORALL_VERTICES(cv, assemblyGraph, AssemblyGraph) {
+        assemblyGraph[cv].superbubbleId = invalid<uint64_t>;
     }
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
         const vector<vertex_descriptor>& superbubble = getSuperbubble(superbubbleId);
         for(const vertex_descriptor cv: superbubble) {
-            AssemblyGraphVertex& vertex = cGraph[cv];
+            AssemblyGraphVertex& vertex = assemblyGraph[cv];
             SHASTA_ASSERT(vertex.superbubbleId == invalid<uint64_t>);
             vertex.superbubbleId = superbubbleId;
         }
@@ -177,8 +179,8 @@ Superbubbles::Superbubbles(
 // This uses dominator trees.
 // It only finds superbubbles with one entrance and one exit.
 Superbubbles::Superbubbles(
-    AssemblyGraph& cGraph) :
-    cGraph(cGraph)
+    AssemblyGraph& assemblyGraph) :
+    assemblyGraph(assemblyGraph)
 {
     const bool debug = false;
     if(debug) {
@@ -188,7 +190,7 @@ Superbubbles::Superbubbles(
     // Map vertices to integers.
     std::map<vertex_descriptor, uint64_t> indexMap;
     uint64_t vertexIndex = 0;
-    BGL_FORALL_VERTICES(v, cGraph, AssemblyGraph) {
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
         indexMap.insert({v, vertexIndex++});
     }
     auto associativeIndexMap = boost::make_assoc_property_map(indexMap);
@@ -207,8 +209,8 @@ Superbubbles::Superbubbles(
 
     // Compute dominator trees using as entrance each of the
     // vertices with zero in-degree.
-    BGL_FORALL_VERTICES(entrance, cGraph, AssemblyGraph) {
-        if(in_degree(entrance, cGraph) != 0) {
+    BGL_FORALL_VERTICES(entrance, assemblyGraph, AssemblyGraph) {
+        if(in_degree(entrance, assemblyGraph) != 0) {
             continue;
         }
 
@@ -219,7 +221,7 @@ Superbubbles::Superbubbles(
         std::map<vertex_descriptor, vertex_descriptor> predecessorMap;
 
         boost::lengauer_tarjan_dominator_tree(
-            cGraph,
+            assemblyGraph,
             entrance,
             boost::make_assoc_property_map(indexMap),
             boost::make_iterator_property_map(dfNum.begin(), associativeIndexMap),
@@ -229,15 +231,15 @@ Superbubbles::Superbubbles(
 
         if(debug) {
             cout << "Forward dominator tree with entrance at " <<
-                anchorIdToString(cGraph[entrance].getAnchorId()) << endl;
+                anchorIdToString(assemblyGraph[entrance].getAnchorId()) << endl;
         }
         for(const auto& p: predecessorMap) {
             const vertex_descriptor cv0 = p.second;
             const vertex_descriptor cv1 = p.first;
             forwardPairs.push_back({cv0, cv1});
             if(debug) {
-                cout << "F " << anchorIdToString(cGraph[cv0].getAnchorId()) << "->" <<
-                    anchorIdToString(cGraph[cv1].getAnchorId()) << endl;
+                cout << "F " << anchorIdToString(assemblyGraph[cv0].getAnchorId()) << "->" <<
+                    anchorIdToString(assemblyGraph[cv1].getAnchorId()) << endl;
             }
         }
     }
@@ -248,7 +250,7 @@ Superbubbles::Superbubbles(
     // vertices with zero in-degree on the reverse graph
     // (that is, zero out-degree on the AssemblyGraph).
     using ReverseAssemblyGraph = boost::reverse_graph<AssemblyGraph>;
-    ReverseAssemblyGraph reverseGraph(cGraph);
+    ReverseAssemblyGraph reverseGraph(assemblyGraph);
     BGL_FORALL_VERTICES(entrance, reverseGraph, ReverseAssemblyGraph) {
         if(in_degree(entrance, reverseGraph) != 0) {
             continue;
@@ -271,15 +273,15 @@ Superbubbles::Superbubbles(
 
         if(debug) {
             cout << "Backward dominator tree with exit at " <<
-                anchorIdToString(cGraph[entrance].getAnchorId()) << endl;
+                anchorIdToString(assemblyGraph[entrance].getAnchorId()) << endl;
         }
         for(const auto& p: predecessorMap) {
             const vertex_descriptor cv0 = p.first;
             const vertex_descriptor cv1 = p.second;
             backwardPairs.push_back({cv0, cv1});
             if(debug) {
-                cout << "B " << anchorIdToString(cGraph[cv0].getAnchorId()) << "->" <<
-                    anchorIdToString(cGraph[cv1].getAnchorId()) << endl;
+                cout << "B " << anchorIdToString(assemblyGraph[cv0].getAnchorId()) << "->" <<
+                    anchorIdToString(assemblyGraph[cv1].getAnchorId()) << endl;
             }
         }
     }
@@ -287,7 +289,7 @@ Superbubbles::Superbubbles(
     // Compute strongly connected components.
     std::map<vertex_descriptor, uint64_t> componentMap;
     boost::strong_components(
-        cGraph,
+        assemblyGraph,
         boost::make_assoc_property_map(componentMap),
         boost::vertex_index_map(boost::make_assoc_property_map(indexMap)));
 
@@ -317,8 +319,8 @@ Superbubbles::Superbubbles(
         for(const auto& p: bidirectionalPairs) {
             const vertex_descriptor cv0 = p.first;
             const vertex_descriptor cv1 = p.second;
-            cout << anchorIdToString(cGraph[cv0].getAnchorId()) << "->" <<
-                anchorIdToString(cGraph[cv1].getAnchorId()) << endl;
+            cout << anchorIdToString(assemblyGraph[cv0].getAnchorId()) << "->" <<
+                anchorIdToString(assemblyGraph[cv1].getAnchorId()) << endl;
         }
     }
 
@@ -330,10 +332,10 @@ Superbubbles::Superbubbles(
     for(const auto& p: bidirectionalPairs) {
         const vertex_descriptor cv0 = p.first;
         const vertex_descriptor cv1 = p.second;
-        if(out_degree(cv0, cGraph) <= 1) {
+        if(out_degree(cv0, assemblyGraph) <= 1) {
             continue;
         }
-        if(in_degree(cv1, cGraph) <= 1) {
+        if(in_degree(cv1, assemblyGraph) <= 1) {
             continue;
         }
         if(strongComponents[componentMap[cv0]].size() > 1) {
@@ -348,11 +350,11 @@ Superbubbles::Superbubbles(
         Superbubble& superbubble = superbubbles.back();
         superbubble.entrances.push_back(cv0);
         superbubble.exits.push_back(cv1);
-        superbubble.fillInFromEntranceAndExit(cGraph);
+        superbubble.fillInFromEntranceAndExit(assemblyGraph);
 
         if(debug) {
-            cout << "Tentative superbubble with entrance " << anchorIdToString(cGraph[cv0].getAnchorId()) <<
-                " exit " << anchorIdToString(cGraph[cv1].getAnchorId()) << " and " << superbubble.size() <<
+            cout << "Tentative superbubble with entrance " << anchorIdToString(assemblyGraph[cv0].getAnchorId()) <<
+                " exit " << anchorIdToString(assemblyGraph[cv1].getAnchorId()) << " and " << superbubble.size() <<
                 " vertices total." << endl;
         }
 
@@ -374,8 +376,8 @@ Superbubbles::Superbubbles(
         for(const Superbubble& superbubble: superbubbles) {
             const vertex_descriptor cv0 = superbubble.entrances.front();
             const vertex_descriptor cv1 = superbubble.exits.front();;
-            cout << anchorIdToString(cGraph[cv0].getAnchorId()) << "->" <<
-                anchorIdToString(cGraph[cv1].getAnchorId()) << endl;
+            cout << anchorIdToString(assemblyGraph[cv0].getAnchorId()) << "->" <<
+                anchorIdToString(assemblyGraph[cv1].getAnchorId()) << endl;
         }
     }
 
@@ -387,7 +389,7 @@ Superbubbles::Superbubbles(
 
 
 // Fill in the superbubble given a single entrance and exit.
-void Superbubble::fillInFromEntranceAndExit(const AssemblyGraph& cGraph)
+void Superbubble::fillInFromEntranceAndExit(const AssemblyGraph& assemblyGraph)
 {
     SHASTA_ASSERT(empty());
     SHASTA_ASSERT(entrances.size() == 1);
@@ -403,8 +405,8 @@ void Superbubble::fillInFromEntranceAndExit(const AssemblyGraph& cGraph)
     while(not q.empty()) {
         const vertex_descriptor cv0 = q.front();
         q.pop();
-        BGL_FORALL_OUTEDGES(cv0, e, cGraph, AssemblyGraph) {
-            const vertex_descriptor cv1 = target(e, cGraph);
+        BGL_FORALL_OUTEDGES(cv0, e, assemblyGraph, AssemblyGraph) {
+            const vertex_descriptor cv1 = target(e, assemblyGraph);
             if(cv1 != exit) {
                 if(not internalVertices.contains(cv1)) {
                     internalVertices.insert(cv1);
@@ -424,7 +426,7 @@ void Superbubble::fillInFromEntranceAndExit(const AssemblyGraph& cGraph)
 
 Superbubbles::~Superbubbles()
 {
-    cGraph.clearVertexNumbering();
+    assemblyGraph.clearVertexNumbering();
 }
 
 
@@ -433,6 +435,6 @@ Superbubbles::~Superbubbles()
 // Figure out if a vertex is in the specified superbubble.
 bool Superbubbles::isInSuperbubble(uint64_t superbubbleId, vertex_descriptor cv) const
 {
-    return cGraph[cv].superbubbleId == superbubbleId;
+    return assemblyGraph[cv].superbubbleId == superbubbleId;
 }
 

@@ -82,7 +82,7 @@ public:
 
 private:
 
-    AssemblyGraph& cGraph;
+    AssemblyGraph& assemblyGraph;
 
     // The superbubbles are the connected components with size at least 2,
     // computed using only the edges with offset up to maxOffset1.
