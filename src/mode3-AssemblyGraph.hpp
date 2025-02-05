@@ -58,6 +58,9 @@ namespace shasta {
             AssemblyGraphVertex,
             AssemblyGraphEdge>;
 
+        class Superbubble;
+        class Superbubbles;
+
         class ChainIdentifier;
 
         class AnchorGraph;
@@ -309,6 +312,70 @@ public:
 
 
 
+// Find short superbubbles in the AssemblyGraph.
+class shasta::mode3::Superbubble : public vector<AssemblyGraphBaseClass::vertex_descriptor> {
+public:
+    using vertex_descriptor = AssemblyGraphBaseClass::vertex_descriptor;
+    vector<vertex_descriptor> entrances;
+    vector<vertex_descriptor> exits;
+
+    // Fill in the superbubble given a single entrance and exit.
+    void fillInFromEntranceAndExit(const AssemblyGraph&);
+};
+
+
+
+class shasta::mode3::Superbubbles {
+public:
+    using vertex_descriptor = AssemblyGraphBaseClass::vertex_descriptor;
+
+    // This computes connected components using only edges with length up to maxOffset1.
+    Superbubbles(
+        AssemblyGraph&,
+        uint64_t maxOffset1
+        );
+
+    // This uses dominator trees.
+    // It only finds superbubbles with one entrance and one exit.
+    Superbubbles(AssemblyGraph&);
+
+    // This constructs superbubbles consisting of a single edge v0->v1
+    // such that outDegree(v0)=1 and indegree(v1)=1.
+    class FromEdges{};
+    Superbubbles(AssemblyGraph&, const FromEdges&);
+
+    ~Superbubbles();
+
+    // Return the number of superbubbbles.
+    uint64_t size() const
+    {
+        return superbubbles.size();
+    }
+
+    // Return the vertices in the specified superbubble.
+    Superbubble& getSuperbubble(uint64_t superBubbleId)
+    {
+        return superbubbles[superBubbleId];
+    }
+    const Superbubble& getSuperbubble(uint64_t superBubbleId) const
+    {
+        return superbubbles[superBubbleId];
+    }
+
+    // Figure out if a vertex is in the specified superbubble.
+    bool isInSuperbubble(uint64_t superbubbleId, vertex_descriptor cv) const;
+
+private:
+
+    AssemblyGraph& cGraph;
+
+    // The superbubbles are the connected components with size at least 2,
+    // computed using only the edges with offset up to maxOffset1.
+    vector<Superbubble> superbubbles;
+};
+
+
+
 class shasta::mode3::AssemblyGraph:
     public AssemblyGraphBaseClass,
     public MultithreadedObject<shasta::mode3::AssemblyGraph>,
@@ -426,8 +493,10 @@ private:
     // Compute vertexIndex for every vertex.
     // This numbers vertices consecutively starting at zero.
     // This numbering becomes invalid as soon as a vertex is added or removed.
+public:
     void numberVertices();
     void clearVertexNumbering();
+private:
 
     // Create a new edge connecting cv0 and cv1.
     // The new edge will consist of a simple BubbleChain with a single
@@ -554,65 +623,6 @@ private:
 
 
 
-    // Find short superbubbles in the AssemblyGraph.
-    class Superbubble : public vector<vertex_descriptor> {
-    public:
-        vector<vertex_descriptor> entrances;
-        vector<vertex_descriptor> exits;
-
-        // Fill in the superbubble given a single entrance and exit.
-        void fillInFromEntranceAndExit(const AssemblyGraph&);
-    };
-    class Superbubbles {
-    public:
-
-        // This computes connected components using only edges with length up to maxOffset1.
-        Superbubbles(
-            AssemblyGraph&,
-            uint64_t maxOffset1
-            );
-
-        // This uses dominator trees.
-        // It only finds superbubbles with one entrance and one exit.
-        Superbubbles(AssemblyGraph&);
-
-        // This constructs superbubbles consisting of a single edge v0->v1
-        // such that outDegree(v0)=1 and indegree(v1)=1.
-        class FromEdges{};
-        Superbubbles(AssemblyGraph&, const FromEdges&);
-
-        ~Superbubbles();
-
-        // Return the number of superbubbbles.
-        uint64_t size() const
-        {
-            return superbubbles.size();
-        }
-
-        // Return the vertices in the specified superbubble.
-        Superbubble& getSuperbubble(uint64_t superBubbleId)
-        {
-            return superbubbles[superBubbleId];
-        }
-        const Superbubble& getSuperbubble(uint64_t superBubbleId) const
-        {
-            return superbubbles[superBubbleId];
-        }
-
-        // Figure out if a vertex is in the specified superbubble.
-        bool isInSuperbubble(uint64_t superbubbleId, vertex_descriptor cv) const
-        {
-            return cGraph[cv].superbubbleId == superbubbleId;
-        }
-
-    private:
-
-        AssemblyGraph& cGraph;
-
-        // The superbubbles are the connected components with size at least 2,
-        // computed using only the edges with offset up to maxOffset1.
-        vector<Superbubble> superbubbles;
-    };
 
 
 

@@ -1783,7 +1783,7 @@ void AssemblyGraph::bubbleChainOffset(
 
 
 
-AssemblyGraph::Superbubbles::Superbubbles(
+Superbubbles::Superbubbles(
     AssemblyGraph& cGraph,
     uint64_t maxOffset1     // Used to define superbubbles
     ) :
@@ -1884,7 +1884,7 @@ AssemblyGraph::Superbubbles::Superbubbles(
 
 // This constructs superbubbles consisting of a single edge v0->v1
 // such that outDegree(v0)=1 and inDegree(v1)=1.
-AssemblyGraph::Superbubbles::Superbubbles(
+Superbubbles::Superbubbles(
     AssemblyGraph& assemblyGraph, const FromEdges&) :
     cGraph(assemblyGraph)
 {
@@ -1943,7 +1943,7 @@ AssemblyGraph::Superbubbles::Superbubbles(
 
 // This uses dominator trees.
 // It only finds superbubbles with one entrance and one exit.
-AssemblyGraph::Superbubbles::Superbubbles(
+Superbubbles::Superbubbles(
     AssemblyGraph& cGraph) :
     cGraph(cGraph)
 {
@@ -1981,8 +1981,8 @@ AssemblyGraph::Superbubbles::Superbubbles(
 
         // Compute the dominator tree.
         fill(dfNum.begin(), dfNum.end(), invalid<uint64_t>);
-        fill(parent.begin(), parent.end(), null_vertex());
-        fill(verticesByDFNum.begin(), verticesByDFNum.end(), null_vertex());
+        fill(parent.begin(), parent.end(), AssemblyGraph::null_vertex());
+        fill(verticesByDFNum.begin(), verticesByDFNum.end(), AssemblyGraph::null_vertex());
         std::map<vertex_descriptor, vertex_descriptor> predecessorMap;
 
         boost::lengauer_tarjan_dominator_tree(
@@ -2023,8 +2023,8 @@ AssemblyGraph::Superbubbles::Superbubbles(
 
         // Compute the dominator tree.
         fill(dfNum.begin(), dfNum.end(), invalid<uint64_t>);
-        fill(parent.begin(), parent.end(), null_vertex());
-        fill(verticesByDFNum.begin(), verticesByDFNum.end(), null_vertex());
+        fill(parent.begin(), parent.end(), AssemblyGraph::null_vertex());
+        fill(verticesByDFNum.begin(), verticesByDFNum.end(), AssemblyGraph::null_vertex());
         std::map<vertex_descriptor, vertex_descriptor> predecessorMap;
 
         boost::lengauer_tarjan_dominator_tree(
@@ -2154,7 +2154,7 @@ AssemblyGraph::Superbubbles::Superbubbles(
 
 
 // Fill in the superbubble given a single entrance and exit.
-void AssemblyGraph::Superbubble::fillInFromEntranceAndExit(const AssemblyGraph& cGraph)
+void Superbubble::fillInFromEntranceAndExit(const AssemblyGraph& cGraph)
 {
     SHASTA_ASSERT(empty());
     SHASTA_ASSERT(entrances.size() == 1);
@@ -2189,7 +2189,7 @@ void AssemblyGraph::Superbubble::fillInFromEntranceAndExit(const AssemblyGraph& 
 
 
 
-AssemblyGraph::Superbubbles::~Superbubbles()
+Superbubbles::~Superbubbles()
 {
     cGraph.clearVertexNumbering();
 }
@@ -8213,3 +8213,10 @@ void AssemblyGraph::annotateAnchors()
     }
 }
 
+
+
+// Figure out if a vertex is in the specified superbubble.
+bool Superbubbles::isInSuperbubble(uint64_t superbubbleId, vertex_descriptor cv) const
+{
+    return cGraph[cv].superbubbleId == superbubbleId;
+}
