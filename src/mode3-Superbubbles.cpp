@@ -156,6 +156,28 @@ Superbubbles::Superbubbles(
 
 
 
+// This constructs superbubbles consisting of a single tangled vertex.
+// A vertex v is tangled if:
+// inDegree(v)>1, outDegree(v)>1.
+Superbubbles::Superbubbles(
+    AssemblyGraph& assemblyGraph, const FromTangledVertices&) :
+    assemblyGraph(assemblyGraph)
+{
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        if((in_degree(v, assemblyGraph)  > 1) and (out_degree(v, assemblyGraph) > 1)) {
+            superbubbles.push_back(Superbubble());
+            Superbubble& superbubble = superbubbles.back();
+            superbubble.push_back(v);
+            superbubble.entrances.push_back(v);
+            superbubble.exits.push_back(v);
+        }
+    }
+
+    assemblyGraph.storeSuperbubblesInformation(*this);
+}
+
+
+
 // This uses dominator trees.
 // It only finds superbubbles with one entrance and one exit.
 Superbubbles::Superbubbles(
@@ -361,7 +383,9 @@ Superbubbles::Superbubbles(
         }
     }
 
-    assemblyGraph.storeSuperbubblesInformation(*this);
+    // Don't store superbubble informatiom in the AssemblyGraph, because the
+    // superbubbles created in this way can have overlap.
+    // assemblyGraph.storeSuperbubblesInformation(*this);
 
     if(debug) {
         cout << "End Superbubbles constructor using dominator trees." << endl;

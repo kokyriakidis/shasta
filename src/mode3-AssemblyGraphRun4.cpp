@@ -50,12 +50,21 @@ void AssemblyGraph::run4(
     // For detangling the Assemblyraph needs to be in expanded form.
     expand();
 
+    // Vertex detangling.
+    {
+        Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledVertices{});
+        detangleShortSuperbubbles4(false, superbubbles);
+    }
+
     // Edge detangling.
-    Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledEdges{});
-    detangleShortSuperbubbles4(false, superbubbles);
+    {
+        Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledEdges{});
+        detangleShortSuperbubbles4(false, superbubbles);
+    }
 
     // Before assembly sequence we put the AssemblyGraph back to compressed form.
     compress();
+    write("Z");
 
     // Assemble sequence.
     assembleAllChainsMultithreaded(
