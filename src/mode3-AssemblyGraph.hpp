@@ -1003,7 +1003,7 @@ private:
         bool debug);
     uint64_t detangleShortSuperbubbles4(bool debug, const Superbubbles&);
     bool detangleShortSuperbubble4(bool debug, const Superbubbles&, uint64_t superbubbleId);
-
+    uint64_t removeBubbles4();
 
     // Serialization.
     friend class boost::serialization::access;

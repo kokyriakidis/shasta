@@ -21,9 +21,20 @@ void AssemblyGraph::run4(
     SHASTA_ASSERT(std::is_sorted(anchorIds.begin(), anchorIds.end()));
 
     // write("A");
+    compress();
+
+    // Bubbles that are removed or cleaned up don't participate in detangling
+    // but can stil be assembled correctly if we are able to phase/detangle around them.
+
+    // Remove Bubbles n which one or more Chains have no internal Anchors.
+    const uint64_t removedBubbleCount = removeBubbles4();
+    if(removedBubbleCount > 0) {
+        cout << "Removed "<< removedBubbleCount << " bubbles." << endl;
+        compressBubbleChains();
+        compress();
+    }
 
     // Bubble cleanup.
-    compress();
     for(uint64_t iteration=0; ; iteration ++) {
         performanceLog << timestamp << "Iteration " << iteration <<
             " of bubble cleanup begins." << endl;
@@ -114,7 +125,7 @@ bool AssemblyGraph::detangleShortSuperbubble4(
 {
     // EXPOSE WHEN CODE STABILIZES.
     const double epsilon = 0.05;
-    const double chiSquareThreshold = 10.;
+    const double chiSquareThreshold = 30.;
 
     AssemblyGraph& assemblyGraph = *this;
     const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
@@ -485,3 +496,46 @@ bool AssemblyGraph::detangleShortSuperbubble4(
     return true;
 }
 
+
+
+// This removes non-haploid Bubbles in which one or more Chains have no internal Anchors.
+uint64_t AssemblyGraph::removeBubbles4()
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    /// Loop over all BubbleChains.
+    uint64_t n = 0;
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        BubbleChain& bubbleChain = assemblyGraph[e];
+
+        // Loop over non-haploid Bubbles of this BubbleChain.
+        for(Bubble& bubble: bubbleChain) {
+            if(bubble.isHaploid()) {
+                continue;
+            }
+
+            // Look for a Chain in this Bubble that has no internal Anchors.
+            uint64_t j = invalid<uint64_t>;
+            for(uint64_t i=0; i<bubble.size(); i++) {
+                const Chain& chain = bubble[i];
+                if(chain.size() == 2) {
+                    j = i;
+                    break;
+                }
+            }
+
+            // If did not find any such Chains, do nothing.
+            if(j == invalid<uint64_t>) {
+                continue;
+            }
+
+            // Only keep the Chain without internal Anchor.
+            const Chain chain = bubble[j];
+            bubble.clear();
+            bubble.push_back(chain);
+            ++n;
+        }
+    }
+
+    return n;
+}
