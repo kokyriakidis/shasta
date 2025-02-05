@@ -1924,6 +1924,19 @@ AssemblyGraph::Superbubbles::Superbubbles(
         superbubble.entrances.push_back(v0);
         superbubble.exits.push_back(v1);
     }
+
+    // Store superbubble ids in the vertices.
+    BGL_FORALL_VERTICES(cv, cGraph, AssemblyGraph) {
+        cGraph[cv].superbubbleId = invalid<uint64_t>;
+    }
+    for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
+        const vector<vertex_descriptor>& superbubble = getSuperbubble(superbubbleId);
+        for(const vertex_descriptor cv: superbubble) {
+            AssemblyGraphVertex& vertex = cGraph[cv];
+            SHASTA_ASSERT(vertex.superbubbleId == invalid<uint64_t>);
+            vertex.superbubbleId = superbubbleId;
+        }
+    }
 }
 
 
@@ -8199,3 +8212,4 @@ void AssemblyGraph::annotateAnchors()
         }
     }
 }
+

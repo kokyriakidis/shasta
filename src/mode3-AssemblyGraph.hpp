@@ -1060,9 +1060,6 @@ private:
         bool debug);
     void detangleVertices4();
     bool detangleVertex4(vertex_descriptor);
-
-    // These require all BubbleChains to consist of a single Chain.
-    // They returns the number of edges that were detangled.
     uint64_t detangleEdges4(
         bool debug,
         uint64_t detangleToleranceHigh);
@@ -1076,7 +1073,8 @@ private:
         bool debug,
         std::map<uint64_t, edge_descriptor>& edgeMap,
         std::map<uint64_t, edge_descriptor>::iterator&);
-
+    uint64_t detangleShortSuperbubbles4(bool debug, const Superbubbles&);
+    bool detangleShortSuperbubble4(bool debug, const Superbubbles&, uint64_t superbubbleId);
 
 
     // Serialization.
