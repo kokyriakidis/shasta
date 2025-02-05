@@ -54,10 +54,11 @@ public:
     // It only finds superbubbles with one entrance and one exit.
     Superbubbles(AssemblyGraph&);
 
-    // This constructs superbubbles consisting of a single edge v0->v1
-    // such that outDegree(v0)=1 and indegree(v1)=1.
-    class FromEdges{};
-    Superbubbles(AssemblyGraph&, const FromEdges&);
+    // This constructs superbubbles consisting of a single tangled edge.
+    // An edge v0->v1 is tangled if
+    // inDegree(v0)>1, outDegree(v0)==1, inDegree(v1)==1, outDegree(v1)>1.
+    class FromTangledEdges{};
+    Superbubbles(AssemblyGraph&, const FromTangledEdges&);
 
     ~Superbubbles();
 

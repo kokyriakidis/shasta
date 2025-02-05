@@ -170,7 +170,7 @@ public:
         return n;
     }
 
-    // This returns true if this superbubble consists of a single haploid bubble.
+    // This returns true if this BubbleChain consists of a single haploid bubble.
     bool isSimpleChain() const
     {
         return size() == 1 and firstBubble().isHaploid();
@@ -284,7 +284,7 @@ public:
     uint64_t index = invalid<uint64_t>;
 
     // The id of the Superbubble this vertex belongs to, if any.
-    // Stored by class Superbubbles.
+    // Stored by storeSuperbubblesInformation.
     uint64_t superbubbleId = invalid<uint64_t>;
 
     template<class Archive> void serialize(Archive & ar, unsigned int /* version */)
@@ -555,11 +555,10 @@ private:
         uint64_t maxOffset,
         uint64_t chainTerminalCommonThreshold);
 
-
-
-
-
-
+    // Store Superbubbles information in the vertices.
+public:
+    void storeSuperbubblesInformation(const Superbubbles&);
+private:
 
     // Remove short superbubbles with one entry and one exit.
     bool removeShortSuperbubbles(

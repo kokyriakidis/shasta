@@ -43,7 +43,7 @@ uint64_t AssemblyGraph::detangleSuperbubblesWithReadFollowing(
         superbubbles = make_shared<Superbubbles>(assemblyGraph, maxOffset);
         // cout << "Found " << superbubbles->size() << " superbubbles for detangling." << endl;
     } else if(superbubbleCreationMethod == SuperbubbleCreationMethod::SingleEdges) {
-        superbubbles = make_shared<Superbubbles>(assemblyGraph, Superbubbles::FromEdges());
+        superbubbles = make_shared<Superbubbles>(assemblyGraph, Superbubbles::FromTangledEdges());
         // cout << "Found " << superbubbles->size() <<
         //     " superbubbles for detangling, each consisting of a single edge." << endl;
     } else {

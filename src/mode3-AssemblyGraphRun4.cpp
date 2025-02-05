@@ -51,7 +51,7 @@ void AssemblyGraph::run4(
     expand();
 
     // Edge detangling.
-    Superbubbles superbubbles(assemblyGraph, Superbubbles::FromEdges{});
+    Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledEdges{});
     detangleShortSuperbubbles4(false, superbubbles);
 
     // Before assembly sequence we put the AssemblyGraph back to compressed form.

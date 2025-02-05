@@ -60,16 +60,7 @@ Superbubbles::Superbubbles(
         }
     }
 
-    // Store superbubble ids in the vertices.
-    BGL_FORALL_VERTICES(cv, assemblyGraph, AssemblyGraph) {
-        assemblyGraph[cv].superbubbleId = invalid<uint64_t>;
-    }
-    for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        const vector<vertex_descriptor>& superbubble = getSuperbubble(superbubbleId);
-        for(const vertex_descriptor cv: superbubble) {
-            assemblyGraph[cv].superbubbleId = superbubbleId;
-        }
-    }
+    assemblyGraph.storeSuperbubblesInformation(*this);
 
 
 
@@ -120,7 +111,7 @@ Superbubbles::Superbubbles(
 // outDegree(v0) == 1, inDegree(v0)  > 1
 // inDegree (v1) == 1, outDegree(v1) > 1
 Superbubbles::Superbubbles(
-    AssemblyGraph& assemblyGraph, const FromEdges&) :
+    AssemblyGraph& assemblyGraph, const FromTangledEdges&) :
     assemblyGraph(assemblyGraph)
 {
 
@@ -160,18 +151,7 @@ Superbubbles::Superbubbles(
         superbubble.exits.push_back(v1);
     }
 
-    // Store superbubble ids in the vertices.
-    BGL_FORALL_VERTICES(cv, assemblyGraph, AssemblyGraph) {
-        assemblyGraph[cv].superbubbleId = invalid<uint64_t>;
-    }
-    for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        const vector<vertex_descriptor>& superbubble = getSuperbubble(superbubbleId);
-        for(const vertex_descriptor cv: superbubble) {
-            AssemblyGraphVertex& vertex = assemblyGraph[cv];
-            SHASTA_ASSERT(vertex.superbubbleId == invalid<uint64_t>);
-            vertex.superbubbleId = superbubbleId;
-        }
-    }
+    assemblyGraph.storeSuperbubblesInformation(*this);
 }
 
 
@@ -381,9 +361,12 @@ Superbubbles::Superbubbles(
         }
     }
 
+    assemblyGraph.storeSuperbubblesInformation(*this);
+
     if(debug) {
         cout << "End Superbubbles constructor using dominator trees." << endl;
     }
+
 }
 
 
