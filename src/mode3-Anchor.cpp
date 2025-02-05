@@ -122,20 +122,23 @@ void Anchor::check() const
 
 
 // Return the number of common oriented reads between two Anchors.
-uint64_t Anchors::countCommon(AnchorId anchorId0, AnchorId anchorId1) const
+uint64_t Anchors::countCommon(
+    AnchorId anchorId0,
+    AnchorId anchorId1,
+    bool ignoreNegativeOffsets) const
 {
     const Anchors& anchors = *this;
     const Anchor anchor0 = anchors[anchorId0];
     const Anchor anchor1 = anchors[anchorId1];
 
-    return anchor0.countCommon(anchor1);
+    return anchor0.countCommon(anchor1, ignoreNegativeOffsets);
 }
 
 
 
 // Return the number of common oriented reads with another Anchor.
 // Oriented reads in each Anchor are sorted and not duplicated.
-uint64_t Anchor::countCommon(const Anchor& that) const
+uint64_t Anchor::countCommon(const Anchor& that, bool ignoreNegativeOffsets) const
 {
     const Anchor& anchor0 = *this;
     const Anchor& anchor1 = that;
@@ -155,7 +158,13 @@ uint64_t Anchor::countCommon(const Anchor& that) const
         } else if(orientedReadId1 < orientedReadId0) {
             ++it1;
         } else {
-            ++count;
+            if(ignoreNegativeOffsets){
+                if(it0->ordinal0 < it1->ordinal0) {
+                    ++count;
+                }
+            } else {
+                ++count;
+            }
             ++it0;
             ++it1;
         }

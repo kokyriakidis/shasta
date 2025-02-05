@@ -101,7 +101,7 @@ public:
     }
 
     // Return the number of common oriented reads with another Anchor.
-    uint64_t countCommon(const Anchor& that) const;
+    uint64_t countCommon(const Anchor& that, bool ignoreNegativeOffsets = false) const;
 };
 
 
@@ -164,7 +164,7 @@ public:
     vector<Base> anchorExtendedSequence(AnchorId) const;
 
     // Return the number of common oriented reads between two Anchors.
-    uint64_t countCommon(AnchorId, AnchorId) const;
+    uint64_t countCommon(AnchorId, AnchorId, bool ignoreNegativeOffsets = false) const;
 
     // Analyze the oriented read composition of two anchors.
     void analyzeAnchorPair(AnchorId, AnchorId, AnchorPairInfo&) const;

@@ -47,31 +47,43 @@ void AssemblyGraph::run4(
     compressBubbleChains();
     compress();
 
-    // For detangling the Assemblyraph needs to be in expanded form.
+    // For detangling the AssemblyGraph needs to be in expanded form.
     expand();
 
     // Vertex detangling.
     {
-        Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledVertices{});
-        detangleShortSuperbubbles4(false, superbubbles);
+        while(true) {
+            Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledVertices{});
+            const uint64_t detangledCount = detangleShortSuperbubbles4(false, superbubbles);
+            if(detangledCount == 0) {
+                break;
+            }
+            cout << "Detangled " << detangledCount << " vertices." << endl;
+        }
     }
 
     // Edge detangling.
-    {
+    while(true) {
         Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledEdges{});
-        detangleShortSuperbubbles4(false, superbubbles);
+        const uint64_t detangledCount = detangleShortSuperbubbles4(false, superbubbles);
+        if(detangledCount == 0) {
+            break;
+        }
+        cout << "Detangled " << detangledCount << " edges." << endl;
     }
 
-    // Before assembly sequence we put the AssemblyGraph back to compressed form.
+    // Before sequence assembly we put the AssemblyGraph back to compressed form.
     compress();
     write("Z");
 
+#if 0
     // Assemble sequence.
     assembleAllChainsMultithreaded(
         options.assemblyGraphOptions.chainTerminalCommonThreshold,
         threadCount);
     writeAssemblyDetails();
     write("Final", true);
+#endif
 }
 
 
@@ -221,7 +233,7 @@ bool AssemblyGraph::detangleShortSuperbubble4(
         const AnchorId anchorId0 = inAnchors[i0];
         for(uint64_t i1=0; i1<outDegree; i1++) {
             const AnchorId anchorId1 = outAnchors[i1];
-            const uint64_t n = anchors.countCommon(anchorId0, anchorId1);
+            const uint64_t n = anchors.countCommon(anchorId0, anchorId1, true);
             tangleMatrix[i0][i1] = n;
             N += n;
             inCoverage[i0] += n;
@@ -470,6 +482,6 @@ bool AssemblyGraph::detangleShortSuperbubble4(
         remove_vertex(v, assemblyGraph);
     }
 
-    return false;
+    return true;
 }
 
