@@ -1053,26 +1053,11 @@ private:
 
 
 
-    // Code in mode3-AssemblyGraphDetangle4.cpp.
+    // Code in mode3-AssemblyGraphRun4.cpp.
     void run4(
         uint64_t threadCount,
         bool assembleSequence,
         bool debug);
-    void detangleVertices4();
-    bool detangleVertex4(vertex_descriptor);
-    uint64_t detangleEdges4(
-        bool debug,
-        uint64_t detangleToleranceHigh);
-    bool detangleEdge4(
-        bool debug,
-        std::map<uint64_t, edge_descriptor>& edgeMap,
-        std::map<uint64_t, edge_descriptor>::iterator&,
-        uint64_t detangleToleranceHigh);
-    uint64_t detangleEdges4Strict(bool debug);
-    bool detangleEdge4Strict(
-        bool debug,
-        std::map<uint64_t, edge_descriptor>& edgeMap,
-        std::map<uint64_t, edge_descriptor>::iterator&);
     uint64_t detangleShortSuperbubbles4(bool debug, const Superbubbles&);
     bool detangleShortSuperbubble4(bool debug, const Superbubbles&, uint64_t superbubbleId);
 
