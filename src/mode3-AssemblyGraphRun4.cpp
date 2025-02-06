@@ -17,6 +17,7 @@ void AssemblyGraph::run4(
     // EXPOSE WHEN CODE STABILIZES.
     const double epsilon = 0.05;
     const double chiSquareThreshold = 30.;
+    const uint64_t superbubbleLengthThreshold = 1000;
 
     AssemblyGraph& assemblyGraph = *this;
 
@@ -89,6 +90,19 @@ void AssemblyGraph::run4(
                 break;
             }
             cout << "Detangled " << detangledCount << " edges." << endl;
+        }
+    }
+
+    // Superbubble detangling.
+    {
+        Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
+        while(true) {
+            Superbubbles superbubbles(assemblyGraph, superbubbleLengthThreshold);
+            const uint64_t detangledCount = detangle(superbubbles, detangler);
+            if(detangledCount == 0) {
+                break;
+            }
+            cout << "Detangled " << detangledCount << " superbubbles." << endl;
         }
     }
 
