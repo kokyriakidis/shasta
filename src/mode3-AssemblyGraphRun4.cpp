@@ -29,60 +29,62 @@ void AssemblyGraph::run4(
     // write("A");
     compress();
 
-    // Bubbles that are removed or cleaned up don't participate in detangling
-    // but can still be assembled correctly if we are able to phase/detangle around them.
+    // An iteration loop in which we try at each iteration
+    // all operations that can simplify the AssemblyGraph.
+    for(uint64_t iteration=0; ; iteration++) {
+        cout << "Simplify iteration " << iteration << " begins with " <<
+            num_vertices(assemblyGraph) << " vertices and " << num_edges(assemblyGraph) <<
+            " edges." << endl;
 
-    // Remove Bubbles in which one or more Chains have no internal Anchors.
-    const uint64_t removedBubbleCount = cleanupBubbles();
-    if(removedBubbleCount > 0) {
-        cout << "Removed "<< removedBubbleCount << " bubbles." << endl;
+        uint64_t simplificationCount = 0;
+
+        // Bubbles that are removed or cleaned up don't participate in detangling
+        // but can still be assembled correctly if we are able to phase/detangle around them.
+
+        // Clean up Bubbles in which one or more Chains have no internal Anchors.
+        compress();
+        const uint64_t cleanedUpBubbleCount1 = cleanupBubbles();
+        cout << "Cleaned up "<< cleanedUpBubbleCount1 << " bubbles containing chains "
+            "without internal anchors." << endl;
+        simplificationCount += cleanedUpBubbleCount1;
+
         compressBubbleChains();
         compress();
-    }
 
-    // Bubble cleanup.
-    for(uint64_t iteration=0; ; iteration ++) {
-        performanceLog << timestamp << "Iteration " << iteration <<
-            " of bubble cleanup begins." << endl;
-        const uint64_t cleanedUpBubbleCount = cleanupBubbles(
+        // Bubble cleanup. This cleans up Bubbles that are probably caused by errors.
+        const uint64_t cleanedUpBubbleCount2 = cleanupBubbles(
             debug,
             options.assemblyGraphOptions.bubbleCleanupMaxOffset,
             options.assemblyGraphOptions.chainTerminalCommonThreshold,
             threadCount);
-        if(cleanedUpBubbleCount == 0) {
-            break;
-        }
-        cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles." << endl;
+        simplificationCount += cleanedUpBubbleCount2;
+        cout << "Cleaned up " << cleanedUpBubbleCount2 << " bubbles "
+            "probably caused by errors." << endl;
+
         compressBubbleChains();
         compress();
-    }
 
-    // Clean up short superbubbles.
-    cleanupSuperbubbles(false,
-        options.assemblyGraphOptions.superbubbleLengthThreshold1,
-        options.assemblyGraphOptions.chainTerminalCommonThreshold);
-    compressBubbleChains();
-    compress();
-
-    // For detangling the AssemblyGraph needs to be in expanded form.
-    expand();
+        // Clean up short superbubbles.
+        const uint64_t cleanedUpSuperbubbleCount =
+            cleanupSuperbubbles(false,
+            options.assemblyGraphOptions.superbubbleLengthThreshold1,
+            options.assemblyGraphOptions.chainTerminalCommonThreshold);
+        simplificationCount += cleanedUpSuperbubbleCount;
+        cout << "Cleaned up " << cleanedUpSuperbubbleCount << " superbubbles." << endl;
 
 
-    // Detangle iteration. Continue detangling until nothing changes.
-    // Vertex detangling.
-    for(uint64_t iteration=0; ; iteration++) {
-        cout << "Detangle iteration " << iteration << " begins with " <<
-            num_vertices(assemblyGraph) << " and " << num_edges(assemblyGraph) <<
-            " edges." << endl;
+        compressBubbleChains();
+        compress();
 
-        uint64_t totalDetangledCount = 0;
+        // For detangling the AssemblyGraph needs to be in expanded form.
+        expand();
 
         // Vertex detangling.
         {
             Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
             Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledVertices{});
             const uint64_t detangledCount = detangle(superbubbles, detangler);
-            totalDetangledCount += detangledCount;
+            simplificationCount += detangledCount;
             cout << "Detangled " << detangledCount << " vertices." << endl;
         }
 
@@ -91,35 +93,36 @@ void AssemblyGraph::run4(
             Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
             Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledEdges{});
             const uint64_t detangledCount = detangle(superbubbles, detangler);
-            totalDetangledCount += detangledCount;
+            simplificationCount += detangledCount;
             cout << "Detangled " << detangledCount << " edges." << endl;
         }
 
         // Superbubble detangling.
         {
-            Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
+            Detangler2by2 detangler(true, epsilon, chiSquareThreshold);
             Superbubbles superbubbles(assemblyGraph, superbubbleLengthThreshold);
             const uint64_t detangledCount = detangle(superbubbles, detangler);
-            totalDetangledCount += detangledCount;
+            simplificationCount += detangledCount;
             cout << "Detangled " << detangledCount << " superbubbles." << endl;
         }
 
         cout << "Detangle iteration " << iteration << " had " <<
-            totalDetangledCount << " successful detangling operation." << endl;
+            simplificationCount << " successful detangling operations." << endl;
 
+        // After detangling put the AssemblyGraph back in compressed form.
+        compress();
 
-        if(totalDetangledCount == 0) {
+        if(simplificationCount == 0) {
             break;
         }
     }
-    cout << "After detangling, the assembly graph has " <<
-        num_vertices(assemblyGraph) << " and " << num_edges(assemblyGraph) <<
+    cout << "After simplifying iterations, the assembly graph has " <<
+        num_vertices(assemblyGraph) << " vertices and " << num_edges(assemblyGraph) <<
         " edges." << endl;
 
 
 
     // Before sequence assembly we put the AssemblyGraph back to compressed form.
-    compress();
     write("Z");
 
 #if 0
@@ -550,7 +553,7 @@ bool AssemblyGraph::detangleShortSuperbubble4(
 
 
 
-// This removes non-haploid Bubbles in which one or more Chains have no internal Anchors.
+// This cleans up non-haploid Bubbles in which one or more Chains have no internal Anchors.
 uint64_t AssemblyGraph::cleanupBubbles()
 {
     AssemblyGraph& assemblyGraph = *this;

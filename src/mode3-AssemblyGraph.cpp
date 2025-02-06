@@ -1921,7 +1921,7 @@ bool AssemblyGraph::removeShortSuperbubbles(
 
 // Cleanup/simplify superbubbles that are likely to be caused by errors,
 // completely or in part.
-void AssemblyGraph::cleanupSuperbubbles(
+uint64_t AssemblyGraph::cleanupSuperbubbles(
     bool debug,
     uint64_t maxOffset1,    // Used to define superbubbles
     uint64_t maxOffset2,    // Compared against the offset between entry and exit
@@ -1954,7 +1954,7 @@ void AssemblyGraph::cleanupSuperbubbles(
 
 // This version of superbubble cleanup uses dominator trees to define superbubbles,
 // instead of computing connected components using edges of length uo tp maxOffset1.
-void AssemblyGraph::cleanupSuperbubbles(
+uint64_t AssemblyGraph::cleanupSuperbubbles(
     bool debug,
     uint64_t maxOffset2,     // Compared against the offset between entry and exit
     uint64_t chainTerminalCommonThreshold)
@@ -1965,6 +1965,8 @@ void AssemblyGraph::cleanupSuperbubbles(
     if(debug) {
         cout << "cleanupSuperbubbles begins." << endl;
     }
+
+    uint64_t cleanedUpCount = 0;
 
     // Find the superbubbles using dominator trees.
     Superbubbles superbubbles(cGraph);
@@ -1989,13 +1991,17 @@ void AssemblyGraph::cleanupSuperbubbles(
     // Loop over the superbubbles in order of increasing size.
     for(const auto& p: superbubbleTable) {
         const uint64_t superbubbleId = p.first;
-        cleanupSuperbubble(debug, superbubbles, superbubbleId, maxOffset2,
-            chainTerminalCommonThreshold, previousSuperbubblesVertices);
+        if(cleanupSuperbubble(debug, superbubbles, superbubbleId, maxOffset2,
+            chainTerminalCommonThreshold, previousSuperbubblesVertices)) {
+            ++cleanedUpCount;
+        }
     }
     if(debug) {
         cout << "cleanupSuperbubbles ends." << endl;
     }
     performanceLog << timestamp << "AssemblyGraph::cleanupSuperbubbles ends." << endl;
+
+    return cleanedUpCount;
 
 }
 
@@ -2005,7 +2011,7 @@ void AssemblyGraph::cleanupSuperbubbles(
 // completely or in part.
 // This handles superbubbles caused by two marker graph bubbles with
 // no primary edges in between.
-void AssemblyGraph::cleanupSuperbubble(
+bool AssemblyGraph::cleanupSuperbubble(
     bool debug,
     const Superbubbles& superbubbles,
     uint64_t superbubbleId,
@@ -2047,7 +2053,7 @@ void AssemblyGraph::cleanupSuperbubble(
         previousSuperbubblesVertices.insert(v);
     }
     if(overlaps) {
-        return;
+        return false;
     }
 
     // Skip it if it has more than one entrance or exit.
@@ -2057,7 +2063,7 @@ void AssemblyGraph::cleanupSuperbubble(
                 superbubble.entrances.size() << " entrances and " <<
                 superbubble.exits.size() << " exits." << endl;
         }
-        return;
+        return false;
     }
 
     const vertex_descriptor entrance = superbubble.entrances.front();
@@ -2072,7 +2078,7 @@ void AssemblyGraph::cleanupSuperbubble(
             cout << "This superbubble will be skipped because the entrance vertex"
                 " is the same as the exit vertex." << endl;
         }
-        return;
+        return false;
     }
 
 
@@ -2086,14 +2092,14 @@ void AssemblyGraph::cleanupSuperbubble(
             cout << "This superbubble will be skipped because "
                 "there are no common oriented reads between the entrance and the exit." << endl;
         }
-        return;
+        return false;
     }
     if(info.offsetInBases > int64_t(maxOffset2)) {
         if(debug) {
             cout << "This superbubble will be skipped because offsetInBases is " <<
                 info.offsetInBases << endl;
         }
-        return;
+        return false;
     }
 
     // If a trivial superbubble, skip it.
@@ -2111,7 +2117,7 @@ void AssemblyGraph::cleanupSuperbubble(
             if(debug) {
                 cout << "This superbubble be skipped because it is trivial." << endl;
             }
-            return;
+            return false;
         }
     }
 
@@ -2163,7 +2169,7 @@ void AssemblyGraph::cleanupSuperbubble(
                     commonEdges.size() << " common edges between the out-edges of the entrance "
                     "and the in-edges of the exit." << endl;
             }
-            return;
+            return false;
         }
     }
 
@@ -2396,6 +2402,7 @@ void AssemblyGraph::cleanupSuperbubble(
         bubbleChain.push_back(newBubble);
     }
 
+    return true;
 }
 
 

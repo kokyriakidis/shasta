@@ -636,12 +636,12 @@ private:
 
     // Cleanup/simplify superbubbles that are likely to be caused by errors,
     // completely or in part.
-    void cleanupSuperbubbles(
+    uint64_t cleanupSuperbubbles(
         bool debug,
         uint64_t maxOffset1,    // Used to define superbubbles
         uint64_t maxOffset2,    // Compared against the offset between entry and exit
         uint64_t chainTerminalCommonThreshold);
-    void cleanupSuperbubble(
+    bool cleanupSuperbubble(
         bool debug,
         const Superbubbles&,
         uint64_t superbubbleId,
@@ -651,7 +651,7 @@ private:
 
     // This version of superbubble cleanup uses dominator trees to define superbubbles,
     // instead of computing connected components using edges of length uo tp maxOffset1.
-    void cleanupSuperbubbles(
+    uint64_t cleanupSuperbubbles(
         bool debug,
         uint64_t maxOffset2,    // Compared against the offset between entry and exit
         uint64_t chainTerminalCommonThreshold);
