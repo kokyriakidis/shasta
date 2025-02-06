@@ -555,9 +555,28 @@ private:
         uint64_t maxOffset,
         uint64_t chainTerminalCommonThreshold);
 
-    // Store Superbubbles information in the vertices.
 public:
+
+    // Store Superbubbles information in the superbubbleId field of the vertices.
+    // Vertices that don't belong to any superbubble are assigned invalid<uint64_t>.
     void storeSuperbubblesInformation(const Superbubbles&);
+
+    // Find out if two vertices are in the same superbubble.
+    bool areInSameSuperbubble(vertex_descriptor v0, vertex_descriptor v1) const
+    {
+        const AssemblyGraph& assemblyGraph = *this;
+        return assemblyGraph[v0].superbubbleId == assemblyGraph[v1].superbubbleId;
+    }
+
+    // Find out if the two vertices of an edge are in the same superbubble.
+    bool isInternalToSuperbubble(edge_descriptor e) const
+    {
+        const AssemblyGraph& assemblyGraph = *this;
+        const vertex_descriptor v0 = source(e, assemblyGraph);
+        const vertex_descriptor v1 = target(e, assemblyGraph);
+        return areInSameSuperbubble(v0, v1);
+    }
+
 private:
 
     // Remove short superbubbles with one entry and one exit.

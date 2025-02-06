@@ -144,18 +144,16 @@ bool AssemblyGraph::detangleShortSuperbubble4(
     // as they can change when other superbubbles are detangled.
     vector<edge_descriptor> inEdges;
     vector<edge_descriptor> outEdges;
-    for(const vertex_descriptor v0: superbubble) {
-        BGL_FORALL_INEDGES(v0, e, assemblyGraph, AssemblyGraph) {
-            const vertex_descriptor v1 = source(e, assemblyGraph);
-            if(not superbubbles.isInSuperbubble(superbubbleId, v1)) {
+    for(const vertex_descriptor v: superbubble) {
+        BGL_FORALL_INEDGES(v, e, assemblyGraph, AssemblyGraph) {
+            if(not assemblyGraph.isInternalToSuperbubble(e)) {
                  inEdges.push_back(e);
             }
         }
     }
-    for(const vertex_descriptor v0: superbubble) {
-        BGL_FORALL_OUTEDGES(v0, e, assemblyGraph, AssemblyGraph) {
-            const vertex_descriptor v1 = target(e, assemblyGraph);
-            if(not superbubbles.isInSuperbubble(superbubbleId, v1)) {
+    for(const vertex_descriptor v: superbubble) {
+        BGL_FORALL_OUTEDGES(v, e, assemblyGraph, AssemblyGraph) {
+            if(not assemblyGraph.isInternalToSuperbubble(e)) {
                  outEdges.push_back(e);
             }
         }
