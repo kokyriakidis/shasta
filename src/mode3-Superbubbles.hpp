@@ -87,8 +87,6 @@ public:
     // Figure out if a vertex is in the specified superbubble.
     bool isInSuperbubble(uint64_t superbubbleId, vertex_descriptor cv) const;
 
-private:
-
     AssemblyGraph& assemblyGraph;
 
     // The superbubbles are the connected components with size at least 2,

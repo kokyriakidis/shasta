@@ -103,15 +103,15 @@ uint64_t AssemblyGraph::detangleShortSuperbubbles4(
     bool debug,
     const Superbubbles& superbubbles)
 {
-    uint64_t n = 0;
+    uint64_t detangledCount = 0;
 
-    for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        if(detangleShortSuperbubble4(debug, superbubbles, superbubbleId)) {
-            ++n;
+    for(const Superbubble& superbubble: superbubbles.superbubbles) {
+        if(detangleShortSuperbubble4(debug, superbubble)) {
+            ++detangledCount;
         }
     }
 
-    return n;
+    return detangledCount;
 }
 
 
@@ -120,15 +120,13 @@ uint64_t AssemblyGraph::detangleShortSuperbubbles4(
 // It uses a chi-squared test for phasing.
 bool AssemblyGraph::detangleShortSuperbubble4(
     bool debug,
-    const Superbubbles& superbubbles,
-    uint64_t superbubbleId)
+    const vector<vertex_descriptor>& superbubble)
 {
     // EXPOSE WHEN CODE STABILIZES.
     const double epsilon = 0.05;
     const double chiSquareThreshold = 30.;
 
     AssemblyGraph& assemblyGraph = *this;
-    const Superbubble& superbubble = superbubbles.getSuperbubble(superbubbleId);
 
     if(debug) {
         cout << "Found a superbubble with " << superbubble.size() <<

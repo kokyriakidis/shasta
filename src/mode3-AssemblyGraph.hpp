@@ -1021,7 +1021,7 @@ private:
         bool assembleSequence,
         bool debug);
     uint64_t detangleShortSuperbubbles4(bool debug, const Superbubbles&);
-    bool detangleShortSuperbubble4(bool debug, const Superbubbles&, uint64_t superbubbleId);
+    bool detangleShortSuperbubble4(bool debug, const vector<vertex_descriptor>& superbubble);
     uint64_t removeBubbles4();
 
     // Serialization.
