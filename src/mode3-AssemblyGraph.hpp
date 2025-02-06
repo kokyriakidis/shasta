@@ -4,6 +4,7 @@
 #include "Base.hpp"
 #include "invalid.hpp"
 #include "mode3-Anchor.hpp"
+#include "mode3-Detangler.hpp"
 #include "mode3-PhasedComponent.hpp"
 #include "mode3-Superbubbles.hpp"
 #include "MappedMemoryOwner.hpp"
@@ -1020,9 +1021,10 @@ private:
         uint64_t threadCount,
         bool assembleSequence,
         bool debug);
-    uint64_t detangleShortSuperbubbles4(bool debug, const Superbubbles&);
-    bool detangleShortSuperbubble4(bool debug, const vector<vertex_descriptor>& superbubble);
-    uint64_t removeBubbles4();
+    uint64_t detangle(const Superbubbles&, Detangler&);
+    // uint64_t detangleShortSuperbubbles4(bool debug, const Superbubbles&);
+    // bool detangleShortSuperbubble4(bool debug, const vector<vertex_descriptor>& superbubble);
+    uint64_t cleanupBubbles();
 
     // Serialization.
     friend class boost::serialization::access;

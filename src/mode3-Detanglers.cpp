@@ -1,161 +1,38 @@
+// This file contains implementations of concrete classes derived from mode3::Detangler.
+
 // Shasta.
-#include "mode3-AssemblyGraph.hpp"
 #include "mode3-Detanglers.hpp"
-#include "AssemblerOptions.hpp"
-#include "performanceLog.hpp"
-#include "timestamp.hpp"
+#include "mode3-Anchor.hpp"
+#include "mode3-AssemblyGraph.hpp"
+#include "SHASTA_ASSERT.hpp"
 using namespace shasta;
 using namespace mode3;
 
+// Boost libraries.
+#include <boost/graph/iteration_macros.hpp>
+
+// Standard library.
+#include <iostream.hpp>
 
 
-void AssemblyGraph::run4(
-    uint64_t threadCount,
-    bool /* assembleSequence */,
-    bool debug)
-{
-    // EXPOSE WHEN CODE STABILIZES.
-    const double epsilon = 0.05;
-    const double chiSquareThreshold = 30.;
 
-    AssemblyGraph& assemblyGraph = *this;
-
-    cout << "AssemblyGraph::run4 begins for component " << componentId << endl;
-
-    SHASTA_ASSERT(std::is_sorted(orientedReadIds.begin(), orientedReadIds.end()));
-    SHASTA_ASSERT(std::is_sorted(anchorIds.begin(), anchorIds.end()));
-
-    // write("A");
-    compress();
-
-    // Bubbles that are removed or cleaned up don't participate in detangling
-    // but can still be assembled correctly if we are able to phase/detangle around them.
-
-    // Remove Bubbles in which one or more Chains have no internal Anchors.
-    const uint64_t removedBubbleCount = cleanupBubbles();
-    if(removedBubbleCount > 0) {
-        cout << "Removed "<< removedBubbleCount << " bubbles." << endl;
-        compressBubbleChains();
-        compress();
-    }
-
-    // Bubble cleanup.
-    for(uint64_t iteration=0; ; iteration ++) {
-        performanceLog << timestamp << "Iteration " << iteration <<
-            " of bubble cleanup begins." << endl;
-        const uint64_t cleanedUpBubbleCount = cleanupBubbles(
-            debug,
-            options.assemblyGraphOptions.bubbleCleanupMaxOffset,
-            options.assemblyGraphOptions.chainTerminalCommonThreshold,
-            threadCount);
-        if(cleanedUpBubbleCount == 0) {
-            break;
-        }
-        cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles." << endl;
-        compressBubbleChains();
-        compress();
-    }
-
-    // Clean up short superbubbles.
-    cleanupSuperbubbles(false,
-        options.assemblyGraphOptions.superbubbleLengthThreshold1,
-        options.assemblyGraphOptions.chainTerminalCommonThreshold);
-    compressBubbleChains();
-    compress();
-
-    // For detangling the AssemblyGraph needs to be in expanded form.
-    expand();
-
-    // Vertex detangling.
-    {
-        Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
-        while(true) {
-            Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledVertices{});
-            const uint64_t detangledCount = detangle(superbubbles, detangler);
-            if(detangledCount == 0) {
-                break;
-            }
-            cout << "Detangled " << detangledCount << " vertices." << endl;
-        }
-    }
-
-    // Edge detangling.
-    {
-        Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
-        while(true) {
-            Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledEdges{});
-            const uint64_t detangledCount = detangle(superbubbles, detangler);
-            if(detangledCount == 0) {
-                break;
-            }
-            cout << "Detangled " << detangledCount << " edges." << endl;
-        }
-    }
-
-    // Before sequence assembly we put the AssemblyGraph back to compressed form.
-    compress();
-    write("Z");
-
-#if 0
-    // Assemble sequence.
-    assembleAllChainsMultithreaded(
-        options.assemblyGraphOptions.chainTerminalCommonThreshold,
-        threadCount);
-    writeAssemblyDetails();
-    write("Final", true);
-#endif
-}
-
-
-#if 0
-uint64_t AssemblyGraph::detangleShortSuperbubbles4(
+Detangler2by2::Detangler2by2(
     bool debug,
-    const Superbubbles& superbubbles)
+    double epsilon,
+    double chiSquareThreshold) :
+    debug(debug),
+    epsilon(epsilon),
+    chiSquareThreshold(chiSquareThreshold)
 {
-    uint64_t detangledCount = 0;
-
-    for(const Superbubble& superbubble: superbubbles.superbubbles) {
-        if(detangleShortSuperbubble4(debug, superbubble)) {
-            ++detangledCount;
-        }
-    }
-
-    return detangledCount;
-}
-#endif
-
-
-
-// Loop over all Superbubbles and let the Detangler try detangling each one.
-uint64_t AssemblyGraph::detangle(const Superbubbles& superbubbles, Detangler& detangler)
-{
-    AssemblyGraph& assemblyGraph = *this;
-
-    uint64_t detangledCount = 0;
-
-    for(const Superbubble& superbubble: superbubbles.superbubbles) {
-        if(detangler(assemblyGraph, superbubble)) {
-            ++detangledCount;
-        }
-    }
-
-    return detangledCount;
 }
 
 
 
-#if 0
-// This only detangles 2 by 2 superbubbles.
-// It uses a chi-squared test for phasing.
-bool AssemblyGraph::detangleShortSuperbubble4(
-    bool debug,
-    const vector<vertex_descriptor>& superbubble)
+bool Detangler2by2::operator()(
+    AssemblyGraph& assemblyGraph,
+    const vector<vertex_descriptor>& superbubble
+    )
 {
-    // EXPOSE WHEN CODE STABILIZES.
-    const double epsilon = 0.05;
-    const double chiSquareThreshold = 30.;
-
-    AssemblyGraph& assemblyGraph = *this;
 
     if(debug) {
         cout << "Found a superbubble with " << superbubble.size() <<
@@ -191,12 +68,12 @@ bool AssemblyGraph::detangleShortSuperbubble4(
     if(debug) {
         cout << inDegree << " in-edges:";
         for(const edge_descriptor e: inEdges) {
-            cout << " " << bubbleChainStringId(e);
+            cout << " " << assemblyGraph.bubbleChainStringId(e);
         }
         cout << endl;
         cout << outDegree << " out-edges:";
         for(const edge_descriptor e: outEdges) {
-            cout << " " << bubbleChainStringId(e);
+            cout << " " << assemblyGraph.bubbleChainStringId(e);
         }
         cout << endl;
     }
@@ -205,7 +82,7 @@ bool AssemblyGraph::detangleShortSuperbubble4(
     for(const edge_descriptor e: inEdges) {
         if(find(outEdges.begin(), outEdges.end(), e) != outEdges.end()) {
             if(debug) {
-                cout << "Not detangling because " << bubbleChainStringId(e) <<
+                cout << "Not detangling because " << assemblyGraph.bubbleChainStringId(e) <<
                     " is both an in-edge and out-edge." << endl;
             }
             return false;
@@ -269,7 +146,7 @@ bool AssemblyGraph::detangleShortSuperbubble4(
         const AnchorId anchorId0 = inAnchors[i0];
         for(uint64_t i1=0; i1<outDegree; i1++) {
             const AnchorId anchorId1 = outAnchors[i1];
-            const uint64_t n = anchors.countCommon(anchorId0, anchorId1, true);
+            const uint64_t n = assemblyGraph.anchors.countCommon(anchorId0, anchorId1, true);
             tangleMatrix[i0][i1] = n;
             N += n;
             inCoverage[i0] += n;
@@ -284,8 +161,8 @@ bool AssemblyGraph::detangleShortSuperbubble4(
             for(uint64_t i1=0; i1<outDegree; i1++) {
                 const edge_descriptor outEdge = outEdges[i1];
 
-                cout << bubbleChainStringId(inEdge) << " " <<
-                    bubbleChainStringId(outEdge) << " " << tangleMatrix[i0][i1];
+                cout << assemblyGraph.bubbleChainStringId(inEdge) << " " <<
+                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrix[i0][i1];
 
                 cout << endl;
             }
@@ -300,7 +177,8 @@ bool AssemblyGraph::detangleShortSuperbubble4(
     for(uint64_t i=0; i<inDegree; i++) {
         if(inCoverage[i] == 0) {
             if(debug) {
-                cout << "Not detangling because of zero common coverage on in-edge " << bubbleChainStringId(inEdges[i]) << endl;
+                cout << "Not detangling because of zero common coverage on in-edge " <<
+                    assemblyGraph.bubbleChainStringId(inEdges[i]) << endl;
             }
             return false;
         }
@@ -308,7 +186,8 @@ bool AssemblyGraph::detangleShortSuperbubble4(
     for(uint64_t i=0; i<outDegree; i++) {
         if(outCoverage[i] == 0) {
             if(debug) {
-                cout << "Not detangling because of zero common coverage on out-edge " << bubbleChainStringId(outEdges[i]) << endl;
+                cout << "Not detangling because of zero common coverage on out-edge " <<
+                    assemblyGraph.bubbleChainStringId(outEdges[i]) << endl;
             }
             return false;
         }
@@ -379,8 +258,8 @@ bool AssemblyGraph::detangleShortSuperbubble4(
             for(uint64_t i1=0; i1<outDegree; i1++) {
                 const edge_descriptor outEdge = outEdges[i1];
 
-                cout << bubbleChainStringId(inEdge) << " " <<
-                    bubbleChainStringId(outEdge) << " " << tangleMatrixRandom[i0][i1];
+                cout << assemblyGraph.bubbleChainStringId(inEdge) << " " <<
+                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixRandom[i0][i1];
 
                 cout << endl;
             }
@@ -391,8 +270,8 @@ bool AssemblyGraph::detangleShortSuperbubble4(
             for(uint64_t i1=0; i1<outDegree; i1++) {
                 const edge_descriptor outEdge = outEdges[i1];
 
-                cout << bubbleChainStringId(inEdge) << " " <<
-                    bubbleChainStringId(outEdge) << " " << tangleMatrixInPhaseIdeal[i0][i1];
+                cout << assemblyGraph.bubbleChainStringId(inEdge) << " " <<
+                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixInPhaseIdeal[i0][i1];
 
                 cout << endl;
             }
@@ -403,8 +282,8 @@ bool AssemblyGraph::detangleShortSuperbubble4(
             for(uint64_t i1=0; i1<outDegree; i1++) {
                 const edge_descriptor outEdge = outEdges[i1];
 
-                cout << bubbleChainStringId(inEdge) << " " <<
-                    bubbleChainStringId(outEdge) << " " << tangleMatrixOutOfPhaseIdeal[i0][i1];
+                cout << assemblyGraph.bubbleChainStringId(inEdge) << " " <<
+                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixOutOfPhaseIdeal[i0][i1];
 
                 cout << endl;
             }
@@ -415,8 +294,8 @@ bool AssemblyGraph::detangleShortSuperbubble4(
             for(uint64_t i1=0; i1<outDegree; i1++) {
                 const edge_descriptor outEdge = outEdges[i1];
 
-                cout << bubbleChainStringId(inEdge) << " " <<
-                    bubbleChainStringId(outEdge) << " " << tangleMatrixInPhase[i0][i1];
+                cout << assemblyGraph.bubbleChainStringId(inEdge) << " " <<
+                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixInPhase[i0][i1];
 
                 cout << endl;
             }
@@ -427,8 +306,8 @@ bool AssemblyGraph::detangleShortSuperbubble4(
             for(uint64_t i1=0; i1<outDegree; i1++) {
                 const edge_descriptor outEdge = outEdges[i1];
 
-                cout << bubbleChainStringId(inEdge) << " " <<
-                    bubbleChainStringId(outEdge) << " " << tangleMatrixOutOfPhase[i0][i1];
+                cout << assemblyGraph.bubbleChainStringId(inEdge) << " " <<
+                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixOutOfPhase[i0][i1];
 
                 cout << endl;
             }
@@ -499,7 +378,7 @@ bool AssemblyGraph::detangleShortSuperbubble4(
         edge_descriptor eNew;
         tie(eNew, ignore) = boost::add_edge(v0, v1, assemblyGraph);
         AssemblyGraphEdge& edgeNew = assemblyGraph[eNew];
-        edgeNew.id = nextEdgeId++;
+        edgeNew.id = assemblyGraph.nextEdgeId++;
         BubbleChain& newBubbleChain = edgeNew;
         newBubbleChain.resize(1);   // The new BubbleChain has a single Bubble
         Bubble& newBubble = newBubbleChain.front();
@@ -519,49 +398,4 @@ bool AssemblyGraph::detangleShortSuperbubble4(
     }
 
     return true;
-}
-#endif
-
-
-
-// This removes non-haploid Bubbles in which one or more Chains have no internal Anchors.
-uint64_t AssemblyGraph::cleanupBubbles()
-{
-    AssemblyGraph& assemblyGraph = *this;
-
-    /// Loop over all BubbleChains.
-    uint64_t n = 0;
-    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
-        BubbleChain& bubbleChain = assemblyGraph[e];
-
-        // Loop over non-haploid Bubbles of this BubbleChain.
-        for(Bubble& bubble: bubbleChain) {
-            if(bubble.isHaploid()) {
-                continue;
-            }
-
-            // Look for a Chain in this Bubble that has no internal Anchors.
-            uint64_t j = invalid<uint64_t>;
-            for(uint64_t i=0; i<bubble.size(); i++) {
-                const Chain& chain = bubble[i];
-                if(chain.size() == 2) {
-                    j = i;
-                    break;
-                }
-            }
-
-            // If did not find any such Chains, do nothing.
-            if(j == invalid<uint64_t>) {
-                continue;
-            }
-
-            // Only keep the Chain without internal Anchor.
-            const Chain chain = bubble[j];
-            bubble.clear();
-            bubble.push_back(chain);
-            ++n;
-        }
-    }
-
-    return n;
 }
