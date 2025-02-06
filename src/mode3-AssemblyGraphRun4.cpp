@@ -67,44 +67,56 @@ void AssemblyGraph::run4(
     // For detangling the AssemblyGraph needs to be in expanded form.
     expand();
 
+
+    // Detangle iteration. Continue detangling until nothing changes.
     // Vertex detangling.
-    {
-        Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
-        while(true) {
+    for(uint64_t iteration=0; ; iteration++) {
+        cout << "Detangle iteration " << iteration << " begins with " <<
+            num_vertices(assemblyGraph) << " and " << num_edges(assemblyGraph) <<
+            " edges." << endl;
+
+        uint64_t totalDetangledCount = 0;
+
+        // Vertex detangling.
+        {
+            Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
             Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledVertices{});
             const uint64_t detangledCount = detangle(superbubbles, detangler);
-            if(detangledCount == 0) {
-                break;
-            }
+            totalDetangledCount += detangledCount;
             cout << "Detangled " << detangledCount << " vertices." << endl;
         }
-    }
 
-    // Edge detangling.
-    {
-        Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
-        while(true) {
+        // Edge detangling.
+        {
+            Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
             Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledEdges{});
             const uint64_t detangledCount = detangle(superbubbles, detangler);
-            if(detangledCount == 0) {
-                break;
-            }
+            totalDetangledCount += detangledCount;
             cout << "Detangled " << detangledCount << " edges." << endl;
         }
-    }
 
-    // Superbubble detangling.
-    {
-        Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
-        while(true) {
+        // Superbubble detangling.
+        {
+            Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
             Superbubbles superbubbles(assemblyGraph, superbubbleLengthThreshold);
             const uint64_t detangledCount = detangle(superbubbles, detangler);
-            if(detangledCount == 0) {
-                break;
-            }
+            totalDetangledCount += detangledCount;
             cout << "Detangled " << detangledCount << " superbubbles." << endl;
         }
+
+        cout << "Detangle iteration " << iteration << " had " <<
+            totalDetangledCount << " successful detangling operation." << endl;
+
+
+        if(totalDetangledCount == 0) {
+            break;
+        }
     }
+    cout << "After detangling, the assembly graph has " <<
+        num_vertices(assemblyGraph) << " and " << num_edges(assemblyGraph) <<
+        " edges." << endl;
+
+
 
     // Before sequence assembly we put the AssemblyGraph back to compressed form.
     compress();
