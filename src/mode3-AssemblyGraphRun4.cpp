@@ -72,7 +72,6 @@ void AssemblyGraph::run4(
         simplificationCount += cleanedUpSuperbubbleCount;
         cout << "Cleaned up " << cleanedUpSuperbubbleCount << " superbubbles." << endl;
 
-
         compressBubbleChains();
         compress();
 
@@ -81,7 +80,7 @@ void AssemblyGraph::run4(
 
         // Vertex detangling.
         {
-            Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
+            Detangler2by2 detangler(debug, assemblyGraph, epsilon, chiSquareThreshold);
             Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledVertices{});
             const uint64_t detangledCount = detangle(superbubbles, detangler);
             simplificationCount += detangledCount;
@@ -90,7 +89,7 @@ void AssemblyGraph::run4(
 
         // Edge detangling.
         {
-            Detangler2by2 detangler(debug, epsilon, chiSquareThreshold);
+            Detangler2by2 detangler(debug, assemblyGraph, epsilon, chiSquareThreshold);
             Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledEdges{});
             const uint64_t detangledCount = detangle(superbubbles, detangler);
             simplificationCount += detangledCount;
@@ -99,7 +98,7 @@ void AssemblyGraph::run4(
 
         // Superbubble detangling.
         {
-            Detangler2by2 detangler(true, epsilon, chiSquareThreshold);
+            Detangler2by2 detangler(debug, assemblyGraph, epsilon, chiSquareThreshold);
             Superbubbles superbubbles(assemblyGraph, superbubbleLengthThreshold);
             const uint64_t detangledCount = detangle(superbubbles, detangler);
             simplificationCount += detangledCount;
@@ -158,16 +157,12 @@ uint64_t AssemblyGraph::detangleShortSuperbubbles4(
 // Loop over all Superbubbles and let the Detangler try detangling each one.
 uint64_t AssemblyGraph::detangle(const Superbubbles& superbubbles, Detangler& detangler)
 {
-    AssemblyGraph& assemblyGraph = *this;
-
     uint64_t detangledCount = 0;
-
     for(const Superbubble& superbubble: superbubbles.superbubbles) {
-        if(detangler(assemblyGraph, superbubble)) {
+        if(detangler(superbubble)) {
             ++detangledCount;
         }
     }
-
     return detangledCount;
 }
 

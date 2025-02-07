@@ -1940,14 +1940,20 @@ uint64_t AssemblyGraph::cleanupSuperbubbles(
     // so we don't have to worry about overlapping bubbles.
     std::set<vertex_descriptor> previousSuperbubblesVertices;
 
+    uint64_t detangledCount = 0;
+
     // Loop over the superbubbles.
     for(uint64_t superbubbleId=0; superbubbleId<superbubbles.size(); superbubbleId++) {
-        cleanupSuperbubble(debug, superbubbles, superbubbleId,
-            maxOffset2, chainTerminalCommonThreshold, previousSuperbubblesVertices);
+        if(cleanupSuperbubble(debug, superbubbles, superbubbleId,
+            maxOffset2, chainTerminalCommonThreshold, previousSuperbubblesVertices)) {
+            ++detangledCount;
+        }
     }
     if(debug) {
         cout << "cleanupSuperbubbles ends." << endl;
     }
+
+    return detangledCount;
 }
 
 

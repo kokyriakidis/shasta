@@ -12,18 +12,16 @@ namespace shasta {
 
 
 
-class shasta::mode3::Detangler2by2 : public Detangler {
+class shasta::mode3::Detangler2by2 : public ChainDetangler {
 public:
 
     Detangler2by2(
         bool debug,
+        AssemblyGraph&,
         double epsilon,
         double chiSquareThreshold);
 
-    bool operator()(
-        AssemblyGraph&,
-        const vector<vertex_descriptor>& superbubble
-        );
+    bool operator()(const vector<vertex_descriptor>& superbubble);
 
 private:
     bool debug;

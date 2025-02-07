@@ -18,8 +18,10 @@ using namespace mode3;
 
 Detangler2by2::Detangler2by2(
     bool debug,
+    AssemblyGraph& assemblyGraph,
     double epsilon,
     double chiSquareThreshold) :
+    ChainDetangler(debug, assemblyGraph),
     debug(debug),
     epsilon(epsilon),
     chiSquareThreshold(chiSquareThreshold)
@@ -28,20 +30,11 @@ Detangler2by2::Detangler2by2(
 
 
 
-bool Detangler2by2::operator()(
-    AssemblyGraph& assemblyGraph,
-    const vector<vertex_descriptor>& superbubble
-    )
+bool Detangler2by2::operator()(const vector<vertex_descriptor>& superbubble)
 {
-
-    if(debug) {
-        cout << "Found a superbubble with " << superbubble.size() <<
-            " vertices:";
-        for(const vertex_descriptor cv: superbubble) {
-            cout << " " << anchorIdToString(assemblyGraph[cv].getAnchorId());
-        }
-        cout << endl;
-    }
+    writeInitialMessage(superbubble);
+    prepare(superbubble);
+    writeEntrancesAndExits();
 
     // Fill in the in-edges and out-edges.
     // These cannot be computed while constructing the superbubbles
@@ -62,32 +55,10 @@ bool Detangler2by2::operator()(
             }
         }
     }
-    const uint64_t inDegree = inEdges.size();
-    const uint64_t outDegree = outEdges.size();
+    const uint64_t inDegree = entrances.size();
+    const uint64_t outDegree = exits.size();
 
-    if(debug) {
-        cout << inDegree << " in-edges:";
-        for(const edge_descriptor e: inEdges) {
-            cout << " " << assemblyGraph.bubbleChainStringId(e);
-        }
-        cout << endl;
-        cout << outDegree << " out-edges:";
-        for(const edge_descriptor e: outEdges) {
-            cout << " " << assemblyGraph.bubbleChainStringId(e);
-        }
-        cout << endl;
-    }
-
-    // If an inEdge is also an outEdge, don't do anything.
-    for(const edge_descriptor e: inEdges) {
-        if(find(outEdges.begin(), outEdges.end(), e) != outEdges.end()) {
-            if(debug) {
-                cout << "Not detangling because " << assemblyGraph.bubbleChainStringId(e) <<
-                    " is both an in-edge and out-edge." << endl;
-            }
-            return false;
-        }
-    }
+    writeEntrancesAndExits();
 
     // This only detangles superbubbles with 2 entrances and 2 exits.
     if(not ((inDegree == 2) and (outDegree == 2))) {
@@ -96,6 +67,15 @@ bool Detangler2by2::operator()(
         }
         return false;
     }
+
+    // If there are common Chains between the entrance and exits, don't do anything.
+    if(commonChainsBetweenEntrancesAndExitsExists()) {
+        if(debug) {
+            cout << "Not detangling because of a cycle between the entrances and exits." << endl;
+        }
+        return false;
+    }
+
 
     // Gather the second to last AnchorId of each inEdge and the second AnchorId
     // of each outEdge.
@@ -110,47 +90,28 @@ bool Detangler2by2::operator()(
         outAnchors.push_back(chain.second());
     }
 
-    if(debug) {
-        cout << inDegree << " in-anchors:";
-        for(const AnchorId anchorId: inAnchors) {
-            cout << " " << anchorIdToString(anchorId);
+    // If there are common Anchors between the entrance and exits, don't do anything.
+    // Detangling could generate Chain with consecutive identical AnchorIds.
+    if(commonAnchorsBetweenEntrancesAndExitsExists()) {
+        if(debug) {
+            cout << "Not detangling because of a common anchors between the entrances and exits." << endl;
         }
-        cout << endl;
-        cout << outDegree << " out-anchors:";
-        for(const AnchorId anchorId: outAnchors) {
-            cout << " " << anchorIdToString(anchorId);
-        }
-        cout << endl;
-    }
-
-    // If an AnchorId appears both in the inAnchors and in the outAnchors,
-    // detangling could generate a chain with two consecutive copies of the same
-    // AnchorId. Don't detangle.
-    for(const AnchorId anchorId: inAnchors) {
-        if(find(outAnchors.begin(), outAnchors.end(), anchorId) != outAnchors.end()) {
-            if(debug) {
-                cout << "Not detangling because " << anchorIdToString(anchorId) <<
-                    " is both an in-anchor and out-anchor." << endl;
-            }
-            return false;
-        }
+        return false;
     }
 
 
     // Compute the tangle matrix.
-    vector< vector<uint64_t> > tangleMatrix(2, vector<uint64_t>(2));
+    vector< vector<uint64_t> > tangleMatrix(inDegree, vector<uint64_t>(outDegree));
     uint64_t N = 0;
-    vector<uint64_t> inCoverage(inDegree, 0);
-    vector<uint64_t> outCoverage(inDegree, 0);
-    for(uint64_t i0=0; i0<inDegree; i0++) {
-        const AnchorId anchorId0 = inAnchors[i0];
-        for(uint64_t i1=0; i1<outDegree; i1++) {
-            const AnchorId anchorId1 = outAnchors[i1];
-            const uint64_t n = assemblyGraph.anchors.countCommon(anchorId0, anchorId1, true);
-            tangleMatrix[i0][i1] = n;
+    for(uint64_t iEntrance=0; iEntrance<inDegree; iEntrance++) {
+        Entrance& entrance = entrances[iEntrance];
+        for(uint64_t iExit=0; iExit<outDegree; iExit++) {
+            Exit& exit = exits[iExit];
+            const uint64_t n = assemblyGraph.anchors.countCommon(entrance.anchorId, exit.anchorId, true);
+            tangleMatrix[iEntrance][iExit] = n;
             N += n;
-            inCoverage[i0] += n;
-            outCoverage[i1] += n;
+            entrance.commonCoverage += n;
+            exit.commonCoverage += n;
         }
     }
 
@@ -167,27 +128,27 @@ bool Detangler2by2::operator()(
                 cout << endl;
             }
         }
-        cout << "In-coverage: " << inCoverage[0] << " " << inCoverage[1] << endl;
-        cout << "Out-coverage: " << outCoverage[0] << " " << outCoverage[1] << endl;
-        SHASTA_ASSERT(inCoverage[0] + inCoverage[1] == N);
-        SHASTA_ASSERT(outCoverage[0] + outCoverage[1] == N);
+        cout << "In-coverage: " << entrances[0].commonCoverage << " " << entrances[1].commonCoverage << endl;
+        cout << "Out-coverage: " << exits[0].commonCoverage << " " << exits[1].commonCoverage << endl;
+        SHASTA_ASSERT(entrances[0].commonCoverage + entrances[1].commonCoverage == N);
+        SHASTA_ASSERT(exits[0].commonCoverage + exits[1].commonCoverage == N);
     }
 
-    // If the inCoverage or outCoverage have zero entries, do nothing.
-    for(uint64_t i=0; i<inDegree; i++) {
-        if(inCoverage[i] == 0) {
+    // If any Entrance or Exit has zero common coverage, do nothing.
+    for(const Entrance& entrance: entrances) {
+        if(entrance.commonCoverage == 0) {
             if(debug) {
-                cout << "Not detangling because of zero common coverage on in-edge " <<
-                    assemblyGraph.bubbleChainStringId(inEdges[i]) << endl;
+                cout << "Not detangling because of zero common coverage on entrance " <<
+                    assemblyGraph.bubbleChainStringId(entrance.e) << endl;
             }
             return false;
         }
     }
-    for(uint64_t i=0; i<outDegree; i++) {
-        if(outCoverage[i] == 0) {
+    for(const Exit& exit: exits) {
+        if(exit.commonCoverage == 0) {
             if(debug) {
-                cout << "Not detangling because of zero common coverage on out-edge " <<
-                    assemblyGraph.bubbleChainStringId(outEdges[i]) << endl;
+                cout << "Not detangling because of zero common coverage on exit " <<
+                    assemblyGraph.bubbleChainStringId(exit.e) << endl;
             }
             return false;
         }
@@ -200,14 +161,15 @@ bool Detangler2by2::operator()(
     vector< vector<double> > tangleMatrixRandom(2, vector<double>(2, 0.));
     for(uint64_t i0=0; i0<inDegree; i0++) {
         for(uint64_t i1=0; i1<outDegree; i1++) {
-            tangleMatrixRandom[i0][i1] = double(inCoverage[i0]) * double(outCoverage[i1]) / double(N);
+            tangleMatrixRandom[i0][i1] =
+                double(entrances[i0].commonCoverage) * double(exits[i1].commonCoverage) / double(N);
         }
     }
 
     // In phase, ideal.
     vector< vector<double> > tangleMatrixInPhaseIdeal(2, vector<double>(2, 0.));
-    tangleMatrixInPhaseIdeal[0][0]    = sqrt(double(inCoverage[0]) * double(outCoverage[0]));
-    tangleMatrixInPhaseIdeal[1][1]    = sqrt(double(inCoverage[1]) * double(outCoverage[1]));
+    tangleMatrixInPhaseIdeal[0][0] = sqrt(double(entrances[0].commonCoverage) * double(exits[0].commonCoverage));
+    tangleMatrixInPhaseIdeal[1][1] = sqrt(double(entrances[1].commonCoverage) * double(exits[1].commonCoverage));
     // Normalize.
     double inPhaseSum = 0.;
     for(uint64_t i0=0; i0<inDegree; i0++) {
@@ -224,8 +186,8 @@ bool Detangler2by2::operator()(
 
     // Out of phase, ideal.
     vector< vector<double> > tangleMatrixOutOfPhaseIdeal(2, vector<double>(2, 0.));
-    tangleMatrixOutOfPhaseIdeal[0][1] = sqrt(double(inCoverage[0]) * double(outCoverage[1]));
-    tangleMatrixOutOfPhaseIdeal[1][0] = sqrt(double(inCoverage[1]) * double(outCoverage[0]));
+    tangleMatrixOutOfPhaseIdeal[0][1] = sqrt(double(entrances[0].commonCoverage) * double(exits[1].commonCoverage));
+    tangleMatrixOutOfPhaseIdeal[1][0] = sqrt(double(entrances[1].commonCoverage) * double(exits[0].commonCoverage));
     // Normalize.
     double outOfPhaseSum = 0.;
     for(uint64_t i0=0; i0<inDegree; i0++) {
