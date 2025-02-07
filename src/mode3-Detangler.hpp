@@ -118,6 +118,14 @@ protected:
     vector<Exit> exits;
     void writeEntrancesAndExits() const;
 
+    // The tangle matrix is computed using the second to last AnchorId of
+    // each incoming Chain and the second AnchorId of each outgoing Chain.
+    // Indexed by [iEntrance][iExit].
+    vector< vector<uint64_t> > tangleMatrix;
+    uint64_t totalCommonCoverage = 0;
+    void computeTangleMatrix();
+    void writeTangleMatrix() const;
+
     // Return true if there is one or more Entrance/Exit pair
     // with the same edge_descriptor.
     bool commonChainsBetweenEntrancesAndExitsExists() const;
@@ -126,10 +134,6 @@ protected:
     // with the same AnchorId.
     bool commonAnchorsBetweenEntrancesAndExitsExists() const;
 
-    // The tangle matrix is computed using the second to last AnchorId of
-    // each incoming Chain and the second AnchorId of each outgoing Chain.
-    // Indexed by [iEntrance][iExit].
-    vector< vector<uint64_t> > chainTangleMatrix;
 };
 
 

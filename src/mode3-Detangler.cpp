@@ -64,6 +64,7 @@ void ChainDetangler::prepare(const vector<vertex_descriptor>& superbubble)
         }
     }
 
+    computeTangleMatrix();
 }
 
 
@@ -101,6 +102,89 @@ void ChainDetangler::writeEntrancesAndExits() const
         for(const Exit& exit: exits) {
             cout << assemblyGraph.bubbleChainStringId(exit.e) <<
                 " " << anchorIdToString(exit.anchorId) << endl;
+        }
+    }
+
+}
+
+
+
+void ChainDetangler::computeTangleMatrix()
+{
+    const uint64_t inDegree = entrances.size();
+    const uint64_t outDegree = exits.size();
+
+    totalCommonCoverage = 0;
+
+    for(Entrance& entrance: entrances) {
+        entrance.commonCoverage = 0;
+    }
+    for(Exit& exit: exits) {
+        exit.commonCoverage = 0;
+    }
+
+    tangleMatrix.clear();
+    tangleMatrix.resize(inDegree, vector<uint64_t>(outDegree));
+
+    for(uint64_t iEntrance=0; iEntrance<inDegree; iEntrance++) {
+        Entrance& entrance = entrances[iEntrance];
+        for(uint64_t iExit=0; iExit<outDegree; iExit++) {
+            Exit& exit = exits[iExit];
+            const uint64_t n = assemblyGraph.anchors.countCommon(entrance.anchorId, exit.anchorId, true);
+            tangleMatrix[iEntrance][iExit] = n;
+            totalCommonCoverage += n;
+            entrance.commonCoverage += n;
+            exit.commonCoverage += n;
+        }
+    }
+
+    // Sanity checks.
+    {
+        uint64_t sum = 0;
+        for(Entrance& entrance: entrances) {
+            sum += entrance.commonCoverage;
+        }
+        SHASTA_ASSERT(sum == totalCommonCoverage);
+    }
+    {
+        uint64_t sum = 0;
+        for(Exit& exit: exits) {
+            sum += exit.commonCoverage;
+        }
+        SHASTA_ASSERT(sum == totalCommonCoverage);
+    }
+}
+
+
+
+void ChainDetangler::writeTangleMatrix() const
+{
+    if(debug) {
+        cout << "Tangle matrix with total coverage " << totalCommonCoverage << ":" << endl;
+
+        for(uint64_t iEntrance=0; iEntrance<entrances.size(); iEntrance++) {
+            const Entrance& entrance = entrances[iEntrance];
+
+            for(uint64_t iExit=0; iExit<exits.size(); iExit++) {
+                const Exit& exit = exits[iExit];
+
+                cout << assemblyGraph.bubbleChainStringId(entrance.e) << " " <<
+                    assemblyGraph.bubbleChainStringId(exit.e) <<
+                    " " << tangleMatrix[iEntrance][iExit];
+
+                cout << endl;
+            }
+        }
+
+        for(const Entrance& entrance: entrances) {
+            cout << "Total common coverage for entrance " <<
+                assemblyGraph.bubbleChainStringId(entrance.e) <<
+                " is " << entrance.commonCoverage << endl;
+        }
+        for(const Exit& exit: exits) {
+            cout << "Total common coverage for exit " <<
+                assemblyGraph.bubbleChainStringId(exit.e) <<
+                " is " << exit.commonCoverage << endl;
         }
     }
 

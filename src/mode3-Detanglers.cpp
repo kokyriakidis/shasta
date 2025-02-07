@@ -35,30 +35,10 @@ bool Detangler2by2::operator()(const vector<vertex_descriptor>& superbubble)
     writeInitialMessage(superbubble);
     prepare(superbubble);
     writeEntrancesAndExits();
+    writeTangleMatrix();
 
-    // Fill in the in-edges and out-edges.
-    // These cannot be computed while constructing the superbubbles
-    // as they can change when other superbubbles are detangled.
-    vector<edge_descriptor> inEdges;
-    vector<edge_descriptor> outEdges;
-    for(const vertex_descriptor v: superbubble) {
-        BGL_FORALL_INEDGES(v, e, assemblyGraph, AssemblyGraph) {
-            if(not assemblyGraph.isInternalToSuperbubble(e)) {
-                 inEdges.push_back(e);
-            }
-        }
-    }
-    for(const vertex_descriptor v: superbubble) {
-        BGL_FORALL_OUTEDGES(v, e, assemblyGraph, AssemblyGraph) {
-            if(not assemblyGraph.isInternalToSuperbubble(e)) {
-                 outEdges.push_back(e);
-            }
-        }
-    }
     const uint64_t inDegree = entrances.size();
     const uint64_t outDegree = exits.size();
-
-    writeEntrancesAndExits();
 
     // This only detangles superbubbles with 2 entrances and 2 exits.
     if(not ((inDegree == 2) and (outDegree == 2))) {
@@ -76,20 +56,6 @@ bool Detangler2by2::operator()(const vector<vertex_descriptor>& superbubble)
         return false;
     }
 
-
-    // Gather the second to last AnchorId of each inEdge and the second AnchorId
-    // of each outEdge.
-    vector<AnchorId> inAnchors;
-    for(const edge_descriptor e: inEdges) {
-        const Chain& chain = assemblyGraph[e].getOnlyChain();
-        inAnchors.push_back(chain.secondToLast());
-    }
-    vector<AnchorId> outAnchors;
-    for(const edge_descriptor e: outEdges) {
-        const Chain& chain = assemblyGraph[e].getOnlyChain();
-        outAnchors.push_back(chain.second());
-    }
-
     // If there are common Anchors between the entrance and exits, don't do anything.
     // Detangling could generate Chain with consecutive identical AnchorIds.
     if(commonAnchorsBetweenEntrancesAndExitsExists()) {
@@ -97,41 +63,6 @@ bool Detangler2by2::operator()(const vector<vertex_descriptor>& superbubble)
             cout << "Not detangling because of a common anchors between the entrances and exits." << endl;
         }
         return false;
-    }
-
-
-    // Compute the tangle matrix.
-    vector< vector<uint64_t> > tangleMatrix(inDegree, vector<uint64_t>(outDegree));
-    uint64_t N = 0;
-    for(uint64_t iEntrance=0; iEntrance<inDegree; iEntrance++) {
-        Entrance& entrance = entrances[iEntrance];
-        for(uint64_t iExit=0; iExit<outDegree; iExit++) {
-            Exit& exit = exits[iExit];
-            const uint64_t n = assemblyGraph.anchors.countCommon(entrance.anchorId, exit.anchorId, true);
-            tangleMatrix[iEntrance][iExit] = n;
-            N += n;
-            entrance.commonCoverage += n;
-            exit.commonCoverage += n;
-        }
-    }
-
-    if(debug) {
-        cout << "Tangle matrix with total coverage " << N << ":" << endl;
-        for(uint64_t i0=0; i0<inDegree; i0++) {
-            const edge_descriptor inEdge = inEdges[i0];
-            for(uint64_t i1=0; i1<outDegree; i1++) {
-                const edge_descriptor outEdge = outEdges[i1];
-
-                cout << assemblyGraph.bubbleChainStringId(inEdge) << " " <<
-                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrix[i0][i1];
-
-                cout << endl;
-            }
-        }
-        cout << "In-coverage: " << entrances[0].commonCoverage << " " << entrances[1].commonCoverage << endl;
-        cout << "Out-coverage: " << exits[0].commonCoverage << " " << exits[1].commonCoverage << endl;
-        SHASTA_ASSERT(entrances[0].commonCoverage + entrances[1].commonCoverage == N);
-        SHASTA_ASSERT(exits[0].commonCoverage + exits[1].commonCoverage == N);
     }
 
     // If any Entrance or Exit has zero common coverage, do nothing.
@@ -162,7 +93,7 @@ bool Detangler2by2::operator()(const vector<vertex_descriptor>& superbubble)
     for(uint64_t i0=0; i0<inDegree; i0++) {
         for(uint64_t i1=0; i1<outDegree; i1++) {
             tangleMatrixRandom[i0][i1] =
-                double(entrances[i0].commonCoverage) * double(exits[i1].commonCoverage) / double(N);
+                double(entrances[i0].commonCoverage) * double(exits[i1].commonCoverage) / double(totalCommonCoverage);
         }
     }
 
@@ -177,7 +108,7 @@ bool Detangler2by2::operator()(const vector<vertex_descriptor>& superbubble)
             inPhaseSum += tangleMatrixInPhaseIdeal[i0][i1];
         }
     }
-    double inPhaseFactor = double(N) / inPhaseSum;
+    double inPhaseFactor = double(totalCommonCoverage) / inPhaseSum;
     for(uint64_t i0=0; i0<inDegree; i0++) {
         for(uint64_t i1=0; i1<outDegree; i1++) {
             tangleMatrixInPhaseIdeal[i0][i1] *= inPhaseFactor;
@@ -195,7 +126,7 @@ bool Detangler2by2::operator()(const vector<vertex_descriptor>& superbubble)
             outOfPhaseSum += tangleMatrixOutOfPhaseIdeal[i0][i1];
         }
     }
-    double outOfPhaseFactor = double(N) / outOfPhaseSum;
+    double outOfPhaseFactor = double(totalCommonCoverage) / outOfPhaseSum;
     for(uint64_t i0=0; i0<inDegree; i0++) {
         for(uint64_t i1=0; i1<outDegree; i1++) {
             tangleMatrixOutOfPhaseIdeal[i0][i1] *= outOfPhaseFactor;
@@ -215,61 +146,61 @@ bool Detangler2by2::operator()(const vector<vertex_descriptor>& superbubble)
 
     if(false) {
         cout << "Random tangle matrix:" << endl;
-        for(uint64_t i0=0; i0<inDegree; i0++) {
-            const edge_descriptor inEdge = inEdges[i0];
-            for(uint64_t i1=0; i1<outDegree; i1++) {
-                const edge_descriptor outEdge = outEdges[i1];
+        for(uint64_t iEntrance=0; iEntrance<inDegree; iEntrance++) {
+            const edge_descriptor inEdge = entrances[iEntrance].e;
+            for(uint64_t iExit=0; iExit<outDegree; iExit++) {
+                const edge_descriptor outEdge = exits[iExit].e;
 
                 cout << assemblyGraph.bubbleChainStringId(inEdge) << " " <<
-                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixRandom[i0][i1];
+                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixRandom[iEntrance][iExit];
 
                 cout << endl;
             }
         }
         cout << "Ideal in phase tangle matrix:" << endl;
-        for(uint64_t i0=0; i0<inDegree; i0++) {
-            const edge_descriptor inEdge = inEdges[i0];
-            for(uint64_t i1=0; i1<outDegree; i1++) {
-                const edge_descriptor outEdge = outEdges[i1];
+        for(uint64_t iEntrance=0; iEntrance<inDegree; iEntrance++) {
+            const edge_descriptor inEdge = entrances[iEntrance].e;
+            for(uint64_t iExit=0; iExit<outDegree; iExit++) {
+                const edge_descriptor outEdge = exits[iExit].e;
 
                 cout << assemblyGraph.bubbleChainStringId(inEdge) << " " <<
-                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixInPhaseIdeal[i0][i1];
+                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixInPhaseIdeal[iEntrance][iExit];
 
                 cout << endl;
             }
         }
         cout << "Ideal out of phase tangle matrix:" << endl;
-        for(uint64_t i0=0; i0<inDegree; i0++) {
-            const edge_descriptor inEdge = inEdges[i0];
-            for(uint64_t i1=0; i1<outDegree; i1++) {
-                const edge_descriptor outEdge = outEdges[i1];
+        for(uint64_t iEntrance=0; iEntrance<inDegree; iEntrance++) {
+            const edge_descriptor inEdge = entrances[iEntrance].e;
+            for(uint64_t iExit=0; iExit<outDegree; iExit++) {
+                const edge_descriptor outEdge = exits[iExit].e;
 
                 cout << assemblyGraph.bubbleChainStringId(inEdge) << " " <<
-                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixOutOfPhaseIdeal[i0][i1];
+                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixOutOfPhaseIdeal[iEntrance][iExit];
 
                 cout << endl;
             }
         }
         cout << "Non-ideal in phase tangle matrix:" << endl;
-        for(uint64_t i0=0; i0<inDegree; i0++) {
-            const edge_descriptor inEdge = inEdges[i0];
-            for(uint64_t i1=0; i1<outDegree; i1++) {
-                const edge_descriptor outEdge = outEdges[i1];
+        for(uint64_t iEntrance=0; iEntrance<inDegree; iEntrance++) {
+            const edge_descriptor inEdge = entrances[iEntrance].e;
+            for(uint64_t iExit=0; iExit<outDegree; iExit++) {
+                const edge_descriptor outEdge = exits[iExit].e;
 
                 cout << assemblyGraph.bubbleChainStringId(inEdge) << " " <<
-                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixInPhase[i0][i1];
+                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixInPhase[iEntrance][iExit];
 
                 cout << endl;
             }
         }
         cout << "Non-ideal out of phase tangle matrix:" << endl;
-        for(uint64_t i0=0; i0<inDegree; i0++) {
-            const edge_descriptor inEdge = inEdges[i0];
-            for(uint64_t i1=0; i1<outDegree; i1++) {
-                const edge_descriptor outEdge = outEdges[i1];
+        for(uint64_t iEntrance=0; iEntrance<inDegree; iEntrance++) {
+            const edge_descriptor inEdge = entrances[iEntrance].e;
+            for(uint64_t iExit=0; iExit<outDegree; iExit++) {
+                const edge_descriptor outEdge = exits[iExit].e;
 
                 cout << assemblyGraph.bubbleChainStringId(inEdge) << " " <<
-                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixOutOfPhase[i0][i1];
+                    assemblyGraph.bubbleChainStringId(outEdge) << " " << tangleMatrixOutOfPhase[iEntrance][iExit];
 
                 cout << endl;
             }
@@ -279,18 +210,18 @@ bool Detangler2by2::operator()(const vector<vertex_descriptor>& superbubble)
 
     // Do a chi-square test.
     double chi2InPhase = 0.;
-    for(uint64_t i0=0; i0<inDegree; i0++) {
-        for(uint64_t i1=0; i1<outDegree; i1++) {
-            const double expected = tangleMatrixInPhase[i0][i1];
-            const double delta = double(tangleMatrix[i0][i1]) - expected;
+    for(uint64_t iEntrance=0; iEntrance<inDegree; iEntrance++) {
+        for(uint64_t iExit=0; iExit<outDegree; iExit++) {
+            const double expected = tangleMatrixInPhase[iEntrance][iExit];
+            const double delta = double(tangleMatrix[iEntrance][iExit]) - expected;
             chi2InPhase += delta * delta / expected;
         }
     }
     double chi2OutOfPhase = 0.;
-    for(uint64_t i0=0; i0<inDegree; i0++) {
-        for(uint64_t i1=0; i1<outDegree; i1++) {
-            const double expected = tangleMatrixOutOfPhase[i0][i1];
-            const double delta = double(tangleMatrix[i0][i1]) - expected;
+    for(uint64_t iEntrance=0; iEntrance<inDegree; iEntrance++) {
+        for(uint64_t iExit=0; iExit<outDegree; iExit++) {
+            const double expected = tangleMatrixOutOfPhase[iEntrance][iExit];
+            const double delta = double(tangleMatrix[iEntrance][iExit]) - expected;
             chi2OutOfPhase += delta * delta / expected;
         }
     }
@@ -325,8 +256,8 @@ bool Detangler2by2::operator()(const vector<vertex_descriptor>& superbubble)
     for(uint64_t i=0; i<2; i++) {
 
         // Get the two edges to be connected.
-        const edge_descriptor e0 = inEdges[i];
-        const edge_descriptor e1 = (isInPhase ? outEdges[i] : outEdges[1 - i]);
+        const edge_descriptor e0 = entrances[i].e;
+        const edge_descriptor e1 = (isInPhase ? exits[i].e : exits[1 - i].e);
 
         // Get the corresponding Chains.
         const Chain& chain0 = assemblyGraph[e0].getOnlyChain();
