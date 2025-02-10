@@ -6,16 +6,17 @@
 
 namespace shasta {
     namespace mode3 {
-        class Detangler2by2;
+        class ChainDetangler2by2Permutation;
+        class ChainDetanglerNbyNPermutation;
     }
 }
 
 
 
-class shasta::mode3::Detangler2by2 : public ChainDetangler {
+class shasta::mode3::ChainDetangler2by2Permutation : public ChainDetangler {
 public:
 
-    Detangler2by2(
+    ChainDetangler2by2Permutation(
         bool debug,
         AssemblyGraph&,
         double epsilon,
@@ -27,4 +28,27 @@ private:
     bool debug;
     double epsilon;
     double chiSquareThreshold;
+};
+
+
+
+class shasta::mode3::ChainDetanglerNbyNPermutation : public ChainDetangler {
+public:
+
+    ChainDetanglerNbyNPermutation(
+        bool debug,
+        AssemblyGraph&,
+        uint64_t nMax,
+        double epsilon,
+        double maxLogP,
+        double minLogPDelta);
+
+    bool operator()(const vector<vertex_descriptor>& superbubble);
+
+private:
+    bool debug;
+    uint64_t nMax;
+    double epsilon;
+    double maxLogP;
+    double minLogPDelta;
 };

@@ -61,6 +61,8 @@ protected:
     AssemblyGraph& assemblyGraph;
 
     void writeInitialMessage(const vector<vertex_descriptor>& superbubble) const;
+
+    void removeAllSuperbubbleVertices(const vector<vertex_descriptor>& superbubble) const;
 };
 
 
@@ -86,7 +88,7 @@ protected:
         edge_descriptor e;
 
         // The second to last AnchorId of that Chain.
-        AnchorId anchorId;
+        AnchorId anchorId = invalid<AnchorId>;
 
         // Total common coverage for this Entrance.
         // This is the sum of tangle matrix elements
@@ -94,6 +96,7 @@ protected:
         uint64_t commonCoverage = 0;
 
         Entrance(edge_descriptor, const AssemblyGraph&);
+        Entrance() {}
     };
 
     class Exit {
@@ -104,7 +107,7 @@ protected:
         edge_descriptor e;
 
         // The second AnchorId of that Chain.
-        AnchorId anchorId;
+        AnchorId anchorId = invalid<AnchorId>;
 
         // Total common coverage for this ExitChain.
         // This is the sum of tangle matrix elements
@@ -112,6 +115,7 @@ protected:
         uint64_t commonCoverage = 0;
 
         Exit(edge_descriptor, const AssemblyGraph&);
+        Exit() {}
     };
 
     vector<Entrance> entrances;
@@ -133,6 +137,10 @@ protected:
     // Return true if there is one or more Entrance/Exit pair
     // with the same AnchorId.
     bool commonAnchorsBetweenEntrancesAndExitsExists() const;
+
+    // Connect the Chains of an Entrance and Exit and
+    // remove the AssemblyGraph edges for the entrance and exit.
+    void connect(const Entrance&, const Exit&) const;
 
 };
 

@@ -16,8 +16,10 @@ void AssemblyGraph::run4(
 {
     // EXPOSE WHEN CODE STABILIZES.
     const double epsilon = 0.05;
-    const double chiSquareThreshold = 30.;
+    // const double chiSquareThreshold = 30.;
     const uint64_t superbubbleLengthThreshold = 1000;
+    const double maxLogP = 10.;
+    const double minLogPDelta = 20.;
 
     AssemblyGraph& assemblyGraph = *this;
 
@@ -26,7 +28,6 @@ void AssemblyGraph::run4(
     SHASTA_ASSERT(std::is_sorted(orientedReadIds.begin(), orientedReadIds.end()));
     SHASTA_ASSERT(std::is_sorted(anchorIds.begin(), anchorIds.end()));
 
-    // write("A");
     compress();
 
     // An iteration loop in which we try at each iteration
@@ -80,7 +81,7 @@ void AssemblyGraph::run4(
 
         // Vertex detangling.
         {
-            Detangler2by2 detangler(debug, assemblyGraph, epsilon, chiSquareThreshold);
+            ChainDetanglerNbyNPermutation detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
             Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledVertices{});
             const uint64_t detangledCount = detangle(superbubbles, detangler);
             simplificationCount += detangledCount;
@@ -89,7 +90,7 @@ void AssemblyGraph::run4(
 
         // Edge detangling.
         {
-            Detangler2by2 detangler(debug, assemblyGraph, epsilon, chiSquareThreshold);
+            ChainDetanglerNbyNPermutation detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
             Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledEdges{});
             const uint64_t detangledCount = detangle(superbubbles, detangler);
             simplificationCount += detangledCount;
@@ -98,7 +99,7 @@ void AssemblyGraph::run4(
 
         // Superbubble detangling.
         {
-            Detangler2by2 detangler(debug, assemblyGraph, epsilon, chiSquareThreshold);
+            ChainDetanglerNbyNPermutation detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
             Superbubbles superbubbles(assemblyGraph, superbubbleLengthThreshold);
             const uint64_t detangledCount = detangle(superbubbles, detangler);
             simplificationCount += detangledCount;

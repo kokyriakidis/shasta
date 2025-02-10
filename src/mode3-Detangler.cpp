@@ -33,6 +33,16 @@ void Detangler::writeInitialMessage(const vector<vertex_descriptor>& superbubble
 
 
 
+void Detangler::removeAllSuperbubbleVertices(const vector<vertex_descriptor>& superbubble) const
+{
+    for(vertex_descriptor v: superbubble) {
+        boost::clear_vertex(v, assemblyGraph);
+        boost::remove_vertex(v, assemblyGraph);
+    }
+}
+
+
+
 ChainDetangler::ChainDetangler(bool debug, AssemblyGraph& assemblyGraph) :
     Detangler(debug, assemblyGraph)
 {
@@ -92,13 +102,13 @@ ChainDetangler::Exit::Exit(
 void ChainDetangler::writeEntrancesAndExits() const
 {
     if(debug) {
-        cout << entrances.size() << " entrances:";
+        cout << entrances.size() << " entrances:" << endl;;
         for(const Entrance& entrance: entrances) {
             cout << assemblyGraph.bubbleChainStringId(entrance.e) <<
                 " " << anchorIdToString(entrance.anchorId) << endl;
         }
 
-        cout << exits.size() << " exit chains:";
+        cout << exits.size() << " exits:" << endl;
         for(const Exit& exit: exits) {
             cout << assemblyGraph.bubbleChainStringId(exit.e) <<
                 " " << anchorIdToString(exit.anchorId) << endl;
@@ -176,6 +186,7 @@ void ChainDetangler::writeTangleMatrix() const
             }
         }
 
+#if 0
         for(const Entrance& entrance: entrances) {
             cout << "Total common coverage for entrance " <<
                 assemblyGraph.bubbleChainStringId(entrance.e) <<
@@ -186,6 +197,7 @@ void ChainDetangler::writeTangleMatrix() const
                 assemblyGraph.bubbleChainStringId(exit.e) <<
                 " is " << exit.commonCoverage << endl;
         }
+#endif
     }
 
 }
@@ -224,4 +236,44 @@ bool ChainDetangler::commonAnchorsBetweenEntrancesAndExitsExists() const
     return false;
 }
 
+
+
+// Connect the Chains of an Entrance and Exit and
+// remove the AssemblyGraph edges for the entrance and exit.
+void ChainDetangler::connect(
+    const Entrance& entrance,
+    const Exit& exit) const
+{
+    // Get the two edges to be connected.
+    const edge_descriptor e0 = entrance.e;
+    const edge_descriptor e1 = exit.e;
+
+    // Get the corresponding Chains.
+    const Chain& chain0 = assemblyGraph[e0].getOnlyChain();
+    const Chain& chain1 = assemblyGraph[e1].getOnlyChain();
+
+    // Get the two vertices for the new edge.
+    const vertex_descriptor v0 = source(e0, assemblyGraph);
+    const vertex_descriptor v1 = target(e1, assemblyGraph);
+
+    // Create the new edge.
+    edge_descriptor eNew;
+    tie(eNew, ignore) = boost::add_edge(v0, v1, assemblyGraph);
+    AssemblyGraphEdge& edgeNew = assemblyGraph[eNew];
+    edgeNew.id = assemblyGraph.nextEdgeId++;
+    BubbleChain& newBubbleChain = edgeNew;
+    newBubbleChain.resize(1);   // The new BubbleChain has a single Bubble
+    Bubble& newBubble = newBubbleChain.front();
+    newBubble.resize(1);        // The new Bubble is haploid.
+    Chain& newChain = newBubble.front();
+
+    // Build the new chain.
+    copy(chain0.begin(), chain0.end() - 1, back_inserter(newChain));
+    copy(chain1.begin() + 1, chain1.end(), back_inserter(newChain));
+
+    // Remove the original Chains we connected.
+    boost::remove_edge(e0, assemblyGraph);
+    boost::remove_edge(e1, assemblyGraph);
+
+}
 
