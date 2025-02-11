@@ -568,7 +568,7 @@ void Mode3Assembler::exploreJourney(const vector<string>& request, ostream& html
             "<tr>"
             "<td class=centered>" << positionInJourney <<
             "<td class=centered>" <<
-            "<a href='exploreAnchor?anchorIdString=" << anchorIdString << "'>" <<
+            "<a href='exploreAnchor?anchorIdString=" << HttpServer::urlEncode(anchorIdString) << "'>" <<
             anchorIdString << "</a>"
             "<td class=centered>" << anchorCoverage <<
             "<td class=centered>" << ordinal0 <<
