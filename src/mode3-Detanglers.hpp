@@ -6,16 +6,20 @@
 
 namespace shasta {
     namespace mode3 {
-        class ChainDetanglerNbyNPermutation;
+        class ChainPermutationDetangler;
     }
 }
 
 
 
-class shasta::mode3::ChainDetanglerNbyNPermutation : public ChainDetangler {
+// This uses a chi squared test to detangle superbubbles
+// where the number of incoming Chains equal the number of outgoing Chains
+// and is greater than 1. It applies the chi squared test to all
+// possible permutations.
+class shasta::mode3::ChainPermutationDetangler : public ChainDetangler {
 public:
 
-    ChainDetanglerNbyNPermutation(
+    ChainPermutationDetangler(
         bool debug,
         AssemblyGraph&,
         uint64_t nMax,

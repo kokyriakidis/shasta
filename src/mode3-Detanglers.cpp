@@ -18,7 +18,7 @@ using namespace mode3;
 
 
 
-ChainDetanglerNbyNPermutation::ChainDetanglerNbyNPermutation(
+ChainPermutationDetangler::ChainPermutationDetangler(
     bool debug,
     AssemblyGraph& assemblyGraph,
     uint64_t nMax,
@@ -36,7 +36,7 @@ ChainDetanglerNbyNPermutation::ChainDetanglerNbyNPermutation(
 
 
 
-bool ChainDetanglerNbyNPermutation::operator()(const vector<vertex_descriptor>& superbubble)
+bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& superbubble)
 {
 
     writeInitialMessage(superbubble);
