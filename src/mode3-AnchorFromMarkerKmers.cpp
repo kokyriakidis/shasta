@@ -394,6 +394,9 @@ void Anchors::constructFromMarkerKmersFlagForbiddenKmers(uint64_t /* threadId */
 // objects stored in each bucket.
 void Anchors::constructFromMarkerKmersCreateAnchors(uint64_t threadId )
 {
+    // EXPOSE WHEN CODE STABILIZES.
+    const uint64_t maxHomopolymerLength = 6;
+
     ConstructFromMarkerKmersData& data = constructFromMarkerKmersData;
     const uint64_t minPrimaryCoverage = data.minPrimaryCoverage;
     const uint64_t maxPrimaryCoverage = data.maxPrimaryCoverage;
@@ -461,6 +464,13 @@ void Anchors::constructFromMarkerKmersCreateAnchors(uint64_t threadId )
                         break;
                     }
                     ++streakEnd;
+                }
+
+                // If this k-mer has a long homopolymer, skip it.
+                if(kmer.maxHomopolymerLength(k) > maxHomopolymerLength) {
+                    // Prepare to process the next streak.
+                    streakBegin = streakEnd;
+                    continue;
                 }
 
                 // If this k-mer is marked as forbidden, skip it.

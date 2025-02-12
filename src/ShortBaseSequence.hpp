@@ -7,6 +7,7 @@
 #include "IntegerBySize.hpp"
 
 // Standard library.
+#include "algorithm.hpp"
 #include "array.hpp"
 #include <concepts>
 #include "iostream.hpp"
@@ -170,6 +171,30 @@ public:
         data[0] = Int(data[0] >> 1);
         data[1] = Int(data[1] >> 1);
     }
+
+
+
+    // Return the longest homopolymer length in the first k bases.
+    uint64_t maxHomopolymerLength(uint64_t k) const
+    {
+        uint64_t maxLength = 0;
+
+        for(uint64_t i=0; i<k-1; /* Increment later */) {
+            const Base base = (*this)[i];
+
+            // Find the first base not equal to this one.
+            uint64_t j = i + 1;
+            while(j < k and (*this)[j] == base) {
+                ++j;
+            }
+            maxLength = max(maxLength, j - i);
+            i = j;
+        }
+
+        return maxLength;
+    }
+
+
 
     // The data are left public to facilitate low level custom code.
     array<Int, 2> data;

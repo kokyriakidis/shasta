@@ -10,24 +10,25 @@ using namespace shasta;
 
 void shasta::testShortBaseSequence()
 {
-    const string s = "CGATCTTGAT";
-    const uint64_t k = s.size();
-    ShortBaseSequence64 x;
-    for(uint64_t i=0; i<k; i++) {
-        x.set(i, Base::fromCharacter(s[i]));
-    }
+    while(true) {
 
-    vector<ShortBaseSequence64> v;
-    applySingleEdit(x, k, v);
+        // Read the k-mer string.
+        string kmerString;
+        cout << "Enter a k-mer." << endl;
+        cin >> kmerString;
+        const uint64_t k = kmerString.size();
+        if(k > 64) {
+            cout << "Can be at most 64 bases long." << endl;
+        }
 
-    cout << "x:" << endl;
-    x.write(cout, k);
-    cout << endl;
-    cout << "y:" << endl;
+        // Create the k-mer.
+        ShortBaseSequence64 kmer;
+        for(uint64_t i=0; i<k; i++) {
+            kmer.set(i, Base::fromCharacter(kmerString[i]));
+        }
 
-
-    for(const auto& y: v) {
-        y.write(cout, k);
-        cout << endl;
+        // Write out the maximum homopolymer length.
+        cout << "Maximum homopolymer length is " <<
+            kmer.maxHomopolymerLength(k) << endl;
     }
 }
