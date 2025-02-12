@@ -388,7 +388,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 {
     // EXPOSE WHEN CODE STABILIZES.
     // Minimum anchor graph, edge coverage, only for alignment-free assembly.
-    const uint64_t minEdgeCoverageAlignmentFree = 3;
+    const uint64_t minEdgeCoverageAlignmentFree = 2;
 
 
     performanceLog << timestamp << "Assembling connected component " <<
