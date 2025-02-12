@@ -23,6 +23,8 @@ namespace shasta {
             boost::bidirectionalS,
             AssemblyGraphVertex,
             AssemblyGraphEdge>;
+
+        class AssemblyGraphEdgePredicate;
     }
 }
 
@@ -65,6 +67,12 @@ public:
     // inDegree(v0)>1, outDegree(v0)==1, inDegree(v1)==1, outDegree(v1)>1.
     class FromTangledEdges{};
     Superbubbles(AssemblyGraph&, const FromTangledEdges&);
+
+    // This computes connected components using the set of edges
+    // for which the AssemblyGraphEdgePredicate returns true.
+    // Each connected component with more than one vertex becomes a Superbubble.
+    // This does not compute entrances and exits of each Superbubble.
+    Superbubbles(AssemblyGraph&, const AssemblyGraphEdgePredicate&);
 
     ~Superbubbles();
 

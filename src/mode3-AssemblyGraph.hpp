@@ -59,6 +59,8 @@ namespace shasta {
             boost::bidirectionalS,
             AssemblyGraphVertex,
             AssemblyGraphEdge>;
+        class AssemblyGraphEdgePredicate;
+        class AssemblyGraphCrossEdgePredicate;
 
         class ChainIdentifier;
 
@@ -1046,3 +1048,37 @@ private:
 
 };
 
+
+
+// An AssemblyGraphEdgePredicate is an abstract base class for an object
+// whose operator() can be applied to an edge_descriptor and can return
+// true or false.
+class shasta::mode3::AssemblyGraphEdgePredicate {
+public:
+
+    using vertex_descriptor = AssemblyGraph::vertex_descriptor;
+    using edge_descriptor = AssemblyGraph::edge_descriptor;
+
+    virtual bool operator()(edge_descriptor) const = 0;
+
+    AssemblyGraphEdgePredicate(const AssemblyGraph&);
+
+protected:
+
+    // All derived classes will need access to the AssemblyGraph.
+    const AssemblyGraph& assemblyGraph;
+};
+
+
+
+// An AssemblyGraphEdgePredicate that returns true for a cross-edge.
+// An edge v0->v1 is defined to be a cross-edge if removing it
+// does not cause a forward dead end at v0- and a backward dead end
+// at v1. That is:
+// out-degree(v0) > 1
+// in_degree(v1) > 1.
+class shasta::mode3::AssemblyGraphCrossEdgePredicate : public AssemblyGraphEdgePredicate {
+public:
+    bool operator()(edge_descriptor) const;
+    AssemblyGraphCrossEdgePredicate(const AssemblyGraph&);
+};

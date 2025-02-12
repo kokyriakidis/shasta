@@ -7833,3 +7833,30 @@ void AssemblyGraph::storeSuperbubblesInformation(const Superbubbles& superbubble
     }
 
 }
+
+
+
+AssemblyGraphEdgePredicate::AssemblyGraphEdgePredicate(
+    const AssemblyGraph& assemblyGraph) :
+    assemblyGraph(assemblyGraph)
+{}
+
+
+
+AssemblyGraphCrossEdgePredicate::AssemblyGraphCrossEdgePredicate(
+    const AssemblyGraph& assemblyGraph) :
+    AssemblyGraphEdgePredicate(assemblyGraph)
+{}
+
+
+
+bool AssemblyGraphCrossEdgePredicate::operator()(edge_descriptor e) const
+{
+    const vertex_descriptor v0 = source(e, assemblyGraph);
+    const vertex_descriptor v1 = target(e, assemblyGraph);
+
+    return
+        (out_degree(v0, assemblyGraph) > 1) and
+        (in_degree(v1, assemblyGraph) > 1);
+}
+

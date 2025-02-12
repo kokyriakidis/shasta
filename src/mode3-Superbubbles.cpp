@@ -106,6 +106,55 @@ Superbubbles::Superbubbles(
 
 
 
+// This computes connected components using the set of edges
+// for which the AssemblyGraphEdgePredicate returns true.
+// Each connected component with more than one vertex becoens a Superbubble.
+// This does not compute entrances and exits of each Superbubble.
+Superbubbles::Superbubbles(
+    AssemblyGraph& assemblyGraph,
+    const AssemblyGraphEdgePredicate& edgePredicate) :
+    assemblyGraph(assemblyGraph)
+{
+    assemblyGraph.numberVertices();
+    const uint64_t vertexCount = num_vertices(assemblyGraph);
+
+    vector<uint64_t> rank(vertexCount);
+    vector<uint64_t> parent(vertexCount);
+    boost::disjoint_sets<uint64_t*, uint64_t*> disjointSets(&rank[0], &parent[0]);
+
+    // Compute connected components, using only edges
+    // for which the AssemblyGraphEdgePredicate returns true.
+    for(uint64_t i=0; i<vertexCount; i++) {
+        disjointSets.make_set(i);
+    }
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+        if(edgePredicate(e)) {
+            const vertex_descriptor v0 = source(e, assemblyGraph);
+            const vertex_descriptor v1 = target(e, assemblyGraph);
+            disjointSets.union_set(assemblyGraph[v0].index, assemblyGraph[v1].index);
+        }
+    }
+
+    // Gather the vertices in each connected component.
+    vector< vector<vertex_descriptor> > components(vertexCount);
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        const uint64_t componentId = disjointSets.find_set(assemblyGraph[v].index);
+        components[componentId].push_back(v);
+    }
+
+    // The superbubbles are the components with size at least 2.
+    for(uint64_t componentId=0; componentId<components.size(); componentId++) {
+        const vector<vertex_descriptor> component = components[componentId];
+        if(components[componentId].size() > 1) {
+            superbubbles.emplace_back(Superbubble(component));
+        }
+    }
+
+    assemblyGraph.storeSuperbubblesInformation(*this);
+}
+
+
+
 // This constructs superbubbles consisting of a single edge v0->v1
 // such that:
 // outDegree(v0) == 1, inDegree(v0)  > 1
