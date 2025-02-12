@@ -27,8 +27,23 @@ void shasta::testShortBaseSequence()
             kmer.set(i, Base::fromCharacter(kmerString[i]));
         }
 
-        // Write out the maximum homopolymer length.
-        cout << "Maximum homopolymer length is " <<
+        // Test maxHomopolymerLength.
+        cout << "maxHomopolymerLength returned " <<
             kmer.maxHomopolymerLength(k) << endl;
+
+        // Test countExactRepeatCopies.
+        cout << "countExactRepeatCopies<1> returned " <<
+            kmer.countExactRepeatCopies<1>(k) << endl;
+        cout << "countExactRepeatCopies<2> returned " <<
+            kmer.countExactRepeatCopies<2>(k) << endl;
+        cout << "countExactRepeatCopies<3> returned " <<
+            kmer.countExactRepeatCopies<3>(k) << endl;
+        cout << "countExactRepeatCopies<4> returned " <<
+            kmer.countExactRepeatCopies<4>(k) << endl;
+        cout << "countExactRepeatCopies<5> returned " <<
+            kmer.countExactRepeatCopies<5>(k) << endl;
+        cout << "countExactRepeatCopies<6> returned " <<
+            kmer.countExactRepeatCopies<6>(k) << endl;
+
     }
 }

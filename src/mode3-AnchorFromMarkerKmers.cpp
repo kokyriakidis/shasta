@@ -394,8 +394,6 @@ void Anchors::constructFromMarkerKmersFlagForbiddenKmers(uint64_t /* threadId */
 // objects stored in each bucket.
 void Anchors::constructFromMarkerKmersCreateAnchors(uint64_t threadId )
 {
-    // EXPOSE WHEN CODE STABILIZES.
-    const uint64_t maxHomopolymerLength = 6;
 
     ConstructFromMarkerKmersData& data = constructFromMarkerKmersData;
     const uint64_t minPrimaryCoverage = data.minPrimaryCoverage;
@@ -466,13 +464,6 @@ void Anchors::constructFromMarkerKmersCreateAnchors(uint64_t threadId )
                     ++streakEnd;
                 }
 
-                // If this k-mer has a long homopolymer, skip it.
-                if(kmer.maxHomopolymerLength(k) > maxHomopolymerLength) {
-                    // Prepare to process the next streak.
-                    streakBegin = streakEnd;
-                    continue;
-                }
-
                 // If this k-mer is marked as forbidden, skip it.
                 const auto& kmerInfos = data.kmerInfo[bucketId];
                 bool isForbidden = false;
@@ -517,6 +508,21 @@ void Anchors::constructFromMarkerKmersCreateAnchors(uint64_t threadId )
                     continue;
                 }
 
+                // EXPOSE THE CONSTANTS WHEN CODE STABILIZES
+                // If this k-mer has long repeats, skip it.
+                // Do this check last because it is expensive.
+                if(
+                    (kmer.maxHomopolymerLength(k) > 6) or
+                    (kmer.countExactRepeatCopies<2>(k) > 3) or
+                    (kmer.countExactRepeatCopies<3>(k) > 2) or
+                    (kmer.countExactRepeatCopies<4>(k) > 2) or
+                    (kmer.countExactRepeatCopies<5>(k) > 2) or
+                    (kmer.countExactRepeatCopies<6>(k) > 2)
+                    ) {
+                    // Prepare to process the next streak.
+                    streakBegin = streakEnd;
+                    continue;
+                }
 
                 // Generate the first anchor of the pair (no reverse complementing).
                 threadAnchors.appendVector();
