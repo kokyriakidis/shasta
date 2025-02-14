@@ -61,6 +61,7 @@ namespace shasta {
             AssemblyGraphEdge>;
         class AssemblyGraphEdgePredicate;
         class AssemblyGraphCrossEdgePredicate;
+        class AssemblyGraphNoInternalAnchorsEdgePredicate;
 
         class ChainIdentifier;
 
@@ -1085,4 +1086,14 @@ class shasta::mode3::AssemblyGraphCrossEdgePredicate : public AssemblyGraphEdgeP
 public:
     bool operator()(edge_descriptor) const;
     AssemblyGraphCrossEdgePredicate(const AssemblyGraph&);
+};
+
+
+
+// An AssemblyGraphEdgePredicate that returns true for an edge without internal anchors.
+// Must be called for an edge corresponding to a single Chain.
+class shasta::mode3::AssemblyGraphNoInternalAnchorsEdgePredicate : public AssemblyGraphEdgePredicate {
+public:
+    bool operator()(edge_descriptor) const;
+    AssemblyGraphNoInternalAnchorsEdgePredicate(const AssemblyGraph&);
 };

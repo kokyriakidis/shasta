@@ -110,8 +110,8 @@ void AssemblyGraph::run4(
 
         // Detangle of cross-edges individually.
         {
-            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
-            const uint64_t detangledCount = detangleCrossEdgesIndividually(true, detangler);
+            ChainPermutationDetangler detangler(iteration==4, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
+            const uint64_t detangledCount = detangleCrossEdgesIndividually(iteration==4, detangler);
             simplificationCount += detangledCount;
             compressSequentialEdges();
             compressBubbleChains();
@@ -136,6 +136,21 @@ void AssemblyGraph::run4(
                 num_edges(assemblyGraph) << " edges." << endl;
         }
 
+        // Detangle superbubbles defined by edges without internal anchors.
+        {
+            AssemblyGraphNoInternalAnchorsEdgePredicate edgePredicate(assemblyGraph);
+            Superbubbles superbubbles(assemblyGraph, edgePredicate);
+
+            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
+            const uint64_t detangledCount = detangle(superbubbles, detangler);
+
+            simplificationCount += detangledCount;
+            compressSequentialEdges();
+            compressBubbleChains();
+            cout << "Detangled " << detangledCount << " superbubbles defined by edges without internal anchors. The assembly graph now has " <<
+                num_vertices(assemblyGraph) << " vertices and " <<
+                num_edges(assemblyGraph) << " edges." << endl;
+        }
 
 
         // Superbubble detangling.

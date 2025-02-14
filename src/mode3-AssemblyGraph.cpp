@@ -7860,3 +7860,19 @@ bool AssemblyGraphCrossEdgePredicate::operator()(edge_descriptor e) const
         (in_degree(v1, assemblyGraph) > 1);
 }
 
+
+
+AssemblyGraphNoInternalAnchorsEdgePredicate::AssemblyGraphNoInternalAnchorsEdgePredicate(
+    const AssemblyGraph& assemblyGraph) :
+    AssemblyGraphEdgePredicate(assemblyGraph)
+{}
+
+
+
+bool AssemblyGraphNoInternalAnchorsEdgePredicate::operator()(edge_descriptor e) const
+{
+    const Chain& chain = assemblyGraph[e].getOnlyChain();
+    SHASTA_ASSERT(chain.size() > 1);
+    return chain.size() == 2;
+}
+
