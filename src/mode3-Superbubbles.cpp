@@ -444,6 +444,14 @@ Superbubbles::Superbubbles(
 
 
 
+Superbubbles::Superbubbles(
+    AssemblyGraph& assemblyGraph,
+    const Empty&) :
+    assemblyGraph(assemblyGraph)
+{}
+
+
+
 // Fill in the superbubble given a single entrance and exit.
 void Superbubble::fillInFromEntranceAndExit(const AssemblyGraph& assemblyGraph)
 {

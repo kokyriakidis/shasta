@@ -66,6 +66,7 @@ namespace shasta {
 
         class AnchorGraph;
         class Anchors;
+        class ChainPermutationDetangler;
     }
 }
 
@@ -1027,6 +1028,9 @@ private:
     // uint64_t detangleShortSuperbubbles4(bool debug, const Superbubbles&);
     // bool detangleShortSuperbubble4(bool debug, const vector<vertex_descriptor>& superbubble);
     uint64_t cleanupBubbles();
+    uint64_t detangleCrossEdgesIndividually(
+        bool debug,
+        ChainPermutationDetangler&);
 
     // Serialization.
     friend class boost::serialization::access;

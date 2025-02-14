@@ -74,6 +74,10 @@ public:
     // This does not compute entrances and exits of each Superbubble.
     Superbubbles(AssemblyGraph&, const AssemblyGraphEdgePredicate&);
 
+    // This creates an empty Superbubbles object.
+    class Empty{};
+    Superbubbles(AssemblyGraph&, const Empty&);
+
     ~Superbubbles();
 
     // Return the number of superbubbbles.

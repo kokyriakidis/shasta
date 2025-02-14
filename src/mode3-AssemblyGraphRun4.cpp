@@ -2,6 +2,7 @@
 #include "mode3-AssemblyGraph.hpp"
 #include "mode3-Detanglers.hpp"
 #include "AssemblerOptions.hpp"
+#include "deduplicate.hpp"
 #include "performanceLog.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
@@ -107,6 +108,17 @@ void AssemblyGraph::run4(
                 num_edges(assemblyGraph) << " edges." << endl;
         }
 
+        // Detangle of cross-edges individually.
+        {
+            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
+            const uint64_t detangledCount = detangleCrossEdgesIndividually(true, detangler);
+            simplificationCount += detangledCount;
+            compressSequentialEdges();
+            compressBubbleChains();
+            cout << "Detangled " << detangledCount << " cross-edges individually. The assembly graph now has " <<
+                num_vertices(assemblyGraph) << " vertices and " <<
+                num_edges(assemblyGraph) << " edges." << endl;
+        }
 
         // Detangle superbubbles defined by cross-edges.
         {
@@ -620,4 +632,113 @@ uint64_t AssemblyGraph::cleanupBubbles()
     }
 
     return n;
+}
+
+
+
+// This detangles cross-edges individually one by one.
+// For each cross-edge, we construt a Superbubbles object
+// containing just a single Superbubble with the two vertices
+// of the cross-edge. We can't use a single Superbubbles object
+// with one Superbubble for each cross-edge because
+// one vertex can only belong to one superbubble.
+uint64_t AssemblyGraph::detangleCrossEdgesIndividually(
+    bool debug,
+    ChainPermutationDetangler& detangler)
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    // While detangling, some edges are removed.
+    // To avoid attempting to detangle edges that were removed
+    // during detangling, we maintain a map that contains all
+    // the unprocessed edges. The map gives the edge_descriptor
+    // corresponding to each edgeId. We remove map entries as edges
+    // are removed during detangling.
+    // We cannot use edge_descriptors are reliable keys because
+    // an edge_descriptor can be reused after an edge is removed.
+    std::map<uint64_t, edge_descriptor> edgeMap;
+    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
+         edgeMap.insert(make_pair(assemblyGraph[e].id, e));
+    }
+
+    // Clear the superbubbleId of all vertices.
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        assemblyGraph[v].superbubbleId = invalid<uint64_t>;
+    }
+
+    // Create a Superbubbles object containing a single Superbubble
+    // with two vertices. We will these vertices in for each cross edge separately.
+    Superbubbles superbubbles(assemblyGraph, Superbubbles::Empty());
+    superbubbles.superbubbles.resize(1);
+    Superbubble& superbubble = superbubbles.superbubbles.front();
+    superbubble.resize(2);
+
+
+
+    // Main loop over unprocessed edges.
+    AssemblyGraphCrossEdgePredicate crossEdgePredicate(assemblyGraph);
+    uint64_t detangledCount = 0;
+    vector<uint64_t> detangledEdges;
+    while(not edgeMap.empty()) {
+
+        // Get the first edge in the edgeMap and remove it from the edgeMap.
+        auto it = edgeMap.begin();
+        // const uint64_t edgeId = it->first;
+        const edge_descriptor e = it->second;
+        edgeMap.erase(it);
+
+        // If not a cross-edge, do nothing.
+        if(not crossEdgePredicate(e)) {
+            continue;
+        }
+
+        if(debug) {
+            cout << "Detangling cross-edge " << bubbleChainStringId(e) << endl;
+        }
+
+        // Get the vertices of our cross-edge.
+        const vertex_descriptor v0 = source(e, assemblyGraph);
+        const vertex_descriptor v1 = target(e, assemblyGraph);
+
+        // If the detangling is successful, all the in-edges and out-edges
+        // of v0 and  v1 will be removed, and we would have to remove them from
+        // the edgeMap. Find out what those edges are.
+        detangledEdges.clear();
+        BGL_FORALL_INEDGES(v0, e, assemblyGraph, AssemblyGraph) {
+            detangledEdges.push_back(assemblyGraph[e].id);
+        }
+        BGL_FORALL_INEDGES(v1, e, assemblyGraph, AssemblyGraph) {
+            detangledEdges.push_back(assemblyGraph[e].id);
+        }
+        BGL_FORALL_OUTEDGES(v0, e, assemblyGraph, AssemblyGraph) {
+            detangledEdges.push_back(assemblyGraph[e].id);
+        }
+        BGL_FORALL_OUTEDGES(v1, e, assemblyGraph, AssemblyGraph) {
+            detangledEdges.push_back(assemblyGraph[e].id);
+        }
+        deduplicate(detangledEdges);
+
+        // Fill in our Superbubble.
+        superbubble[0] = v0;
+        superbubble[1] = v1;
+        assemblyGraph[v0].superbubbleId = 0;
+        assemblyGraph[v1].superbubbleId = 0;
+
+        // Attempt to detangle it.
+        const uint64_t success = detangle(superbubbles, detangler);
+
+
+        if(success) {
+            ++detangledCount;
+            for(const uint64_t edgeId: detangledEdges) {
+                edgeMap.erase(edgeId);
+            }
+        } else {
+            assemblyGraph[v0].superbubbleId = invalid<uint64_t>;
+            assemblyGraph[v1].superbubbleId = invalid<uint64_t>;
+        }
+    }
+
+
+    return detangledCount;
 }
