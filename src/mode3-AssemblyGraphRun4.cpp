@@ -190,7 +190,6 @@ void AssemblyGraph::run4(
     // Test detangleInducedSubgraphs.
     {
         expand();
-        write("U");
 
         // A diploid bubble preceded and followed by haploid segments.
         Subgraph subgraph(4);
@@ -199,7 +198,15 @@ void AssemblyGraph::run4(
         add_edge(1, 2, subgraph);
         add_edge(2, 3, subgraph);
         ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
-        detangleInducedSubgraphs(true, subgraph, detangler);
+        write("U");
+        while(true) {
+            const uint64_t detangledCount =  detangleInducedSubgraphs(false, subgraph, detangler);
+            cout << "Detangled " << detangledCount << " induced subgraphs." << endl;
+            if(detangledCount == 0) {
+                break;
+            }
+        }
+        write("V");
         compress();
     }
 
@@ -787,7 +794,7 @@ uint64_t AssemblyGraph::detangleCrossEdgesIndividually(
 uint64_t AssemblyGraph::detangleInducedSubgraphs(
     bool debug,
     const Subgraph& subgraph,
-    ChainPermutationDetangler&)
+    ChainPermutationDetangler& detangler)
 {
     AssemblyGraph& assemblyGraph = *this;
 
@@ -810,9 +817,11 @@ uint64_t AssemblyGraph::detangleInducedSubgraphs(
         deduplicate(parallelEdgesSet);
 
         // Loop over all isomorphisms.
-        for(const vector<vertex_descriptor>& isomorphism: isomorphisms) {
+        for(uint64_t i=0; i<isomorphisms.size(); i++) {
+            const vector<vertex_descriptor>& isomorphism = isomorphisms[i];
 
             // Write the vertex isomorphism.
+            cout << "Isomorphism " << i << endl;
             cout << "Vertex isomorphism:" << endl;
             for(Subgraph::vertex_descriptor v0s=0; v0s<isomorphism.size(); v0s++) {
                 const vertex_descriptor v0 = isomorphism[v0s];
@@ -821,6 +830,7 @@ uint64_t AssemblyGraph::detangleInducedSubgraphs(
 
             // The edge isomorphism is more complicated because we have to
             // account correctly for parallel edges.
+
 
             // Find the corresponding sets of parallel edges in the AssemblyGraph.
             cout << "Edge isomorphism:" << endl;
@@ -841,5 +851,117 @@ uint64_t AssemblyGraph::detangleInducedSubgraphs(
     }
 
 
-    return 0;
+
+    // The induced subgraphs can overlap each other.
+    // If we successfully detangle one induced subgraph, we have to discard
+    // all of the overlapping induced subgraphs.
+    // We create an undirected graph in which each vertex represents
+    // one of the isomorphisms we found (that is, one of the induced subgragphs).
+    // We add edges between vertices corresponding to isomorphisms that share
+    // AssemblyGraph vertices.
+    using OverlapGraph = boost::adjacency_list<boost::setS, boost::vecS, boost::undirectedS>;
+    OverlapGraph overlapGraph(isomorphisms.size());
+    {
+        // Find the isomorphisms that each AssemblyGraph vertex is involved in.
+        std::map<vertex_descriptor, vector<uint64_t> > vertexIsomorphisms;
+        for(uint64_t i=0; i<isomorphisms.size(); i++) {
+            const vector<vertex_descriptor>& isomorphism = isomorphisms[i];
+            for(Subgraph::vertex_descriptor v0s=0; v0s<isomorphism.size(); v0s++) {
+                const vertex_descriptor v0 = isomorphism[v0s];
+                vertexIsomorphisms[v0].push_back(i);
+            }
+        }
+
+        // Add edges to the OverlapGraph.
+        for(const auto& p: vertexIsomorphisms) {
+            const vector<uint64_t>& v = p.second;
+            for(uint64_t i=0; i<v.size()-1; i++) {
+                for(uint64_t j=i+1; j<v.size(); j++) {
+                    add_edge(v[i], v[j], overlapGraph);
+                }
+            }
+        }
+
+        if(debug) {
+            ofstream dot("OverlapGraph.dot");
+            dot << "graph OverlapGraph{\n";
+            BGL_FORALL_VERTICES(v, overlapGraph, OverlapGraph) {
+                dot << v << ";\n";
+            }
+            BGL_FORALL_EDGES(e, overlapGraph, OverlapGraph) {
+                const OverlapGraph::vertex_descriptor v0 = source(e, overlapGraph);
+                const OverlapGraph::vertex_descriptor v1 = target(e, overlapGraph);
+                dot << v0 << "--" << v1 << ";\n";
+            }
+            dot << "}\n";
+        }
+
+    }
+
+
+    // Each induced subgraph isomorphism corresponds to a superbubble.
+    // Each of these superbubbles is detangled individually.
+    // However if an induced subgraph is detangled successfully we
+    // have to skip all other induced subgraphs that overlap with it.
+    vector<bool> wasDetangledSuccessfully(isomorphisms.size(), false);
+
+    // Clear the superbubbleId of all vertices.
+    BGL_FORALL_VERTICES(v, assemblyGraph, AssemblyGraph) {
+        assemblyGraph[v].superbubbleId = invalid<uint64_t>;
+    }
+
+    // Create a Superbubbles object containing a single Superbubble.
+    Superbubbles superbubbles(assemblyGraph, Superbubbles::Empty());
+    superbubbles.superbubbles.resize(1);
+    Superbubble& superbubble = superbubbles.superbubbles.front();
+
+
+
+    // Main loop over induced subgraph isomorphisms.
+    uint64_t detangledCount = 0;
+    for(uint64_t i=0; i<isomorphisms.size(); i++) {
+        // cout << "Detangling " << i << " of " << isomorphisms.size() << endl;
+
+        // If any overlapping isomorphisms were successfully detangled,
+        // we have to skip this one.
+        bool skip = false;
+        BGL_FORALL_OUTEDGES(i, e, overlapGraph, OverlapGraph) {
+            SHASTA_ASSERT(source(e, overlapGraph) == i);
+            const uint64_t j = target(e, overlapGraph);
+            if(wasDetangledSuccessfully[j]) {
+                skip = true;
+                break;
+            }
+        }
+        if(skip) {
+            // cout << "Skipped " << i << endl;
+            continue;
+        }
+
+
+        // Fill in our Superbubble.
+        superbubble.clear();
+        const vector<vertex_descriptor>& isomorphism = isomorphisms[i];
+        for(const vertex_descriptor v: isomorphism) {
+            superbubble.push_back(v);
+            assemblyGraph[v].superbubbleId = 0;
+        }
+
+        // Attempt to detangle it.
+        wasDetangledSuccessfully[i] = detangle(superbubbles, detangler);
+
+
+        if(wasDetangledSuccessfully[i]) {
+            ++detangledCount;
+            // cout << "Success " << i << endl;
+        } else {
+            // cout << "Failure " << i << endl;
+            for(const vertex_descriptor v: isomorphism) {
+                superbubble.push_back(v);
+                assemblyGraph[v].superbubbleId = invalid<uint64_t>;
+            }
+        }
+    }
+
+    return detangledCount;
 }
