@@ -1033,6 +1033,16 @@ private:
         bool debug,
         ChainPermutationDetangler&);
 
+    // This detangles induced subgraphs of the AssemblyGraph
+    // that are isomorphic to a given Subgraph.
+    using Subgraph = boost::adjacency_list<boost::listS, boost::vecS, boost::bidirectionalS>;
+    uint64_t detangleInducedSubgraphs(
+        bool debug,
+        const Subgraph&,
+        ChainPermutationDetangler&);
+
+
+
     // Serialization.
     friend class boost::serialization::access;
     template<class Archive> void serialize(Archive& ar, unsigned int /* version */)

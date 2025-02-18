@@ -3,6 +3,8 @@
 #include "mode3-Detanglers.hpp"
 #include "AssemblerOptions.hpp"
 #include "deduplicate.hpp"
+#include "inducedSubgraphIsomorphisms.hpp"
+#include "orderPairs.hpp"
 #include "performanceLog.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
@@ -29,9 +31,9 @@ void AssemblyGraph::run4(
     SHASTA_ASSERT(std::is_sorted(orientedReadIds.begin(), orientedReadIds.end()));
     SHASTA_ASSERT(std::is_sorted(anchorIds.begin(), anchorIds.end()));
 
-    write("A");
+    // write("A");
     compress();
-    write("B");
+    // write("B");
 
     // An iteration loop in which we try at each iteration
     // all operations that can simplify the AssemblyGraph.
@@ -181,7 +183,27 @@ void AssemblyGraph::run4(
         num_vertices(assemblyGraph) << " vertices and " << num_edges(assemblyGraph) <<
         " edges." << endl;
 
-    write("Z");
+    // write("Z");
+
+
+
+    // Test detangleInducedSubgraphs.
+    {
+        expand();
+        write("U");
+
+        // A diploid bubble preceded and followed by haploid segments.
+        Subgraph subgraph(4);
+        add_edge(0, 1, subgraph);
+        add_edge(1, 2, subgraph);
+        add_edge(1, 2, subgraph);
+        add_edge(2, 3, subgraph);
+        ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
+        detangleInducedSubgraphs(true, subgraph, detangler);
+        compress();
+    }
+
+
 
 #if 0
     // Assemble sequence.
@@ -756,4 +778,68 @@ uint64_t AssemblyGraph::detangleCrossEdgesIndividually(
 
 
     return detangledCount;
+}
+
+
+
+// This detangles induced subgraphs of the AssemblyGraph
+// that are isomorphic to a given Subgraph.
+uint64_t AssemblyGraph::detangleInducedSubgraphs(
+    bool debug,
+    const Subgraph& subgraph,
+    ChainPermutationDetangler&)
+{
+    AssemblyGraph& assemblyGraph = *this;
+
+    vector< vector<vertex_descriptor> > isomorphisms;
+    inducedSubgraphIsomorphisms(assemblyGraph, subgraph, isomorphisms);
+
+
+
+    if(debug) {
+        cout << "Found " << isomorphisms.size() << " isomorphisms." << endl;
+
+        // Find sets of parallel edges in the Subgraph.
+        // They are needed below.
+        vector< pair<Subgraph::vertex_descriptor, Subgraph::vertex_descriptor> > parallelEdgesSet;
+        BGL_FORALL_EDGES(e, subgraph, Subgraph) {
+            const Subgraph::vertex_descriptor v0 = source(e, subgraph);
+            const Subgraph::vertex_descriptor v1 = target(e, subgraph);
+            parallelEdgesSet.push_back({v0, v1});
+        }
+        deduplicate(parallelEdgesSet);
+
+        // Loop over all isomorphisms.
+        for(const vector<vertex_descriptor>& isomorphism: isomorphisms) {
+
+            // Write the vertex isomorphism.
+            cout << "Vertex isomorphism:" << endl;
+            for(Subgraph::vertex_descriptor v0s=0; v0s<isomorphism.size(); v0s++) {
+                const vertex_descriptor v0 = isomorphism[v0s];
+                cout << v0s << ": " << anchorIdToString(assemblyGraph[v0].anchorId) << endl;
+            }
+
+            // The edge isomorphism is more complicated because we have to
+            // account correctly for parallel edges.
+
+            // Find the corresponding sets of parallel edges in the AssemblyGraph.
+            cout << "Edge isomorphism:" << endl;
+            for(const pair<Subgraph::vertex_descriptor, Subgraph::vertex_descriptor>& p: parallelEdgesSet) {
+                const Subgraph::vertex_descriptor v0s = p.first;
+                const Subgraph::vertex_descriptor v1s = p.second;
+                const vertex_descriptor v0 = isomorphism[v0s];
+                const vertex_descriptor v1 = isomorphism[v1s];
+                cout << v0s << "->" << v1s << ":";
+                BGL_FORALL_OUTEDGES(v0, e, assemblyGraph, AssemblyGraph) {
+                    if(target(e, assemblyGraph) == v1) {
+                        cout << " " << bubbleChainStringId(e);
+                    }
+                }
+                cout << endl;
+            }
+        }
+    }
+
+
+    return 0;
 }
