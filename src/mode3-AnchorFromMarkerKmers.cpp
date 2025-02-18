@@ -513,13 +513,11 @@ void Anchors::constructFromMarkerKmersCreateAnchors(uint64_t threadId )
                 // Do this check last because it is expensive.
                 if(
                     (kmer.maxHomopolymerLength(k) > 6) or
-                    (kmer.countExactRepeatCopies<2>(k) > 3)
-                    /*
-                    or
-                    (kmer.countExactRepeatCopies<3>(k) > 2) or
-                    (kmer.countExactRepeatCopies<4>(k) > 2) or
-                    (kmer.countExactRepeatCopies<5>(k) > 2) or
-                    (kmer.countExactRepeatCopies<6>(k) > 2) */
+                    (kmer.countExactRepeatCopies<2>(k) > 6) or
+                    (kmer.countExactRepeatCopies<3>(k) > 4) or
+                    (kmer.countExactRepeatCopies<4>(k) > 3) or
+                    (kmer.countExactRepeatCopies<5>(k) > 3) or
+                    (kmer.countExactRepeatCopies<6>(k) > 3)
                     ) {
                     // Prepare to process the next streak.
                     streakBegin = streakEnd;
