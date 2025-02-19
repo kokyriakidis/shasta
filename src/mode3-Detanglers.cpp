@@ -123,7 +123,7 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
     vector<Exit> permutedExits(n);
     vector< vector<uint64_t> > permutedTangleMatrix(n, vector<uint64_t>(n));
     do {
-        if(false) {
+        if(debug) {
             cout << "Trying permutation ";
             copy(permutation.begin(), permutation.end(), ostream_iterator<uint64_t>(cout, " "));
             cout << endl;
@@ -133,7 +133,7 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
         for(uint64_t iExit=0; iExit<n; iExit++) {
             permutedExits[iExit] = exits[permutation[iExit]];
         }
-        if(false) {
+        if(debug) {
             cout << "Permuted exits:";
             for(const Exit& exit: permutedExits) {
                 cout << " " << assemblyGraph.bubbleChainStringId(exit.e);
@@ -148,7 +148,7 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
             }
         }
 
-        if(false) {
+        if(debug) {
             cout << "Permuted tangle matrix:" << endl;
             for(uint64_t iEntrance=0; iEntrance<entrances.size(); iEntrance++) {
                 const Entrance& entrance = entrances[iEntrance];
@@ -195,7 +195,7 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
             }
         }
 
-        if(false) {
+        if(debug) {
             cout << "Random tangle matrix for this permutation:" << endl;
             for(uint64_t iEntrance=0; iEntrance<entrances.size(); iEntrance++) {
                 const Entrance& entrance = entrances[iEntrance];
@@ -265,7 +265,7 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
             // Store this permutation and its logP.
             permutationTable.push_back(make_pair(permutation, logP));
 
-            if(false) {
+            if(debug) {
                 cout << "Chi square for this permutation: " << chi2 <<
                     ", logP " << logP << " dB." << endl;
             }
@@ -277,7 +277,7 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
     // If we did not find any usable permutation, do nothing.
     if(permutationTable.empty()) {
         if(debug) {
-            cout << "The permutatio table is empty." << endl;
+            cout << "The permutation table is empty." << endl;
         }
         return false;
     }
