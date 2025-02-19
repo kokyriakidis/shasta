@@ -19,10 +19,9 @@ void AssemblyGraph::run4(
 {
     // EXPOSE WHEN CODE STABILIZES.
     const double epsilon = 0.05;
-    // const double chiSquareThreshold = 30.;
     const uint64_t superbubbleLengthThreshold = 10000;
-    const double maxLogP = 10.;
-    const double minLogPDelta = 20.;
+    const double maxLogP = 30.;
+    const double minLogPDelta = 30.;
 
     AssemblyGraph& assemblyGraph = *this;
 
@@ -168,6 +167,23 @@ void AssemblyGraph::run4(
                 num_edges(assemblyGraph) << " edges." << endl;
         }
 
+        // Detangle remaining bubbles preceded and followed by haploid segments.
+        {
+            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
+            Subgraph subgraph(4);
+            add_edge(0, 1, subgraph);
+            add_edge(1, 2, subgraph);
+            add_edge(1, 2, subgraph);
+            add_edge(2, 3, subgraph);
+            const uint64_t detangledCount =  detangleInducedSubgraphs(false, subgraph, detangler);
+            simplificationCount += detangledCount;
+            compressSequentialEdges();
+            compressBubbleChains();
+            cout << "Detangled " << detangledCount << " induced subgraphs (bubbles with stems)." << endl;
+            if(detangledCount == 0) {
+                break;
+            }
+        }
 
         cout << "Detangle iteration " << iteration << " had " <<
             simplificationCount << " successful detangling operations." << endl;
@@ -183,37 +199,13 @@ void AssemblyGraph::run4(
         num_vertices(assemblyGraph) << " vertices and " << num_edges(assemblyGraph) <<
         " edges." << endl;
 
-    // write("Z");
-
-
-
-    // Test detangleInducedSubgraphs.
-    {
-        expand();
-
-        // A diploid bubble preceded and followed by haploid segments.
-        Subgraph subgraph(4);
-        add_edge(0, 1, subgraph);
-        add_edge(1, 2, subgraph);
-        add_edge(1, 2, subgraph);
-        add_edge(2, 3, subgraph);
-        ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
-        write("U");
-        while(true) {
-            const uint64_t detangledCount =  detangleInducedSubgraphs(false, subgraph, detangler);
-            cout << "Detangled " << detangledCount << " induced subgraphs." << endl;
-            if(detangledCount == 0) {
-                break;
-            }
-        }
-        write("V");
-        compress();
-    }
+    write("Z");
 
 
 
 #if 0
     // Assemble sequence.
+    cout << timestamp << "Assembling sequence." << endl;
     assembleAllChainsMultithreaded(
         options.assemblyGraphOptions.chainTerminalCommonThreshold,
         threadCount);
