@@ -234,6 +234,45 @@ void AnchorGraph::writeEdgeCoverageHistogram(const string& fileName) const
 
 
 
+void AnchorGraph::writeEdgeDetails(
+    const string& fileName,
+    const Anchors& anchors) const
+{
+    const AnchorGraph& anchorGraph = *this;
+
+    ofstream csv(fileName);
+    csv << "AnchorId0,AnchorId1,Coverage,Common,Common with positive offset,Offset,\n";
+
+
+    // Loop over all edges.
+    BGL_FORALL_EDGES(e, anchorGraph, AnchorGraph) {
+        const AnchorGraphEdge& edge = anchorGraph[e];
+        const uint64_t coverage = edge.coverage;
+        const uint64_t commonCount = edge.info.common;
+        SHASTA_ASSERT(coverage <= commonCount);
+
+        const vertex_descriptor v0 = source(e, anchorGraph);
+        const vertex_descriptor v1 = target(e, anchorGraph);
+        const AnchorId anchorId0 = getAnchorId(v0);
+        const AnchorId anchorId1 = getAnchorId(v1);
+
+        const uint64_t commonCountPositiveOffset = anchors.countCommon(anchorId0, anchorId1, true);
+        SHASTA_ASSERT(commonCountPositiveOffset <= commonCount);
+
+        csv << anchorIdToString(anchorId0) << ",";
+        csv << anchorIdToString(anchorId1) << ",";
+        csv << coverage << ",";
+        csv << commonCount << ",";
+        csv << commonCountPositiveOffset << ",";
+        csv << edge.info.offsetInBases << ",";
+        csv << "\n";
+
+    }
+
+}
+
+
+
 void AnchorGraph::removeNegativeOffsetEdges()
 {
     AnchorGraph& graph = *this;

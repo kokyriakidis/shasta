@@ -22,7 +22,7 @@ void AssemblyGraph::run4(
     const uint64_t superbubbleLengthThreshold = 10000;
     const double maxLogP = 30.;
     const double minLogPDelta = 30.;
-    const uint64_t minDetangledCoverage = 6;
+    const uint64_t minDetangledCoverage = 0;
 
     AssemblyGraph& assemblyGraph = *this;
 

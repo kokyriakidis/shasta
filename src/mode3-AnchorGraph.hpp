@@ -145,6 +145,7 @@ public:
         const Anchors&) const;
 
     void writeEdgeCoverageHistogram(const string& fileName) const;
+    void writeEdgeDetails(const string& fileName, const Anchors&) const;
 
     void localTransitiveReduction(
         uint64_t distance,

@@ -388,7 +388,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
 {
     // EXPOSE WHEN CODE STABILIZES.
     // Minimum anchor graph edge coverage, only for alignment-free assembly.
-    const uint64_t minEdgeCoverageAlignmentFree = 6;
+    const uint64_t minEdgeCoverageAlignmentFree = 10;
 
 
     performanceLog << timestamp << "Assembling connected component " <<
@@ -451,6 +451,7 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
          anchorGraph.writeGraphviz(
              "AnchorGraphCompactInitial" + to_string(componentId), options, anchors());
          anchorGraph.writeEdgeCoverageHistogram("AnchorGraphInitial" + to_string(componentId) + "-EdgeCoverageHistogram.csv");
+         anchorGraph.writeEdgeDetails("AnchorGraphInitial" + to_string(componentId) + "-EdgeDetails.csv", anchors());
      }
 
      if(options.anchorCreationMethod != "FromMarkerKmers") {
