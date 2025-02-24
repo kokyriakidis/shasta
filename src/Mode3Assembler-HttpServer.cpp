@@ -13,6 +13,7 @@ using namespace shasta;
 using namespace mode3;
 
 // Boost libraries.
+#include <boost/algorithm/string.hpp>
 #include <boost/graph/iteration_macros.hpp>
 
 // Standard library.
@@ -42,6 +43,7 @@ void Mode3Assembler::exploreAnchor(const vector<string>& request, ostream& html)
     // Get the request parameters.
     string anchorIdString;
     const bool anchorIdStringIsPresent = HttpServer::getParameterValue(request, "anchorIdString", anchorIdString);
+    boost::trim(anchorIdString);
 
     string annotateString;
     const bool annotate = HttpServer::getParameterValue(request,
@@ -351,8 +353,10 @@ void Mode3Assembler::exploreAnchorPair(const vector<string>& request, ostream& h
     // Get the parameters for the request
     string anchorIdAString;
     const bool anchorIdAStringIsPresent = HttpServer::getParameterValue(request, "anchorIdAString", anchorIdAString);
+    boost::trim(anchorIdAString);
     string anchorIdBString;
     const bool anchorIdBStringIsPresent = HttpServer::getParameterValue(request, "anchorIdBString", anchorIdBString);
+    boost::trim(anchorIdBString);
 
     // Write the form.
     html << "<form><table>";
@@ -592,6 +596,7 @@ void Mode3Assembler::exploreReadFollowing(const vector<string>& request, ostream
     // Get the request parameters.
     string anchorIdString;
     const bool anchorIdStringIsPresent = HttpServer::getParameterValue(request, "anchorIdString", anchorIdString);
+    boost::trim(anchorIdString);
 
     uint64_t direction = 0;
     HttpServer::getParameterValue(request, "direction", direction);
@@ -782,9 +787,11 @@ void Mode3Assembler::exploreLocalAssembly(
     // Get the parameters for the request.
     string anchorIdAString;
     const bool anchorIdAStringIsPresent = HttpServer::getParameterValue(request, "anchorIdAString", anchorIdAString);
+    boost::trim(anchorIdAString);
 
     string anchorIdBString;
     const bool anchorIdBStringIsPresent = HttpServer::getParameterValue(request, "anchorIdBString", anchorIdBString);
+    boost::trim(anchorIdBString);
 
     string useAString;
     const bool useA = HttpServer::getParameterValue(request, "useA", useAString);
@@ -949,6 +956,7 @@ void Mode3Assembler::exploreLocalAnchorGraph(
     // Get the options that control graph creation.
     string anchorIdsString;
     HttpServer::getParameterValue(request, "anchorIdsString", anchorIdsString);
+    boost::trim(anchorIdsString);
 
     uint64_t distance = 10;
     HttpServer::getParameterValue(request, "distance", distance);
@@ -1075,6 +1083,7 @@ void Mode3Assembler::exploreAssemblyGraph(
 
     string chainStringIds;
     HttpServer::getParameterValue(request, "chainStringIds", chainStringIds);
+    boost::trim(chainStringIds);
 
     uint64_t distance = 10;
     HttpServer::getParameterValue(request, "distance", distance);
@@ -1173,6 +1182,7 @@ void Mode3Assembler::exploreSegment(
 
     string segmentName;
     HttpServer::getParameterValue(request, "segmentName", segmentName);
+    boost::trim(segmentName);
 
     string displayAnchors = "none";
     HttpServer::getParameterValue(request, "displayAnchors", displayAnchors);
@@ -1183,10 +1193,10 @@ void Mode3Assembler::exploreSegment(
     string endString;
     HttpServer::getParameterValue(request, "end", endString);
 
-    string firstAnchorsCountString;
+    string firstAnchorsCountString = "5";
     HttpServer::getParameterValue(request, "firstAnchorsCount", firstAnchorsCountString);
 
-    string lastAnchorsCountString;
+    string lastAnchorsCountString = "5";
     HttpServer::getParameterValue(request, "lastAnchorsCount", lastAnchorsCountString);
 
 
@@ -1452,6 +1462,7 @@ void Mode3Assembler::exploreReadFollowingAssemblyGraph(const vector<string>& req
 
     string segmentName;
     HttpServer::getParameterValue(request, "segmentName", segmentName);
+    boost::trim(segmentName);
 
     uint64_t direction = 0;
     HttpServer::getParameterValue(request, "direction", direction);
