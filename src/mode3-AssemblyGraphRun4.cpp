@@ -22,6 +22,7 @@ void AssemblyGraph::run4(
     const uint64_t superbubbleLengthThreshold = 10000;
     const double maxLogP = 30.;
     const double minLogPDelta = 30.;
+    const uint64_t minDetangledCoverage = 6;
 
     AssemblyGraph& assemblyGraph = *this;
 
@@ -30,9 +31,9 @@ void AssemblyGraph::run4(
     SHASTA_ASSERT(std::is_sorted(orientedReadIds.begin(), orientedReadIds.end()));
     SHASTA_ASSERT(std::is_sorted(anchorIds.begin(), anchorIds.end()));
 
-    // write("A");
+    write("A");
     compress();
-    // write("B");
+    write("B");
 
     // An iteration loop in which we try at each iteration
     // all operations that can simplify the AssemblyGraph.
@@ -69,23 +70,13 @@ void AssemblyGraph::run4(
         compressBubbleChains();
         compress();
 
-        // Clean up short superbubbles.
-        const uint64_t cleanedUpSuperbubbleCount =
-            cleanupSuperbubbles(false,
-            options.assemblyGraphOptions.superbubbleLengthThreshold1,
-            options.assemblyGraphOptions.chainTerminalCommonThreshold);
-        simplificationCount += cleanedUpSuperbubbleCount;
-        cout << "Cleaned up " << cleanedUpSuperbubbleCount << " superbubbles." << endl;
-
-        compressBubbleChains();
-        compress();
 
         // For detangling the AssemblyGraph needs to be in expanded form.
         expand();
 
         // Vertex detangling.
         {
-            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
+            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta, minDetangledCoverage);
             Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledVertices{});
             const uint64_t detangledCount = detangle(superbubbles, detangler);
             simplificationCount += detangledCount;
@@ -98,7 +89,7 @@ void AssemblyGraph::run4(
 
         // Edge detangling.
         {
-            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
+            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta, minDetangledCoverage);
             Superbubbles superbubbles(assemblyGraph, Superbubbles::FromTangledEdges{});
             const uint64_t detangledCount = detangle(superbubbles, detangler);
             simplificationCount += detangledCount;
@@ -111,7 +102,7 @@ void AssemblyGraph::run4(
 
         // Detangle of cross-edges individually.
         {
-            ChainPermutationDetangler detangler(iteration==4, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
+            ChainPermutationDetangler detangler(iteration==4, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta, minDetangledCoverage);
             const uint64_t detangledCount = detangleCrossEdgesIndividually(iteration==4, detangler);
             simplificationCount += detangledCount;
             compressSequentialEdges();
@@ -126,7 +117,7 @@ void AssemblyGraph::run4(
             AssemblyGraphCrossEdgePredicate edgePredicate(assemblyGraph);
             Superbubbles superbubbles(assemblyGraph, edgePredicate);
 
-            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
+            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta, minDetangledCoverage);
             const uint64_t detangledCount = detangle(superbubbles, detangler);
 
             simplificationCount += detangledCount;
@@ -142,7 +133,7 @@ void AssemblyGraph::run4(
             AssemblyGraphNoInternalAnchorsEdgePredicate edgePredicate(assemblyGraph);
             Superbubbles superbubbles(assemblyGraph, edgePredicate);
 
-            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
+            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta, minDetangledCoverage);
             const uint64_t detangledCount = detangle(superbubbles, detangler);
 
             simplificationCount += detangledCount;
@@ -153,10 +144,9 @@ void AssemblyGraph::run4(
                 num_edges(assemblyGraph) << " edges." << endl;
         }
 
-
         // Superbubble detangling.
         {
-            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
+            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta, minDetangledCoverage);
             Superbubbles superbubbles(assemblyGraph, superbubbleLengthThreshold);
             const uint64_t detangledCount = detangle(superbubbles, detangler);
             simplificationCount += detangledCount;
@@ -167,9 +157,10 @@ void AssemblyGraph::run4(
                 num_edges(assemblyGraph) << " edges." << endl;
         }
 
+
         // Detangle remaining bubbles preceded and followed by haploid segments.
         {
-            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta);
+            ChainPermutationDetangler detangler(false, assemblyGraph, 6, epsilon, maxLogP, minLogPDelta, minDetangledCoverage);
             Subgraph subgraph(4);
             add_edge(0, 1, subgraph);
             add_edge(1, 2, subgraph);
@@ -185,10 +176,21 @@ void AssemblyGraph::run4(
             }
         }
 
+        // After detangling put the AssemblyGraph back in compressed form.
+        compressBubbleChains();
+        compress();
+
+        // Clean up short superbubbles.
+        const uint64_t cleanedUpSuperbubbleCount =
+            cleanupSuperbubbles(false,
+            options.assemblyGraphOptions.superbubbleLengthThreshold1,
+            options.assemblyGraphOptions.chainTerminalCommonThreshold);
+        simplificationCount += cleanedUpSuperbubbleCount;
+        cout << "Cleaned up " << cleanedUpSuperbubbleCount << " superbubbles." << endl;
+
         cout << "Detangle iteration " << iteration << " had " <<
             simplificationCount << " successful detangling operations." << endl;
 
-        // After detangling put the AssemblyGraph back in compressed form.
         compress();
 
         if(simplificationCount == 0) {
@@ -203,7 +205,7 @@ void AssemblyGraph::run4(
 
 
 
-#if 0
+#if 1
     // Assemble sequence.
     cout << timestamp << "Assembling sequence." << endl;
     assembleAllChainsMultithreaded(

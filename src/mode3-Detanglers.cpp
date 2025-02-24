@@ -24,13 +24,15 @@ ChainPermutationDetangler::ChainPermutationDetangler(
     uint64_t nMax,
     double epsilon,
     double maxLogP,
-    double minLogPDelta) :
+    double minLogPDelta,
+    uint64_t minDetangledCoverage) :
     ChainDetangler(debug, assemblyGraph),
     debug(debug),
     nMax(nMax),
     epsilon(epsilon),
     maxLogP(maxLogP),
-    minLogPDelta(minLogPDelta)
+    minLogPDelta(minLogPDelta),
+    minDetangledCoverage(minDetangledCoverage)
 {
 }
 
@@ -164,6 +166,25 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
                 }
             }
         }
+
+
+        // If any diagonal element of the permuted tangle matrix is
+        // less than minDetangledCoverage, ignore this permutation.
+        bool hasSmallDiagonalElements = false;
+        for(uint64_t iEntrance=0; iEntrance<entrances.size(); iEntrance++) {
+            for(uint64_t iExit=0; iExit<exits.size(); iExit++) {
+                if(permutedTangleMatrix[iEntrance][iExit] < minDetangledCoverage) {
+                    hasSmallDiagonalElements = true;
+                }
+            }
+        }
+        if(hasSmallDiagonalElements) {
+            if(debug) {
+                cout << "This permutation was discarded because of small diagonal elements." << endl;
+            }
+            continue;
+        }
+
 
         // Assuming this permutation, create expected values for the tangle matrix
         // under various assumptions.

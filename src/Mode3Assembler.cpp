@@ -387,8 +387,8 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
     bool debug)
 {
     // EXPOSE WHEN CODE STABILIZES.
-    // Minimum anchor graph, edge coverage, only for alignment-free assembly.
-    const uint64_t minEdgeCoverageAlignmentFree = 2;
+    // Minimum anchor graph edge coverage, only for alignment-free assembly.
+    const uint64_t minEdgeCoverageAlignmentFree = 6;
 
 
     performanceLog << timestamp << "Assembling connected component " <<
@@ -453,29 +453,32 @@ shared_ptr<AssemblyGraph> Mode3Assembler::assembleConnectedComponent(
          anchorGraph.writeEdgeCoverageHistogram("AnchorGraphInitial" + to_string(componentId) + "-EdgeCoverageHistogram.csv");
      }
 
-     // Remove weak edges.
-     anchorGraph.removeWeakEdges(options.primaryGraphOptions.maxLoss, debug);
-     cout << "After removing weak edges, the AnchorGraph for this connected component has " <<
-         num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
+     if(options.anchorCreationMethod != "FromMarkerKmers") {
 
-     // Remove cross-edges.
-     anchorGraph.removeCrossEdges(
-         options.primaryGraphOptions.crossEdgesLowCoverageThreshold,
-         options.primaryGraphOptions.crossEdgesHighCoverageThreshold,
-         0,
-         debug);
-     cout << "After removing cross-edges, the AnchorGraph for this connected component has " <<
-         num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
+         // Remove weak edges.
+         anchorGraph.removeWeakEdges(options.primaryGraphOptions.maxLoss, debug);
+         cout << "After removing weak edges, the AnchorGraph for this connected component has " <<
+             num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
 
-     // Graphviz output.
-     if(debug) {
-         AnchorGraphDisplayOptions options;
-         options.showNonTransitiveReductionEdges = false;
-         anchorGraph.writeGraphviz(
-             "AnchorGraph" + to_string(componentId), options, anchors());
-         options.makeCompact();
-         anchorGraph.writeGraphviz(
-             "AnchorGraphCompact" + to_string(componentId), options, anchors());
+         // Remove cross-edges.
+         anchorGraph.removeCrossEdges(
+             options.primaryGraphOptions.crossEdgesLowCoverageThreshold,
+             options.primaryGraphOptions.crossEdgesHighCoverageThreshold,
+             0,
+             debug);
+         cout << "After removing cross-edges, the AnchorGraph for this connected component has " <<
+             num_vertices(anchorGraph) << " vertices and " << num_edges(anchorGraph) << " edges." << endl;
+
+         // Graphviz output.
+         if(debug) {
+             AnchorGraphDisplayOptions options;
+             options.showNonTransitiveReductionEdges = false;
+             anchorGraph.writeGraphviz(
+                 "AnchorGraph" + to_string(componentId), options, anchors());
+             options.makeCompact();
+             anchorGraph.writeGraphviz(
+                 "AnchorGraphCompact" + to_string(componentId), options, anchors());
+         }
      }
 
      // Create the assembly graph for this connected component.

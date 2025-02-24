@@ -25,7 +25,8 @@ public:
         uint64_t nMax,
         double epsilon,
         double maxLogP,
-        double minLogPDelta);
+        double minLogPDelta,
+        uint64_t minDetangledCoverage);
 
     bool operator()(const vector<vertex_descriptor>& superbubble);
 
@@ -35,4 +36,5 @@ private:
     double epsilon;
     double maxLogP;
     double minLogPDelta;
+    uint64_t minDetangledCoverage;
 };
