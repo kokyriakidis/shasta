@@ -94,37 +94,65 @@ Anchors::Anchors(
         Ptree json;
         boost::property_tree::read_json(jsonFileName, json);
 
+        cout << "File " << jsonFileName << "contains " << json.size() << " candidate anchors." << endl;
+
+
+
         // Loop over the candidate anchors.
         for(const auto& p: json) {
             const Ptree& candidateAnchorWithName = p.second;
             ++candidateAnchorCount;
 
-            // Get the name.
-            auto it = candidateAnchorWithName.begin();
-            const Ptree& namePtree = (*it).second;
-            const string name = namePtree.get<string>("");
+            try {
 
-            // Get the list of the base intervals.
-            ++it;
-            const Ptree& candidateAnchor = (*it).second;
+                // Sanity checks, then get the name.
+                if(candidateAnchorWithName.size() != 2) {
+                    cout << "Invalid format for the following candidate anchor. "
+                        "Must have two elements." << endl;
+                    boost::property_tree::write_json(cout, candidateAnchorWithName);
+                    cout << endl;
+                    throw runtime_error("Invalid format for the following candidate anchor.");
+                }
 
-            // If not in the desired coverage range, skip it.
-            const uint64_t coverage = candidateAnchor.size();
-            if(
-                (coverage < minPrimaryCoverage) or
-                (coverage > maxPrimaryCoverage)) {
-                ++candidateAnchorDiscardedDueToCoverageCount;
-                csv << name << "," << "Discarded due to coverage," << coverage << "\n";
-                continue;
-            }
+                auto it = candidateAnchorWithName.begin();
+                const Ptree& namePtree = (*it).second;
 
-            if(processCandidateAnchor(candidateAnchor)) {
-                ++candidateAnchorKeptCount;
-                csv << name << "," << anchorIdToString(anchorInfos.size() - 2) << "," <<
-                    anchorIdToString(anchorInfos.size() - 1) << "\n";
-            } else {
-                ++candidateAnchorDiscardedDueToLengthCount;
-                csv << name << "," << "Discarded when clipping to markers\n";
+                const string name = namePtree.get<string>("");
+
+                if(name.empty()) {
+                    cout << "Empty name for the following candidate anchor." << endl;
+                    boost::property_tree::write_json(cout, candidateAnchorWithName);
+                    cout << endl;
+                    throw runtime_error("Empty name for candidate anchor");
+                }
+
+                // Get the list of the base intervals.
+                ++it;
+                const Ptree& candidateAnchor = (*it).second;
+
+                // If not in the desired coverage range, skip it.
+                const uint64_t coverage = candidateAnchor.size();
+                if(
+                    (coverage < minPrimaryCoverage) or
+                    (coverage > maxPrimaryCoverage)) {
+                    ++candidateAnchorDiscardedDueToCoverageCount;
+                    csv << name << "," << "Discarded due to coverage," << coverage << "\n";
+                    continue;
+                }
+
+                if(processCandidateAnchor(candidateAnchor, name)) {
+                    ++candidateAnchorKeptCount;
+                    csv << name << "," << anchorIdToString(anchorInfos.size() - 2) << "," <<
+                        anchorIdToString(anchorInfos.size() - 1) << "\n";
+                } else {
+                    ++candidateAnchorDiscardedDueToLengthCount;
+                    csv << name << "," << "Discarded when clipping to markers\n";
+                }
+            } catch(...) {
+                cout << "An error occurred while processing the following candidate anchor:" << endl;
+                boost::property_tree::write_json(cout, candidateAnchorWithName);
+                cout << endl;
+                throw;
             }
         }
     }
@@ -149,9 +177,11 @@ Anchors::Anchors(
 }
 
 
+
 // Process a candidate anchor from json input.
 bool Anchors::processCandidateAnchor(
-    const Ptree& candidateAnchor)
+    const Ptree& candidateAnchor,
+    const string& name)
 {
     const bool debug = false;
     if(debug) {
@@ -245,6 +275,7 @@ bool Anchors::processCandidateAnchor(
     // Check that the sequences on these intervals are identical.
     const Interval& interval0 = intervals[0];
     const uint64_t length0 = interval0.length();
+    bool foundDiscrepancy = false;
     if(length0 < k) {
         // cout << "Anchor is too short." << endl;
         return false;
@@ -264,9 +295,40 @@ bool Anchors::processCandidateAnchor(
         for(uint64_t j=0; j<length; j++) {
             const Base b0 = reads.getOrientedReadBase(interval0.orientedReadId, uint32_t(interval0.begin + j));
             const Base b = reads.getOrientedReadBase(interval.orientedReadId, uint32_t(interval.begin + j));
-            SHASTA_ASSERT(b == b0);
+            if(b != b0) {
+                foundDiscrepancy = true;
+            }
+            break;
+        }
+        if(foundDiscrepancy) {
+            break;
         }
     }
+
+
+
+    // If a discrepancy in the sequence was found, write all the sequences.
+    if(foundDiscrepancy) {
+        cout << "The sequences of all intervals for anchor " << name << " are not identical:" << endl;
+        for(const Interval& interval: intervals) {
+            const uint64_t length = interval.length();
+            for(uint64_t j=0; j<length; j++) {
+                const Base b = reads.getOrientedReadBase(interval.orientedReadId, uint32_t(interval.begin + j));
+                cout << b;
+            }
+            cout << " ";
+            const span<const char> readName = reads.getReadName(interval.orientedReadId.getReadId());
+            copy(readName.begin(), readName.end(), ostream_iterator<char>(cout));
+            cout <<
+                " " << interval.orientedReadId.getStrand() <<
+                " " << interval.orientedReadId <<
+                " " << interval.begin <<
+                " " << interval.end << endl;
+        }
+        throw runtime_error("The sequences of all intervals for an anchor are not identical.");
+    }
+
+
 
     // Object to compare CompressedMarkers by position.
     class Comparator {
