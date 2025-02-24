@@ -42,6 +42,7 @@ Mode3Assembler::Mode3Assembler(
 {
     SHASTA_ASSERT(anchorsPointer);
     anchors().writeCoverageHistogram();
+    anchors().writeAnchorGapsByRead();
 
     performanceLog << timestamp << "Mode 3 assembly begins." << endl;
 

@@ -1000,3 +1000,56 @@ void Anchors::followOrientedReads(
     };
     sort(anchorInfos.begin(), anchorInfos.end(), SortHelper());
 }
+
+
+
+// For each read, write out the largest gap between adjacent anchors.
+// The two oriented reads for a read have the same gaps.
+void Anchors::writeAnchorGapsByRead() const
+{
+
+    // Open the output csv file and write a header.
+    ofstream csv("AnchorGaps.csv");
+    csv << "ReadId,Gap\n";
+
+    // Loop over all reads.
+    for(ReadId readId=0; readId<reads.readCount(); readId++) {
+        const uint64_t readLength = reads.getRead(readId).baseCount;
+
+        // Put in on strand 0. It would have the same gap on strand 1.
+        const OrientedReadId orientedReadId(readId, 0);
+
+        // Get the markers and the journey.
+        const auto orientedReadMarkers = markers[orientedReadId.getValue()];
+        const auto journey = journeys[orientedReadId.getValue()];
+
+        // Loop over adjacent positions in journey.
+        uint64_t previousPosition = 0;
+        uint64_t maxGap = 0;
+        for(uint64_t i=0; i<=journey.size(); i++) {
+
+            uint64_t position = invalid<uint64_t>;
+            if(i == journey.size()) {
+                position = readLength;
+            } else {
+                const AnchorId anchorId = journey[i];
+                const Anchor anchor = (*this)[anchorId];
+                for(const AnchorMarkerInterval& markerInterval: anchor) {
+                    if(markerInterval.orientedReadId == orientedReadId) {
+                        const uint32_t ordinal = markerInterval.ordinal0;
+                        const CompressedMarker& marker = orientedReadMarkers[ordinal];
+                        position = marker.position;
+                        break;
+                    }
+                }
+            }
+            SHASTA_ASSERT(position != invalid<uint64_t>);
+
+            const uint64_t gap = position - previousPosition;
+            maxGap = max(maxGap, gap);
+
+            previousPosition = position;
+        }
+        csv << readId << "," << maxGap << "\n";
+    }
+}

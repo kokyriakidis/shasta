@@ -220,6 +220,7 @@ public:
     MemoryMapped::VectorOfVectors<AnchorId, uint64_t> journeys;
     void computeJourneys(uint64_t threadCount);
     void writeJourneys() const;
+    void writeAnchorGapsByRead() const;
 private:
     void computeJourneysThreadFunction1(uint64_t threadId);
     void computeJourneysThreadFunction2(uint64_t threadId);
