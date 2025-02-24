@@ -464,6 +464,7 @@ void Anchors::constructFromMarkerKmersCreateAnchors(uint64_t threadId )
                     ++streakEnd;
                 }
 
+#if 0
                 // If this k-mer is marked as forbidden, skip it.
                 const auto& kmerInfos = data.kmerInfo[bucketId];
                 bool isForbidden = false;
@@ -478,6 +479,7 @@ void Anchors::constructFromMarkerKmersCreateAnchors(uint64_t threadId )
                     streakBegin = streakEnd;
                     continue;
                 }
+#endif
 
                 // If the first oriented read is not on strand 0, skip it.
                 if(bucketInfo[streakBegin].orientedReadId.getStrand() != 0) {
@@ -508,6 +510,7 @@ void Anchors::constructFromMarkerKmersCreateAnchors(uint64_t threadId )
                     continue;
                 }
 
+#if 0
                 // EXPOSE THE CONSTANTS WHEN CODE STABILIZES
                 // If this k-mer has long repeats, skip it.
                 // Do this check last because it is expensive.
@@ -523,6 +526,7 @@ void Anchors::constructFromMarkerKmersCreateAnchors(uint64_t threadId )
                     streakBegin = streakEnd;
                     continue;
                 }
+#endif
 
                 // Generate the first anchor of the pair (no reverse complementing).
                 threadAnchors.appendVector();
