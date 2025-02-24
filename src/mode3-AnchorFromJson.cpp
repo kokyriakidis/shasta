@@ -255,7 +255,8 @@ bool Anchors::processCandidateAnchor(
             const uint64_t begin = ((it++)->second).get<uint64_t>("");
             const uint64_t end = ((it++)->second).get<uint64_t>("");
             if((begin >= readLength) or (end > readLength)) {
-                cout << "Invalid begin/end. Read length is " << readLength << endl;
+                cout << "Invalid begin/end for " << readName << endl;
+                cout << "Read length is " << readLength << endl;
                 throw runtime_error("Invalid begin/end.");
             }
             intervals.push_back({orientedReadId, begin, end});
