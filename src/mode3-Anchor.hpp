@@ -369,7 +369,7 @@ private:
 
     // Process a candidate anchor from json input.
     using Ptree = boost::property_tree::basic_ptree<string, string>;
-    bool processCandidateAnchor(const Ptree&);
+    bool processCandidateAnchor(const Ptree&, const string& name);
 };
 
 
