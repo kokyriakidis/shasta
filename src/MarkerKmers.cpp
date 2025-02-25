@@ -400,3 +400,40 @@ void MarkerKmers::writeFrequencyHistogram() const
     }
 
 }
+
+
+
+uint64_t MarkerKmers::getFrequency(const Kmer& kmer) const
+{
+    const Kmer kmerRc = kmer.reverseComplement(k);
+    if(kmer <= kmerRc) {
+        return getMarkerInfos(kmer).size();
+    } else {
+        return getMarkerInfos(kmerRc).size();
+    }
+}
+
+
+
+// Return a span of the MarkerInfos for a given canonical k-mer.
+// If this is called for a non-canonical k-mer, it returns an empty span.
+span<const MarkerKmers::MarkerInfo> MarkerKmers::getMarkerInfos(const Kmer& kmer) const
+{
+    if(not kmer.isCanonical(k)) {
+        return span<const MarkerInfo>();
+    }
+
+    const uint64_t bucketId = findBucket(kmer);
+    const span<const KmerInfo> bucket = kmerInfos[bucketId];
+    for(const KmerInfo& kmerInfo: bucket) {
+        if(getKmer(kmerInfo.markerInfo) == kmer) {
+            const MarkerInfo* const begin = markerInfos.begin() + kmerInfo.begin;
+            const MarkerInfo* const end   = markerInfos.begin() + kmerInfo.end;
+            return span<const MarkerInfo>(begin, end);
+        }
+    }
+
+    // We did not find this Kmer in the bucket where it would have been.
+    return span<const MarkerInfo>();
+}
+

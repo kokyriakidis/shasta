@@ -648,6 +648,11 @@ void Assembler::accessAllSoft()
     }
 
     try {
+        accessMarkerKmers();
+    } catch(const exception& e) {
+    }
+
+    try {
         accessAlignmentCandidates();
     } catch(const exception& e) {
         cout << "Alignment candidates are not accessible." << endl;

@@ -43,6 +43,13 @@ public:
         const Reads&,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers);
 
+    bool isOpen() const
+    {
+        return markerInfos.isOpen() and kmerInfos.isOpen();
+    }
+
+    uint64_t getFrequency(const Kmer&) const;
+
 private:
 
     // Constructor arguments.
@@ -131,6 +138,10 @@ private:
     MemoryMapped::VectorOfVectors<KmerInfo, uint64_t> kmerInfos;
     void fillKmerInfosPass1(uint64_t threadId);
     void fillKmerInfosPass2(uint64_t threadId);
+
+    // Return a span of the MarkerInfos for a given canonical k-mer.
+    // If this is called for a non-canonical k-mer, it returns an empty span.
+    span<const MarkerInfo> getMarkerInfos(const Kmer&) const;
 
 
     void writeCsv() const;

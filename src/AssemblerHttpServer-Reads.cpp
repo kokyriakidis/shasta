@@ -2,6 +2,7 @@
 #include "Assembler.hpp"
 #include "deduplicate.hpp"
 #include "KmerCounter.hpp"
+#include "MarkerKmers.hpp"
 #include "orderPairs.hpp"
 #include "Reads.hpp"
 using namespace shasta;
@@ -1564,11 +1565,14 @@ void Assembler::exploreReadMarkers(const vector<string>& request, ostream& html)
         "<th>Begin<br>position"
         "<th>End<br>position"
         "<th>Kmer"
-        "<th>Frequency<br>in this read"
+        "<th>Frequency<br>in this<br>oriented read"
         ;
+    if(markerKmers and markerKmers->isOpen()) {
+        html << "<th>Global<br>frequency";
+    }
 
     if(kmerCounter and kmerCounter->isAvailable()) {
-        html << "<th>Frequency<br>in this assembly";
+        html << "<th>Global<br>frequency";
     }
 
 
@@ -1596,6 +1600,8 @@ void Assembler::exploreReadMarkers(const vector<string>& request, ostream& html)
         // Global frequency of this Kmer.
         if(kmerCounter and kmerCounter->isAvailable()) {
             html << "<td class=centered>" << kmerCounter->getFrequency(kmer);
+        } else if(markerKmers and markerKmers->isOpen()) {
+            html << "<td class=centered>" << markerKmers->getFrequency(kmer);
         }
 
     }
