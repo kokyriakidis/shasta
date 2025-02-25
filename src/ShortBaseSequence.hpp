@@ -174,6 +174,28 @@ public:
 
 
 
+    // A k-mer is canonical if it is <= than its reverse complement.
+    bool isCanonical(uint64_t k) const
+    {
+        return *this <= reverseComplement(k);
+    }
+
+    // A k-mer is palindromic if it is equal to its reverse complement.
+    // A palindromic k-mer is also canonical.
+    bool isPalindromic(uint64_t k) const
+    {
+        return *this == reverseComplement(k);
+    }
+
+    void classify(uint64_t k, bool& isCanonical, bool& isPalindromic) const
+    {
+        const ShortBaseSequence<Int> rc = reverseComplement(k);
+        isCanonical   = ( (*this) <= rc );
+        isPalindromic = ( (*this) == rc );
+    }
+
+
+
     // Return the longest homopolymer length in the first k bases.
     uint64_t maxHomopolymerLength(uint64_t k) const
     {
