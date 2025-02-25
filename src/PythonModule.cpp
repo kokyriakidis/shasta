@@ -187,6 +187,12 @@ PYBIND11_MODULE(shasta, shastaModule)
             &Assembler::countKmers,
             arg("threadCount") = 0,
             arg("globalFrequencyOverrideDirectory") = "")
+        .def("createMarkerKmers",
+            &Assembler::createMarkerKmers,
+            arg("threadCount") = 0)
+        .def("accessMarkerKmers",
+            &Assembler::accessMarkerKmers)
+
 
 
         // Alignment candidates.

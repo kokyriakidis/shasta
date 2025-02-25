@@ -6,6 +6,7 @@
 #include "KmerCounter.hpp"
 #include "KmerDistributionInfo.hpp"
 #include "MarkerFinder.hpp"
+#include "MarkerKmers.hpp"
 #include "performanceLog.hpp"
 #include "timestamp.hpp"
 using namespace shasta;
@@ -755,5 +756,32 @@ void Assembler::accessKmerCounts()
 {
     SHASTA_ASSERT(markers.isOpen());
     kmerCounter = make_shared<KmerCounter>(assemblerInfo->k, *this);
+}
+
+
+
+void Assembler::createMarkerKmers(uint64_t threadCount)
+{
+    const MappedMemoryOwner& mappedMemoryOwner = *this;
+
+    markerKmers = make_shared<MarkerKmers>(
+        assemblerInfo->k,
+        mappedMemoryOwner,
+        getReads(),
+        markers,
+        threadCount);
+}
+
+
+
+void Assembler::accessMarkerKmers()
+{
+    const MappedMemoryOwner& mappedMemoryOwner = *this;
+
+    markerKmers = make_shared<MarkerKmers>(
+        assemblerInfo->k,
+        mappedMemoryOwner,
+        getReads(),
+        markers);
 }
 

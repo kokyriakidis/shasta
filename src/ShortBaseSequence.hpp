@@ -153,6 +153,11 @@ public:
         return data < that.data;
     }
 
+    bool operator<=(const ShortBaseSequence<Int>& that) const
+    {
+        return data < that.data;
+    }
+
     // Write the first n bases.
     ostream& write(ostream& s, uint64_t n) const
     {

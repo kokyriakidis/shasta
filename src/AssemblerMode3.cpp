@@ -605,6 +605,7 @@ void Assembler::alignmentFreeAssembly(
     // Create the Anchors.
     shared_ptr<mode3::Anchors> anchorsPointer;
     if(mode3Options.anchorCreationMethod == "FromMarkerKmers") {
+        createMarkerKmers(threadCount);
         anchorsPointer =
             make_shared<mode3::Anchors>(
                 MappedMemoryOwner(*this),
