@@ -440,6 +440,9 @@ void Assembler::writeNavigation(ostream& html) const
         {"Summary", "exploreSummary"},
         });
 
+
+
+    // Reads menu.
     if(assemblerInfo->readRepresentation == 1) {
         // RLE
         writeNavigation(html, "Reads", {
@@ -449,27 +452,61 @@ void Assembler::writeNavigation(ostream& html) const
         // No RLE.
         writeNavigation(html, "Reads", {
             {"Sequence", "exploreReadSequence"},
-            {"Markers", "exploreReadMarkers"},
             {"Look up a read by name", "exploreLookupRead"},
             });
     }
 
-    writeNavigation(html, "Alignments", {
-        {"Candidate graph", "exploreAlignmentCandidateGraph"},
-        {"Stored alignments", "exploreAlignments"},
-        {"Alignment coverage", "exploreAlignmentCoverage"},
-        {"Align two reads", "exploreAlignment"},
-        {"Align one read with all", "computeAllAlignments"},
-        {"Alignment graph", "exploreAlignmentGraph"},
-        {"Assess alignments", "assessAlignments"},
-        {"Align sequences in base representation", "alignSequencesInBaseRepresentation"},
-        });
-    writeNavigation(html, "Read graph", {
-        {"Read graph", "exploreReadGraph"},
-        });
+
+
+    // Markers menu.
+    if(assemblerInfo->readRepresentation == 0) {
+        writeNavigation(html, "Markers", {
+            {"Markers", "exploreReadMarkers"},
+            });
+
+    }
 
 
 
+    // Alignments menu.
+    bool alignmentsAreAvailable = false;
+    try {
+        checkAlignmentDataAreOpen();
+        alignmentsAreAvailable = true;
+    } catch(...) {
+    }
+
+    if(alignmentsAreAvailable) {
+        writeNavigation(html, "Alignments", {
+            {"Candidate graph", "exploreAlignmentCandidateGraph"},
+            {"Stored alignments", "exploreAlignments"},
+            {"Alignment coverage", "exploreAlignmentCoverage"},
+            {"Align two reads", "exploreAlignment"},
+            {"Align one read with all", "computeAllAlignments"},
+            {"Alignment graph", "exploreAlignmentGraph"},
+            {"Assess alignments", "assessAlignments"},
+            {"Align sequences in base representation", "alignSequencesInBaseRepresentation"},
+            });
+    }
+
+
+
+    // Read graph menu.
+    bool readGraphIsAvailable = false;
+    try {
+        checkReadGraphIsOpen();
+        readGraphIsAvailable = true;
+    } catch(...) {
+    }
+
+    if(readGraphIsAvailable) {
+        writeNavigation(html, "Read graph", {
+            {"Read graph", "exploreReadGraph"},
+            });
+    }
+
+
+    // Marker graph menu.
     if(assemblerInfo->assemblyMode != 3) {
         writeNavigation(html, "Marker graph", {
             {"Local marker graph", "exploreMarkerGraph0?useBubbleReplacementEdges=on"},
@@ -484,6 +521,7 @@ void Assembler::writeNavigation(ostream& html) const
 
 
 
+    // Assembly menu for assembly mode 0.
     if(assemblerInfo->assemblyMode == 0) {
         writeNavigation(html, "Assembly graph", {
             {"Local assembly graph", "exploreAssemblyGraph"},
@@ -495,20 +533,33 @@ void Assembler::writeNavigation(ostream& html) const
 
 
 
+    // Assembly Mode 2 does not provide an assembly menu.
+
+
+
+    // Anchors and Assembly menus for assembly mode 3.
     if(assemblerInfo->assemblyMode == 3) {
-        writeNavigation(html, "Assembly", {
+
+        writeNavigation(html, "Anchors", {
             {"Anchor", "exploreAnchor"},
             {"Anchor pair", "exploreAnchorPair"},
             {"Journey", "exploreJourney"},
             {"Read following on anchors", "exploreReadFollowing"},
-            {"Local assembly", "exploreLocalAssembly"},
             {"Local anchor graph", "exploreLocalAnchorGraph"},
+            });
+
+        writeNavigation(html, "Assembly", {
+            {"Local assembly", "exploreLocalAssembly"},
             {"Local assembly graph", "exploreMode3AssemblyGraph"},
             {"Segment", "exploreSegment"},
             {"Read following on assembly graph", "exploreReadFollowingAssemblyGraph"},
             });
     }
 
+
+
+    // Help menu.
+    // This is only available if the executable is in a complete build tree.
     if (!httpServerData.docsDirectory.empty()) {
         writeNavigation(html, "Help", {
             {"Documentation", "docs/index.html"},
