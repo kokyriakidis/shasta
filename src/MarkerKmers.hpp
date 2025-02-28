@@ -50,13 +50,6 @@ public:
 
     uint64_t getFrequency(const Kmer&) const;
 
-private:
-
-    // Constructor arguments.
-    uint64_t k;
-    const Reads& reads;
-    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
-
     // Class to describe a single marker of an oriented read.
     class MarkerInfo {
     public:
@@ -66,6 +59,16 @@ private:
         MarkerInfo(OrientedReadId orientedReadId, uint32_t ordinal) :
             orientedReadId(orientedReadId), ordinal(ordinal) {}
     };
+
+    // Get MarkerInfo objects for a given Kmer.
+    void get(const Kmer&, vector<MarkerInfo>&) const;
+
+private:
+
+    // Constructor arguments.
+    uint64_t k;
+    const Reads& reads;
+    const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers;
 
     // Get the Kmer corresponding to a given MarkerInfo.
     Kmer getKmer(const MarkerInfo&) const;
@@ -88,7 +91,8 @@ private:
         const MarkerKmers& markerKmers;
     };
 
-
+    // Construct the reverse complement of a MarkerInfo.
+    MarkerInfo reverseComplement(const MarkerInfo&) const;
 
     // A hash table that will contain a MarkerInfo object
     // for each marker in all oriented reads.
@@ -146,7 +150,8 @@ private:
 
     void writeCsv() const;
     void writeFrequencyHistogram() const;
-    void writeMarkerInfosCsv() const;
+    void writeMarkerInfosCsv1() const;
+    void writeMarkerInfosCsv2() const;
     void writeKmerInfosCsv() const;
 
 };

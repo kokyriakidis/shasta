@@ -1044,6 +1044,7 @@ void Anchors::writeAnchorGapsByRead() const
                 }
             }
             SHASTA_ASSERT(position != invalid<uint64_t>);
+            SHASTA_ASSERT(position >= previousPosition);
 
             const uint64_t gap = position - previousPosition;
             maxGap = max(maxGap, gap);

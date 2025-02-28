@@ -2,9 +2,10 @@
 // Shasta.
 #include "Assembler.hpp"
 #include "AssemblyGraph.hpp"
-#include "filesystem.hpp"
-#include "Coverage.hpp"
 #include "buildId.hpp"
+#include "Coverage.hpp"
+#include "filesystem.hpp"
+#include "MarkerKmers.hpp"
 #include "platformDependent.hpp"
 #include "Reads.hpp"
 using namespace shasta;
@@ -223,6 +224,7 @@ void Assembler::fillServerFunctionTable()
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreLookupRead);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreReadSequence);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreReadMarkers);
+    SHASTA_ADD_TO_FUNCTION_TABLE(exploreMarkerKmers);
     SHASTA_ADD_TO_FUNCTION_TABLE(blastRead);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreAlignments);
     SHASTA_ADD_TO_FUNCTION_TABLE(exploreAlignmentCoverage);
@@ -460,34 +462,28 @@ void Assembler::writeNavigation(ostream& html) const
 
     // Markers menu.
     if(assemblerInfo->readRepresentation == 0) {
-        writeNavigation(html, "Markers", {
+        vector<pair <string, string> > items = {
             {"Markers", "exploreReadMarkers"},
-            });
-
+        };
+        if(markerKmers and markerKmers->isOpen()) {
+            items.push_back({"Marker k-mers", "exploreMarkerKmers"});
+        }
+        writeNavigation(html, "Markers", items);
     }
 
 
 
     // Alignments menu.
-    bool alignmentsAreAvailable = false;
-    try {
-        checkAlignmentDataAreOpen();
-        alignmentsAreAvailable = true;
-    } catch(...) {
-    }
-
-    if(alignmentsAreAvailable) {
-        writeNavigation(html, "Alignments", {
-            {"Candidate graph", "exploreAlignmentCandidateGraph"},
-            {"Stored alignments", "exploreAlignments"},
-            {"Alignment coverage", "exploreAlignmentCoverage"},
-            {"Align two reads", "exploreAlignment"},
-            {"Align one read with all", "computeAllAlignments"},
-            {"Alignment graph", "exploreAlignmentGraph"},
-            {"Assess alignments", "assessAlignments"},
-            {"Align sequences in base representation", "alignSequencesInBaseRepresentation"},
-            });
-    }
+    writeNavigation(html, "Alignments", {
+        {"Candidate graph", "exploreAlignmentCandidateGraph"},
+        {"Stored alignments", "exploreAlignments"},
+        {"Alignment coverage", "exploreAlignmentCoverage"},
+        {"Align two reads", "exploreAlignment"},
+        {"Align one read with all", "computeAllAlignments"},
+        {"Alignment graph", "exploreAlignmentGraph"},
+        {"Assess alignments", "assessAlignments"},
+        {"Align sequences in base representation", "alignSequencesInBaseRepresentation"},
+        });
 
 
 
