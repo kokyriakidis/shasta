@@ -63,6 +63,21 @@ public:
     // Get MarkerInfo objects for a given Kmer.
     void get(const Kmer&, vector<MarkerInfo>&) const;
 
+    // Return the number of Kmers stored.
+    uint64_t size() const
+    {
+        return kmerInfos.totalSize();
+    }
+
+    // Get MarkerInfo objects for the i-th k-mer stored.
+    span<const MarkerInfo> operator[](uint64_t i) const
+    {
+        const KmerInfo& kmerInfo = kmerInfos.begin()[i];
+        return span<const MarkerInfo>(
+            markerInfos.begin() + kmerInfo.begin,
+            markerInfos.begin() + kmerInfo.end);
+    }
+
 private:
 
     // Constructor arguments.
