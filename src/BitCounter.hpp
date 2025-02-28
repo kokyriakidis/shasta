@@ -7,6 +7,9 @@
 // also for unsigned integers defined by the Boost Multiprecision library.
 // std::numeric_limits::digits only works for built-in types
 // and cannot be extended.
+// Boost libraries.
+
+#include <boost/multiprecision/cpp_int.hpp>
 
 namespace shasta {
 
@@ -33,6 +36,16 @@ namespace shasta {
     template<> class BitCounter<uint64_t> {
     public:
         static constexpr int numberOfBits = 64;
+    };
+
+    template<> class BitCounter<boost::multiprecision::uint128_t> {
+    public:
+        static constexpr int numberOfBits = 128;
+    };
+
+    template<> class BitCounter<boost::multiprecision::uint256_t> {
+    public:
+        static constexpr int numberOfBits = 256;
     };
 
 }
