@@ -38,7 +38,7 @@ namespace shasta {
         static constexpr int numberOfBits = 64;
     };
 
-    template<> class BitCounter<boost::multiprecision::uint128_t> {
+    template<> class BitCounter<__uint128_t> {
     public:
         static constexpr int numberOfBits = 128;
     };
