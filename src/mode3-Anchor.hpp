@@ -4,6 +4,7 @@
 #include "Kmer.hpp"
 #include "invalid.hpp"
 #include "MarkerInterval.hpp"
+#include "MarkerKmers.hpp"
 #include "MappedMemoryOwner.hpp"
 #include "MemoryMappedVectorOfVectors.hpp"
 #include "MultithreadedObject.hpp"
@@ -128,8 +129,9 @@ public:
         const Reads& reads,
         uint64_t k,
         const MemoryMapped::VectorOfVectors<CompressedMarker, uint64_t>& markers,
-        uint64_t minPrimaryCoverage,
-        uint64_t maxPrimaryCoverage,
+        shared_ptr<MarkerKmers>,
+        uint64_t minAnchorCoverage,
+        uint64_t maxAnchorCoverage,
         uint64_t threadCount);
 
     // This constructor creates the Anchors from a json file.
@@ -309,8 +311,25 @@ private:
     void constructFromMarkerGraphThreadFunction(uint64_t threadId);
 
 
+    // Data and functions used when constructing the Anchors from marker k-mers.
+    // New code that gets the Kmers from MarkerKmers.
+    class ConstructFromMarkerKmersData {
+    public:
+        uint64_t minAnchorCoverage;
+        uint64_t maxAnchorCoverage;
 
-    // Data and functions used when constructing the Anchors from marker k-mers
+        shared_ptr<MarkerKmers> markerKmers;
+
+        // The MarkerInfo objects for the candidate anchors found by each thread.
+        using MarkerInfo = MarkerKmers::MarkerInfo;
+        vector< shared_ptr<MemoryMapped::VectorOfVectors<MarkerInfo, uint64_t> > > threadAnchors;
+    };
+    ConstructFromMarkerKmersData constructFromMarkerKmersData;
+    void constructFromMarkerKmersThreadFunction(uint64_t threadId);
+
+
+#if 0
+    // Data and functions used when constructing the Anchors from marker k-mers (old code).
     class ConstructFromMarkerKmersData {
     public:
         uint64_t minPrimaryCoverage;
@@ -365,7 +384,7 @@ private:
     void constructFromMarkerKmersComputeKmerFrequencyPass12(uint64_t pass);
     void constructFromMarkerKmersFlagForbiddenKmers(uint64_t threadId);
     void constructFromMarkerKmersCreateAnchors(uint64_t threadId);
-
+#endif
 
 
     // Process a candidate anchor from json input.

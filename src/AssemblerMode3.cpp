@@ -612,6 +612,7 @@ void Assembler::alignmentFreeAssembly(
                 getReads(),
                 assemblerInfo->k,
                 markers,
+                markerKmers,
                 mode3Options.minAnchorCoverage,
                 mode3Options.maxAnchorCoverage,
                 threadCount);

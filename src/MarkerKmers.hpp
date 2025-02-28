@@ -78,6 +78,9 @@ public:
             markerInfos.begin() + kmerInfo.end);
     }
 
+    // Construct the reverse complement of a MarkerInfo.
+    MarkerInfo reverseComplement(const MarkerInfo&) const;
+
 private:
 
     // Constructor arguments.
@@ -105,9 +108,6 @@ private:
     private:
         const MarkerKmers& markerKmers;
     };
-
-    // Construct the reverse complement of a MarkerInfo.
-    MarkerInfo reverseComplement(const MarkerInfo&) const;
 
     // A hash table that will contain a MarkerInfo object
     // for each marker in all oriented reads.
