@@ -32,6 +32,39 @@ namespace shasta {
     template<class Int> inline ostream& operator<<(ostream&, const ShortBaseSequence<Int>&);
 
     void testShortBaseSequence();
+
+
+
+    // To permit extension to using other integer types
+    // (such as those defined in the Boost multiprecision library)
+    // to define ShortBaseSequence types,
+    // don't use std::numeric_limits<Int>::digits to get the number of bits of an Int type.
+    // Use this traits class instead.
+    template<class Int> class BitCounter {
+    public:
+        static constexpr int numberOfBits = 0;
+    };
+
+    template<> class BitCounter<uint8_t> {
+    public:
+        static constexpr int numberOfBits = 8;
+    };
+
+    template<> class BitCounter<uint16_t> {
+    public:
+        static constexpr int numberOfBits = 16;
+    };
+
+    template<> class BitCounter<uint32_t> {
+    public:
+        static constexpr int numberOfBits = 32;
+    };
+
+    template<> class BitCounter<uint64_t> {
+    public:
+        static constexpr int numberOfBits = 64;
+    };
+
 }
 
 
@@ -48,8 +81,8 @@ public:
 
     // The number of bases that can be represented equals the number of bits
     // in the Int type.
-    static const size_t capacity = std::numeric_limits<Int>::digits;
-    static const size_t capacityMinus1 = capacity - 1ULL;
+    static constexpr size_t capacity = BitCounter<Int>::numberOfBits;
+    static constexpr size_t capacityMinus1 = capacity - 1;
 
     // The constructor fills the data with 0, which corresponds to all A's.
     ShortBaseSequence()
