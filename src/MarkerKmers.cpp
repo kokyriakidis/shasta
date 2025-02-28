@@ -64,7 +64,7 @@ MarkerKmers::MarkerKmers(
     kmerInfos.endPass2(false, true);
 
     writeFrequencyHistogram();
-    // writeMarkerInfosCsv2();
+    // writeCsv();
 }
 
 
@@ -296,7 +296,7 @@ void MarkerKmers::fillKmerInfosPass2(uint64_t /* threadId */)
 void MarkerKmers::writeCsv() const
 {
     writeFrequencyHistogram();
-    writeMarkerInfosCsv1();
+    writeMarkerInfosCsv2();
     writeKmerInfosCsv();
 }
 
