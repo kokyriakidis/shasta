@@ -1,8 +1,8 @@
-#ifndef SHASTA_SHORT_BASE_SEQUENCE_HPP
-#define SHASTA_SHORT_BASE_SEQUENCE_HPP
+#pragma once
 
-// shasta.
+// Shasta.
 #include "Base.hpp"
+#include "BitCounter.hpp"
 #include "bitReversal.hpp"
 #include "IntegerBySize.hpp"
 
@@ -32,39 +32,6 @@ namespace shasta {
     template<class Int> inline ostream& operator<<(ostream&, const ShortBaseSequence<Int>&);
 
     void testShortBaseSequence();
-
-
-
-    // To permit extension to using other integer types
-    // (such as those defined in the Boost multiprecision library)
-    // to define ShortBaseSequence types,
-    // don't use std::numeric_limits<Int>::digits to get the number of bits of an Int type.
-    // Use this traits class instead.
-    template<class Int> class BitCounter {
-    public:
-        static constexpr int numberOfBits = 0;
-    };
-
-    template<> class BitCounter<uint8_t> {
-    public:
-        static constexpr int numberOfBits = 8;
-    };
-
-    template<> class BitCounter<uint16_t> {
-    public:
-        static constexpr int numberOfBits = 16;
-    };
-
-    template<> class BitCounter<uint32_t> {
-    public:
-        static constexpr int numberOfBits = 32;
-    };
-
-    template<> class BitCounter<uint64_t> {
-    public:
-        static constexpr int numberOfBits = 64;
-    };
-
 }
 
 
@@ -319,6 +286,3 @@ template<class Int> inline std::ostream& shasta::operator<<(
     return s;
 }
 
-
-
-#endif
