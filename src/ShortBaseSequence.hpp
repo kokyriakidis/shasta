@@ -4,7 +4,6 @@
 #include "Base.hpp"
 #include "BitCounter.hpp"
 #include "bitReversal.hpp"
-#include "IntegerBySize.hpp"
 
 // Standard library.
 #include "algorithm.hpp"
@@ -91,7 +90,7 @@ public:
 
     // Return an integer consisting of the concatenation
     // of the base bits corresponding to the first n bases.
-    using Int2 = UintBySize<2 * sizeof(Int)>::type;
+    using Int2 = typename BitCounter<Int>::doubleSizeType;
     Int2 id(uint64_t n) const
     {
         const uint64_t shift = capacity - n;
