@@ -24,13 +24,15 @@ ChainPermutationDetangler::ChainPermutationDetangler(
     uint64_t nMax,
     double epsilon,
     double maxLogP,
-    double minLogPDelta) :
+    double minLogPDelta,
+    uint64_t minDetangledCoverage) :
     ChainDetangler(debug, assemblyGraph),
     debug(debug),
     nMax(nMax),
     epsilon(epsilon),
     maxLogP(maxLogP),
-    minLogPDelta(minLogPDelta)
+    minLogPDelta(minLogPDelta),
+    minDetangledCoverage(minDetangledCoverage)
 {
 }
 
@@ -123,7 +125,7 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
     vector<Exit> permutedExits(n);
     vector< vector<uint64_t> > permutedTangleMatrix(n, vector<uint64_t>(n));
     do {
-        if(false) {
+        if(debug) {
             cout << "Trying permutation ";
             copy(permutation.begin(), permutation.end(), ostream_iterator<uint64_t>(cout, " "));
             cout << endl;
@@ -133,7 +135,7 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
         for(uint64_t iExit=0; iExit<n; iExit++) {
             permutedExits[iExit] = exits[permutation[iExit]];
         }
-        if(false) {
+        if(debug) {
             cout << "Permuted exits:";
             for(const Exit& exit: permutedExits) {
                 cout << " " << assemblyGraph.bubbleChainStringId(exit.e);
@@ -148,7 +150,7 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
             }
         }
 
-        if(false) {
+        if(debug) {
             cout << "Permuted tangle matrix:" << endl;
             for(uint64_t iEntrance=0; iEntrance<entrances.size(); iEntrance++) {
                 const Entrance& entrance = entrances[iEntrance];
@@ -164,6 +166,25 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
                 }
             }
         }
+
+
+        // If any diagonal element of the permuted tangle matrix is
+        // less than minDetangledCoverage, ignore this permutation.
+        bool hasSmallDiagonalElements = false;
+        for(uint64_t iEntrance=0; iEntrance<entrances.size(); iEntrance++) {
+            for(uint64_t iExit=0; iExit<exits.size(); iExit++) {
+                if(permutedTangleMatrix[iEntrance][iExit] < minDetangledCoverage) {
+                    hasSmallDiagonalElements = true;
+                }
+            }
+        }
+        if(hasSmallDiagonalElements) {
+            if(debug) {
+                cout << "This permutation was discarded because of small diagonal elements." << endl;
+            }
+            continue;
+        }
+
 
         // Assuming this permutation, create expected values for the tangle matrix
         // under various assumptions.
@@ -195,7 +216,7 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
             }
         }
 
-        if(false) {
+        if(debug) {
             cout << "Random tangle matrix for this permutation:" << endl;
             for(uint64_t iEntrance=0; iEntrance<entrances.size(); iEntrance++) {
                 const Entrance& entrance = entrances[iEntrance];
@@ -265,7 +286,7 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
             // Store this permutation and its logP.
             permutationTable.push_back(make_pair(permutation, logP));
 
-            if(false) {
+            if(debug) {
                 cout << "Chi square for this permutation: " << chi2 <<
                     ", logP " << logP << " dB." << endl;
             }
@@ -277,7 +298,7 @@ bool ChainPermutationDetangler::operator()(const vector<vertex_descriptor>& supe
     // If we did not find any usable permutation, do nothing.
     if(permutationTable.empty()) {
         if(debug) {
-            cout << "The permutatio table is empty." << endl;
+            cout << "The permutation table is empty." << endl;
         }
         return false;
     }

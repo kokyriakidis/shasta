@@ -14,7 +14,7 @@
 
 namespace shasta {
     class LongBaseSequenceView;
-    template<class Int> requires std::unsigned_integral<Int> class ShortBaseSequence;
+    template<class Int> class ShortBaseSequence;
 
     template<class Int> void extractKmer(
         const LongBaseSequenceView&,

@@ -57,6 +57,7 @@ namespace shasta {
     class LongBaseSequences;
     class MarkerConnectivityGraph;
     class MarkerConnectivityGraphVertexMap;
+    class MarkerKmers;
     class Mode2AssemblyOptions;
     class Mode3AssemblyOptions;
     class Mode3Assembler;
@@ -591,6 +592,17 @@ public:
         uint64_t threadCount,
         const string& globalFrequencyOverrideDirectory);
     void accessKmerCounts();
+
+
+
+    // The MarkerKmers keep track of the locations in the oriented reads
+    // where each marker k-mer appears. It is only used for alignment-free assembly
+    // (--Assembly.mode 3 --Assembly.mode3.anchorCreationMethod FromMarkerKmers)
+    // but can also be created using CreateMarkerKmers.py.
+    shared_ptr<MarkerKmers> markerKmers;
+    void createMarkerKmers(uint64_t threadCount);
+    void accessMarkerKmers();
+
 
 
     // Flag palindromic reads.
@@ -2244,6 +2256,7 @@ public:
     void exploreLookupRead(const vector<string>&, ostream&);
     void exploreReadSequence(const vector<string>&, ostream&);
     void exploreReadMarkers(const vector<string>&, ostream&);
+    void exploreMarkerKmers(const vector<string>&, ostream&);
     void blastRead(const vector<string>&, ostream&);
     void exploreAlignmentCandidateGraph(const vector<string>& request, ostream& html);
     void exploreAlignments(const vector<string>&, ostream&);

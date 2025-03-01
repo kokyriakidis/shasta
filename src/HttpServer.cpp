@@ -266,6 +266,11 @@ template<class T> void HttpServer::processRequest(T& s)
     cout << "isFirefox=" << browserInformation.isFirefox << " ";
     cout << "isChrome=" << browserInformation.isChrome << endl;
 
+    // Reject favicon.ico requests.
+    if(tokens[0] == "/favicon.ico") {
+        s << "HTTP/1.1 501 Not Implemented\r\n";
+        return;
+    }
 
 
     // Write the success response.

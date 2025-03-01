@@ -1,15 +1,14 @@
-#ifndef SHASTA_SHORT_BASE_SEQUENCE_HPP
-#define SHASTA_SHORT_BASE_SEQUENCE_HPP
+#pragma once
 
-// shasta.
+// Shasta.
 #include "Base.hpp"
+#include "BitCounter.hpp"
 #include "bitReversal.hpp"
 #include "IntegerBySize.hpp"
 
 // Standard library.
 #include "algorithm.hpp"
 #include "array.hpp"
-#include <concepts>
 #include "iostream.hpp"
 #include <limits>
 #include "stdexcept.hpp"
@@ -24,11 +23,12 @@ namespace shasta {
     // by the length of the integers used.
     // This class does not keep track of the number of bases
     // actually stored. All unused positions are left set at "A".
-    template<class Int> requires std::unsigned_integral<Int> class ShortBaseSequence;
+    template<class Int> class ShortBaseSequence;
     using ShortBaseSequence8 = ShortBaseSequence<uint8_t>;
     using ShortBaseSequence16 = ShortBaseSequence<uint16_t>;
     using ShortBaseSequence32 = ShortBaseSequence<uint32_t>;
     using ShortBaseSequence64 = ShortBaseSequence<uint64_t>;
+    using ShortBaseSequence128 = ShortBaseSequence<boost::multiprecision::uint128_t>;
     template<class Int> inline ostream& operator<<(ostream&, const ShortBaseSequence<Int>&);
 
     void testShortBaseSequence();
@@ -43,13 +43,13 @@ namespace shasta {
 // Position 1: the MSB bit of the bases (with base 0 corresponding to the MSB bit).
 // This class does not keep track of the number of bases
 // actually stored. All unused positions are left set at "A".
-template<class Int> requires std::unsigned_integral<Int> class shasta::ShortBaseSequence {
+template<class Int> class shasta::ShortBaseSequence {
 public:
 
     // The number of bases that can be represented equals the number of bits
     // in the Int type.
-    static const size_t capacity = std::numeric_limits<Int>::digits;
-    static const size_t capacityMinus1 = capacity - 1ULL;
+    static constexpr size_t capacity = BitCounter<Int>::numberOfBits;
+    static constexpr size_t capacityMinus1 = capacity - 1;
 
     // The constructor fills the data with 0, which corresponds to all A's.
     ShortBaseSequence()
@@ -153,6 +153,11 @@ public:
         return data < that.data;
     }
 
+    bool operator<=(const ShortBaseSequence<Int>& that) const
+    {
+        return data < that.data;
+    }
+
     // Write the first n bases.
     ostream& write(ostream& s, uint64_t n) const
     {
@@ -170,6 +175,28 @@ public:
     void shiftRight() {
         data[0] = Int(data[0] >> 1);
         data[1] = Int(data[1] >> 1);
+    }
+
+
+
+    // A k-mer is canonical if it is <= than its reverse complement.
+    bool isCanonical(uint64_t k) const
+    {
+        return *this <= reverseComplement(k);
+    }
+
+    // A k-mer is palindromic if it is equal to its reverse complement.
+    // A palindromic k-mer is also canonical.
+    bool isPalindromic(uint64_t k) const
+    {
+        return *this == reverseComplement(k);
+    }
+
+    void classify(uint64_t k, bool& isCanonical, bool& isPalindromic) const
+    {
+        const ShortBaseSequence<Int> rc = reverseComplement(k);
+        isCanonical   = ( (*this) <= rc );
+        isPalindromic = ( (*this) == rc );
     }
 
 
@@ -259,6 +286,3 @@ template<class Int> inline std::ostream& shasta::operator<<(
     return s;
 }
 
-
-
-#endif
