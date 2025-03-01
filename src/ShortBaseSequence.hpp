@@ -27,7 +27,7 @@ namespace shasta {
     using ShortBaseSequence16 = ShortBaseSequence<uint16_t>;
     using ShortBaseSequence32 = ShortBaseSequence<uint32_t>;
     using ShortBaseSequence64 = ShortBaseSequence<uint64_t>;
-    using ShortBaseSequence128 = ShortBaseSequence<boost::multiprecision::uint128_t>;
+    using ShortBaseSequence128 = ShortBaseSequence<__uint128_t>;
     template<class Int> inline ostream& operator<<(ostream&, const ShortBaseSequence<Int>&);
 
     void testShortBaseSequence();
