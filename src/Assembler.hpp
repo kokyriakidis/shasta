@@ -979,6 +979,9 @@ private:
     // of the AlignmentInfo stored in the alignmentTable).
     vector< pair<OrientedReadId, AlignmentInfo> >
         findOrientedAlignments(OrientedReadId, bool inReadGraphOnly) const;
+    
+    vector< pair<OrientedReadId, uint64_t> >
+        findOrientedAlignmentsPlusIds(OrientedReadId) const;
 
 
 

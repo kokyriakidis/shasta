@@ -528,6 +528,9 @@ double ProjectedAlignment::errorRateRle() const
 double ProjectedAlignment::Q() const
 {
     const double er = errorRate();
+    if (er == 0.) {
+        return 1000.;
+    }
     SHASTA_ASSERT(er > 0.);
     return -10. * log10(er);
 }
@@ -537,6 +540,9 @@ double ProjectedAlignment::Q() const
 double ProjectedAlignment::QRle() const
 {
     const double er = errorRateRle();
+    if (er == 0.) {
+        return 1000.;
+    }
     SHASTA_ASSERT(er > 0.);
     return -10. * log10(er);
 }
