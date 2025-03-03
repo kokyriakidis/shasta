@@ -33,6 +33,11 @@ endif(BUILD_NATIVE)
 # Build id.
 add_definitions(-DBUILD_ID=${BUILD_ID})
 
+# SHASTA_LONG_MARKERS.
+if(SHASTA_LONG_MARKERS)
+    add_definitions(-DSHASTA_LONG_MARKERS)
+endif(SHASTA_LONG_MARKERS)
+
 # Definitions needed to eliminate dependency on the boost system library.
 add_definitions(-DBOOST_SYSTEM_NO_DEPRECATED)
 add_definitions(-DBOOST_ERROR_CODE_HEADER_ONLY)
