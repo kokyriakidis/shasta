@@ -196,24 +196,28 @@ void AssemblyGraph::run(
     // Must do compress to make sure all bubbles are in bubble chains.
     compress();
     if(debug) write("B");
-    for(uint64_t iteration=0; ; iteration ++) {
-        performanceLog << timestamp << "Iteration " << iteration <<
-            " of bubble cleanup begins." << endl;
-        const uint64_t cleanedUpBubbleCount = cleanupBubbles(
-            debug,
-            options.assemblyGraphOptions.bubbleCleanupMaxOffset,
-            options.assemblyGraphOptions.chainTerminalCommonThreshold,
-            threadCount);
-        if(cleanedUpBubbleCount == 0) {
-            break;
+    if(options.assemblyGraphOptions.suppressBubbleCleanup) {
+        cout << "Bubble cleanup before phasing was suppressed." << endl;
+    } else {
+        for(uint64_t iteration=0; ; iteration ++) {
+            performanceLog << timestamp << "Iteration " << iteration <<
+                " of bubble cleanup begins." << endl;
+            const uint64_t cleanedUpBubbleCount = cleanupBubbles(
+                debug,
+                options.assemblyGraphOptions.bubbleCleanupMaxOffset,
+                options.assemblyGraphOptions.chainTerminalCommonThreshold,
+                threadCount);
+            if(cleanedUpBubbleCount == 0) {
+                break;
+            }
+            if(debug) {
+                cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
+            }
+            compressBubbleChains();
+            compress();
         }
-        if(debug) {
-            cout << "Cleaned up " << cleanedUpBubbleCount << " bubbles probably caused by errors." << endl;
-        }
-        compressBubbleChains();
-        compress();
+        if(debug) write("C");
     }
-    if(debug) write("C");
     cleanupSuperbubbles(false,
         options.assemblyGraphOptions.superbubbleLengthThreshold1,
         options.assemblyGraphOptions.chainTerminalCommonThreshold);
