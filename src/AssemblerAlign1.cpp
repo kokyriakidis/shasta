@@ -101,11 +101,11 @@ void Assembler::alignOrientedReads1(
     // Construct the sequences of KmerId's we want to align.
     // SeqAn uses 45 to represent gaps, so we add 100 to the KmerIds passed to SeqAn.
     TSequence seq0;
-    for(const KmerId kmerId: allMarkerKmerIds[0]) {
+    for(const KmerId& kmerId: allMarkerKmerIds[0]) {
         appendValue(seq0, kmerId + 100);
     }
     TSequence seq1;
-    for(const KmerId kmerId: allMarkerKmerIds[1]) {
+    for(const KmerId& kmerId: allMarkerKmerIds[1]) {
         appendValue(seq1, kmerId + 100);
     }
 

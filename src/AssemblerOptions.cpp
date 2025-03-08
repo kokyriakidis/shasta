@@ -1133,6 +1133,11 @@ void AssemblerOptions::addConfigurableOptions()
         "Used for detangling of the assembly graph "
         "(Mode 3 assembly only).")
 
+        ("Assembly.mode3.assemblyGraph.suppressBubbleCleanup",
+        bool_switch(&assemblyOptions.mode3Options.assemblyGraphOptions.suppressBubbleCleanup)->
+        default_value(false),
+        "Suppress bubble cleanup before phasing (Mode 3 assembly only).")
+
         ("Assembly.mode3.assemblyGraph.epsilon",
         value<double>(&assemblyOptions.mode3Options.assemblyGraphOptions.epsilon)->
         default_value(0.1),
@@ -1529,6 +1534,7 @@ void Mode3AssemblyOptions::AssemblyGraphOptions::write(ostream& s) const
 {
     s << "mode3.assemblyGraph.detangleToleranceLow = " << detangleToleranceLow << "\n";
     s << "mode3.assemblyGraph.detangleToleranceHigh = " << detangleToleranceHigh << "\n";
+    s << "mode3.assemblyGraph.suppressBubbleCleanup = " << convertBoolToPythonString(suppressBubbleCleanup) << "\n";
     s << "mode3.assemblyGraph.epsilon = " << epsilon << "\n";
     s << "mode3.assemblyGraph.minLogP = " << minLogP << "\n";
     s << "mode3.assemblyGraph.longBubbleThreshold = " << longBubbleThreshold << "\n";

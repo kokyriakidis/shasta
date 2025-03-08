@@ -82,6 +82,11 @@ endif(NOT DEFINED BUILD_ID)
 message(STATUS "BUILD_ID is: " ${BUILD_ID})
 
 
+# Option to request a build with long markers.
+option(SHASTA_LONG_MARKERS "Make a build with SHASTA_LONG_MARKERS set." OFF)
+message(STATUS "SHASTA_LONG_MARKERS is " ${SHASTA_LONG_MARKERS})
+
+
 
 # Add the subdirectories we need.
 if(BUILD_STATIC_LIBRARY)

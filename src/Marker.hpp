@@ -38,7 +38,7 @@ public:
 
     // The position of this marker in the oriented read.
     // This limits the length of a read to 2^24=16Mib bases.
-    uint32_t position;
+    Uint24 position;
 };
 
 

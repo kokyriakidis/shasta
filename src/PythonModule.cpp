@@ -744,6 +744,9 @@ PYBIND11_MODULE(shasta, shastaModule)
     shastaModule.def("testDeduplicateAndCount",
         testDeduplicateAndCount
         );
+    shastaModule.def("testBitReversal",
+        testBitReversal
+        );
     shastaModule.def("dset64Test",
         dset64Test,
         arg("n"),

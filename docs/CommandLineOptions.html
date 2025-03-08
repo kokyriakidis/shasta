@@ -146,7 +146,7 @@ to request one thread per virtual processor.
 
 <tr id='suppressStdoutLog'><td><code>--suppressStdoutLog</code><td class=centered><code>false</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 Normally, Shasta duplicates output to <code>stdout</code>
 by sending a copy to <code>stdout.log</code>
 in the assembly directory.
@@ -219,7 +219,7 @@ the assembly terminates with an error message.
 
 <tr><td><code>--Reads.noCache</code><td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 If set, requests skipping the Linux cache when loading reads.
 Implemented for Linux only (uses the <a href='http://man7.org/linux/man-pages/man2/open.2.html'>O_DIRECT flag</a>).
 Can help performance, but only use it if you know you will not 
@@ -393,7 +393,7 @@ MinHash/LowHash algorithm in order to be considered a candidate alignment.
 <tr id='MinHash.allPairs'>
 <td><code>--MinHash.allPairs</code><td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>
 that causes the MinHash process to be skipped. 
 Instead, all possible read pairs are marked as alignment candidates, on both 
 relative orientations. This should only be used for very small test
@@ -491,7 +491,7 @@ option has no effect.
 <tr id='Align.suppressContainments'>
 <td><code>--Align.suppressContainments</code><td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 If set, containment alignments are suppressed.
 Containment alignments are alignments in which
 one read is entirely contained in another read,
@@ -534,7 +534,7 @@ The maximum alignments to be kept in the read graph for each read.
 <tr id='ReadGraph.preferAlignedFraction'>
 <td><code>--ReadGraph.preferAlignedFraction</code><td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 Prefer alignments with a higher aligned fraction, rather than higher number of aligned markers.
 
 <tr id='ReadGraph.maxChimericReadDistance'>
@@ -558,7 +558,7 @@ Maximum distance (edges) for strand separation method 1.
 <tr id='ReadGraph.removeConflicts'>
 <td><code>--ReadGraph.removeConflicts</code><td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 Remove conflicts from the read graph. Experimental - do not use.
 
 <tr id='ReadGraph.markerCountPercentile'>
@@ -594,7 +594,7 @@ Percentile for adaptive selection of <code>--ReadGraph.maxTrim</code>
 <tr id='ReadGraph.flagInconsistentAlignments'>
 <td><code>--ReadGraph.flagInconsistentAlignments</code><td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 Flag inconsistent alignments. Experimental.
 
 <tr id='ReadGraph.flagInconsistentAlignments.triangleErrorThreshold'>
@@ -670,14 +670,14 @@ Experimental. Only used with <code>--Assembly.mode 2</code>.
 <tr id='MarkerGraph.allowDuplicateMarkers'>
 <td><code>--MarkerGraph.allowDuplicateMarkers</code><td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 It specifies whether to allow more than one marker on the
 same oriented read on a single marker graph vertex. Experimental.
 
 <tr id='MarkerGraph.cleanupDuplicateMarkers'>
 <td><code>--MarkerGraph.cleanupDuplicateMarkers</code><td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 It specifies whether to clean up marker graph vertices with 
 more than one marker on the same oriented read. Experimental.
 
@@ -782,13 +782,13 @@ Used to select the consensus caller for repeat counts. <a class=qm href='Computa
 <tr id='Assembly.storeCoverageData'>
 <td><code>--Assembly.storeCoverageData</code><td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>
 used to request storing of coverage data (only useful in conjunction with <code>--memoryMode filesystem</code>).
 
 <tr id='Assembly.writeReadsByAssembledSegment'>
 <td><code>--Assembly.writeReadsByAssembledSegment</code><td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>
 used to request writing a csv file containing all the reads that were used
 to assemble each segment).
 
@@ -831,7 +831,7 @@ Experimental. Maximum ratio of total off-diagonal elements over diagonal element
 <tr id='Assembly.iterative'>
 <td><code>--Assembly.iterative</code><td class=centered><code>False</code><td>
 This is a
-<a href="#BooleanSwitches">Boolean switch</a>
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>
 used to request iterative assembly (experimental).
 <a class=qm href='ComputationalMethods.html#IterativeAssembly'/>
 
@@ -958,7 +958,7 @@ Edge length threshold in markers for superbubble removal. Mode 2 assembly only.
 <td><code>--Assembly.mode2.suppressGfaOutput</code>
 <td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 If set, all GFA output is suppressed. Mode 2 assembly only.
 <a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
 
@@ -966,7 +966,7 @@ If set, all GFA output is suppressed. Mode 2 assembly only.
 <td><code>--Assembly.mode2.suppressFastaOutput</code>
 <td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 If set, all FASTA output is suppressed. Mode 2 assembly only.
 <a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
 
@@ -974,7 +974,7 @@ If set, all FASTA output is suppressed. Mode 2 assembly only.
 <td><code>--Assembly.mode2.suppressDetailedOutput</code>
 <td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 If set, output of the detailed representation 
 of the assembly is suppressed. Mode 2 assembly only.
 <a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
@@ -983,14 +983,14 @@ of the assembly is suppressed. Mode 2 assembly only.
 <td><code>--Assembly.mode2.suppressPhasedOutput</code>
 <td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 If set, output of the phased representation of the assembly is suppressed. Mode 2 assembly only.
 
 <tr id='Assembly.mode2.suppressHaploidOutput'>
 <td><code>--Assembly.mode2.suppressHaploidOutput</code>
 <td class=centered><code>False</code><td>
 This is a 
-<a href="#BooleanSwitches">Boolean switch</a>.
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
 If set, output of the haploid representation of the assembly is suppressed. Mode 2 assembly only.
 <a class=qm href='ComputationalMethods.html#Mode2Assembly'/>
 
@@ -1068,6 +1068,13 @@ Mode 3 assembly only.
 <td class=centered><code>2</code><td>
 Used for detangling of the assembly graph.
 Mode 3 assembly only.
+
+<tr id='Assembly.mode3.assemblyGraph.suppressBubbleCleanup'>
+<td><code>--Assembly.mode3.assemblyGraph.suppressBubbleCleanup</code>
+<td class=centered><code>False</code><td>
+This is a 
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
+If set, bubble cleanup before phasing is suppressed. Mode 3 assembly only.
 
 <tr id='Assembly.mode3.assemblyGraph.epsilon'>
 <td><code>--Assembly.mode3.assemblyGraph.epsilon</code>

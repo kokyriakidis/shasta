@@ -389,6 +389,8 @@ public:
         uint64_t detangleToleranceLow;
         uint64_t detangleToleranceHigh;
 
+        bool suppressBubbleCleanup;
+
         // Bayesian model.
         double epsilon;
         double minLogP;
