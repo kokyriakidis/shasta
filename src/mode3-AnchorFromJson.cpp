@@ -408,10 +408,21 @@ bool Anchors::processCandidateAnchor(
         SHASTA_ASSERT(interval.rightClip() == rightClip0);
     }
 
+    // Check that the same ReadId does not appear twice.
+    sort(intervals.begin(), intervals.end());
+    for(uint64_t i=1; i<intervals.size(); i++) {
+        const ReadId readId = intervals[i].orientedReadId.getReadId();
+        const ReadId previousReadId = intervals[i-1].orientedReadId.getReadId();
+        if(readId == previousReadId) {
+            const auto readName = reads.getReadName(readId);
+            string readNameString;
+            copy(readName.begin(), readName.end(), back_inserter(readNameString));
+            throw runtime_error("Duplicate read " + readNameString + " on anchor " + name);
+        }
+    }
 
     // All good. Generate an anchor.
     {
-        sort(intervals.begin(), intervals.end());
 
         if(debug) {
             const AnchorId anchorId = anchorSequences.size();
