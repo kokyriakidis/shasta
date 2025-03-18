@@ -1010,7 +1010,7 @@ void Anchors::writeAnchorGapsByRead() const
 
     // Open the output csv file and write a header.
     ofstream csv("AnchorGaps.csv");
-    csv << "ReadId,Gap\n";
+    csv << "ReadId,Length,Anchor count,Gap\n";
 
     // Loop over all reads.
     for(ReadId readId=0; readId<reads.readCount(); readId++) {
@@ -1051,6 +1051,6 @@ void Anchors::writeAnchorGapsByRead() const
 
             previousPosition = position;
         }
-        csv << readId << "," << maxGap << "\n";
+        csv << readId << "," << readLength << "," << journey.size() << "," << maxGap << "\n";
     }
 }
