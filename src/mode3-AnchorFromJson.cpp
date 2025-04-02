@@ -285,11 +285,12 @@ bool Anchors::processCandidateAnchor(
         const Interval& interval = intervals[i];
 
         // Check the lengths.
-        const uint64_t length = interval0.length();
+        const uint64_t length = interval.length();
         if(length != length0) {
             std::ostringstream s;
-            boost::property_tree::write_json(s, candidateAnchor);
-            throw runtime_error("Interval lengths must all be identical: " + s.str());
+            cout << "Length for interval " << i << " is " << length << endl;
+            cout << "Length for interval 0 is " << length0 << endl;
+            throw runtime_error("Interval lengths must all be identical.");
         }
 
         // Check the bases.
@@ -404,9 +405,28 @@ bool Anchors::processCandidateAnchor(
     const uint64_t rightClip0 = intervals[0].rightClip();
     for(uint64_t i=1; i<intervals.size(); i++) {
         const Interval& interval = intervals[i];
-        SHASTA_ASSERT(interval.leftClip() == leftClip0);
-        SHASTA_ASSERT(interval.rightClip() == rightClip0);
+        if((interval.leftClip() != leftClip0) or (interval.rightClip() != rightClip0)) {
+            cout << "i,OrientedReadId,Begin,End,Length,ClipperBegin,ClippedEnd,Ordinal0,Ordinal1,LeftClip,RightClip," << endl;
+            for(uint64_t i=0; i<intervals.size(); i++) {
+                const Interval& interval = intervals[i];
+                cout << i << ",";
+                cout << interval.orientedReadId << ",";
+                cout << interval.begin << ",";
+                cout << interval.end << ",";
+                cout << interval.length() << ",";
+                cout << interval.clippedBegin << ",";
+                cout << interval.clippedEnd << ",";
+                cout << interval.ordinal0 << ",";
+                cout << interval.ordinal1 << ",";
+                cout << interval.leftClip() << ",";
+                cout << interval.rightClip() << ",";
+                cout << endl;
+            }
+            throw runtime_error("Clip inconsistency for interval " + to_string(i) +
+                ". See above message for details.");
+        }
     }
+
 
     // Check that the same ReadId does not appear twice.
     sort(intervals.begin(), intervals.end());
