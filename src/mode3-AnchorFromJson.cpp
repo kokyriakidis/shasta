@@ -437,7 +437,8 @@ bool Anchors::processCandidateAnchor(
             const auto readName = reads.getReadName(readId);
             string readNameString;
             copy(readName.begin(), readName.end(), back_inserter(readNameString));
-            throw runtime_error("Duplicate read " + readNameString + " on anchor " + name);
+            cout << "Duplicate read " << readNameString << " on anchor " << name << ". This anchor was suppressed." << endl;
+            return false;
         }
     }
 
