@@ -1046,6 +1046,13 @@ public:
         double WThreshold,
         double WThresholdForBreaks
         );
+    void createReadGraph4withStrandSeparation2(
+        uint64_t maxAlignmentCount,
+        double epsilon,
+        double delta,
+        double WThreshold,
+        double WThresholdForBreaks
+        );
     void removeReadGraph();
 
     void accessReadGraphAllAlignments();

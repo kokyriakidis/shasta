@@ -8,6 +8,7 @@
 #include "Reads.hpp"
 #include "shastaLapack.hpp"
 #include "timestamp.hpp"
+#include <vector>
 using namespace shasta;
 
 // Boost libraries.
@@ -105,57 +106,553 @@ void Assembler::createReadGraph(
 
     } else {
 
-        // Vector to keep the alignments for each read,
-        // with their number of markers.
-        // Contains pairs(marker count, alignment id).
-        vector< pair<uint32_t, uint32_t> > readAlignments;
+    //     // Vector to keep the alignments for each read,
+    //     // with their number of markers.
+    //     // Contains pairs(marker count, alignment id).
+    //     vector< pair<uint32_t, uint32_t> > readAlignments;
 
-        const bool debug = false;
-        if(debug) {
-            cout << "createReadGraph begins, maxAlignmentCount " << maxAlignmentCount << endl;
-        }
+    //     const bool debug = false;
+    //     if(debug) {
+    //         cout << "createReadGraph begins, maxAlignmentCount " << maxAlignmentCount << endl;
+    //     }
 
 
+    //     // Loop over reads.
+    //     for(ReadId readId=0; readId<readCount; readId++) {
+    //         if(debug) {
+    //             cout << "Working on read " << readId << endl;
+    //         }
+
+    //         // Gather the alignments for this read, each with its number of markers.
+    //         readAlignments.clear();
+    //         for(const uint32_t alignmentId: alignmentTable[OrientedReadId(readId, 0).getValue()]) {
+    //             const AlignmentData& alignment = alignmentData[alignmentId];
+    //             readAlignments.push_back(make_pair(alignment.info.markerCount, alignmentId));
+    //         }
+    //         if(debug) {
+    //             cout << "Found " << readAlignments.size() << " alignments." << endl;
+    //         }
+
+    //         // Keep the best maxAlignmentCount.
+    //         if(readAlignments.size() > maxAlignmentCount) {
+    //             std::nth_element(
+    //                 readAlignments.begin(),
+    //                 readAlignments.begin() + maxAlignmentCount,
+    //                 readAlignments.end(),
+    //                 std::greater< pair<uint32_t, uint32_t> >());
+    //             readAlignments.resize(maxAlignmentCount);
+    //         }
+    //         if(debug) {
+    //             cout << "Kept " << readAlignments.size() << " alignments." << endl;
+    //         }
+
+    //         // Mark the surviving alignments as to be kept.
+    //         for(const auto& p: readAlignments) {
+    //             const uint32_t alignmentId = p.second;
+    //             keepAlignment[alignmentId] = true;
+    //             if(debug) {
+    //                 const AlignmentData& alignment = alignmentData[alignmentId];
+    //                 cout << "Marked alignment " << alignment.readIds[0] << " " <<
+    //                     alignment.readIds[1] << (alignment.isSameStrand ? " same strand" : " opposite strand") << endl;
+    //             }
+    //         }
+    //     }
+    // }
+
+        double delta = 5e-4;
+        double epsilon = 3e-2;
+        double WThreshold = 1e-1;
+        double WThresholdForBreaks = 1e+300;
+
+        // Get the total number of stored alignments.
+        const uint64_t alignmentCount = alignmentData.size();
+        SHASTA_ASSERT(compressedAlignments.size() == alignmentCount);
+
+
+
+        vector <bool> forbiddenReadIds(readCount, false);
+        vector <bool> forbiddenAlignmentIds(alignmentData.size(), false);
         // Loop over reads.
         for(ReadId readId=0; readId<readCount; readId++) {
-            if(debug) {
-                cout << "Working on read " << readId << endl;
+
+            vector <bool> readIdsUsed(readCount, false);
+
+            if (forbiddenReadIds[readId]) {
+                continue;
             }
 
-            // Gather the alignments for this read, each with its number of markers.
-            readAlignments.clear();
+            const ReadId readId0 = readId;
+            const ReadId strand0 = 0;
+
+            const OrientedReadId orientedReadId0Argument = OrientedReadId(readId0, strand0);
+
+            
             for(const uint32_t alignmentId: alignmentTable[OrientedReadId(readId, 0).getValue()]) {
-                const AlignmentData& alignment = alignmentData[alignmentId];
-                readAlignments.push_back(make_pair(alignment.info.markerCount, alignmentId));
-            }
-            if(debug) {
-                cout << "Found " << readAlignments.size() << " alignments." << endl;
+                const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
+                // Get the oriented read ids that the AlignmentData refers to.
+                OrientedReadId orientedReadId0(thisAlignmentData.readIds[0], 0);
+                OrientedReadId orientedReadId1(thisAlignmentData.readIds[1], thisAlignmentData.isSameStrand ? 0 : 1);
+                AlignmentInfo alignmentInfo = thisAlignmentData.info;
+
+                // Swap oriented reads, if necessary.
+                if(orientedReadId0.getReadId() != readId0) {
+                    swap(orientedReadId0, orientedReadId1);
+                    alignmentInfo.swap();
+                }
+                SHASTA_ASSERT(orientedReadId0.getReadId() == readId0);
+
+                // Reverse complement, if necessary.
+                if(orientedReadId0.getStrand() != strand0) {
+                    orientedReadId0.flipStrand();
+                    orientedReadId1.flipStrand();
+                    alignmentInfo.reverseComplement();
+                }
+                SHASTA_ASSERT(orientedReadId0.getStrand() == strand0);
+                SHASTA_ASSERT(orientedReadId0 == orientedReadId0Argument);
+
+                const ReadId readId1 = orientedReadId1.getReadId();
+
+                if(readIdsUsed[readId1]) {
+                    forbiddenAlignmentIds[alignmentId] = true;
+                    forbiddenReadIds[readId1] = true;
+                    continue;
+                }
+                readIdsUsed[readId1] = true;
+
             }
 
-            // Keep the best maxAlignmentCount.
-            if(readAlignments.size() > maxAlignmentCount) {
-                std::nth_element(
-                    readAlignments.begin(),
-                    readAlignments.begin() + maxAlignmentCount,
-                    readAlignments.end(),
-                    std::greater< pair<uint32_t, uint32_t> >());
-                readAlignments.resize(maxAlignmentCount);
-            }
-            if(debug) {
-                cout << "Kept " << readAlignments.size() << " alignments." << endl;
-            }
-
-            // Mark the surviving alignments as to be kept.
-            for(const auto& p: readAlignments) {
-                const uint32_t alignmentId = p.second;
-                keepAlignment[alignmentId] = true;
-                if(debug) {
-                    const AlignmentData& alignment = alignmentData[alignmentId];
-                    cout << "Marked alignment " << alignment.readIds[0] << " " <<
-                        alignment.readIds[1] << (alignment.isSameStrand ? " same strand" : " opposite strand") << endl;
+            // We need a second loop over the alignments to forbid the second alignment instance in some cases
+            for(const uint32_t alignmentId: alignmentTable[OrientedReadId(readId, 0).getValue()]) {
+                const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
+                OrientedReadId orientedReadId0(thisAlignmentData.readIds[0], 0);
+                OrientedReadId orientedReadId1(thisAlignmentData.readIds[1], thisAlignmentData.isSameStrand ? 0 : 1);
+                const ReadId readId0 = orientedReadId0.getReadId();
+                const ReadId readId1 = orientedReadId1.getReadId();
+                if(forbiddenReadIds[readId0] or forbiddenReadIds[readId1]) {
+                    forbiddenAlignmentIds[alignmentId] = true;
                 }
             }
         }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        //*
+        //
+        // Order alignments in order of increasing Q. 
+        //
+        // Gather in alignmentTablePassFilter[alignmentID, Q]
+        // alignments in order of increasing Q.
+        // Q(n) = (1 + δ/2ε)^n * e-δL
+        // ε = 3e-3, δ = 5e-4
+        // logQ(n) = αn - δL
+        //
+        //*
+
+        // const double epsilon = 1e-4;
+        // const double delta = 5e-4;
+        const double alpha = log(1 + delta/(2*epsilon));
+
+        // const double WThreshold = 1e-8;
+        const double logWThreshold = log(WThreshold);
+
+        // const double WThresholdForBreaks = 1e+15;
+        const double logWThresholdForBreaks = log(WThresholdForBreaks);
+
+
+
+        vector< pair<uint64_t, double> > alignmentTablePassFilter;
+        vector< pair<uint64_t, double> > alignmentTableNotPassFilter;
+        
+
+        // Get stats about the reads
+        const uint64_t readCount = reads->readCount();
+        const uint64_t orientedReadCount = 2*readCount;
+        
+        // Keep track of which readIds were used in alignments
+        vector<bool> readIDsPassFilter(readCount, false);
+
+        // Flag alignments to be kept for break detection.
+        vector<bool> keepAlignmentsForBreaks(alignmentCount, false);
+
+
+        // Loop over all alignments.
+        for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
+            if((alignmentId % 100000) == 0) {
+                cout << timestamp << alignmentId << "/" << alignmentCount << endl;
+            }
+
+            if (forbiddenAlignmentIds[alignmentId]) {
+                continue;
+            }
+
+            // Get information for this alignment.
+            AlignmentData& thisAlignmentData = alignmentData[alignmentId];
+
+            // The alignment is stored as an alignment between readId0 on strand 0
+            // and readId1 on strand 0 or 1 depending on the value of isSameStrand.
+            // The reverse complement alignment also exists, but is not stored explicitly.
+            const ReadId readId0 = thisAlignmentData.readIds[0];
+            const ReadId readId1 = thisAlignmentData.readIds[1];
+            const bool isSameStrand = thisAlignmentData.isSameStrand;
+            SHASTA_ASSERT(readId0 < readId1);
+            // Get the oriented read ids that the AlignmentData refers to.
+            OrientedReadId orientedReadId0(readId0, 0);   // On strand 0.
+            OrientedReadId orientedReadId1(readId1, isSameStrand ? 0 : 1);   // On strand 0 or 1.
+            AlignmentInfo alignmentInfo = thisAlignmentData.info;
+
+            if(forbiddenReadIds[readId0] or forbiddenReadIds[readId1]) {
+                continue;
+            }
+
+            // if (alignmentInfo.alignedFraction(1) < 0.98) {
+            //     continue;
+            // }
+
+            // Store this pair of edges in our edgeTable.
+            const uint64_t range0 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId0, 0, markers);
+            const uint64_t range1 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId1, 1, markers);
+            const double L = double(range0 + range1)/2.;
+            // const uint64_t n = thisAlignmentData.info.mismatchCountRle;
+            const double errorRateRle = thisAlignmentData.info.errorRateRle;
+            const double nRLE = errorRateRle * 2 * L;
+            const double markerCount = thisAlignmentData.info.markerCount;
+            const double rightTrim1 = thisAlignmentData.info.data[1].rightTrim();
+            const double alignedFraction = thisAlignmentData.info.alignedFraction(1);
+
+            // logQ(n) = αn - δL
+            // const double logQ = alpha * double(nRLE) - delta * L;
+            const double logQ = double(markerCount) * double(rightTrim1) * double(alignedFraction) * (-errorRateRle);
+            // const double logQ = double(markerCount) * double(rightTrim1) * double(alignedFraction);
+          
+            // if (alignmentInfo.alignedFraction(1) >= 0.97) {
+            if (alignmentInfo.alignedFraction(1) >= 0.98 and markerCount >= 1000) {
+                alignmentTablePassFilter.push_back(make_pair(alignmentId, logQ));
+                // alignmentTablePassFilter.push_back(make_pair(alignmentId, thisAlignmentMarkerCount));
+                readIDsPassFilter[readId0] = true;
+                readIDsPassFilter[readId1] = true;
+            } else {
+                alignmentTableNotPassFilter.push_back(make_pair(alignmentId, logQ));
+                // alignmentTableNotPassFilter.push_back(make_pair(alignmentId, thisAlignmentMarkerCount));
+                keepAlignmentsForBreaks[alignmentId] = true;
+            }
+
+        }
+
+        // sort(alignmentTablePassFilter.begin(), alignmentTablePassFilter.end(), OrderPairsBySecondOnly<uint64_t, double>());
+        // sort(alignmentTableNotPassFilter.begin(), alignmentTableNotPassFilter.end(), OrderPairsBySecondOnly<uint64_t, double>());
+        sort(alignmentTablePassFilter.begin(), alignmentTablePassFilter.end(), OrderPairsBySecondOnlyGreater<uint64_t, double>());
+        sort(alignmentTableNotPassFilter.begin(), alignmentTableNotPassFilter.end(), OrderPairsBySecondOnlyGreater<uint64_t, double>());
+
+        // print how many alignments passed the filter
+        cout << "Number of alignments passing the first filter: " << alignmentTablePassFilter.size() << endl;
+        cout << "Number of alignments passing the first filter BREAKS: " << alignmentTableNotPassFilter.size() << endl;
+
+
+
+
+
+
+
+
+        // Maintain a vector containing the degree of each vertex
+        // verticesDegree[vertexID] -> degree
+        vector<uint64_t> verticesDegree(orientedReadCount, 0);
+
+
+        // Keep track of which readIds were used in alignments
+        vector<bool> readId0Used(readCount, false);
+
+        vector< pair<uint64_t, double> > alignmentTablePassFilterStrictSingleNeigbor;
+
+        for(auto it=alignmentTablePassFilter.begin(); it!=alignmentTablePassFilter.end(); ++it) {
+            const pair<uint64_t, double>& p = *it;
+            const uint64_t alignmentId = p.first;
+
+            // Get information for this alignment.
+            AlignmentData& thisAlignmentData = alignmentData[alignmentId];
+
+            // The alignment is stored as an alignment between readId0 on strand 0
+            // and readId1 on strand 0 or 1 depending on the value of isSameStrand.
+            // The reverse complement alignment also exists, but is not stored explicitly.
+            const ReadId readId0 = thisAlignmentData.readIds[0];
+            const ReadId readId1 = thisAlignmentData.readIds[1];
+            const bool isSameStrand = thisAlignmentData.isSameStrand;
+            SHASTA_ASSERT(readId0 < readId1);
+
+            // Get the oriented read ids that the AlignmentData refers to.
+            OrientedReadId orientedReadId0(readId0, 0);   // On strand 0.
+            OrientedReadId orientedReadId1(readId1, isSameStrand ? 0 : 1);   // On strand 0 or 1.
+            AlignmentInfo alignmentInfo = thisAlignmentData.info;
+
+            const uint32_t leftTrim0  = thisAlignmentData.info.data[0].leftTrim();
+            const uint32_t rightTrim0 = thisAlignmentData.info.data[0].rightTrim();
+
+            const uint32_t leftTrim1  = thisAlignmentData.info.data[1].leftTrim();
+            const uint32_t rightTrim1 = thisAlignmentData.info.data[1].rightTrim();
+
+            // Contained read1 in read0
+            if (rightTrim1 == 0 and leftTrim1 == 0) {
+                continue;
+            }
+
+            if (rightTrim1 != 0 and leftTrim1 != 0) {
+                continue;
+            }
+
+            if (rightTrim1 < 150 and leftTrim1 < 150) {
+                continue;
+            }
+
+            // Read1 hanging on the left side of read0.
+            // Correct the orientations of the reads
+            // to get Read1 hanging on the right side of read0.
+            if (rightTrim1 == 0 and leftTrim1 != 0) {
+                orientedReadId0.flipStrand();
+                orientedReadId1.flipStrand();
+                alignmentInfo.reverseComplement();
+                //forbiddenAlignmentIds[alignmentId] = true;
+            }
+
+            //
+            // If we reached this point, then the Read1 is hanging on the right side of Read0.
+            //
+
+            // Only add the first time we see this readId0.
+            if (readId0Used[readId0]) {
+                continue;
+            }
+
+            readId0Used[readId0] = true;
+
+            alignmentTablePassFilterStrictSingleNeigbor.push_back(make_pair(alignmentId, p.second));
+
+        }
+
+        // print how many alignments passed the filter
+        cout << "Number of alignments passing the second filter: " << alignmentTablePassFilterStrictSingleNeigbor.size() << endl;
+
+
+
+        
+
+        vector<ReadId> rank(orientedReadCount);
+        vector<ReadId> parent(orientedReadCount);
+        boost::disjoint_sets<ReadId*, ReadId*> disjointSets(&rank[0], &parent[0]);
+        for(ReadId readId=0; readId<readCount; readId++) {
+            for(Strand strand=0; strand<2; strand++) {
+                disjointSets.make_set(OrientedReadId(readId, strand).getValue());
+            }
+        }
+
+        // Process alignments in order of increasing Q
+        vector alignmentTablesToProcess({alignmentTablePassFilterStrictSingleNeigbor});
+            
+        uint64_t crossStrandEdgeCount = 0;
+
+        for (auto alignmentTableToProcess : alignmentTablesToProcess) {
+            for(auto it=alignmentTableToProcess.begin(); it!=alignmentTableToProcess.end(); ++it) {
+                const pair<uint64_t, double>& p = *it;
+                const uint64_t alignmentId = p.first;
+                // const double logQ = p.second;
+
+                // Get the alignment data
+                AlignmentData& alignment = alignmentData[alignmentId];
+                const ReadId readId0 = alignment.readIds[0];
+                const ReadId readId1 = alignment.readIds[1];
+                const bool isSameStrand = alignment.isSameStrand;
+                SHASTA_ASSERT(readId0 < readId1);
+                const OrientedReadId A0 = OrientedReadId(readId0, 0);
+                const OrientedReadId B0 = OrientedReadId(readId1, isSameStrand ? 0 : 1);
+                const OrientedReadId A1 = OrientedReadId(readId0, 1);
+                const OrientedReadId B1 = OrientedReadId(readId1, isSameStrand ? 1 : 0);
+
+                SHASTA_ASSERT(A0.getReadId() == A1.getReadId());
+                SHASTA_ASSERT(B0.getReadId() == B1.getReadId());
+                SHASTA_ASSERT(A0.getStrand() == 1 - A1.getStrand());
+                SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
+
+                // Get the connected components that these oriented reads are in.
+                const uint64_t a0 = disjointSets.find_set(A0.getValue());
+                const uint64_t b0 = disjointSets.find_set(B0.getValue());
+                const uint64_t a1 = disjointSets.find_set(A1.getValue());
+                const uint64_t b1 = disjointSets.find_set(B1.getValue());
+
+
+                // If the alignment breaks strand separation, it is skipped.
+                // If A0 and B1 are in the same connected component,
+                // A1 and B0 also must be in the same connected component.
+                // Adding this pair of edges would create a self-complementary
+                // connected component containing A0, B0, A1, and B1,
+                // and to ensure strand separation we don't want to do that.
+                // So we mark these edges as cross-strand edges
+                // and don't use them to update the disjoint set data structure.
+                if(a0 == b1) {
+                    SHASTA_ASSERT(a1 == b0);
+                    crossStrandEdgeCount += 2;
+                    continue;
+                }
+
+                // If both vertices of the potential edge have at least the required minimum number 
+                // of neighbors, the alignment is also skipped. 
+                const uint64_t degreeA0 = verticesDegree[A0.getValue()];
+                const uint64_t degreeB0 = verticesDegree[B0.getValue()];
+
+
+
+                if(degreeA0 >= maxAlignmentCount && degreeB0 >= maxAlignmentCount) {
+                    // cout << "Skipping alignment " << alignmentId << " because vertex " << A0.getValue() << " has degree " << degreeA0 << " and vertex " << B0.getValue() << " has degree " << degreeB0 << endl;
+                    continue;
+                }
+
+                // Add the alignment to the read graph.
+                keepAlignment[alignmentId] = true;
+                alignment.info.isInReadGraph = 1;
+
+                // Update vertex degrees
+                verticesDegree[A0.getValue()]++;
+                verticesDegree[B0.getValue()]++;
+                verticesDegree[A1.getValue()]++;
+                verticesDegree[B1.getValue()]++;
+                
+
+                // Update disjoint sets
+                disjointSets.union_set(a0, b0);
+                disjointSets.union_set(a1, b1);
+
+            }
+
+            // Verify that for any read the two oriented reads are in distinct
+            // connected components.
+            for(ReadId readId=0; readId<readCount; readId++) {
+                const OrientedReadId orientedReadId0(readId, 0);
+                const OrientedReadId orientedReadId1(readId, 1);
+                SHASTA_ASSERT(
+                    disjointSets.find_set(orientedReadId0.getValue()) !=
+                    disjointSets.find_set(orientedReadId1.getValue())
+                );
+            }
+        }
+
+
+
+        cout << "Number of reads: " << readCount << endl;
+        cout << "Number of oriented reads: " << orientedReadCount << endl;
+
+
+        // Process alignments in order of increasing Q
+        vector alignmentTablesToProcessv2({alignmentTablePassFilter, alignmentTableNotPassFilter});
+        
+        for (auto alignmentTableToProcess : alignmentTablesToProcessv2) {
+            for(auto it=alignmentTableToProcess.begin(); it!=alignmentTableToProcess.end(); ++it) {
+                const pair<uint64_t, double>& p = *it;
+                const uint64_t alignmentId = p.first;
+                // const double logQ = p.second;
+
+                // Get the alignment data
+                AlignmentData& alignment = alignmentData[alignmentId];
+                const ReadId readId0 = alignment.readIds[0];
+                const ReadId readId1 = alignment.readIds[1];
+                const bool isSameStrand = alignment.isSameStrand;
+                SHASTA_ASSERT(readId0 < readId1);
+                const OrientedReadId A0 = OrientedReadId(readId0, 0);
+                const OrientedReadId B0 = OrientedReadId(readId1, isSameStrand ? 0 : 1);
+                const OrientedReadId A1 = OrientedReadId(readId0, 1);
+                const OrientedReadId B1 = OrientedReadId(readId1, isSameStrand ? 1 : 0);
+
+                // const uint32_t leftTrim0  = alignment.info.data[0].leftTrim();
+                // const uint32_t rightTrim0 = alignment.info.data[0].rightTrim();
+
+                // const uint32_t leftTrim1  = alignment.info.data[1].leftTrim();
+                // const uint32_t rightTrim1 = alignment.info.data[1].rightTrim();
+
+                // if (rightTrim1 < 50 and leftTrim1 < 50) {
+                //     continue;
+                // }
+
+                SHASTA_ASSERT(A0.getReadId() == A1.getReadId());
+                SHASTA_ASSERT(B0.getReadId() == B1.getReadId());
+                SHASTA_ASSERT(A0.getStrand() == 1 - A1.getStrand());
+                SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
+
+                // Get the connected components that these oriented reads are in.
+                const uint64_t a0 = disjointSets.find_set(A0.getValue());
+                const uint64_t b0 = disjointSets.find_set(B0.getValue());
+                const uint64_t a1 = disjointSets.find_set(A1.getValue());
+                const uint64_t b1 = disjointSets.find_set(B1.getValue());
+
+
+                // If the alignment breaks strand separation, it is skipped.
+                // If A0 and B1 are in the same connected component,
+                // A1 and B0 also must be in the same connected component.
+                // Adding this pair of edges would create a self-complementary
+                // connected component containing A0, B0, A1, and B1,
+                // and to ensure strand separation we don't want to do that.
+                // So we mark these edges as cross-strand edges
+                // and don't use them to update the disjoint set data structure.
+                if(a0 == b1) {
+                    SHASTA_ASSERT(a1 == b0);
+                    crossStrandEdgeCount += 2;
+                    continue;
+                }
+
+                // If both vertices of the potential edge have at least the required minimum number 
+                // of neighbors, the alignment is also skipped. 
+                const uint64_t degreeA0 = verticesDegree[A0.getValue()];
+                const uint64_t degreeB0 = verticesDegree[B0.getValue()];
+
+
+
+                if(degreeA0 >= maxAlignmentCount && degreeB0 >= maxAlignmentCount) {
+                    // cout << "Skipping alignment " << alignmentId << " because vertex " << A0.getValue() << " has degree " << degreeA0 << " and vertex " << B0.getValue() << " has degree " << degreeB0 << endl;
+                    continue;
+                }
+
+                
+                // Add the alignment to the read graph.
+                keepAlignment[alignmentId] = true;
+                alignment.info.isInReadGraph = 1;
+                
+                // Update vertex degrees
+                verticesDegree[A0.getValue()]++;
+                verticesDegree[B0.getValue()]++;
+                verticesDegree[A1.getValue()]++;
+                verticesDegree[B1.getValue()]++;
+
+                // Update disjoint sets
+                disjointSets.union_set(a0, b0);
+                disjointSets.union_set(a1, b1);
+
+            }
+
+            // Verify that for any read the two oriented reads are in distinct
+            // connected components.
+            for(ReadId readId=0; readId<readCount; readId++) {
+                const OrientedReadId orientedReadId0(readId, 0);
+                const OrientedReadId orientedReadId1(readId, 1);
+                SHASTA_ASSERT(
+                    disjointSets.find_set(orientedReadId0.getValue()) !=
+                    disjointSets.find_set(orientedReadId1.getValue())
+                );
+            }
+        }
+
+
+        // Print how many alignments were kept in this step
+        const long keepCountR1 = count(keepAlignment.begin(), keepAlignment.end(), true);
+        cout << "Finding strict disjointSets step: Keeping " << keepCountR1 << " alignments of " << keepAlignment.size() << endl;
+
+
     }
 
 
