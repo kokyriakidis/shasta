@@ -11,80 +11,74 @@
 <div class="goto-index"><a href="index.html">Table of contents</a></div>
 <h1>Quick start</h1>
 
-Note that the Shasta executable has no dependencies and requires no installation
-or set up. This means that you can use it immediately after downloading it and setting its execute permission.
-See below for more information.
-
-
-<h2 id="QuickStartLinux">Linux</h2>
+<h3>Selecting a machine</h3>
 <p>
-You can use the following commands to download the executable from the latest release and run an assembly:
+The Shasta executable has no dependencies and requires no installation
+or set up. It will run on almost any 64-bit Linux machine, regardless of distribution.
+
+<h3>Downloading the executable</h3>
+<p>
+You can download the executable for the latest release from the 
+<a href='https://github.com/paoloshasta/shasta/releases'>Shasta releases page</a>.
+The Linux executable for release <code>X.Y.Z</code> is named <code>shasta-Linux-X.Y.Z</code>. 
+For example, the current release at the time of writing is <code>0.14.0</code> and the executable is named <code>shasta-Linux-0.14.0</code>.
+
+<p>
+You can also download the executable from the command line, for example:
 <pre>
-# Download the executable for the latest release.
-curl -O -L https://github.com/paoloshasta/shasta/releases/download/0.11.1/shasta-Linux-0.11.1
-
-# Grant execute permissions.
-chmod ugo+x shasta-Linux-0.11.1
-
-# Run an assembly.
-./shasta-Linux-0.11.1 --input input.fasta --config Nanopore-May2022
+wget https://github.com/paoloshasta/shasta/releases/download/0.14.0/shasta-Linux-0.14.0
 </pre>
 
+<h3>Setting execute permission</h3>
 <p>
-You can specify multiple input FASTA files, if necessary.
-On a typical laptop, this will run in minutes for a bacterial genome.
-For a human size assembly, AWS instance type <code>x1.32xlarge</code>
-is recommended. It is usually available at a cost around $4/hour
-on the AWS spot market and should complete the human size assembly
-in a few hours, at coverage around 60x.
-<p>
-Assembly output will be created in a new directory named
-<code>ShastaRun</code>. 
-Output includes the assembly in FASTA and GFA 1.0 formats in files:
-<ul>
-<li><code>ShastaRun/Assembly.fasta</code>
-<li><code>ShastaRun/Assembly.gfa</code>
-<li><code>ShastaRun/Assembly-BothStrands.gfa</code>
-</ul>
-This will work on all current 64 bit Linux distributions
-that use Linux kernel 3.2.0 or newer. 
-</ul>
+You have to set the execute permission bit before you can run the executable.
+This can be done for example as follows (replace <code>X.Y.Z</code> consistently 
+with the release you donwloaded):
 
-<p>
-Note that the procedure above does not require root privilege,
-unless some non-default options are used when invoking the
-executable. 
-Those non-default options are, however, necessary
-to achieve maximum performance.
-
-
-
-<h2 id="QuickStartWindows">Windows</h2>
-<ul>
-<li>
-Install 
-<a href="https://docs.microsoft.com/en-us/windows/wsl/install-win10">
-Windows Subsystem for Linux (WSL)</a>.
-<li>Working in a Linux shell created using WSL, follow the directions for Linux above.
-</ul>
-
-<br/>
-<h2 id=QuickDemo>Quick test and demonstration</h2>
-<p>
-You can use the following commands to run a quick test and demonstration
-of the Shasta assembler:
 <pre>
-curl -O -L https://s3-us-west-2.amazonaws.com/lc2019/shasta/ecoli_test/r94_ec_rad2.181119.60x-10kb.fasta.gz
-gunzip r94_ec_rad2.181119.60x-10kb.fasta.gz
-/path/to/shasta_executable --input r94_ec_rad2.181119.60x-10kb.fasta --config Nanopore-May2022
+chmod ugo+x shasta-Linux-X.Y.Z
 </pre>
-The first two commands download and decompress an input fasta file 
-containing Oxford Nanopore reads for <i>E. coli</i>.
-The last command runs a Shasta assembly, which should complete in a few minutes
-on a laptop with at least 8 GB of memory. Assembly output will appear in a
-new directory <code>ShastaRun</code>. See in particular
-<code>ShastaRun/Assembly.fasta</code> and
-<code>ShastaRun/Assembly.gfa</code>.
+
+
+<h3>Downloading input reads for a test assembly</h3>
+<p>
+You can download from
+<a href='https://drive.google.com/file/d/1kso4iDLk5hSeBhUt4fpOVyrGqo3nURfH/view?usp=sharing'>here</a>
+a fasta file that can be used as input for a test assembly. 
+This test covers a 2 Mb region of chromosome 1 for the HG002 human genome
+and was extracted from the 
+<a href=' https://labs.epi2me.io/lc2024_t2t/'>error corrected dataset</a> 
+released by Oxford Nanopore (ONT) in May 2024.
+
+<p>
+Shasta does not accept compressed input files, so you must decompress the <code>fasta.gz</code>
+file before using it as input to Shasta:
+
+<pre>
+gunzip -d LC2024_HERRO_CORRECTED_chr1_34-36.fasta.gz
+</pre>
+
+<h3>Running the test assembly</h3>
+<p>
+Now you are ready to run the test assembly:
+
+<pre>
+./shasta-Linux-0.14.0 --config Nanopore-r10.4.1_e8.2-400bps_sup-Herro-Jan2025 --input LC2024_HERRO_CORRECTED_chr1_34-36.fasta
+</pre>
+
+This will create a directory <code>ShastaRun</code> containing, among other files, 
+the assembly output in <code>fasta</code> and <code>gfa</code> formats,
+<code>Assembly.fasta</code> and <code>Assembly.gfa</code>.
+
+<p>
+The <code>--config</code> option specifies an "assembly configuration" that selects assembly options
+appropriate to a specific type of reads. The assembly configuration used above
+is optimized for Ultra-Long (UL), error corrected reads from the ONT May 2024 data release.
+If you have a different type of reads, see
+<a href='Configurations.html'>this page</a> for a summary of other 
+available assembly configurations.
+
+
 
 <h2>For more information</h2>
 <p>
