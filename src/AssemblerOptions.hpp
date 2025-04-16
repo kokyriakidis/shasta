@@ -294,6 +294,7 @@ public:
     vector<size_t> simplifyMaxLengthVector;
     double peakFinderMinAreaFraction;
     uint64_t peakFinderAreaStartIndex;
+    bool alwaysSave;
 
     // Options that control secondary edges (assembly mode 2 only).
     uint64_t secondaryEdgesMaxSkip;

@@ -503,9 +503,10 @@ void Assembler::writeNavigation(ostream& html) const
 
 
     // Marker graph menu.
-    if(assemblerInfo->assemblyMode != 3) {
+    if((assemblerInfo->assemblyMode != 3) or httpServerData.assemblerOptions->markerGraphOptions.alwaysSave) {
         writeNavigation(html, "Marker graph", {
             {"Local marker graph", "exploreMarkerGraph0?useBubbleReplacementEdges=on"},
+            {"Local marker graph (alternate)", "exploreMarkerGraph1"},
             {"Marker graph vertices", "exploreMarkerGraphVertex"},
             {"Marker graph edges", "exploreMarkerGraphEdge"},
             {"Marker coverage", "exploreMarkerCoverage"},
@@ -739,7 +740,8 @@ void Assembler::accessAllSoft()
     }
 
 
-    if(assemblerInfo->assemblyMode != 3) {
+    // Marker graph. It is not accessed for mode 3, unless --MarkerGraph.alwaysSave is set.
+    if((assemblerInfo->assemblyMode != 3) or httpServerData.assemblerOptions->markerGraphOptions.alwaysSave) {
         try {
             accessMarkerGraphVertices();
         } catch(const exception& e) {

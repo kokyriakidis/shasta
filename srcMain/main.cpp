@@ -1197,8 +1197,20 @@ void shasta::main::mode3Assembly(
             threadCount);
 
     // We no longer need the MarkerGraph vertices.
-    assembler.markerGraph.vertices().remove();
-    assembler.markerGraph.vertexTable.remove();
+    // We can remove them here, unless --MarkerGraph.alwaysSave is in effect,
+    // in which case we also need to complete creation of the marker graph
+    // (at a substantial additional memory cost).
+    if(assemblerOptions.markerGraphOptions.alwaysSave) {
+        assembler.findMarkerGraphReverseComplementVertices(threadCount);
+        assembler.createMarkerGraphEdgesStrict(
+            minPrimaryCoverage,
+            0, threadCount);
+        assembler.findMarkerGraphReverseComplementEdges(threadCount);
+    } else {
+        // This is the standard path.
+        assembler.markerGraph.vertices().remove();
+        assembler.markerGraph.vertexTable.remove();
+    }
 
     // Compute oriented read journeys.
     anchors->computeJourneys(threadCount);

@@ -827,6 +827,12 @@ void AssemblerOptions::addConfigurableOptions()
         "Used in the automatic selection of --MarkerGraph.minCoverage when "
         "--MarkerGraph.minCoverage is set to 0.")
 
+        ("MarkerGraph.alwaysSave",
+        bool_switch(&markerGraphOptions.alwaysSave)->
+        default_value(false),
+        "Always save the marker graph (only effective if --memoryMode filesystem is also used)."
+        "If this is not set, the marker graph is only saved for assembly modes 0 and 2.")
+
         ("MarkerGraph.secondaryEdges.maxSkip",
         value<uint64_t>(&markerGraphOptions.secondaryEdgesMaxSkip)->
         default_value(1000000),
@@ -1435,6 +1441,8 @@ void MarkerGraphOptions::write(ostream& s) const
     s << "crossEdgeCoverageThreshold = " << crossEdgeCoverageThreshold << "\n";
     s << "peakFinder.minAreaFraction = " << peakFinderMinAreaFraction << "\n";
     s << "peakFinder.areaStartIndex = " << peakFinderAreaStartIndex << "\n";
+    s << "alwaysSave = " <<
+        convertBoolToPythonString(alwaysSave) << "\n";
 
     s << "secondaryEdges.maxSkip = " << secondaryEdgesMaxSkip << "\n";
     s << "secondaryEdges.split.errorRateThreshold = " << secondaryEdgesSplitErrorRateThreshold << "\n";
