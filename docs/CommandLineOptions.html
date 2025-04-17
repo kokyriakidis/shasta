@@ -752,6 +752,14 @@ Used in the automatic selection of
 Used in the automatic selection of 
 <code>--MarkerGraph.minCoverage</code> when <code>--MarkerGraph.minCoverage</code> is set to 0.
 
+<tr id='MarkerGraph.alwaysSave'>
+<td><code>--MarkerGraph.alwaysSave</code><td class=centered><code>False</code><td>
+This is a 
+<a href="Configurations.html#BooleanSwitches">Boolean switch</a>.
+If set, the marker graph is saved for all assembly modes.
+Without this option, it is only saved for assembly modes 0 and 2.
+This is only effective if <code>--memoryMode filesystem</code> is also used.
+
 <tr id='MarkerGraph.secondaryEdges.maxSkip'>
 <td><code>--MarkerGraph.secondaryEdges.maxSkip</code><td class=centered><code>1000000</code><td>
 Maximum number of markers skipped by a secondary edge (mode 2 assembly only).
