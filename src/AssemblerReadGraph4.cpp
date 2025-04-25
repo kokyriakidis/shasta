@@ -21,6 +21,8 @@
 #include "Mode3Assembler.hpp"
 #include <iostream>
 #include <vector>
+#include "deduplicate.hpp"
+#include <unordered_set>
 
 using namespace shasta;
 
@@ -1525,46 +1527,125 @@ vector< pair<OrientedReadId, uint64_t> >
 class AlignmentPositionBaseStats{
     public:
         uint64_t positionInRead0 = 0;
+        uint64_t baseOfReadId0 = 0; // Base value (0=A, 1=C, 2=G, 3=T, 4=Gap)
+
         uint64_t totalNumberOfA = 0;
-        std::set<OrientedReadId> orientedReadIdsWithA;
-        std::set<ReadId> readIdsWithA;
-        std::set<uint64_t> alignmentIdsWithA;
         uint64_t totalNumberOfC = 0;
-        std::set<OrientedReadId> orientedReadIdsWithC;
-        std::set<ReadId> readIdsWithC;
-        std::set<uint64_t> alignmentIdsWithC;
         uint64_t totalNumberOfG = 0;
-        std::set<OrientedReadId> orientedReadIdsWithG;
-        std::set<ReadId> readIdsWithG;
-        std::set<uint64_t> alignmentIdsWithG;
-        uint64_t totalNumberOfT = 0; 
-        std::set<OrientedReadId> orientedReadIdsWithT;
-        std::set<ReadId> readIdsWithT;
-        std::set<uint64_t> alignmentIdsWithT;
+        uint64_t totalNumberOfT = 0;
         uint64_t totalNumberOfGap = 0;
-        std::set<OrientedReadId> orientedReadIdsWithGap;
-        std::set<ReadId> readIdsWithGap;
-        std::set<uint64_t> alignmentIdsWithGap;
-        double percentageOfA = 0.;
-        double percentageOfC = 0.;
-        double percentageOfG = 0.;
-        double percentageOfT = 0.;
-        double percentageOfGap = 0.;
         uint64_t totalNumberOfAlignments = 0;
-        uint64_t baseOfReadId0 = 0;
-        uint64_t hetBase1 = 100;
-        uint64_t hetBase2 = 100;
-        std::set<ReadId> hetBase1ReadIds;
-        std::set<OrientedReadId> hetBase1OrientedReadIds;
-        std::set<uint64_t> hetBase1Alignments;
-        std::set<ReadId> hetBase2ReadIds;
-        std::set<OrientedReadId> hetBase2OrientedReadIds;
-        std::set<uint64_t> hetBase2Alignments;
+
+        double percentageOfA = 0.0;
+        double percentageOfC = 0.0;
+        double percentageOfG = 0.0;
+        double percentageOfT = 0.0;
+        double percentageOfGap = 0.0;
+
+        // Use unordered_set for potentially faster insertions/lookups
+        std::unordered_set<shasta::OrientedReadId> orientedReadIdsWithA;
+        std::unordered_set<shasta::OrientedReadId> orientedReadIdsWithC;
+        std::unordered_set<shasta::OrientedReadId> orientedReadIdsWithG;
+        std::unordered_set<shasta::OrientedReadId> orientedReadIdsWithT;
+        std::unordered_set<shasta::OrientedReadId> orientedReadIdsWithGap;
+
+        std::unordered_set<ReadId> readIdsWithA;
+        std::unordered_set<ReadId> readIdsWithC;
+        std::unordered_set<ReadId> readIdsWithG;
+        std::unordered_set<ReadId> readIdsWithT;
+        std::unordered_set<ReadId> readIdsWithGap;
+
+        std::unordered_set<uint64_t> alignmentIdsWithA;
+        std::unordered_set<uint64_t> alignmentIdsWithC;
+        std::unordered_set<uint64_t> alignmentIdsWithG;
+        std::unordered_set<uint64_t> alignmentIdsWithT;
+        std::unordered_set<uint64_t> alignmentIdsWithGap;
+
+        // std::set<OrientedReadId> orientedReadIdsWithA;
+        // std::set<ReadId> readIdsWithA;
+        // std::set<uint64_t> alignmentIdsWithA;
+        // std::set<OrientedReadId> orientedReadIdsWithC;
+        // std::set<ReadId> readIdsWithC;
+        // std::set<uint64_t> alignmentIdsWithC;
+        // std::set<OrientedReadId> orientedReadIdsWithG;
+        // std::set<uint64_t> alignmentIdsWithG;
+        // std::set<OrientedReadId> orientedReadIdsWithT;
+        // std::set<ReadId> readIdsWithT;
+        // std::set<uint64_t> alignmentIdsWithT;
+        // std::set<OrientedReadId> orientedReadIdsWithGap;
+        // std::set<ReadId> readIdsWithGap;
+        // std::set<uint64_t> alignmentIdsWithGap;
+
+        // Fields for heterozygous site analysis
+        uint64_t hetBase1 = 100; // Invalid base value initially
+        uint64_t hetBase2 = 100; // Invalid base value initially
         uint64_t totalNumberOfHetBase1 = 0;
         uint64_t totalNumberOfHetBase2 = 0;
-        double percentageOfHetBase1 = 0.;
-        double percentageOfHetBase2 = 0.;
+        double percentageOfHetBase1 = 0.0;
+        double percentageOfHetBase2 = 0.0;
+
+        std::unordered_set<shasta::OrientedReadId> hetBase1OrientedReadIds;
+        std::unordered_set<shasta::OrientedReadId> hetBase2OrientedReadIds;
+        std::unordered_set<ReadId> hetBase1ReadIds;
+        std::unordered_set<ReadId> hetBase2ReadIds;
+        std::unordered_set<uint64_t> hetBase1Alignments;
+        std::unordered_set<uint64_t> hetBase2Alignments;
+
+
+        // std::set<ReadId> hetBase1ReadIds;
+        // std::set<OrientedReadId> hetBase1OrientedReadIds;
+        // std::set<uint64_t> hetBase1Alignments;
+        // std::set<ReadId> hetBase2ReadIds;
+        // std::set<OrientedReadId> hetBase2OrientedReadIds;
+        // std::set<uint64_t> hetBase2Alignments;
+
+        // // Default constructor
+        // AlignmentPositionBaseStats() = default;
+
 };
+
+
+// Structure to hold data for the phasing threads
+struct PhasingThreadData {
+    // Pointers to assembler data (const access needed in thread)
+    const Assembler* assembler; // Use const Assembler*
+    uint64_t alignmentCount;
+
+    // Parameters needed by the thread function
+    // (Add any other parameters from createReadGraph4withStrandSeparation if needed inside the loop)
+
+    // Thread-local storage for results
+    // Each outer vector is indexed by threadId
+    // Each inner vector<bool> is indexed by alignmentId
+    vector<vector<bool>> threadForbiddenAlignments;
+    vector<vector<bool>> threadFirstPassHetAlignments;
+    vector<vector<bool>> threadAlignmentsConsidered;
+
+    // Mutex for thread-safe cout if debugging is needed inside threads
+    // std::mutex coutMutex; // Uncomment if needed
+
+    PhasingThreadData(const Assembler* asmPtr, size_t threadCount) :
+        assembler(asmPtr),
+        alignmentCount(asmPtr->alignmentData.size())
+     {
+        threadForbiddenAlignments.resize(threadCount);
+        threadFirstPassHetAlignments.resize(threadCount);
+        threadAlignmentsConsidered.resize(threadCount);
+        for(size_t i=0; i<threadCount; ++i) {
+            threadForbiddenAlignments[i].resize(alignmentCount, false);
+            threadFirstPassHetAlignments[i].resize(alignmentCount, false);
+            threadAlignmentsConsidered[i].resize(alignmentCount, false);
+        }
+    }
+};
+// Global pointer for thread access (similar pattern to computeAlignmentsData)
+PhasingThreadData* phasingThreadData = nullptr;
+
+
+class Site {
+    public:
+        std::array<std::set<OrientedReadId>, 2> orientedReads;
+    };
 
 
 
@@ -1590,52 +1671,22 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
     vector<bool> forbiddenAlignments(alignmentCount, false);
+    vector<bool> forbiddenReads(readCount, false);
     vector<uint64_t> firstPassHetAlignments(alignmentCount, false);
+    std::set<ReadId> bridgingReads;
     vector<uint64_t> alignmentsAlreadyConsidered(alignmentCount, false);
+    std::set<ReadId> readIdsPseudoHap1;
+    std::set<ReadId> readIdsPseudoHap2;
+    vector<Site> sites;
 
 
-
-
-
-
-    // // Compute trim.
-    // const uint32_t leftTrim0  = leftTrim(0);
-    // const uint32_t leftTrim1  = leftTrim(1);
-    // const uint32_t rightTrim0 = rightTrim(0);
-    // const uint32_t rightTrim1 = rightTrim(1);
-
-    // // Check for containment.
-    // const bool isContained0 = (leftTrim0<=maxTrim) && (rightTrim0<=maxTrim);
-    // const bool isContained1 = (leftTrim1<=maxTrim) && (rightTrim1<=maxTrim);
-    // if(isContained0 && !isContained1) {
-    //     // 0 is unambiguously contained in 1.
-    //     return AlignmentType::read0IsContained;
-    // }
-    // if(isContained1 && !isContained0) {
-    //     // 1 is unambiguously contained in 0.
-    //     return AlignmentType::read1IsContained;
-    // }
-    // if(isContained0 && isContained1) {
-    //     // Near complete overlap.
-    //     return AlignmentType::ambiguous;
-    // }
-
-
-    // vector<ReadId> sortedReadIds(readCount);
-    // // Sort the reads by length from the longest to the shortest.
-    // for(ReadId readId=0; readId<readCount; readId++) {
-    //     sortedReadIds.push_back(readId);
-    // }
-    // std::sort(sortedReadIds.begin(), sortedReadIds.end(), [&](const ReadId& a, const ReadId& b) {
-    //     return reads->getReadLength(a) > reads->getReadLength(b);
-    // });
 
     // Loop over reads.
     for(ReadId readId=0; readId<readCount; readId++) {
 
-        // if (readId != 856) {
-        //     continue;
-        // }
+        if (readId != 0) {
+            continue;
+        }
 
         cout << "Working on read " << readId << endl;
 
@@ -1825,34 +1876,37 @@ void Assembler::createReadGraph4withStrandSeparation(
                     }
                     cout << endl;
 
-                    cout << "rleAlignmentSequence0: ";
-                    for(uint64_t i=0; i<rleAlignmentSequence0.size(); i++) {
-                        const bool isDifferent = (rleAlignmentSequence0[i] != rleAlignmentSequence1[i]);
-                        if(isDifferent) {
-                            cout << "[";
-                        }
-                        cout << rleAlignmentSequence0[i].character();
-                        if(isDifferent) {
-                            cout << "]";
-                        }
-                    }
-                    cout << endl;
+                    // cout << "rleAlignmentSequence0: ";
+                    // for(uint64_t i=0; i<rleAlignmentSequence0.size(); i++) {
+                    //     const bool isDifferent = (rleAlignmentSequence0[i] != rleAlignmentSequence1[i]);
+                    //     if(isDifferent) {
+                    //         cout << "[";
+                    //     }
+                    //     cout << rleAlignmentSequence0[i].character();
+                    //     if(isDifferent) {
+                    //         cout << "]";
+                    //     }
+                    // }
+                    // cout << endl;
                 
-                    cout << "rleAlignmentSequence1: ";
-                    for(uint64_t i=0; i<rleAlignmentSequence1.size(); i++) {
-                        const bool isDifferent = (rleAlignmentSequence0[i] != rleAlignmentSequence1[i]);
-                        if(isDifferent) {
-                            cout << "[";
-                        }
-                        cout << rleAlignmentSequence1[i].character();
-                        if(isDifferent) {
-                            cout << "]";
-                        }
-                    }
+                    // cout << "rleAlignmentSequence1: ";
+                    // for(uint64_t i=0; i<rleAlignmentSequence1.size(); i++) {
+                    //     const bool isDifferent = (rleAlignmentSequence0[i] != rleAlignmentSequence1[i]);
+                    //     if(isDifferent) {
+                    //         cout << "[";
+                    //     }
+                    //     cout << rleAlignmentSequence1[i].character();
+                    //     if(isDifferent) {
+                    //         cout << "]";
+                    //     }
+                    // }
                     cout << endl;
                     cout << "rawAlignmentSequence0 positionsA start: " << segment.positionsA[0] << endl;
                     cout << "rawAlignmentSequence1 positionsA start: " << segment.positionsA[1] << endl;
                 }
+
+
+
 
                 //
                 //
@@ -1946,7 +2000,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 
                 // When there is an insertion on the orientedReadId1, it will appear as a deletion on the
                 // orientedReadId0. This will mess with the statisticts of the true position on orientedReadId0.
-                // So we need to check if the base in the awAlignmentSequence0 is a gap.
+                // So we need to check if the base in the rawAlignmentSequence0 is a gap.
                 uint64_t actualPositionIndex = 0;
                 uint64_t positionsConsideredInRead0 = 0;
                 for(uint64_t i=0; i<rawAlignmentSequence0.size(); i++) {
@@ -2042,34 +2096,12 @@ void Assembler::createReadGraph4withStrandSeparation(
 
         }
 
-        cout << "Time taken to loop over the alignments: " << std::chrono::duration_cast<std::chrono::nanoseconds>(projectedAlignmentsTime).count() << " ns" << endl;
         cout << "Time taken to decompress alignment: " << std::chrono::duration_cast<std::chrono::nanoseconds>(compressedAlignmentsTime).count() << " ns" << endl;
+        cout << "Time taken to loop do the projectedAlignments: " << std::chrono::duration_cast<std::chrono::nanoseconds>(projectedAlignmentsTime).count() << " ns" << endl;
         cout << "Time taken to loop over segments: " << std::chrono::duration_cast<std::chrono::nanoseconds>(rleLoopsTime).count() << " ns" << endl;
         //return;
 
 
-        //
-        // DEBUGG PRINT TO CHECK SPECIFIC POSITIONS OF THE READ
-        //
-        // cout << "We have found so far those potential het sites: " << endl;
-        // for (const auto& [positionInRead0, positionStats] : positionStatsOnOrientedReadId0) {
-        //     if ((positionInRead0 != 35533) && (positionInRead0 != 35538) && (positionInRead0 != 35535)) {
-        //         continue;
-        //     }
-        //     char bases[] = {'A', 'C', 'G', 'T', '-'};
-        //     cout << "[X][X][X][X][X][X][X][X][X][X][X]" << endl;
-        //     cout << "[X] The readId0 has a base " << bases[positionStats.baseOfReadId0] << " at position " << positionInRead0 << endl;
-        //     cout << "Stats so far for this position: " << endl;
-        //     cout << "Total number of A: " << positionStats.totalNumberOfA << endl;
-        //     cout << "Total number of C: " << positionStats.totalNumberOfC << endl;
-        //     cout << "Total number of G: " << positionStats.totalNumberOfG << endl;
-        //     cout << "Total number of T: " << positionStats.totalNumberOfT << endl;
-        //     cout << "Total number of Gap: " << positionStats.totalNumberOfGap << endl;
-        //     cout << "Total number of alignments: " << positionStats.totalNumberOfAlignments << endl;
-        //     cout << "[X][X][X][X][X][X][X][X][X][X][X]" << endl;
-        // }
-    
-        // cout << "END." << endl;
 
 
 
@@ -2087,7 +2119,7 @@ void Assembler::createReadGraph4withStrandSeparation(
         for (const auto& [positionInRead0, positionStats] : positionStatsOnOrientedReadId0) {
             // Skip positions with insufficient coverage
             // At least ~5x per haplotype
-            if (positionStats.totalNumberOfAlignments < 10) {
+            if (positionStats.totalNumberOfAlignments < 8) {
                 sitesSkippedDueToInsufficientCoverage++;
                 continue;
             }
@@ -2111,7 +2143,7 @@ void Assembler::createReadGraph4withStrandSeparation(
             
             // Check if this is a potential heterozygous site
             // Criteria: top two bases (with highest counts) each represent at least 20% of reads
-            // and together they represent at least 80% of reads
+            // and together they represent at least 70% of reads
             if (baseCounts[0].first > 0 && baseCounts[1].first > 0) {
                 const double firstBasePercentage = double(baseCounts[0].first) / double(positionStats.totalNumberOfAlignments);
                 const uint64_t firstBaseCounts = baseCounts[0].first;
@@ -2119,8 +2151,15 @@ void Assembler::createReadGraph4withStrandSeparation(
                 const uint64_t secondBaseCounts = baseCounts[1].first;
                 const double combinedPercentage = firstBasePercentage + secondBasePercentage;
                 
-                if (firstBasePercentage >= 0.2 && firstBaseCounts >=3 && secondBasePercentage >= 0.2 && secondBaseCounts >=3 && combinedPercentage >= 0.8) {
+                //if (firstBasePercentage >= 0.2 && firstBaseCounts >=3 && secondBasePercentage >= 0.2 && secondBaseCounts >=3 && combinedPercentage >= 0.7) {
+                if (firstBaseCounts >=4 && secondBaseCounts >=4) {
                     // This is a potential heterozygous site
+
+                    // If the base of the readId0 is not one of the top two het bases then we don't want to include it as potential het site
+                    if (positionStats.baseOfReadId0 != baseCounts[0].second && positionStats.baseOfReadId0 != baseCounts[1].second) {
+                        continue;
+                    }
+
                     potentialHetSitesOnOrientedReadId0[positionInRead0] = positionStats;
                     potentialHetSitesOnOrientedReadId0[positionInRead0].hetBase1 = baseCounts[0].second;
                     potentialHetSitesOnOrientedReadId0[positionInRead0].hetBase2 = baseCounts[1].second;
@@ -2210,6 +2249,10 @@ void Assembler::createReadGraph4withStrandSeparation(
         // Loop over the potential heterozygous sites and print them
         char bases[] = {'A', 'C', 'G', 'T', '-'};
         for (const auto& [positionInRead0, positionStats] : potentialHetSitesOnOrientedReadId0) {
+            if (positionStats.hetBase1 == 4 || positionStats.hetBase2 == 4) {
+                // Skip gaps
+                continue;
+            }
             cout << "Potential heterozygous site at position " << positionInRead0 
                 << " in readId " << readId0 << " in strand " << strand0 << ":" << endl
                 << "  Base of readId0: " << bases[positionStats.baseOfReadId0] << endl
@@ -2277,6 +2320,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
             // Check if orientedReadIdsHetBase1 and orientedReadIdsHetBase2 have any common reads
+            // There should NOT be any common reads between the two sets
             // Helper function to check for common elements between sets
             auto hasCommonElements = [](const std::set<OrientedReadId>& set1, 
                 const std::set<OrientedReadId>& set2) -> bool
@@ -2337,359 +2381,1345 @@ void Assembler::createReadGraph4withStrandSeparation(
 
         // Print to verify that we removed the right positions
         if (potentialHetSitesOnOrientedReadId0.size() > 0) {
-            cout << "Found " << potentialHetSitesOnOrientedReadId0.size() << " potential heterozygous sites in readId " << readId0 << endl;
+            cout << "Found " << potentialHetSitesOnOrientedReadId0.size() << " potential heterozygous sites in readId " << readId0 << ", after removing sites with deletions" << endl;
             cout << "Skipped " << sitesSkippedDueToInsufficientCoverage << " sites due to insufficient coverage" << endl;
         } else {
-            cout << "Found no potential heterozygous sites in readId " << readId0 << endl;
+            cout << "Found no potential heterozygous sites in readId " << readId0 << ", after removing sites with deletions" << endl;
             cout << "Skipped " << sitesSkippedDueToInsufficientCoverage << " sites due to insufficient coverage" << endl;
             continue;
         }
 
 
 
-        vector< std::pair< std::set<OrientedReadId>, std::set<OrientedReadId> > > readHaplotypeSetsToKeep;
-        std::set<OrientedReadId> unassignedOrientedReads;
-        double numberOfTimesReadId0DoesNotHaveOneOfTheBasesInHetSites = 0;
-        // Loop over the potential heterozygous sites starting from left to right position in readId0
-        // that's why the potentialHetSitesOnOrientedReadId0 is modelled as a std::map
-        for (const auto& [positionInRead0, positionStats] : potentialHetSitesOnOrientedReadId0) {
-            // Get the number of reads that support this position
-            // const uint64_t numberOfReads = positionStats.totalNumberOfAlignments;
-
-            // Get the two bases that are present at this position
-            const uint64_t currectHetBase1 = positionStats.hetBase1;
-            const uint64_t currectHetBase2 = positionStats.hetBase2;
-
-            // Get the reads that support these bases
-            std::set<OrientedReadId> currectHetReads1 = positionStats.hetBase1OrientedReadIds;
-            std::set<OrientedReadId> currectHetReads2 = positionStats.hetBase2OrientedReadIds;
-            // std::set<ReadId> currectHetReads1 = positionStats.hetBase1ReadIds;
-            // std::set<ReadId> currectHetReads2 = positionStats.hetBase2ReadIds;
-
-            // Get the alignments that support these bases
-            std::set<uint64_t> currectHetReads1Alignments = positionStats.hetBase1Alignments;
-            std::set<uint64_t> currectHetReads2Alignments = positionStats.hetBase2Alignments;
 
 
-            // Check if the reference read belongs to the current read haplotype set pair
-            if (positionStats.baseOfReadId0 == currectHetBase1) {
-                // The reference read belongs to the current read haplotype set pair
-                // We need to add the reference read to the current read haplotype set pair
-                currectHetReads1.insert(orientedReadId0);
-            } else if (positionStats.baseOfReadId0 == currectHetBase2) {
-                // The reference read belongs to the current read haplotype set pair
-                // We need to add the reference read to the current read haplotype set pair
-                currectHetReads2.insert(orientedReadId0);
-            } else {
-                // The reference read does not belong to the current read haplotype set pair
-                numberOfTimesReadId0DoesNotHaveOneOfTheBasesInHetSites++;
-                // TODO: Check if there are other reads supporting that base
-                // TODO: Those reads might belong to another similar copy of the sequence
+        // --- Dynamic Programming for Grouping Compatible Sites ---
+        cout << timestamp << "Starting DP for grouping compatible sites for read " << orientedReadId0 << endl;
+
+        // 0. Prepare sorted list of sites
+        std::vector<std::pair<uint64_t, AlignmentPositionBaseStats>> sortedSites;
+        for (const auto& pair : potentialHetSitesOnOrientedReadId0) {
+            sortedSites.push_back(pair);
+        }
+        // Ensure sites are sorted by position (map iteration order is usually sorted, but explicit sort is safer)
+        std::sort(sortedSites.begin(), sortedSites.end(),
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
+
+        uint64_t N = sortedSites.size();
+        if (N == 0) {
+            cout << "No potential het sites found after filtering for read " << orientedReadId0 << ", skipping DP and subsequent phasing." << endl;
+            cout << "Skipped " << sitesSkippedDueToInsufficientCoverage << " sites due to insufficient coverage" << endl;
+            continue; // Skip to the next readId if no sites
+        } else {
+            cout << "Found " << N << " potential heterozygous sites for DP in readId " << readId0 << endl;
+            cout << "Skipped " << sitesSkippedDueToInsufficientCoverage << " sites due to insufficient coverage" << endl;
+        }
+
+
+        // Define compatibility check function locally (or move to class scope)
+        auto areCompatibleSites =
+            [&](const std::pair<uint64_t, AlignmentPositionBaseStats>& site_pair_i,
+                const std::pair<uint64_t, AlignmentPositionBaseStats>& site_pair_j,
+                const OrientedReadId& targetReadId) -> bool
+        {
+            const AlignmentPositionBaseStats& stats_i = site_pair_i.second;
+            const AlignmentPositionBaseStats& stats_j = site_pair_j.second;
+
+            // --- Check if target read covers both sites informatively ---
+            // Target read must have one of the two identified heterozygous bases at each site
+            // for a meaningful phase comparison relative to the target.
+            bool target_covers_i = (stats_i.baseOfReadId0 == stats_i.hetBase1 || stats_i.baseOfReadId0 == stats_i.hetBase2);
+            bool target_covers_j = (stats_j.baseOfReadId0 == stats_j.hetBase1 || stats_j.baseOfReadId0 == stats_j.hetBase2);
+
+            if (!target_covers_i || !target_covers_j) {
+                // Target read doesn't provide a consistent reference phase across both sites.
+                // cout << "Target read " << targetReadId << " does not cover sites " << site_pair_i.first << " and " << site_pair_j.first << " informatively for relative phasing." << endl;
+                return false;
             }
+            // --- Target read covers both sites informatively ---
 
+            // 1a. Get all reads overlapping site i
+            std::set<OrientedReadId> reads_at_i = stats_i.hetBase1OrientedReadIds;
+            reads_at_i.insert(stats_i.hetBase2OrientedReadIds.begin(), stats_i.hetBase2OrientedReadIds.end());
+            // Add target read since we know it covers informatively
+            reads_at_i.insert(targetReadId);
 
-            
-            // readHaplotypeSetsToKeep.push_back(std::make_pair(currectHetReads1, currectHetReads2));
-            // continue;
+            // 1b. Get all reads overlapping site j
+            std::set<OrientedReadId> reads_at_j = stats_j.hetBase1OrientedReadIds;
+            reads_at_j.insert(stats_j.hetBase2OrientedReadIds.begin(), stats_j.hetBase2OrientedReadIds.end());
+            // Add target read since we know it covers informatively
+            reads_at_j.insert(targetReadId);
 
+            // 2. Find common overlapping reads
+            std::vector<OrientedReadId> commonOverlappingReads;
+            std::set_intersection(reads_at_i.begin(), reads_at_i.end(),
+                                  reads_at_j.begin(), reads_at_j.end(),
+                                  std::back_inserter(commonOverlappingReads));
 
+            bool found_phase_00 = false; // Flag for reads matching target at both sites (Phase 0-0)
+            bool found_phase_11 = false; // Flag for reads differing from target at both sites (Phase 1-1)
 
-
-            // If this is the first het site we meet, we need to add the current read haplotype set pair
-            // to the readHaplotypeSetsToKeep and move on to the next het site
-            if (readHaplotypeSetsToKeep.empty()) {
-                readHaplotypeSetsToKeep.push_back(std::make_pair(currectHetReads1, currectHetReads2));
-                continue;
-            }
-
-            // Get the last read haplotype set pair from the readHaplotypeSetsToKeep
-            auto lastPair = readHaplotypeSetsToKeep.back();
-            const auto& lastHetReads1 = lastPair.first;
-            const auto& lastHetReads2 = lastPair.second;
-
-            // Remove the last element
-            // We removed it because if we manage to find common reads between the last and current
-            // read haplotype sets, we will merge the sets and we will add the new merged set
-            readHaplotypeSetsToKeep.pop_back();
-
-            //
-            // Check if there are common reads between the lastHetReads and currentHetReads
-            //
-
-            //
-            // TODO: Need to check what is happening with those not common reads
-            // TODO: Check if they are not common because they are not lengthy enough?
-            // TODO: or because they do not share the same base in the adjacent het site?
-            //
-
-            // Case1: Common reads between lastHetReads1 and currectHetReads1
-            vector<OrientedReadId> commonReadsBetweenLastHetReads1AndCurrentHetReads1;
-            vector<OrientedReadId> notCommonReadsBetweenLastHetReads1AndCurrentHetReads1;
-            for (const auto& lastHetRead1 : lastHetReads1) {
-                if (std::find(currectHetReads1.begin(), currectHetReads1.end(), lastHetRead1) != currectHetReads1.end()) {
-                    // We have a common read
-                    // Add the common orientedReadId to the common reads vectors
-                    commonReadsBetweenLastHetReads1AndCurrentHetReads1.push_back(lastHetRead1);
-                } else {
-                    notCommonReadsBetweenLastHetReads1AndCurrentHetReads1.push_back(lastHetRead1);
-                }
-            }
-
-            // Case2: Common reads between lastHetReads1 and currectHetReads2
-            vector<OrientedReadId> commonReadsBetweenLastHetReads1AndCurrentHetReads2;
-            vector<OrientedReadId> notCommonReadsBetweenLastHetReads1AndCurrentHetReads2;
-            for (const auto& lastHetRead1 : lastHetReads1) {
-                if (std::find(currectHetReads2.begin(), currectHetReads2.end(), lastHetRead1) != currectHetReads2.end()) {
-                    // We have a common read
-                    // Add the common orientedReadId to the common reads vectors
-                    commonReadsBetweenLastHetReads1AndCurrentHetReads2.push_back(lastHetRead1);
-                } else {
-                    notCommonReadsBetweenLastHetReads1AndCurrentHetReads2.push_back(lastHetRead1);
-                }
-            }
-
-            // Case3: Common reads between lastHetReads2 and nextHetBase1
-            vector<OrientedReadId> commonReadsBetweenLastHetReads2AndCurrentHetReads1;
-            vector<OrientedReadId> notCommonReadsBetweenLastHetReads2AndCurrentHetReads1;
-            for (const auto& lastHetRead2 : lastHetReads2) {
-                if (std::find(currectHetReads1.begin(), currectHetReads1.end(), lastHetRead2) != currectHetReads1.end()) {
-                    // We have a common read
-                    // Add the common orientedReadId to the common reads vectors
-                    commonReadsBetweenLastHetReads2AndCurrentHetReads1.push_back(lastHetRead2);
-                } else {
-                    notCommonReadsBetweenLastHetReads2AndCurrentHetReads1.push_back(lastHetRead2);
-                }
-            }
-
-            // Case4: Common reads between lastHetReads2 and nextHetBase2
-            vector<OrientedReadId> commonReadsBetweenLastHetReads2AndCurrentHetReads2;
-            vector<OrientedReadId> notCommonReadsBetweenLastHetReads2AndCurrentHetReads2;
-            for (const auto& lastHetRead2 : lastHetReads2) {
-                if (std::find(currectHetReads2.begin(), currectHetReads2.end(), lastHetRead2) != currectHetReads2.end()) {
-                    // We have a common read
-                    // Add the common orientedReadId to the common reads vectors
-                    commonReadsBetweenLastHetReads2AndCurrentHetReads2.push_back(lastHetRead2);
-                } else {
-                    notCommonReadsBetweenLastHetReads2AndCurrentHetReads2.push_back(lastHetRead2);
-                }
-            }
-
-            uint64_t numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads1 = commonReadsBetweenLastHetReads1AndCurrentHetReads1.size();
-            uint64_t numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads2 = commonReadsBetweenLastHetReads1AndCurrentHetReads2.size();
-            uint64_t numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads1 = commonReadsBetweenLastHetReads2AndCurrentHetReads1.size();
-            uint64_t numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads2 = commonReadsBetweenLastHetReads2AndCurrentHetReads2.size();
-            cout << "Stats for the common reads between the last and current het sites on current position " << positionInRead0 << " of ReadId " << readId << " :" << endl;
-            cout << "Number of common reads between lastHetReads1 and currectHetReads1: " << numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads1 << endl;
-            cout << "Number of common reads between lastHetReads1 and currectHetReads2: " << numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads2 << endl;
-            cout << "Number of common reads between lastHetReads2 and currectHetReads1: " << numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads1 << endl;
-            cout << "Number of common reads between lastHetReads2 and currectHetReads2: " << numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads2 << endl;
-
-
-
-            // If we have no common reads between the 2 adjacent het sites
-            // we should add lastHetRead and currentHetRead sets without modifying them
-            // and then move to the next het site
-            bool noCommonReads = (numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads1 == 0 && numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads2 == 0 && numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads1 == 0 && numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads2 == 0);
-            if (noCommonReads) {
-                readHaplotypeSetsToKeep.push_back(std::make_pair(lastHetReads1, lastHetReads2));
-                readHaplotypeSetsToKeep.push_back(std::make_pair(currectHetReads1, currectHetReads2));
-                continue;
-            }
-
-            //
-            // If we reached this part it means that 
-            // we have common reads between the 2 adjacent het sites
-            // and we need to merge the sets of reads
-            // 
-
-            // Create a new set for the merged reads
-            std::set<OrientedReadId> mergedReadsHap1;
-            std::set<OrientedReadId> mergedReadsHap2;
-
-            // Find the combination with the most common reads
-            bool managedToPhaseHetSites = false;
-
-            // diploidBayesianPhase uses a Bayesian model to evaluate the phasing of two bubbles relative to each other.
-            uint64_t m00 = numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads1;
-            uint64_t m01 = numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads2;
-            uint64_t m10 = numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads1;
-            uint64_t m11 = numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads2;
-            const array<array<uint64_t, 2>, 2> matrix = {m00, m01, m10, m11};
-            double logPin, logPout;
-            double epsilon = 0.1;
-            tie(logPin, logPout) = diploidBayesianPhase(matrix, epsilon);
-
-            cout << "logPin " << logPin << " logPout " << logPout << endl;
-            
-            double minLogP = 20;
-            const bool isInPhase    = (logPin - logPout) >= minLogP;
-            const bool isOutOfPhase = (logPout - logPin) >= minLogP;
-
-            if (isInPhase) {
-                // loop over commonReadsBetweenLastHetReads1AndCurrentHetReads1
-                for (const auto& commonRead : commonReadsBetweenLastHetReads1AndCurrentHetReads1) {
-                    mergedReadsHap1.insert(commonRead);
-                }
-                // loop over commonReadsBetweenLastHetReads2AndCurrentHetReads2
-                for (const auto& commonRead : commonReadsBetweenLastHetReads2AndCurrentHetReads2) {
-                    mergedReadsHap2.insert(commonRead);
+            // 3. Check phase consistency for each common read relative to target 
+            //    and also evidence for both phase patterns
+            for (const auto& read : commonOverlappingReads) {
+                // Determine phase at site i (0: matches target, 1: differs from target, -1: unknown/not informative)
+                int phase_i = -1;
+                uint64_t allele_at_i = 100; // Invalid allele
+                if (stats_i.hetBase1OrientedReadIds.count(read)) {
+                    allele_at_i = stats_i.hetBase1;
+                } else if (stats_i.hetBase2OrientedReadIds.count(read)) {
+                    allele_at_i = stats_i.hetBase2;
                 }
 
-                // mergedReadsHap1.insert(lastHetReads1.begin(), lastHetReads1.end());
-                // mergedReadsHap1.insert(currectHetReads1.begin(), currectHetReads1.end());
-
-                // mergedReadsHap2.insert(lastHetReads2.begin(), lastHetReads2.end());
-                // mergedReadsHap2.insert(currectHetReads2.begin(), currectHetReads2.end());
-
-                if (m00 >=3 and m11 >=3) {
-                    managedToPhaseHetSites = true;
-                }
-                
-            } else if (isOutOfPhase) {
-                // loop over commonReadsBetweenLastHetReads1AndCurrentHetReads1
-                for (const auto& commonRead : commonReadsBetweenLastHetReads1AndCurrentHetReads2) {
-                    mergedReadsHap1.insert(commonRead);
-                }
-                // loop over commonReadsBetweenLastHetReads2AndCurrentHetReads2
-                for (const auto& commonRead : commonReadsBetweenLastHetReads2AndCurrentHetReads1) {
-                    mergedReadsHap2.insert(commonRead);
-                }
-
-                // mergedReadsHap1.insert(lastHetReads1.begin(), lastHetReads1.end());
-                // mergedReadsHap1.insert(currectHetReads2.begin(), currectHetReads2.end());
-
-                // mergedReadsHap2.insert(lastHetReads2.begin(), lastHetReads2.end());
-                // mergedReadsHap2.insert(currectHetReads1.begin(), currectHetReads1.end());
-
-                if (m01 >=3 and m10 >=3) {
-                    managedToPhaseHetSites = true;
-                }
-            }
-
-            if (managedToPhaseHetSites) {
-                // Check if orientedReadIdsHetBase1 and orientedReadIdsHetBase2 have any common reads
-                // Helper function to check for common elements between sets
-                auto hasCommonElements = [](const std::set<OrientedReadId>& set1, 
-                    const std::set<OrientedReadId>& set2) -> bool
-                {
-                    // Use the smaller set for iteration
-                    const auto& smaller = (set1.size() < set2.size()) ? set1 : set2;
-                    const auto& larger = (set1.size() < set2.size()) ? set2 : set1;
-
-                    for (const auto& elem : smaller) {
-                        if (larger.find(elem) != larger.end()) {
-                            return true;  // Found common element
-                        }
+                if (allele_at_i <= 4) { // Is the allele valid (A,C,G,T,-)?
+                    if (allele_at_i == stats_i.baseOfReadId0) {
+                        phase_i = 0; // Matches the base of the target read
+                    } else {
+                        phase_i = 1; // Differs from the base of the target read
                     }
-                    return false;  // No common elements
-                };
+                } // else phase_i remains -1 (read doesn't support either het allele at this site)
 
-                SHASTA_ASSERT(hasCommonElements(mergedReadsHap1, mergedReadsHap2) == false);
+                // Determine phase at site j (0: matches target, 1: differs from target, -1: unknown/not informative)
+                int phase_j = -1;
+                uint64_t allele_at_j = 100;
+                if (stats_j.hetBase1OrientedReadIds.count(read)) {
+                    allele_at_j = stats_j.hetBase1;
+                } else if (stats_j.hetBase2OrientedReadIds.count(read)) {
+                    allele_at_j = stats_j.hetBase2;
+                }
+
+                if (allele_at_j <= 4) {
+                    if (allele_at_j == stats_j.baseOfReadId0) {
+                        phase_j = 0; // Matches target
+                    } else {
+                        phase_j = 1; // Differs from target
+                    } 
+                } // else phase_j remains -1
+
+                // Check for inconsistency or update flags if consistent and informative
+                if (phase_i != -1 && phase_j != -1) { // Both phases defined relative to target for this read
+                    if (phase_i != phase_j) {
+                        // Found a read with inconsistent phasing relative to the target across the two sites.
+                        // cout << "Incompatibility: Read " << read << " phase " << phase_i << " at site " << site_pair_i.first << ", phase " << phase_j << " at site " << site_pair_j.first << " relative to target." << endl;
+                        return false; // Inconsistent phasing detected
+                    } else if (phase_i == 0) { // phase_i == 0 && phase_j == 0
+                        found_phase_00 = true; // Found evidence for 0-0 linkage relative to target
+                    } else { // phase_i == 1 && phase_j == 1
+                        found_phase_11 = true; // Found evidence for 1-1 linkage relative to target
+                    }
+                } else if (phase_i == -1 || phase_j == -1) {
+                    // cout << "Read " << read << " is not informative for phasing relative to target at site " << site_pair_i.first << " or site " << site_pair_j.first << "." << endl;
+                    return false; // Inconsistent phasing detected
+                }
+
             }
 
-            
+            // Sites are compatible *relative to the target* only if:
+            // 1. No common reads showed inconsistent phasing between positions i and j (phase_i != phase_j).
+            // 2. There was at least one read supporting the 0-0 linkage relative to target.
+            // 3. There was at least one read supporting the 1-1 linkage relative to target.
+            // cout << "Compatibility check for sites " << site_pair_i.first << " and " << site_pair_j.first << " relative to target " << targetReadId << ": found_phase_00=" << found_phase_00 << ", found_phase_11=" << found_phase_11 << endl;
+            return found_phase_00 && found_phase_11;
+
+        };
 
 
-            // We managed to phase the het sites
-            // Modify the read sets of both sites so that they have the up to date merged read sets
-            if (managedToPhaseHetSites) {
-                readHaplotypeSetsToKeep.push_back(std::make_pair(mergedReadsHap1, mergedReadsHap2));
-                continue;
+        // 1. Initialize DP table and parent pointers
+        std::vector<uint64_t> LCG(N, 1); // LCG[i] = size of largest compatible group ending at i
+        std::vector<int64_t> parent(N, -1); // parent[i] = index j that gave the max LCG[i]
+
+        // 2. Fill DP table using recurrence relation: LCG(i) = max_{j<i, S[j]<->S[i]} {LCG(j)} + 1
+        for (uint64_t i = 1; i < N; ++i) {
+            for (uint64_t j = 0; j < i; ++j) {
+                // Check compatibility S[j] <-> S[i]
+                if (areCompatibleSites(sortedSites[i], sortedSites[j], orientedReadId0)) {
+                    if (LCG[j] + 1 > LCG[i]) {
+                        LCG[i] = LCG[j] + 1;
+                        parent[i] = j;
+                    }
+                }
             }
+        }
 
-            // We did not manage to phase the het sites
-            if (!managedToPhaseHetSites) {
-                readHaplotypeSetsToKeep.push_back(std::make_pair(lastHetReads1, lastHetReads2));
-                readHaplotypeSetsToKeep.push_back(std::make_pair(currectHetReads1, currectHetReads2));
-                continue;
+        // 3. Traceback for grouping sites
+        std::vector<bool> isAssigned(N, false);
+
+        // Create pairs of (LCG value, index) to sort by LCG value descending
+        std::vector<std::pair<uint64_t, size_t>> sortedLCGIndices;
+        for(size_t i = 0; i < N; ++i) {
+            if (LCG[i] > 1) { // Only consider sites that are part of a group (they have LCG > 1)
+                sortedLCGIndices.push_back({LCG[i], i});
             }
+        }
+        // Sort descending by LCG value
+        std::sort(sortedLCGIndices.rbegin(), sortedLCGIndices.rend()); 
+
+        cout << "DP results for read " << orientedReadId0 << ": LCG values > 1:" << endl;
+        for(const auto& p : sortedLCGIndices) {
+             cout << "  Site Index: " << p.second << " (Pos: " << sortedSites[p.second].first << "), LCG: " << p.first << endl;
+        }
+
+        std::set<OrientedReadId> tempInPhaseReads;
+        std::set<OrientedReadId> excludedOutOfPhaseReads;
+        std::set<OrientedReadId> involvedReadsInInformativeSites;
+        std::set<OrientedReadId> finalInPhaseReads;
+
+        for (const auto& lcgPair : sortedLCGIndices) {
+            size_t current_i = lcgPair.second;
+
+            if (!isAssigned[current_i]) {
+                std::vector<uint64_t> newClusterPositions; // Keep this for informativeSites logic later if needed
+                std::vector<size_t> newClusterIndices;    // Store indices for phasing logic
+                int traceIndex = current_i;
+                cout << "Starting traceback for cluster ending at index " << current_i << " (Pos: " << sortedSites[current_i].first << ") with LCG " << LCG[current_i] << endl;
+
+                while (traceIndex != -1 && !isAssigned[traceIndex]) {
+
+                    const AlignmentPositionBaseStats& currentIndexStats = sortedSites[traceIndex].second;
+                    uint64_t targetAllele = currentIndexStats.baseOfReadId0;
+                    uint64_t otherAllele = (targetAllele == currentIndexStats.hetBase1) ? currentIndexStats.hetBase2 : currentIndexStats.hetBase1;
+
+                    // 1. Populate involved reads for this site
+                    // Add all reads supporting either heterozygous allele at this site
+                    involvedReadsInInformativeSites.insert(currentIndexStats.hetBase1OrientedReadIds.begin(), currentIndexStats.hetBase1OrientedReadIds.end());
+                    involvedReadsInInformativeSites.insert(currentIndexStats.hetBase2OrientedReadIds.begin(), currentIndexStats.hetBase2OrientedReadIds.end());
+
+                    // 2. Get in-phase and out-of-phase reads *at this specific site index* relative to the target read
+                    // Populate in-phase set (reads with the same allele as the target read at this site)
+                    if (targetAllele == currentIndexStats.hetBase1) {
+                        tempInPhaseReads.insert(currentIndexStats.hetBase1OrientedReadIds.begin(), currentIndexStats.hetBase1OrientedReadIds.end());
+                    } else { // targetAllele must be stats.hetBase2
+                        tempInPhaseReads.insert(currentIndexStats.hetBase2OrientedReadIds.begin(), currentIndexStats.hetBase2OrientedReadIds.end());
+                    }
+                    tempInPhaseReads.insert(orientedReadId0); // The target read is always in phase with itself
+
+                    // Populate out-of-phase set (reads with the other heterozygous allele)
+                    if (otherAllele == currentIndexStats.hetBase1) {
+                        excludedOutOfPhaseReads.insert(currentIndexStats.hetBase1OrientedReadIds.begin(), currentIndexStats.hetBase1OrientedReadIds.end());
+                    } else { // otherAllele must be stats.hetBase2
+                        excludedOutOfPhaseReads.insert(currentIndexStats.hetBase2OrientedReadIds.begin(), currentIndexStats.hetBase2OrientedReadIds.end());
+                    }
+
+                    newClusterPositions.push_back(sortedSites[traceIndex].first); // Store site position
+                    newClusterIndices.push_back(traceIndex); // Store site index
+                    isAssigned[traceIndex] = true;
+                    cout << "  Adding site index " << traceIndex << " (Pos: " << sortedSites[traceIndex].first << ") to compatible group." << endl;
+                    traceIndex = parent[traceIndex];
+
+                }
+
+                std::reverse(newClusterPositions.begin(), newClusterPositions.end()); // Store cluster in positional order
+                std::reverse(newClusterIndices.begin(), newClusterIndices.end());   // Store indices in positional order
+                //siteClusters.push_back(newClusterPositions); // Keep the original structure if needed elsewhere
+                //siteIndexClusters.push_back(newClusterIndices); // Use this for phasing
+                cout << "  Finished constructing of a compatible group with " << newClusterPositions.size() << " sites." << endl;
+            }
+        }
 
 
+        // Find which reads exist only in the tempInPhaseReads set and not in the excludedOutOfPhaseReads set and add them to finalInPhaseReads
+        for (const auto& read : tempInPhaseReads) {
+            if (excludedOutOfPhaseReads.find(read) == excludedOutOfPhaseReads.end()) {
+                finalInPhaseReads.insert(read);
+            }
+        }
+        cout << "Final in-phase reads for read " << orientedReadId0 << ": " << endl;
+        for (const auto& read : finalInPhaseReads) {
+            cout << "  ReadId: " << read.getReadId() << " Strand: " << read.getStrand() << endl;
         }
 
 
 
+
+
+
+        // Loop over all alignments and mark those involving only reads within finalInPhaseReads
+        // Also forbid alignments involving reads in excludedOutOfPhaseReads
+        for(uint64_t alignmentId = 0; alignmentId < alignmentCount; ++alignmentId) {
+            // Skip if already considered to avoid redundant checks or overwriting previous decisions
+            if (alignmentsAlreadyConsidered[alignmentId]) {
+                continue;
+            }
+
+            const AlignmentData& ad = alignmentData[alignmentId];
+            ReadId alnReadId0 = ad.readIds[0];
+            ReadId alnReadId1 = ad.readIds[1];
+            bool isSameStrand = ad.isSameStrand;
+
+            // Create the primary oriented read pair for this alignment
+            OrientedReadId primaryOrientedRead0(alnReadId0, 0);
+            OrientedReadId primaryOrientedRead1(alnReadId1, isSameStrand ? 0 : 1);
+
+            // Create the reverse complement oriented read pair
+            OrientedReadId rcOrientedRead0(alnReadId0, 1);
+            OrientedReadId rcOrientedRead1(alnReadId1, isSameStrand ? 1 : 0);
+
+            // --- Check if any read involved in the alignment is in excludedOutOfPhaseReads ---
+            bool involvesExcludedRead = (finalInPhaseReads.count(primaryOrientedRead0) && excludedOutOfPhaseReads.count(primaryOrientedRead1)) ||
+                                        (finalInPhaseReads.count(primaryOrientedRead1) && excludedOutOfPhaseReads.count(primaryOrientedRead0)) ||
+                                        (finalInPhaseReads.count(rcOrientedRead0) && excludedOutOfPhaseReads.count(rcOrientedRead1)) ||
+                                        (finalInPhaseReads.count(rcOrientedRead1) && excludedOutOfPhaseReads.count(rcOrientedRead0));
+
+            if (involvesExcludedRead) {
+                cout << "Forbidding alignment " << alignmentId << " involving reads: " << alnReadId0 << " and " << alnReadId1 << " because one read is in excludedOutOfPhaseReads." << endl;
+                forbiddenAlignments[alignmentId] = true;
+                alignmentsAlreadyConsidered[alignmentId] = true; // Mark as considered
+                continue; // Skip further checks for this alignment
+            }
+            // --- End check for excluded reads ---
+
+
+            // --- Check if both reads are in finalInPhaseReads (existing logic) ---
+            // Check if both reads in the primary orientation are in finalInPhaseReads
+            bool bothInPhasePrimary = finalInPhaseReads.count(primaryOrientedRead0) &&
+                                      finalInPhaseReads.count(primaryOrientedRead1);
+
+            // Check if both reads in the reverse complement orientation are in finalInPhaseReads
+            bool bothInPhaseRC = finalInPhaseReads.count(rcOrientedRead0) &&
+                                 finalInPhaseReads.count(rcOrientedRead1);
+
+            // If both reads of the alignment (in either orientation pair consistent with the alignment)
+            // are present in the finalInPhaseReads set, mark the alignment.
+            if (bothInPhasePrimary || bothInPhaseRC) {
+                cout << "Marking alignment " << alignmentId << " involving reads: " << alnReadId0 << " and " << alnReadId1 << " as first pass (intra-phase)" << endl;
+                firstPassHetAlignments[alignmentId] = true;
+                alignmentsAlreadyConsidered[alignmentId] = true; // Mark as considered
+            }
+            // --- End check for in-phase reads ---
+        }
+
+
+
+        const long firstPassHetAlignmentsCount = count(firstPassHetAlignments.begin(), firstPassHetAlignments.end(), true);
+        cout << "Found " << firstPassHetAlignmentsCount << " first pass alignments in readId " << readId0 << endl;
+
+
+        
+
+        // return;
+
+        
+
+
+        // // Handle isolated sites (LCG[i] == 1) - criteria (i) from text
+        // std::vector<uint64_t> informativeIsolatedSites;
+        // // Define the threshold for sufficiently high number of reads for an isolated site
+        // // This value might need tuning based on data characteristics.
+        // const uint64_t minReadsPerHetBaseForIsolatedSite = 4; // Example threshold
+        // for(size_t i = 0; i < N; ++i) {
+        //     if (!isAssigned[i]) { // If not part of any cluster found above (i.e., LCG[i] == 1 or part of a smaller cluster already processed)
+        //         // Check criteria (i): "An isolated site is considered informative only if it is supported by a sufficiently high number of reads"
+        //         const AlignmentPositionBaseStats& stats = sortedSites[i].second;
+        //         // Total reads supporting the two major alleles at this site
+        //         uint64_t supportingReadsHet1 = stats.totalNumberOfHetBase1;
+        //         uint64_t supportingReadsHet2 = stats.totalNumberOfHetBase2;
+        //         if (supportingReadsHet1 >= minReadsPerHetBaseForIsolatedSite && supportingReadsHet2 >= minReadsPerHetBaseForIsolatedSite) {
+        //             informativeIsolatedSites.push_back(sortedSites[i].first);
+        //             // cout << "Site index " << i << " (Pos: " << sortedSites[i].first << ") is isolated but informative (support=" << supportingReads << " >= " << minReadsForIsolatedSite << ")" << endl;
+        //         } else {
+        //             // cout << "Site index " << i << " (Pos: " << sortedSites[i].first << ") is isolated and non-informative (support=" << supportingReads << " < " << minReadsForIsolatedSite << ")" << endl;
+        //         }
+        //     }
+        // }
+
+
+        
+
+
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // // --- Global Phasing Implementation Starts ---
+
+        // // 1. Identify Involved Reads
+        // std::set<OrientedReadId> involvedReads;
+        // bool read0Involved = false;
+        // for (const auto& [pos, stats] : potentialHetSitesOnOrientedReadId0) {
+        //     involvedReads.insert(stats.hetBase1OrientedReadIds.begin(), stats.hetBase1OrientedReadIds.end());
+        //     involvedReads.insert(stats.hetBase2OrientedReadIds.begin(), stats.hetBase2OrientedReadIds.end());
+        //     if (stats.baseOfReadId0 == stats.hetBase1 || stats.baseOfReadId0 == stats.hetBase2) {
+        //         read0Involved = true;
+        //     }
+        // }
+        // if (read0Involved) {
+        //     // Check if orientedReadId0 actually exists in the alignment data (should always be true here)
+        //     // and add it if it contributed to any het site definition.
+        //     involvedReads.insert(orientedReadId0);
+        // }
+
+        // std::set<OrientedReadId> finalHaplotype1Reads;
+        // std::set<OrientedReadId> finalHaplotype2Reads;
+
+        // if (involvedReads.empty() || potentialHetSitesOnOrientedReadId0.empty()) {
+        //     cout << "No involved reads or sites for global phasing for read " << orientedReadId0 << endl;
+        //     // If no reads/sites, haplotypes remain empty. Skip graph building/partitioning.
+        // } else {
+        //     cout << "Starting global phasing for read " << orientedReadId0 << " with " << involvedReads.size() << " involved reads and " << potentialHetSitesOnOrientedReadId0.size() << " sites." << endl;
+
+        //     // Create mapping for graph vertices
+        //     std::map<OrientedReadId, size_t> readToIndex;
+        //     std::vector<OrientedReadId> indexToRead;
+        //     size_t currentIndex = 0;
+        //     for(const auto& read : involvedReads) {
+        //         readToIndex[read] = currentIndex;
+        //         indexToRead.push_back(read);
+        //         currentIndex++;
+        //     }
+        //     size_t numInvolvedReads = involvedReads.size();
+
+        //     // 2. Build Phasing Graph
+        //     // Use boost::adjacency_list. Edge property stores the weight.
+        //     using PhasingGraph = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS, boost::no_property, boost::property<boost::edge_weight_t, double>>;
+        //     PhasingGraph phasingGraph(numInvolvedReads);
+        //     // Get the property map for weights
+        //     auto weightMap = boost::get(boost::edge_weight, phasingGraph);
+
+        //     // Use a map to accumulate weights between pairs of nodes before adding edges
+        //     // Key: pair of indices (u, v) where u < v. Value: accumulated weight.
+        //     std::map<std::pair<size_t, size_t>, double> edgeWeightSums;
+
+        //     for (const auto& [positionInRead0, stats] : potentialHetSitesOnOrientedReadId0) {
+        //         const auto& reads1 = stats.hetBase1OrientedReadIds;
+        //         const auto& reads2 = stats.hetBase2OrientedReadIds;
+        //         uint64_t allele1 = stats.hetBase1;
+        //         uint64_t allele2 = stats.hetBase2;
+
+        //         // Combine reads covering this site (including read0 if applicable and involved)
+        //         std::set<OrientedReadId> readsAtSite;
+        //         // Add reads supporting allele 1 if they are in the overall involved set
+        //         for(const auto& r : reads1) {
+        //             if (involvedReads.count(r)) readsAtSite.insert(r);
+        //         }
+        //         // Add reads supporting allele 2 if they are in the overall involved set
+        //         for(const auto& r : reads2) {
+        //             if (involvedReads.count(r)) readsAtSite.insert(r);
+        //         }
+        //         // Add read0 if it supports an allele and is in the overall involved set
+        //         if ((stats.baseOfReadId0 == allele1 || stats.baseOfReadId0 == allele2) && involvedReads.count(orientedReadId0)) {
+        //             readsAtSite.insert(orientedReadId0);
+        //         }
+
+
+        //         // Iterate through pairs of reads covering this site
+        //         for (auto itA = readsAtSite.begin(); itA != readsAtSite.end(); ++itA) {
+        //             auto itB = itA;
+        //             std::advance(itB, 1); // Start B after A
+        //             for (; itB != readsAtSite.end(); ++itB) {
+        //                 const OrientedReadId& readA = *itA;
+        //                 const OrientedReadId& readB = *itB;
+
+        //                 // Determine allele for readA at this site
+        //                 uint64_t alleleA = 100; // Use an invalid value initially
+        //                 if (readA == orientedReadId0) alleleA = stats.baseOfReadId0;
+        //                 else if (reads1.count(readA)) alleleA = allele1;
+        //                 else if (reads2.count(readA)) alleleA = allele2;
+
+        //                 // Determine allele for readB at this site
+        //                 uint64_t alleleB = 100;
+        //                 if (readB == orientedReadId0) alleleB = stats.baseOfReadId0;
+        //                 else if (reads1.count(readB)) alleleB = allele1;
+        //                 else if (reads2.count(readB)) alleleB = allele2;
+
+        //                 // Ensure both reads have a valid allele assigned for this site
+        //                 if (alleleA > 4 || alleleB > 4) {
+        //                     // This might happen if a read is in involvedReads but doesn't support either allele at this specific site
+        //                     continue;
+        //                 }
+
+        //                 double weightIncrement = 0;
+        //                 if (alleleA == alleleB) {
+        //                     weightIncrement = +1.0; // Agreement weight
+        //                 } else {
+        //                     weightIncrement = -1.0; // Conflict weight
+        //                 }
+
+        //                 // Get indices and update the weight sum map
+        //                 size_t u = readToIndex[readA];
+        //                 size_t v = readToIndex[readB];
+        //                 if (u > v) std::swap(u, v); // Ensure consistent key order (u < v)
+        //                 edgeWeightSums[{u, v}] += weightIncrement;
+        //             }
+        //         }
+        //     }
+
+        //     // Add edges to the actual BGL graph from the summed weights
+        //     for(const auto& [edgePair, totalWeight] : edgeWeightSums) {
+        //         if (std::abs(totalWeight) > 0) { // Only add edges with non-zero net weight
+        //             auto edge_desc = boost::add_edge(edgePair.first, edgePair.second, phasingGraph);
+        //             // Check if edge was added successfully before setting weight
+        //             if(edge_desc.second) {
+        //                 weightMap[edge_desc.first] = totalWeight;
+        //             } else {
+        //                  // This case should ideally not happen with vecS/vecS if indices are valid
+        //                  cout << "Warning: Failed to add edge between " << edgePair.first << " and " << edgePair.second << endl;
+        //             }
+        //         }
+        //     }
+
+        //     // 3. Partition the Graph (Greedy BFS/Queue-based Heuristic)
+        //     std::set<OrientedReadId> visitedPhasing; // Keep track of assigned reads across components
+        //     std::queue<OrientedReadId> q;
+
+        //     for (const auto& startNodeRead : involvedReads) {
+        //         if (visitedPhasing.count(startNodeRead)) {
+        //             continue; // Already processed in a previous component
+        //         }
+
+        //         // Start phasing a new connected component
+        //         std::set<OrientedReadId> currentHaplotype1;
+        //         std::set<OrientedReadId> currentHaplotype2;
+
+        //         // Start the component with the current unvisited read in Haplotype 1
+        //         currentHaplotype1.insert(startNodeRead);
+        //         visitedPhasing.insert(startNodeRead);
+        //         q.push(startNodeRead);
+
+        //         while(!q.empty()) {
+        //             OrientedReadId currentRead = q.front();
+        //             q.pop();
+        //             size_t u = readToIndex[currentRead];
+        //             bool isInHap1 = currentHaplotype1.count(currentRead); // Check which haplotype currentRead belongs to within this component
+
+        //             // Iterate over neighbors in the phasing graph
+        //             PhasingGraph::adjacency_iterator neighborIt, neighborEnd;
+        //             for (boost::tie(neighborIt, neighborEnd) = boost::adjacent_vertices(u, phasingGraph); neighborIt != neighborEnd; ++neighborIt) {
+        //                 size_t v_idx = *neighborIt;
+        //                 OrientedReadId neighborRead = indexToRead[v_idx];
+
+        //                 if (visitedPhasing.count(neighborRead)) {
+        //                     // Optional: Check for consistency if already assigned in this component run?
+        //                     // bool neighborInHap1 = currentHaplotype1.count(neighborRead);
+        //                     // bool neighborInHap2 = currentHaplotype2.count(neighborRead);
+        //                     // if (neighborInHap1 || neighborInHap2) { ... check consistency ... }
+        //                     continue; // Already assigned globally
+        //                 }
+
+        //                 // Get edge weight
+        //                 auto edge_desc = boost::edge(u, v_idx, phasingGraph);
+        //                 if (!edge_desc.second) continue; // Should exist if adjacent_vertices found it
+        //                 double weight = weightMap[edge_desc.first];
+
+        //                 // Assign neighbor based on connection to currentRead
+        //                 if (weight > 0) { // Agreement: Assign to the same haplotype
+        //                     if (isInHap1) currentHaplotype1.insert(neighborRead);
+        //                     else currentHaplotype2.insert(neighborRead);
+        //                 } else { // Conflict (weight < 0): Assign to the opposite haplotype
+        //                     if (isInHap1) currentHaplotype2.insert(neighborRead);
+        //                     else currentHaplotype1.insert(neighborRead);
+        //                 }
+        //                 visitedPhasing.insert(neighborRead);
+        //                 q.push(neighborRead);
+        //             }
+        //         }
+
+        //         // Merge current component's haplotypes into final sets
+        //         // Simple merge: Add all reads. Assumes first component sets the phase.
+        //         // A more robust merge could check overlaps if final sets are non-empty.
+        //         finalHaplotype1Reads.insert(currentHaplotype1.begin(), currentHaplotype1.end());
+        //         finalHaplotype2Reads.insert(currentHaplotype2.begin(), currentHaplotype2.end());
+        //     }
+
+        //     // Handle reads not connected in the phasing graph (e.g., singletons or pairs with zero net weight)
+        //     // These reads could not be confidently assigned to either haplotype based on the graph structure.
+        //     for(const auto& read : involvedReads) {
+        //         if (!visitedPhasing.count(read)) {
+        //             // Add disconnected/unphased reads to a separate set instead of arbitrarily assigning
+        //             forbiddenReads[read.getReadId()] = true; // Mark as forbidden
+        //             cout << "Warning: Adding disconnected/unphased read " << read.getReadId() << " to forbiddenReads set." << endl;
+        //         }
+        //     }
+        // }
+
+        // // --- Global Phasing Implementation Ends ---
+
+        // // print the finalHaplotype1Reads and finalHaplotype2Reads
+        // cout << "Working on ReadId " << readId0 << " in strand " << strand0 << endl;
+        // cout << "Final Haplotype 1 Reads: " << endl;
+        // for (const auto& read : finalHaplotype1Reads) {
+        //     cout << "ReadId: " << read.getReadId() << " Strand: " << read.getStrand() << endl;
+        // }
+        // cout << "Final Haplotype 2 Reads: " << endl;
+        // for (const auto& read : finalHaplotype2Reads) {
+        //     cout << "ReadId: " << read.getReadId() << " Strand: " << read.getStrand() << endl;
+        // }
+        // // Check if the finalHaplotype1Reads and finalHaplotype2Reads have any common reads
+        // // There should NOT be any common reads between the two sets
+        // // Helper function to check for common elements between sets
+        // auto hasCommonElements = [](const std::set<OrientedReadId>& set1, 
+        //     const std::set<OrientedReadId>& set2) -> bool
+        // {
+        //     // Use the smaller set for iteration
+        //     const auto& smaller = (set1.size() < set2.size()) ? set1 : set2;
+        //     const auto& larger = (set1.size() < set2.size()) ? set2 : set1;
+
+        //     for (const auto& elem : smaller) {
+        //         if (larger.find(elem) != larger.end()) {
+        //             return true;  // Found common element
+        //         }
+        //     }
+        //     return false;  // No common elements
+        // };
+        // SHASTA_ASSERT(hasCommonElements(finalHaplotype1Reads, finalHaplotype2Reads) == false);
+
+        // vector< std::pair< std::set<OrientedReadId>, std::set<OrientedReadId> > > readHaplotypeSetsToKeep;
+        // if (!finalHaplotype1Reads.empty() || !finalHaplotype2Reads.empty()) {
+        //     readHaplotypeSetsToKeep.push_back(std::make_pair(finalHaplotype1Reads, finalHaplotype2Reads));
+        // }
+
+        // // --- Populate the sites vector for this read's haplotype block ---
+        // for (const auto& haplotypeSetPair : readHaplotypeSetsToKeep) {
+        //     // Create a new Site object for the identified haplotype pair
+        //     Site newSite;
+        //     newSite.orientedReads[0] = haplotypeSetPair.first;  // Assign haplotype 1 reads
+        //     newSite.orientedReads[1] = haplotypeSetPair.second; // Assign haplotype 2 reads
+
+        //     // Add the newly created site to the global sites vector
+        //     // Note: This might add duplicate or overlapping site information if multiple reads
+        //     // belong to the same underlying haplotype block. A deduplication step might
+        //     // be needed later depending on how 'sites' is used.
+        //     sites.push_back(newSite);
+        // }
+        // // --- End of populating sites vector ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+        //return;
+
+        // vector< std::pair< std::set<OrientedReadId>, std::set<OrientedReadId> > > readHaplotypeSetsToKeep;
+        // std::set<OrientedReadId> unassignedOrientedReads;
+        // double numberOfTimesReadId0DoesNotHaveOneOfTheBasesInHetSites = 0;
+        // // Loop over the potential heterozygous sites starting from left to right position in readId0
+        // // that's why the potentialHetSitesOnOrientedReadId0 is modelled as a std::map
+        // for (const auto& [positionInRead0, positionStats] : potentialHetSitesOnOrientedReadId0) {
+        //     // Get the number of reads that support this position
+        //     // const uint64_t numberOfReads = positionStats.totalNumberOfAlignments;
+
+        //     // Get the two bases that are present at this position
+        //     const uint64_t currectHetBase1 = positionStats.hetBase1;
+        //     const uint64_t currectHetBase2 = positionStats.hetBase2;
+
+        //     // Get the reads that support these bases
+        //     std::set<OrientedReadId> currectHetReads1 = positionStats.hetBase1OrientedReadIds;
+        //     std::set<OrientedReadId> currectHetReads2 = positionStats.hetBase2OrientedReadIds;
+        //     // std::set<ReadId> currectHetReads1 = positionStats.hetBase1ReadIds;
+        //     // std::set<ReadId> currectHetReads2 = positionStats.hetBase2ReadIds;
+
+        //     // Get the alignments that support these bases
+        //     std::set<uint64_t> currectHetReads1Alignments = positionStats.hetBase1Alignments;
+        //     std::set<uint64_t> currectHetReads2Alignments = positionStats.hetBase2Alignments;
+
+
+        //     // Check if the reference read belongs to the current read haplotype set pair
+        //     if (positionStats.baseOfReadId0 == currectHetBase1) {
+        //         // The reference read belongs to the current read haplotype set pair
+        //         // We need to add the reference read to the current read haplotype set pair
+        //         currectHetReads1.insert(orientedReadId0);
+        //     } else if (positionStats.baseOfReadId0 == currectHetBase2) {
+        //         // The reference read belongs to the current read haplotype set pair
+        //         // We need to add the reference read to the current read haplotype set pair
+        //         currectHetReads2.insert(orientedReadId0);
+        //     } else {
+        //         // The reference read does not belong to the current read haplotype set pair
+        //         numberOfTimesReadId0DoesNotHaveOneOfTheBasesInHetSites++;
+        //         // TODO: Check if there are other reads supporting that base
+        //         // TODO: Those reads might belong to another similar copy of the sequence
+        //     }
+
+
+            
+        //     // readHaplotypeSetsToKeep.push_back(std::make_pair(currectHetReads1, currectHetReads2));
+        //     // continue;
+
+
+
+
+        //     // If this is the first het site we meet, we need to add the current read haplotype set pair
+        //     // to the readHaplotypeSetsToKeep and move on to the next het site
+        //     if (readHaplotypeSetsToKeep.empty()) {
+        //         readHaplotypeSetsToKeep.push_back(std::make_pair(currectHetReads1, currectHetReads2));
+        //         continue;
+        //     }
+
+        //     // Get the last read haplotype set pair from the readHaplotypeSetsToKeep
+        //     auto lastPair = readHaplotypeSetsToKeep.back();
+
+        //     const auto& lastHetReads1 = lastPair.first;
+        //     const auto& lastHetReads2 = lastPair.second;
+
+        //     // Remove the last element
+        //     // We removed it because if we manage to find common reads between the last and current
+        //     // read haplotype sets, we will merge the sets and we will add the new merged set
+        //     readHaplotypeSetsToKeep.pop_back();
+
+        //     //
+        //     // Check if there are common reads between the lastHetReads and currentHetReads
+        //     //
+
+        //     //
+        //     // TODO: Need to check what is happening with those not common reads
+        //     // TODO: Check if they are not common because they are not lengthy enough?
+        //     // TODO: or because they do not share the same base in the adjacent het site?
+        //     //
+
+        //     // Case1: Common reads between lastHetReads1 and currectHetReads1
+        //     vector<OrientedReadId> commonReadsBetweenLastHetReads1AndCurrentHetReads1;
+        //     vector<OrientedReadId> notCommonReadsBetweenLastHetReads1AndCurrentHetReads1;
+        //     for (const auto& lastHetRead1 : lastHetReads1) {
+        //         if (std::find(currectHetReads1.begin(), currectHetReads1.end(), lastHetRead1) != currectHetReads1.end()) {
+        //             // We have a common read
+        //             // Add the common orientedReadId to the common reads vectors
+        //             commonReadsBetweenLastHetReads1AndCurrentHetReads1.push_back(lastHetRead1);
+        //         } else {
+        //             notCommonReadsBetweenLastHetReads1AndCurrentHetReads1.push_back(lastHetRead1);
+        //         }
+        //     }
+
+        //     // Case2: Common reads between lastHetReads1 and currectHetReads2
+        //     vector<OrientedReadId> commonReadsBetweenLastHetReads1AndCurrentHetReads2;
+        //     vector<OrientedReadId> notCommonReadsBetweenLastHetReads1AndCurrentHetReads2;
+        //     for (const auto& lastHetRead1 : lastHetReads1) {
+        //         if (std::find(currectHetReads2.begin(), currectHetReads2.end(), lastHetRead1) != currectHetReads2.end()) {
+        //             // We have a common read
+        //             // Add the common orientedReadId to the common reads vectors
+        //             commonReadsBetweenLastHetReads1AndCurrentHetReads2.push_back(lastHetRead1);
+        //         } else {
+        //             notCommonReadsBetweenLastHetReads1AndCurrentHetReads2.push_back(lastHetRead1);
+        //         }
+        //     }
+
+        //     // Case3: Common reads between lastHetReads2 and nextHetBase1
+        //     vector<OrientedReadId> commonReadsBetweenLastHetReads2AndCurrentHetReads1;
+        //     vector<OrientedReadId> notCommonReadsBetweenLastHetReads2AndCurrentHetReads1;
+        //     for (const auto& lastHetRead2 : lastHetReads2) {
+        //         if (std::find(currectHetReads1.begin(), currectHetReads1.end(), lastHetRead2) != currectHetReads1.end()) {
+        //             // We have a common read
+        //             // Add the common orientedReadId to the common reads vectors
+        //             commonReadsBetweenLastHetReads2AndCurrentHetReads1.push_back(lastHetRead2);
+        //         } else {
+        //             notCommonReadsBetweenLastHetReads2AndCurrentHetReads1.push_back(lastHetRead2);
+        //         }
+        //     }
+
+        //     // Case4: Common reads between lastHetReads2 and nextHetBase2
+        //     vector<OrientedReadId> commonReadsBetweenLastHetReads2AndCurrentHetReads2;
+        //     vector<OrientedReadId> notCommonReadsBetweenLastHetReads2AndCurrentHetReads2;
+        //     for (const auto& lastHetRead2 : lastHetReads2) {
+        //         if (std::find(currectHetReads2.begin(), currectHetReads2.end(), lastHetRead2) != currectHetReads2.end()) {
+        //             // We have a common read
+        //             // Add the common orientedReadId to the common reads vectors
+        //             commonReadsBetweenLastHetReads2AndCurrentHetReads2.push_back(lastHetRead2);
+        //         } else {
+        //             notCommonReadsBetweenLastHetReads2AndCurrentHetReads2.push_back(lastHetRead2);
+        //         }
+        //     }
+
+        //     uint64_t numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads1 = commonReadsBetweenLastHetReads1AndCurrentHetReads1.size();
+        //     uint64_t numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads2 = commonReadsBetweenLastHetReads1AndCurrentHetReads2.size();
+        //     uint64_t numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads1 = commonReadsBetweenLastHetReads2AndCurrentHetReads1.size();
+        //     uint64_t numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads2 = commonReadsBetweenLastHetReads2AndCurrentHetReads2.size();
+        //     cout << "Stats for the common reads between the last and current het sites on current position " << positionInRead0 << " of ReadId " << readId << " :" << endl;
+        //     cout << "Number of common reads between lastHetReads1 and currectHetReads1: " << numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads1 << endl;
+        //     cout << "Number of common reads between lastHetReads1 and currectHetReads2: " << numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads2 << endl;
+        //     cout << "Number of common reads between lastHetReads2 and currectHetReads1: " << numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads1 << endl;
+        //     cout << "Number of common reads between lastHetReads2 and currectHetReads2: " << numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads2 << endl;
+
+
+
+        //     // If we have no common reads between the 2 adjacent het sites
+        //     // we should add lastHetRead and currentHetRead sets without modifying them
+        //     // and then move to the next het site
+        //     bool noCommonReads = (numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads1 == 0 && numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads2 == 0 && numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads1 == 0 && numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads2 == 0);
+        //     if (noCommonReads) {
+        //         readHaplotypeSetsToKeep.push_back(std::make_pair(lastHetReads1, lastHetReads2));
+        //         readHaplotypeSetsToKeep.push_back(std::make_pair(currectHetReads1, currectHetReads2));
+        //         continue;
+        //     }
+
+        //     //
+        //     // If we reached this part it means that 
+        //     // we have common reads between the 2 adjacent het sites
+        //     // and we need to merge the sets of reads
+        //     // 
+
+        //     // Create a new set for the merged reads
+        //     std::set<OrientedReadId> mergedReadsHap1;
+        //     std::set<OrientedReadId> mergedReadsHap2;
+
+        //     // Find the combination with the most common reads
+        //     bool managedToPhaseHetSites = false;
+
+        //     // diploidBayesianPhase uses a Bayesian model to evaluate the phasing of two bubbles relative to each other.
+        //     uint64_t m00 = numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads1;
+        //     uint64_t m01 = numberOfCommonReadsBetweenLastHetReads1AndCurrentHetReads2;
+        //     uint64_t m10 = numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads1;
+        //     uint64_t m11 = numberOfCommonReadsBetweenLastHetReads2AndCurrentHetReads2;
+        //     const array<array<uint64_t, 2>, 2> matrix = {m00, m01, m10, m11};
+        //     double logPin, logPout;
+        //     double epsilon = 0.1;
+        //     tie(logPin, logPout) = diploidBayesianPhase(matrix, epsilon);
+
+        //     cout << "logPin " << logPin << " logPout " << logPout << endl;
+            
+        //     double minLogP = 20;
+        //     const bool isInPhase    = (logPin - logPout) >= minLogP;
+        //     const bool isOutOfPhase = (logPout - logPin) >= minLogP;
+
+        //     if (isInPhase) {
+        //         // loop over commonReadsBetweenLastHetReads1AndCurrentHetReads1
+        //         for (const auto& commonRead : commonReadsBetweenLastHetReads1AndCurrentHetReads1) {
+        //             mergedReadsHap1.insert(commonRead);
+        //         }
+        //         // loop over commonReadsBetweenLastHetReads2AndCurrentHetReads2
+        //         for (const auto& commonRead : commonReadsBetweenLastHetReads2AndCurrentHetReads2) {
+        //             mergedReadsHap2.insert(commonRead);
+        //         }
+
+        //         // mergedReadsHap1.insert(lastHetReads1.begin(), lastHetReads1.end());
+        //         // mergedReadsHap1.insert(currectHetReads1.begin(), currectHetReads1.end());
+
+        //         // mergedReadsHap2.insert(lastHetReads2.begin(), lastHetReads2.end());
+        //         // mergedReadsHap2.insert(currectHetReads2.begin(), currectHetReads2.end());
+
+        //         if (m00 >=3 and m11 >=3) {
+        //             managedToPhaseHetSites = true;
+        //         }
+                
+        //     } else if (isOutOfPhase) {
+        //         // loop over commonReadsBetweenLastHetReads1AndCurrentHetReads1
+        //         for (const auto& commonRead : commonReadsBetweenLastHetReads1AndCurrentHetReads2) {
+        //             mergedReadsHap1.insert(commonRead);
+        //         }
+        //         // loop over commonReadsBetweenLastHetReads2AndCurrentHetReads2
+        //         for (const auto& commonRead : commonReadsBetweenLastHetReads2AndCurrentHetReads1) {
+        //             mergedReadsHap2.insert(commonRead);
+        //         }
+
+        //         // mergedReadsHap1.insert(lastHetReads1.begin(), lastHetReads1.end());
+        //         // mergedReadsHap1.insert(currectHetReads2.begin(), currectHetReads2.end());
+
+        //         // mergedReadsHap2.insert(lastHetReads2.begin(), lastHetReads2.end());
+        //         // mergedReadsHap2.insert(currectHetReads1.begin(), currectHetReads1.end());
+
+        //         if (m01 >=3 and m10 >=3) {
+        //             managedToPhaseHetSites = true;
+        //         }
+        //     }
+
+        //     if (managedToPhaseHetSites) {
+        //         // Check if orientedReadIdsHetBase1 and orientedReadIdsHetBase2 have any common reads
+        //         // Helper function to check for common elements between sets
+        //         auto hasCommonElements = [](const std::set<OrientedReadId>& set1, 
+        //             const std::set<OrientedReadId>& set2) -> bool
+        //         {
+        //             // Use the smaller set for iteration
+        //             const auto& smaller = (set1.size() < set2.size()) ? set1 : set2;
+        //             const auto& larger = (set1.size() < set2.size()) ? set2 : set1;
+
+        //             for (const auto& elem : smaller) {
+        //                 if (larger.find(elem) != larger.end()) {
+        //                     return true;  // Found common element
+        //                 }
+        //             }
+        //             return false;  // No common elements
+        //         };
+
+        //         SHASTA_ASSERT(hasCommonElements(mergedReadsHap1, mergedReadsHap2) == false);
+        //     }
+
+            
+
+
+        //     // We managed to phase the het sites
+        //     // Modify the read sets of both sites so that they have the up to date merged read sets
+        //     if (managedToPhaseHetSites) {
+        //         readHaplotypeSetsToKeep.push_back(std::make_pair(mergedReadsHap1, mergedReadsHap2));
+        //         continue;
+        //     }
+
+        //     // We did not manage to phase the het sites
+        //     if (!managedToPhaseHetSites) {
+        //         readHaplotypeSetsToKeep.push_back(std::make_pair(lastHetReads1, lastHetReads2));
+        //         readHaplotypeSetsToKeep.push_back(std::make_pair(currectHetReads1, currectHetReads2));
+        //         continue;
+        //     }
+
+
+        // }
+
+        // TO DELETE
+        // // Loop over the readHaplotypeSetsToKeep and add the reads to readIdsPseudoHap1 and readIdsPseudoHap2
+        // // readIdsPseudoHap1 and readIdsPseudoHap2 are the reads that belong to the first and second haplotype respectively
+        // for (const auto& readHaplotypeSet : readHaplotypeSetsToKeep) {
+
+        //     const auto& haplotype1Reads = readHaplotypeSet.first;
+        //     const auto& haplotype2Reads = readHaplotypeSet.second;
+
+        //     // check how many reads in haplotype1Reads are already in readIdsPseudoHap1
+        //     uint64_t numberOfHaplotype1ReadsInReadIdsPseudoHap1 = 0;
+        //     for (const auto& haplotype1Read : haplotype1Reads) {
+        //         if (readIdsPseudoHap1.find(haplotype1Read.getReadId()) == readIdsPseudoHap1.end()) {
+        //             numberOfHaplotype1ReadsInReadIdsPseudoHap1++;
+        //         }
+        //     }
+        //     // check how many reads in haplotype1Reads are already in readIdsPseudoHap2
+        //     uint64_t numberOfHaplotype1ReadsInReadIdsPseudoHap2 = 0;
+        //     for (const auto& haplotype1Read : haplotype1Reads) {
+        //         if (readIdsPseudoHap2.find(haplotype1Read.getReadId()) == readIdsPseudoHap2.end()) {
+        //             numberOfHaplotype1ReadsInReadIdsPseudoHap2++;
+        //         }
+        //     }
+        //     // check how many reads in haplotype2Reads are already in readIdsPseudoHap1
+        //     uint64_t numberOfHaplotype2ReadsInReadIdsPseudoHap1 = 0;
+        //     for (const auto& haplotype2Read : haplotype2Reads) {
+        //         if (readIdsPseudoHap1.find(haplotype2Read.getReadId()) == readIdsPseudoHap1.end()) {
+        //             numberOfHaplotype2ReadsInReadIdsPseudoHap1++;
+        //         }
+        //     }
+        //     // check how many reads in haplotype2Reads are already in readIdsPseudoHap2
+        //     uint64_t numberOfHaplotype2ReadsInReadIdsPseudoHap2 = 0;
+        //     for (const auto& haplotype2Read : haplotype2Reads) {
+        //         if (readIdsPseudoHap2.find(haplotype2Read.getReadId()) == readIdsPseudoHap2.end()) {
+        //             numberOfHaplotype2ReadsInReadIdsPseudoHap2++;
+        //         }
+        //     }
+
+        //     if (numberOfHaplotype1ReadsInReadIdsPseudoHap1 == 0 and numberOfHaplotype1ReadsInReadIdsPseudoHap2 == 0 and numberOfHaplotype2ReadsInReadIdsPseudoHap1 == 0 and numberOfHaplotype2ReadsInReadIdsPseudoHap2 == 0) {
+        //         // haplotype1Reads and haplotype2Reads are not in readIdsPseudoHap1 or readIdsPseudoHap2
+        //         // add them to readIdsPseudoHap1 and readIdsPseudoHap2 respectively
+        //         for (const auto& haplotype1Read : haplotype1Reads) {
+        //             readIdsPseudoHap1.insert(haplotype1Read.getReadId());
+        //         }
+        //         for (const auto& haplotype2Read : haplotype2Reads) {
+        //             readIdsPseudoHap2.insert(haplotype2Read.getReadId());
+        //         }
+        //         continue;
+        //     } 
+
+        //     if (numberOfHaplotype1ReadsInReadIdsPseudoHap1 > numberOfHaplotype1ReadsInReadIdsPseudoHap2) {
+        //         for (const auto& haplotype1Read : haplotype1Reads) {
+        //             readIdsPseudoHap1.insert(haplotype1Read.getReadId());
+        //         }
+        //         for (const auto& haplotype2Read : haplotype2Reads) {
+        //             readIdsPseudoHap2.insert(haplotype2Read.getReadId());
+        //         }
+        //         continue;
+        //     } else if (numberOfHaplotype1ReadsInReadIdsPseudoHap1 == 0 and numberOfHaplotype1ReadsInReadIdsPseudoHap2 != 0 and numberOfHaplotype1ReadsInReadIdsPseudoHap2 > numberOfHaplotype2ReadsInReadIdsPseudoHap1) {
+        //         for (const auto& haplotype1Read : haplotype1Reads) {
+        //             readIdsPseudoHap2.insert(haplotype1Read.getReadId());
+        //         }
+        //         for (const auto& haplotype2Read : haplotype2Reads) {
+        //             readIdsPseudoHap1.insert(haplotype2Read.getReadId());
+        //         }
+        //         continue;
+        //     }
+
+        // }
+
+
+
+
+        // XXX
         //
         // We finished looping over the potential heterozygous sites
         // and finished trying to phase all the reads in the haplotype block of readId0
         //
 
+        // Find alignments between reads in different haplotype sets
+        // and mark them as forbidden
+        // This is to ensure that we do not use alignments between reads in different haplotype sets
+        // as they are not reliable
 
-        // Gather together all the reads that managed to get phased in the haplotype block
-        std::set<OrientedReadId> orientedReadIdsThatManagedToGetPhasedInTheHaplotypeBlock;
-        std::set<ReadId> readIdsThatManagedToGetPhasedInTheHaplotypeBlock;
-        for (const auto& readHaplotypeSet : readHaplotypeSetsToKeep) {
-                const std::set<OrientedReadId>& haplotype1OrientedReadIdSet = readHaplotypeSet.first;
-                const std::set<OrientedReadId>& haplotype2OrientedReadIdSet = readHaplotypeSet.second;
-                for (const auto& haplotype1OrientedReadId : haplotype1OrientedReadIdSet) {
-                    readIdsThatManagedToGetPhasedInTheHaplotypeBlock.insert(haplotype1OrientedReadId.getReadId());
-                }
-                for (const auto& haplotype2OrientedReadId : haplotype2OrientedReadIdSet) {
-                    readIdsThatManagedToGetPhasedInTheHaplotypeBlock.insert(haplotype2OrientedReadId.getReadId());
-                }
-                orientedReadIdsThatManagedToGetPhasedInTheHaplotypeBlock.insert(haplotype1OrientedReadIdSet.begin(), haplotype1OrientedReadIdSet.end());
-                orientedReadIdsThatManagedToGetPhasedInTheHaplotypeBlock.insert(haplotype2OrientedReadIdSet.begin(), haplotype2OrientedReadIdSet.end());
-        }
 
-        // find the alignments in readHaplotypeSetsToKeep and forbid them.
-        for (const auto& readHaplotypeSet : readHaplotypeSetsToKeep) {
-            const std::set<OrientedReadId>& haplotype1OrientedReadIdSet = readHaplotypeSet.first;
-            const std::set<OrientedReadId>& haplotype2OrientedReadIdSet = readHaplotypeSet.second;
-            // Helper function to extract ReadIds from a set of OrientedReadIds
-            auto getReadIdsFromOrientedReadIds =
-                [](const std::set<OrientedReadId>& orientedReadIds) -> std::set<ReadId> {
-                std::set<ReadId> readIds;
-                for (const auto& orientedReadId : orientedReadIds) {
-                    readIds.insert(orientedReadId.getReadId());
-                }
-                return readIds;
-            };
-            const std::set<ReadId> haplotype1ReadIdSet = getReadIdsFromOrientedReadIds(haplotype1OrientedReadIdSet);
-            const std::set<ReadId> haplotype2ReadIdSet = getReadIdsFromOrientedReadIds(haplotype2OrientedReadIdSet);
-            for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
-                const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
-                // Get the readIds that the AlignmentData refers to.
-                ReadId thisAlignmentReadId0 = thisAlignmentData.readIds[0];
-                ReadId thisAlignmentReadId1 = thisAlignmentData.readIds[1];
-
-                // Check if the readIds are in the readIdsThatManagedToGetPhasedInTheHaplotypeBlock
-                if (haplotype1ReadIdSet.contains(thisAlignmentReadId0) and haplotype2ReadIdSet.contains(thisAlignmentReadId1)) {
-                    cout << "Removing alignment " << alignmentId << " involving reads: " << thisAlignmentReadId0 << " and " << thisAlignmentReadId1 << endl;
-                    forbiddenAlignments[alignmentId] = true;
-                    alignmentsAlreadyConsidered[alignmentId] = true;
-                    continue;
-                }
-
-                if (haplotype1ReadIdSet.contains(thisAlignmentReadId1) and haplotype2ReadIdSet.contains(thisAlignmentReadId0)) {
-                    cout << "Removing alignment " << alignmentId << " involving reads: " << thisAlignmentReadId0 << " and " << thisAlignmentReadId1 << endl;
-                    forbiddenAlignments[alignmentId] = true;
-                    alignmentsAlreadyConsidered[alignmentId] = true;
-                    continue;
-                }
-
-            }
-        }
         
 
-        // Now we need to check if the reference read is involved in the het sites
-        // If numberOfTimesReadId0DoesNotHaveOneOfTheBasesInHetSites is greater than 0
-        // then the ref read should not align with the reads involved in the het heplotypes.
-        // WE TREAT THE HET SITES AS A STRONG SIGNAL FOR WHETHER THE ALIGNMENT IS GOOD OR NOT.
-        bool isRefReadInvolvedInHetSites = false;
+        // // Iterate over the determined haplotype sets for this block
+        // for (const auto& readHaplotypeSet : readHaplotypeSetsToKeep) {
+        //     const std::set<OrientedReadId>& haplotype1OrientedReadIdSet = readHaplotypeSet.first;
+        //     const std::set<OrientedReadId>& haplotype2OrientedReadIdSet = readHaplotypeSet.second;
 
-        if (potentialHetSitesOnOrientedReadId0.size() > 3) {
-            if(numberOfTimesReadId0DoesNotHaveOneOfTheBasesInHetSites / double(potentialHetSitesOnOrientedReadId0.size()) <= 0.25) {
-                isRefReadInvolvedInHetSites = true;
-            } else {
-                isRefReadInvolvedInHetSites = false;
-            }
-        } else if (potentialHetSitesOnOrientedReadId0.size() <= 3) {
-            if(numberOfTimesReadId0DoesNotHaveOneOfTheBasesInHetSites == 0) {
-                isRefReadInvolvedInHetSites = true;
-            } else {
-                isRefReadInvolvedInHetSites = false;
-            }
-        }
+        //     // Helper function to extract ReadIds from a set of OrientedReadIds
+        //     auto getReadIdsFromOrientedReadIds =
+        //         [](const std::set<OrientedReadId>& orientedReadIds) -> std::set<ReadId> {
+        //         std::set<ReadId> readIds;
+        //         for (const auto& orientedReadId : orientedReadIds) {
+        //             readIds.insert(orientedReadId.getReadId());
+        //         }
+        //         return readIds;
+        //     };
+
+        //     // Get the ReadIds for each haplotype set
+        //     std::set<ReadId> haplotype1ReadIdSet = getReadIdsFromOrientedReadIds(haplotype1OrientedReadIdSet);
+        //     std::set<ReadId> haplotype2ReadIdSet = getReadIdsFromOrientedReadIds(haplotype2OrientedReadIdSet);
+
+        //     // Iterate through all alignments to find those connecting reads across haplotypes
+        //     for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
+        //         // Skip if already marked forbidden or considered
+        //         if (forbiddenAlignments[alignmentId] || alignmentsAlreadyConsidered[alignmentId]) {
+        //             continue;
+        //         }
+
+        //         const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
+        //         // Get the readIds that the AlignmentData refers to.
+        //         ReadId thisAlignmentReadId0 = thisAlignmentData.readIds[0];
+        //         ReadId thisAlignmentReadId1 = thisAlignmentData.readIds[1];
+
+        //         // Skip if either read involved in the alignment is forbidden
+        //         if (forbiddenReads[thisAlignmentReadId0] || forbiddenReads[thisAlignmentReadId1]) {
+        //             // Optionally mark this alignment as forbidden too, if desired
+        //             forbiddenAlignments[alignmentId] = true;
+        //             alignmentsAlreadyConsidered[alignmentId] = true;
+        //             continue;
+        //         }
+
+        //         // Check if the alignment connects a read from haplotype 1 to a read from haplotype 2
+        //         bool crossesHaplotypes =
+        //             (haplotype1ReadIdSet.count(thisAlignmentReadId0) && haplotype2ReadIdSet.count(thisAlignmentReadId1)) ||
+        //             (haplotype1ReadIdSet.count(thisAlignmentReadId1) && haplotype2ReadIdSet.count(thisAlignmentReadId0));
+
+        //         // Check if the alignment connects two reads within the same haplotype
+        //         bool withinHaplotype1 = haplotype1ReadIdSet.count(thisAlignmentReadId0) && haplotype1ReadIdSet.count(thisAlignmentReadId1);
+        //         bool withinHaplotype2 = haplotype2ReadIdSet.count(thisAlignmentReadId0) && haplotype2ReadIdSet.count(thisAlignmentReadId1);
+        //         bool withinSameHaplotype = withinHaplotype1 || withinHaplotype2;
+
+
+        //         if (crossesHaplotypes) {
+        //             // Mark this alignment as forbidden
+        //             cout << "Forbidding alignment " << alignmentId << " involving reads: " << thisAlignmentReadId0 << " and " << thisAlignmentReadId1 << " (cross-haplotype)" << endl;
+        //             forbiddenAlignments[alignmentId] = true;
+        //             alignmentsAlreadyConsidered[alignmentId] = true; // Mark as considered to avoid redundant checks
+        //         } else if (withinSameHaplotype) {
+        //             // Mark this alignment as a first pass het alignment (intra-haplotype)
+        //             // cout << "Marking alignment " << alignmentId << " involving reads: " << thisAlignmentReadId0 << " and " << thisAlignmentReadId1 << " as first pass (intra-haplotype)" << endl;
+        //             firstPassHetAlignments[alignmentId] = true;
+        //             alignmentsAlreadyConsidered[alignmentId] = true; // Mark as considered
+        //         }
+
+        //         // if (
+        //         //     (haplotype1ReadIdSet.count(thisAlignmentReadId0) && !haplotype1ReadIdSet.count(thisAlignmentReadId1)) ||
+        //         //     (haplotype1ReadIdSet.count(thisAlignmentReadId1) && !haplotype1ReadIdSet.count(thisAlignmentReadId0))
+        //         // ) {
+        //         //     firstPassHetAlignments[alignmentId] = true;
+        //         //     alignmentsAlreadyConsidered[alignmentId] = true;
+        //         //     haplotype1ReadIdSet.insert(thisAlignmentReadId0);
+        //         //     haplotype1ReadIdSet.insert(thisAlignmentReadId1);
+        //         //     continue;
+        //         // }
+
+        //         // if (
+        //         //     (haplotype2ReadIdSet.count(thisAlignmentReadId0) && !haplotype2ReadIdSet.count(thisAlignmentReadId1)) ||
+        //         //     (haplotype2ReadIdSet.count(thisAlignmentReadId1) && !haplotype2ReadIdSet.count(thisAlignmentReadId0))
+        //         // ) {
+        //         //     firstPassHetAlignments[alignmentId] = true;
+        //         //     alignmentsAlreadyConsidered[alignmentId] = true;
+        //         //     haplotype2ReadIdSet.insert(thisAlignmentReadId0);
+        //         //     haplotype2ReadIdSet.insert(thisAlignmentReadId1);
+        //         //     continue;
+        //         // }
+
+
+
+        //     }
+        // }
+
+
+
+        
+        // // Iterate over the determined haplotype sets for this block
+        // for (const auto& readHaplotypeSet : readHaplotypeSetsToKeep) {
+        //     const std::set<OrientedReadId>& haplotype1OrientedReadIdSet = readHaplotypeSet.first;
+        //     const std::set<OrientedReadId>& haplotype2OrientedReadIdSet = readHaplotypeSet.second;
+
+        //     // Helper function to extract ReadIds from a set of OrientedReadIds
+        //     auto getReadIdsFromOrientedReadIds =
+        //         [](const std::set<OrientedReadId>& orientedReadIds) -> std::set<ReadId> {
+        //         std::set<ReadId> readIds;
+        //         for (const auto& orientedReadId : orientedReadIds) {
+        //             readIds.insert(orientedReadId.getReadId());
+        //         }
+        //         return readIds;
+        //     };
+
+        //     // Get the ReadIds for each haplotype set
+        //     std::set<ReadId> haplotype1ReadIdSet = getReadIdsFromOrientedReadIds(haplotype1OrientedReadIdSet);
+        //     std::set<ReadId> haplotype2ReadIdSet = getReadIdsFromOrientedReadIds(haplotype2OrientedReadIdSet);
+
+        //     std::set<ReadId> connectsToHap1;
+        //     std::set<ReadId> connectsToHap2;
+
+        //     std::set<ReadId> addedToHap1;
+        //     std::set<ReadId> addedToHap2;
+
+        //     for (uint64_t alignmentId = 0; alignmentId < alignmentCount; ++alignmentId) {
+        //         // Optional: Skip forbidden alignments
+        //         if (!forbiddenAlignments.empty() && forbiddenAlignments[alignmentId]) {
+        //              continue;
+        //         }
+
+        //         if (alignmentsAlreadyConsidered[alignmentId]) {
+        //             continue;
+        //         }
+        
+        //         const AlignmentData& aln = alignmentData[alignmentId];
+        //         ReadId readA = aln.readIds[0];
+        //         ReadId readB = aln.readIds[1];
+        
+        //         // Optional: Skip if reads themselves are forbidden
+        //         if (!forbiddenReads.empty() && (forbiddenReads[readA] || forbiddenReads[readB])) {
+        //             continue;
+        //         }
+        
+        //         bool aInHap1 = haplotype1ReadIdSet.count(readA);
+        //         bool bInHap1 = haplotype1ReadIdSet.count(readB);
+        //         bool aInHap2 = haplotype2ReadIdSet.count(readA);
+        //         bool bInHap2 = haplotype2ReadIdSet.count(readB);
+
+        //         if(aInHap1 && !bInHap1 && !bInHap2 && !addedToHap1.count(readB) && !addedToHap2.count(readB)) {
+        //             // firstPassHetAlignments[alignmentId] = true;
+        //             // alignmentsAlreadyConsidered[alignmentId] = true;
+        //             addedToHap1.insert(readB);
+        //         } 
+        //         else if(bInHap1 && !aInHap1 && !aInHap2 && !addedToHap1.count(readA) && !addedToHap2.count(readA)) {
+        //             // firstPassHetAlignments[alignmentId] = true;
+        //             // alignmentsAlreadyConsidered[alignmentId] = true;
+        //             addedToHap1.insert(readA);
+        //         }
+        //         else if(aInHap2 && !bInHap1 && !bInHap2 && !addedToHap1.count(readB) && !addedToHap2.count(readB)) {
+        //             // firstPassHetAlignments[alignmentId] = true;
+        //             // alignmentsAlreadyConsidered[alignmentId] = true;
+        //             addedToHap2.insert(readB);
+        //         } 
+        //         else if(bInHap2 && !aInHap1 && !aInHap2 && !addedToHap1.count(readA) && !addedToHap2.count(readA)) {
+        //             // firstPassHetAlignments[alignmentId] = true;
+        //             // alignmentsAlreadyConsidered[alignmentId] = true;
+        //             addedToHap2.insert(readA);
+        //         }
+        
+        //         // Record which reads connect to which haplotype set via this alignment
+        //         if (aInHap1) connectsToHap1.insert(readB);
+        //         if (bInHap1) connectsToHap1.insert(readA);
+        //         if (aInHap2) connectsToHap2.insert(readB);
+        //         if (bInHap2) connectsToHap2.insert(readA);
+        //     }
+
+        //     // Find the intersection: reads connected to BOTH Hap1 and Hap2
+        //     std::set_intersection(
+        //         connectsToHap1.begin(), connectsToHap1.end(),
+        //         connectsToHap2.begin(), connectsToHap2.end(),
+        //         std::inserter(bridgingReads, bridgingReads.begin())
+        //     );
+
+
+        //     // --- New loop to forbid alignments based on addedToHap1/addedToHap2 ---
+        //     // Iterate through all alignments again to enforce new forbidden connections
+        //     for (uint64_t alignmentId = 0; alignmentId < alignmentCount; ++alignmentId) {
+        //         // Skip if already forbidden
+        //         if (!forbiddenAlignments.empty() && forbiddenAlignments[alignmentId]) {
+        //             continue;
+        //         }
+
+        //         if (alignmentsAlreadyConsidered[alignmentId]) {
+        //             continue;
+        //         }
+
+        //         const AlignmentData& aln = alignmentData[alignmentId];
+        //         ReadId readA = aln.readIds[0];
+        //         ReadId readB = aln.readIds[1];
+
+        //         // Check if alignment connects a read tentatively added to Hap1 with a read in original Hap2
+        //         bool added1_vs_orig2 = (addedToHap1.count(readA) && haplotype2ReadIdSet.count(readB)) ||
+        //                                (addedToHap1.count(readB) && haplotype2ReadIdSet.count(readA));
+
+        //         // Check if alignment connects a read tentatively added to Hap2 with a read in original Hap1
+        //         bool added2_vs_orig1 = (addedToHap2.count(readA) && haplotype1ReadIdSet.count(readB)) ||
+        //                                (addedToHap2.count(readB) && haplotype1ReadIdSet.count(readA));
+
+        //         // Check if alignment connects a read tentatively added to Hap1 with a read in original Hap1
+        //         bool added1_vs_orig1 = (addedToHap1.count(readA) && haplotype1ReadIdSet.count(readB)) ||
+        //                                (addedToHap1.count(readB) && haplotype1ReadIdSet.count(readA));
+
+        //         // Check if alignment connects a read tentatively added to Hap2 with a read in original Hap2
+        //         bool added2_vs_orig2 = (addedToHap2.count(readA) && haplotype2ReadIdSet.count(readB)) ||
+        //                                (addedToHap2.count(readB) && haplotype2ReadIdSet.count(readA));
+
+        //         if (added1_vs_orig2) {
+        //             // This alignment connects a read tentatively assigned to Hap1 extension
+        //             // with a read from the original Hap2 set. Forbid it.
+        //             cout << "Forbidding alignment " << alignmentId << " involving reads: " << readA << " and " << readB << " (addedToHap1 vs haplotype2ReadIdSet)" << endl;
+        //             forbiddenAlignments[alignmentId] = true;
+        //             // If this alignment was previously marked as firstPassHet, unmark it.
+        //             if (firstPassHetAlignments[alignmentId]) {
+        //                 firstPassHetAlignments[alignmentId] = false;
+        //             }
+        //         }
+
+        //         if (added2_vs_orig1) {
+        //             // This alignment connects a read tentatively assigned to Hap2 extension
+        //             // with a read from the original Hap1 set. Forbid it.
+        //             cout << "Forbidding alignment " << alignmentId << " involving reads: " << readA << " and " << readB << " (addedToHap2 vs haplotype1ReadIdSet)" << endl;
+        //             forbiddenAlignments[alignmentId] = true;
+        //              // If this alignment was previously marked as firstPassHet, unmark it.
+        //             if (firstPassHetAlignments[alignmentId]) {
+        //                 firstPassHetAlignments[alignmentId] = false;
+        //             }
+        //         }
+
+        //         // if (added1_vs_orig1) {
+        //         //     // This alignment connects a read tentatively assigned to Hap1 extension
+        //         //     // with a read from the original Hap1 set. Allow it.
+        //         //     cout << "Adding alignment " << alignmentId << " involving reads: " << readA << " and " << readB << " (addedToHap1 vs haplotype1ReadIdSet)" << endl;
+        //         //     firstPassHetAlignments[alignmentId] = true;
+        //         //     alignmentsAlreadyConsidered[alignmentId] = true;
+        //         // }
+
+        //         // if (added2_vs_orig2) {
+        //         //     // This alignment connects a read tentatively assigned to Hap2 extension
+        //         //     // with a read from the original Hap2 set. Allow it.
+        //         //     cout << "Adding alignment " << alignmentId << " involving reads: " << readA << " and " << readB << " (addedToHap2 vs haplotype2ReadIdSet)" << endl;
+        //         //     firstPassHetAlignments[alignmentId] = true;
+        //         //     alignmentsAlreadyConsidered[alignmentId] = true;
+        //         // }
+        //     }
+        //     // --- End of new loop ---
+        // }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // // Gather together all the reads that managed to get phased in the haplotype block
+        // std::set<OrientedReadId> orientedReadIdsThatManagedToGetPhasedInTheHaplotypeBlock;
+        // std::set<ReadId> readIdsThatManagedToGetPhasedInTheHaplotypeBlock;
+        // for (const auto& readHaplotypeSet : readHaplotypeSetsToKeep) {
+        //         const std::set<OrientedReadId>& haplotype1OrientedReadIdSet = readHaplotypeSet.first;
+        //         const std::set<OrientedReadId>& haplotype2OrientedReadIdSet = readHaplotypeSet.second;
+        //         for (const auto& haplotype1OrientedReadId : haplotype1OrientedReadIdSet) {
+        //             readIdsThatManagedToGetPhasedInTheHaplotypeBlock.insert(haplotype1OrientedReadId.getReadId());
+        //         }
+        //         for (const auto& haplotype2OrientedReadId : haplotype2OrientedReadIdSet) {
+        //             readIdsThatManagedToGetPhasedInTheHaplotypeBlock.insert(haplotype2OrientedReadId.getReadId());
+        //         }
+        //         orientedReadIdsThatManagedToGetPhasedInTheHaplotypeBlock.insert(haplotype1OrientedReadIdSet.begin(), haplotype1OrientedReadIdSet.end());
+        //         orientedReadIdsThatManagedToGetPhasedInTheHaplotypeBlock.insert(haplotype2OrientedReadIdSet.begin(), haplotype2OrientedReadIdSet.end());
+        // }
+
+        // // find the alignments in readHaplotypeSetsToKeep and forbid them if they are between reads in opposite sets.
+        // for (const auto& readHaplotypeSet : readHaplotypeSetsToKeep) {
+        //     const std::set<OrientedReadId>& haplotype1OrientedReadIdSet = readHaplotypeSet.first;
+        //     const std::set<OrientedReadId>& haplotype2OrientedReadIdSet = readHaplotypeSet.second;
+        //     // Helper function to extract ReadIds from a set of OrientedReadIds
+        //     auto getReadIdsFromOrientedReadIds =
+        //         [](const std::set<OrientedReadId>& orientedReadIds) -> std::set<ReadId> {
+        //         std::set<ReadId> readIds;
+        //         for (const auto& orientedReadId : orientedReadIds) {
+        //             readIds.insert(orientedReadId.getReadId());
+        //         }
+        //         return readIds;
+        //     };
+        //     const std::set<ReadId> haplotype1ReadIdSet = getReadIdsFromOrientedReadIds(haplotype1OrientedReadIdSet);
+        //     const std::set<ReadId> haplotype2ReadIdSet = getReadIdsFromOrientedReadIds(haplotype2OrientedReadIdSet);
+        //     for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
+        //         const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
+        //         // Get the readIds that the AlignmentData refers to.
+        //         ReadId thisAlignmentReadId0 = thisAlignmentData.readIds[0];
+        //         ReadId thisAlignmentReadId1 = thisAlignmentData.readIds[1];
+
+        //         // Check if the readIds are in the readIdsThatManagedToGetPhasedInTheHaplotypeBlock
+        //         if (haplotype1ReadIdSet.contains(thisAlignmentReadId0) and haplotype2ReadIdSet.contains(thisAlignmentReadId1)) {
+        //             cout << "Removing alignment " << alignmentId << " involving reads: " << thisAlignmentReadId0 << " and " << thisAlignmentReadId1 << endl;
+        //             forbiddenAlignments[alignmentId] = true;
+        //             alignmentsAlreadyConsidered[alignmentId] = true;
+        //             continue;
+        //         }
+
+        //         if (haplotype1ReadIdSet.contains(thisAlignmentReadId1) and haplotype2ReadIdSet.contains(thisAlignmentReadId0)) {
+        //             cout << "Removing alignment " << alignmentId << " involving reads: " << thisAlignmentReadId0 << " and " << thisAlignmentReadId1 << endl;
+        //             forbiddenAlignments[alignmentId] = true;
+        //             alignmentsAlreadyConsidered[alignmentId] = true;
+        //             continue;
+        //         }
+
+        //     }
+        // }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        
+
+        // // Now we need to check if the reference read is involved in the het sites
+        // // If numberOfTimesReadId0DoesNotHaveOneOfTheBasesInHetSites is greater than 0
+        // // then the ref read should not align with the reads involved in the het heplotypes.
+        // // WE TREAT THE HET SITES AS A STRONG SIGNAL FOR WHETHER THE ALIGNMENT IS GOOD OR NOT.
+        // bool isRefReadInvolvedInHetSites = false;
+
+        // if (potentialHetSitesOnOrientedReadId0.size() > 3) {
+        //     if(numberOfTimesReadId0DoesNotHaveOneOfTheBasesInHetSites / double(potentialHetSitesOnOrientedReadId0.size()) <= 0.25) {
+        //         isRefReadInvolvedInHetSites = true;
+        //     } else {
+        //         isRefReadInvolvedInHetSites = false;
+        //     }
+        // } else if (potentialHetSitesOnOrientedReadId0.size() <= 3) {
+        //     if(numberOfTimesReadId0DoesNotHaveOneOfTheBasesInHetSites == 0) {
+        //         isRefReadInvolvedInHetSites = true;
+        //     } else {
+        //         isRefReadInvolvedInHetSites = false;
+        //     }
+        // }
 
 
 
@@ -2743,151 +3773,530 @@ void Assembler::createReadGraph4withStrandSeparation(
         //     }
         // }
 
-        // If the ref read IS involved in the het sites
-        // Use the alignments of ref read with the reads in the het sites
-        if (isRefReadInvolvedInHetSites) {
-            cout << "The reference read have the bases of the het sites." << endl;
-            for (const auto& [positionInRead0, positionStats] : potentialHetSitesOnOrientedReadId0) {
+        // // If the ref read IS involved in the het sites
+        // // Use the alignments of ref read with the reads in the het sites
+        // if (isRefReadInvolvedInHetSites) {
+        //     cout << "The reference read have the bases of the het sites." << endl;
+        //     for (const auto& [positionInRead0, positionStats] : potentialHetSitesOnOrientedReadId0) {
     
-                // Get the alignments that support these bases
-                std::set<uint64_t> currectHetReads1Alignments = positionStats.hetBase1Alignments;
-                std::set<uint64_t> currectHetReads2Alignments = positionStats.hetBase2Alignments;
+        //         // Get the alignments that support these bases
+        //         std::set<uint64_t> currectHetReads1Alignments = positionStats.hetBase1Alignments;
+        //         std::set<uint64_t> currectHetReads2Alignments = positionStats.hetBase2Alignments;
 
-                for (const auto& currectHetReads1Alignment : currectHetReads1Alignments) {
+        //         for (const auto& currectHetReads1Alignment : currectHetReads1Alignments) {
 
-                    const AlignmentData& thisAlignmentData = alignmentData[currectHetReads1Alignment];
-                    // Get the readIds that the AlignmentData refers to.
-                    ReadId thisAlignmentReadId0 = thisAlignmentData.readIds[0];
-                    ReadId thisAlignmentReadId1 = thisAlignmentData.readIds[1];
-                    if (readIdsThatManagedToGetPhasedInTheHaplotypeBlock.contains(thisAlignmentReadId0) and readIdsThatManagedToGetPhasedInTheHaplotypeBlock.contains(thisAlignmentReadId1)) {
-                        if (alignmentsAlreadyConsidered[currectHetReads1Alignment]) {
-                            continue;
-                        }
-                        // cout << "Using alignment " << currectHetReads1Alignment << " involving reads: " << thisAlignmentReadId0 << " and " << thisAlignmentReadId1 << endl;
-                        firstPassHetAlignments[currectHetReads1Alignment] = true;
-                        alignmentsAlreadyConsidered[currectHetReads1Alignment] = true;
-                    }
+        //             const AlignmentData& thisAlignmentData = alignmentData[currectHetReads1Alignment];
+        //             // Get the readIds that the AlignmentData refers to.
+        //             ReadId thisAlignmentReadId0 = thisAlignmentData.readIds[0];
+        //             ReadId thisAlignmentReadId1 = thisAlignmentData.readIds[1];
+        //             if (readIdsThatManagedToGetPhasedInTheHaplotypeBlock.contains(thisAlignmentReadId0) and readIdsThatManagedToGetPhasedInTheHaplotypeBlock.contains(thisAlignmentReadId1)) {
+        //                 if (alignmentsAlreadyConsidered[currectHetReads1Alignment]) {
+        //                     continue;
+        //                 }
+        //                 // cout << "Using alignment " << currectHetReads1Alignment << " involving reads: " << thisAlignmentReadId0 << " and " << thisAlignmentReadId1 << endl;
+        //                 firstPassHetAlignments[currectHetReads1Alignment] = true;
+        //                 alignmentsAlreadyConsidered[currectHetReads1Alignment] = true;
+        //             }
                     
-                }
-                for (const auto& currectHetReads2Alignment : currectHetReads2Alignments) {
+        //         }
+        //         for (const auto& currectHetReads2Alignment : currectHetReads2Alignments) {
 
-                    const AlignmentData& thisAlignmentData = alignmentData[currectHetReads2Alignment];
-                    // Get the readIds that the AlignmentData refers to.
-                    ReadId thisAlignmentReadId0 = thisAlignmentData.readIds[0];
-                    ReadId thisAlignmentReadId1 = thisAlignmentData.readIds[1];
-                    if (readIdsThatManagedToGetPhasedInTheHaplotypeBlock.contains(thisAlignmentReadId0) and readIdsThatManagedToGetPhasedInTheHaplotypeBlock.contains(thisAlignmentReadId1)) {
-                        if (alignmentsAlreadyConsidered[currectHetReads2Alignment]) {
-                            continue;
-                        }
-                        // cout << "Using alignment " << currectHetReads2Alignment << " involving reads: " << thisAlignmentReadId0 << " and " << thisAlignmentReadId1 << endl;
-                        firstPassHetAlignments[currectHetReads2Alignment] = true;
-                        alignmentsAlreadyConsidered[currectHetReads2Alignment] = true;
-                    }
+        //             const AlignmentData& thisAlignmentData = alignmentData[currectHetReads2Alignment];
+        //             // Get the readIds that the AlignmentData refers to.
+        //             ReadId thisAlignmentReadId0 = thisAlignmentData.readIds[0];
+        //             ReadId thisAlignmentReadId1 = thisAlignmentData.readIds[1];
+        //             if (readIdsThatManagedToGetPhasedInTheHaplotypeBlock.contains(thisAlignmentReadId0) and readIdsThatManagedToGetPhasedInTheHaplotypeBlock.contains(thisAlignmentReadId1)) {
+        //                 if (alignmentsAlreadyConsidered[currectHetReads2Alignment]) {
+        //                     continue;
+        //                 }
+        //                 // cout << "Using alignment " << currectHetReads2Alignment << " involving reads: " << thisAlignmentReadId0 << " and " << thisAlignmentReadId1 << endl;
+        //                 firstPassHetAlignments[currectHetReads2Alignment] = true;
+        //                 alignmentsAlreadyConsidered[currectHetReads2Alignment] = true;
+        //             }
                     
-                }
-            }
-        }
+        //         }
+        //     }
+        // }
 
 
-        cout << "Found " << readHaplotypeSetsToKeep.size() << " haplotype sets in readId " << readId0 << endl;
-        // Print the readHaplotypeSetsToKeep
-        for (const auto& readHaplotypeSet : readHaplotypeSetsToKeep) {
-            cout << "Haplotype set: " << endl;
-            cout << "Haplotype 1: " << endl;
-            for (const auto& orientedReadId : readHaplotypeSet.first) {
-                cout << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
-            }
-            cout << "Haplotype 2: " << endl;
-            for (const auto& orientedReadId : readHaplotypeSet.second) {
-                cout << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
-            }
-        }
+        // cout << "Found " << readHaplotypeSetsToKeep.size() << " haplotype sets in readId " << readId0 << endl;
+        // // Print the readHaplotypeSetsToKeep
+        // for (const auto& readHaplotypeSet : readHaplotypeSetsToKeep) {
+        //     cout << "Haplotype set: " << endl;
+        //     cout << "Haplotype 1: " << endl;
+        //     for (const auto& orientedReadId : readHaplotypeSet.first) {
+        //         cout << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
+        //     }
+        //     cout << "Haplotype 2: " << endl;
+        //     for (const auto& orientedReadId : readHaplotypeSet.second) {
+        //         cout << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
+        //     }
+        // }
 
 
-        vector< std::pair< std::set<ReadId>, std::set<ReadId> > > readHaplotypeSetsToKeepReadIdsOnly;
-        for (const auto& readHaplotypeSet : readHaplotypeSetsToKeep) {
-            const std::set<OrientedReadId>& haplotype1OrientedReadIdSet = readHaplotypeSet.first;
-            const std::set<OrientedReadId>& haplotype2OrientedReadIdSet = readHaplotypeSet.second;
-            std::set<ReadId> haplotype1ReadIdSet;
-            std::set<ReadId> haplotype2ReadIdSet;
-            for (const auto& orientedReadId : haplotype1OrientedReadIdSet) {
-                haplotype1ReadIdSet.insert(orientedReadId.getReadId());
-            }
-            for (const auto& orientedReadId : haplotype2OrientedReadIdSet) {
-                haplotype2ReadIdSet.insert(orientedReadId.getReadId());
-            }
-            readHaplotypeSetsToKeepReadIdsOnly.push_back(std::make_pair(haplotype1ReadIdSet, haplotype2ReadIdSet));
+        // vector< std::pair< std::set<ReadId>, std::set<ReadId> > > readHaplotypeSetsToKeepReadIdsOnly;
+        // for (const auto& readHaplotypeSet : readHaplotypeSetsToKeep) {
+        //     const std::set<OrientedReadId>& haplotype1OrientedReadIdSet = readHaplotypeSet.first;
+        //     const std::set<OrientedReadId>& haplotype2OrientedReadIdSet = readHaplotypeSet.second;
+        //     std::set<ReadId> haplotype1ReadIdSet;
+        //     std::set<ReadId> haplotype2ReadIdSet;
+        //     for (const auto& orientedReadId : haplotype1OrientedReadIdSet) {
+        //         haplotype1ReadIdSet.insert(orientedReadId.getReadId());
+        //     }
+        //     for (const auto& orientedReadId : haplotype2OrientedReadIdSet) {
+        //         haplotype2ReadIdSet.insert(orientedReadId.getReadId());
+        //     }
+        //     readHaplotypeSetsToKeepReadIdsOnly.push_back(std::make_pair(haplotype1ReadIdSet, haplotype2ReadIdSet));
             
-        }
+        // }
 
 
 
-        //
-        //
-        // Finally, we need to forbid the alignments between the reads in the haplotype sets
-        // that belong to different haplotypes.
-        // We have the alignmentIds between the reference read and the reads in the haplotype sets.
-        // We don't have the alignmentIds between the reads in the haplotype sets.
-        // So, we need to find them first.
-        //
-        //
+        // //
+        // //
+        // // Finally, we need to forbid the alignments between the reads in the haplotype sets
+        // // that belong to different haplotypes.
+        // // We have the alignmentIds between the reference read and the reads in the haplotype sets.
+        // // We don't have the alignmentIds between the reads in the haplotype sets.
+        // // So, we need to find them first.
+        // //
+        // //
 
-        for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
+        // for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
 
-            if (forbiddenAlignments[alignmentId]) {
-                continue;
-            }
+        //     if (forbiddenAlignments[alignmentId]) {
+        //         continue;
+        //     }
 
-            // Get information for this alignment.
-            AlignmentData& thisAlignmentData = alignmentData[alignmentId];
+        //     // Get information for this alignment.
+        //     AlignmentData& thisAlignmentData = alignmentData[alignmentId];
 
-            // The alignment is stored as an alignment between readId0 on strand 0
-            // and readId1 on strand 0 or 1 depending on the value of isSameStrand.
-            // The reverse complement alignment also exists, but is not stored explicitly.
+        //     // The alignment is stored as an alignment between readId0 on strand 0
+        //     // and readId1 on strand 0 or 1 depending on the value of isSameStrand.
+        //     // The reverse complement alignment also exists, but is not stored explicitly.
             
-            const ReadId readId0 = thisAlignmentData.readIds[0];
-            const ReadId readId1 = thisAlignmentData.readIds[1];
-            const bool isSameStrand = thisAlignmentData.isSameStrand;
-            SHASTA_ASSERT(readId0 < readId1);
-            const OrientedReadId A0(readId0, 0);
-            const OrientedReadId B0(readId1, isSameStrand ? 0 : 1);
-            const OrientedReadId A1(readId0, 1);
-            const OrientedReadId B1(readId1, isSameStrand ? 1 : 0);
+        //     const ReadId readId0 = thisAlignmentData.readIds[0];
+        //     const ReadId readId1 = thisAlignmentData.readIds[1];
+        //     const bool isSameStrand = thisAlignmentData.isSameStrand;
+        //     SHASTA_ASSERT(readId0 < readId1);
+        //     const OrientedReadId A0(readId0, 0);
+        //     const OrientedReadId B0(readId1, isSameStrand ? 0 : 1);
+        //     const OrientedReadId A1(readId0, 1);
+        //     const OrientedReadId B1(readId1, isSameStrand ? 1 : 0);
 
-            // Check if the alignment involves a read in the haplotype sets
-            for (const auto& readHaplotypeSet : readHaplotypeSetsToKeepReadIdsOnly) {
-                const std::set<ReadId>& haplotype1ReadIdSet = readHaplotypeSet.first;
-                const std::set<ReadId>& haplotype2ReadIdSet = readHaplotypeSet.second;
+        //     // Check if the alignment involves a read in the haplotype sets
+        //     for (const auto& readHaplotypeSet : readHaplotypeSetsToKeepReadIdsOnly) {
+        //         const std::set<ReadId>& haplotype1ReadIdSet = readHaplotypeSet.first;
+        //         const std::set<ReadId>& haplotype2ReadIdSet = readHaplotypeSet.second;
                 
-                // We have an alignment that involves two reads that belong to different haplotypes
-                // We need to forbid the alignment
-                if ((haplotype1ReadIdSet.contains(readId0) && haplotype2ReadIdSet.contains(readId1)) 
-                    || (haplotype1ReadIdSet.contains(readId1) && haplotype2ReadIdSet.contains(readId0))) {
-                    cout << "Forbidding alignment " << alignmentId << " involving reads: " << readId0 << " and " << readId1 << " because they belong to different haplotypes." << endl;
-                    forbiddenAlignments[alignmentId] = true;
-                    alignmentsAlreadyConsidered[alignmentId] = true;
-                }
+        //         // We have an alignment that involves two reads that belong to different haplotypes
+        //         // We need to forbid the alignment
+        //         if ((haplotype1ReadIdSet.contains(readId0) && haplotype2ReadIdSet.contains(readId1)) 
+        //             || (haplotype1ReadIdSet.contains(readId1) && haplotype2ReadIdSet.contains(readId0))) {
+        //             cout << "Forbidding alignment " << alignmentId << " involving reads: " << readId0 << " and " << readId1 << " because they belong to different haplotypes." << endl;
+        //             forbiddenAlignments[alignmentId] = true;
+        //             alignmentsAlreadyConsidered[alignmentId] = true;
+        //         }
 
-                // We have an alignment that involves two reads that belong to the same haplotype
-                // We need to use the alignment
-                if ((haplotype1ReadIdSet.contains(readId0) && haplotype1ReadIdSet.contains(readId1)) 
-                    || (haplotype2ReadIdSet.contains(readId0) && haplotype2ReadIdSet.contains(readId1))) {
-                    // cout << "Using alignment " << alignmentId << " involving reads: " << readId0 << " and " << readId1 << " because they belong to the same haplotype." << endl;
-                    firstPassHetAlignments[alignmentId] = true;
-                    alignmentsAlreadyConsidered[alignmentId] = true;
-                }
+        //         // We have an alignment that involves two reads that belong to the same haplotype
+        //         // We need to use the alignment
+        //         if ((haplotype1ReadIdSet.contains(readId0) && haplotype1ReadIdSet.contains(readId1)) 
+        //             || (haplotype2ReadIdSet.contains(readId0) && haplotype2ReadIdSet.contains(readId1))) {
+        //             // cout << "Using alignment " << alignmentId << " involving reads: " << readId0 << " and " << readId1 << " because they belong to the same haplotype." << endl;
+        //             firstPassHetAlignments[alignmentId] = true;
+        //             alignmentsAlreadyConsidered[alignmentId] = true;
+        //         }
 
-            }
+        //     }
 
-        }
+        // }
 
-        const long firstPassHetAlignmentsCount = count(firstPassHetAlignments.begin(), firstPassHetAlignments.end(), true);
-        cout << "Found " << firstPassHetAlignmentsCount << " first pass alignments in readId " << readId0 << endl;
+        // const long firstPassHetAlignmentsCount = count(firstPassHetAlignments.begin(), firstPassHetAlignments.end(), true);
+        // cout << "Found " << firstPassHetAlignmentsCount << " first pass alignments in readId " << readId0 << endl;
 
 
     }
 
+    // print the current timestamp
+    cout << timestamp << "Finished first pass of phasing." << endl;
+
     // return;
+
+    // cout << timestamp << "Finished first pass of phasing." << endl;
+
+    // // --- We need to find, for each orientedReadId, the sites that are associated with it ---
+    // // --- and fill in the orientedReadSites ---
+    // vector< vector<uint64_t> > orientedReadSites(readCount * 2);    // Indexed via OrientedReadId::getValue()
+
+    // for(uint64_t siteId=0; siteId<sites.size(); siteId++) {
+    //     const Site& site = sites[siteId];
+    //     for(const std::set<OrientedReadId>& s: site.orientedReads) {
+    //         for(const OrientedReadId orientedReadId: s) {
+    //             orientedReadSites[orientedReadId.getValue()].push_back(siteId);
+    //         }
+    //     }
+    // }
+
+    // cout << timestamp << "Finished second pass of phasing." << endl;
+
+
+    // // --- We need to generate all possible pairs of sites from the orientedReadSites ---
+    // // --- The siteId of the first site in each pair will always be less than the siteId of the second site in each pair ---
+    // vector< pair<uint64_t, uint64_t> > pairsOfSites;
+    // for(const vector<uint64_t>& v: orientedReadSites) {
+    //     // Add a check to prevent accessing v.size()-1 when v is empty or has only one element.
+    //     if (v.size() < 2) {
+    //         continue; // Skip if there are not enough elements to form a pair
+    //     }
+    //     for(uint64_t i0=0; i0<v.size()-1; i0++) {
+    //         const uint64_t siteId0 = v[i0];
+    //         for(uint64_t i1=i0+1; i1<v.size(); i1++) {
+    //             const uint64_t siteId1 = v[i1];
+    //             pairsOfSites.push_back(make_pair(siteId0, siteId1));
+    //         }
+    //     }
+    // }
+
+    // cout << timestamp << "Finished third pass of phasing." << endl;
+
+    // // --- Because the siteId of the first site in each pair will always be less than the siteId of 
+    // // the second site in each pair, we will have to deduplicate the pairs ---
+    // // --- Deduplicate pairs and count common reads ---
+    // vector<uint64_t> commonReadsCount; // Stores the count of common reads for each unique pair
+    // deduplicateAndCount(pairsOfSites, commonReadsCount);
+    // SHASTA_ASSERT(commonReadsCount.size() == pairsOfSites.size());
+
+    // cout << timestamp << "Finished fourth pass of phasing." << endl;
+
+    // // --- Set up the disjoint sets data structure. ---
+    // // --- Each vertex is a heterozygous phased site ---
+    // const uint64_t vertexCount = sites.size();
+    // vector<uint64_t> rankHetSites(vertexCount);
+    // vector<uint64_t> parentHetSites(vertexCount);
+    // boost::disjoint_sets<uint64_t*, uint64_t*> disjointSetsHetSites(&rankHetSites[0], &parentHetSites[0]);
+    // for(uint64_t i=0; i<vertexCount; i++) {
+    //     disjointSetsHetSites.make_set(i);
+    // }
+
+    // cout << timestamp << "Finished fifth pass of phasing." << endl;
+
+    // // --- Loop over all pairs of sites that share at least m OrientedReadIds. ---
+    // const uint64_t minCommonReadsForMerging = 2;
+    // uint64_t mergeCount = 0;
+    // uint64_t pairsConsidered = 0;
+    // for(uint64_t i=0; i<pairsOfSites.size(); i++) {
+    //     pairsConsidered++;
+    //     const pair<uint64_t, uint64_t>& p = pairsOfSites[i];
+    //     const uint64_t commonOrientedReadCount = commonReadsCount[i];
+    //     const uint64_t siteId0 = p.first;
+    //     const uint64_t siteId1 = p.second;
+    //     const Site& site0 = sites[siteId0];
+    //     const Site& site1 = sites[siteId1];
+        
+    //     // Decide if these two should be merged based on the number of common reads
+    //     const bool merge = (commonOrientedReadCount >= minCommonReadsForMerging);
+        
+    //     if(merge) {
+    //         // Merge the sets (connectedComponents) containing siteId0 and siteId1
+    //         disjointSetsHetSites.union_set(siteId0, siteId1);
+    //         mergeCount++;
+    //     }
+    // }
+    // cout << timestamp << "Finished site merging. Considered " << pairsConsidered << " pairs, merged " << mergeCount << " pairs based on common read count >= " << minCommonReadsForMerging << "." << endl;
+
+
+    // // --- At this point, disjointSetsHetSites.find_set(siteId) gives the id of the merged set
+    // // --- that siteId is part of. This id is in [0, vertexCount).
+    // vector< vector<uint64_t> > connectedComponents;
+    // for(uint64_t siteId=0; siteId<vertexCount; siteId++) {
+    //     const uint64_t componentId = disjointSetsHetSites.find_set(siteId);
+    //     connectedComponents[componentId].push_back(siteId);
+    // }
+
+    // cout << timestamp << "Finished sixth pass of phasing." << endl;
+
+
+    // // --- Global Phasing Implementation Starts Here ---
+    // cout << timestamp << "Starting global phasing of connectedComponents." << endl;
+    // uint64_t totalPhasedReads = 0;
+    // uint64_t totalComponentsPhased = 0;
+
+    // // Loop over the connected connectedComponents.
+    // // Each component is a set of Sites that were recursively merged together.
+    // // We only process compoconnectedComponentsnents that actually contain sites.
+    // for(uint64_t componentId=0; componentId<connectedComponents.size(); componentId++) {
+    //     const vector<uint64_t>& componentSiteIds = connectedComponents[componentId];
+
+    //     cout << timestamp << "Finished seventh pass of phasing." << endl;
+
+    //     // Skip empty connectedComponents (these represent siteIds that were not part of any merged site pair)
+    //     if (componentSiteIds.empty()) {
+    //         continue;
+    //     }
+
+    //     // Skip connectedComponents with only one site, as phasing requires at least two linked sites.
+    //     if (componentSiteIds.size() < 2) {
+    //          cout << "Skipping component " << componentId << " with only " << componentSiteIds.size() << " site(s)." << endl;
+    //          continue;
+    //     }
+
+    //     cout << "Phasing component " << componentId << " with " << componentSiteIds.size() << " sites." << endl;
+    //     totalComponentsPhased++;
+
+    //     // 1. Identify Involved Reads within this component
+    //     std::set<OrientedReadId> involvedReads;
+    //     for(const uint64_t siteId : componentSiteIds) {
+    //         const Site& site = sites[siteId];
+    //         involvedReads.insert(site.orientedReads[0].begin(), site.orientedReads[0].end());
+    //         involvedReads.insert(site.orientedReads[1].begin(), site.orientedReads[1].end());
+    //     }
+
+    //     if (involvedReads.empty()) {
+    //         cout << "Component " << componentId << " has no involved reads. Skipping." << endl;
+    //         continue;
+    //     }
+    //     cout << "Component " << componentId << " involves " << involvedReads.size() << " reads." << endl;
+
+
+    //     // Create mapping for graph vertices
+    //     std::map<OrientedReadId, size_t> readToIndex;
+    //     std::vector<OrientedReadId> indexToRead;
+    //     size_t currentIndex = 0;
+    //     for(const auto& read : involvedReads) {
+    //         readToIndex[read] = currentIndex;
+    //         indexToRead.push_back(read);
+    //         currentIndex++;
+    //     }
+    //     size_t numInvolvedReads = involvedReads.size();
+
+    //     // 2. Build Phasing Graph for the component
+    //     using PhasingGraph = boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS, boost::no_property, boost::property<boost::edge_weight_t, double>>;
+    //     PhasingGraph phasingGraph(numInvolvedReads);
+    //     auto weightMap = boost::get(boost::edge_weight, phasingGraph);
+    //     std::map<std::pair<size_t, size_t>, double> edgeWeightSums;
+
+    //     // Iterate over all pairs of involved reads
+    //     for (auto itA = involvedReads.begin(); itA != involvedReads.end(); ++itA) {
+    //         auto itB = itA;
+    //         std::advance(itB, 1);
+    //         for (; itB != involvedReads.end(); ++itB) {
+    //             const OrientedReadId& readA = *itA;
+    //             const OrientedReadId& readB = *itB;
+    //             double currentWeightSum = 0;
+
+    //             // Check all sites in the component if they contain both readA and readB
+    //             for (const uint64_t siteId : componentSiteIds) {
+    //                  const Site& site = sites[siteId];
+    //                  bool aInHap0 = site.orientedReads[0].count(readA);
+    //                  bool aInHap1 = site.orientedReads[1].count(readA);
+    //                  bool bInHap0 = site.orientedReads[0].count(readB);
+    //                  bool bInHap1 = site.orientedReads[1].count(readB);
+
+    //                  // Only contribute weight if both reads are present in this site
+    //                  if ((aInHap0 || aInHap1) && (bInHap0 || bInHap1)) {
+    //                      if ((aInHap0 && bInHap0) || (aInHap1 && bInHap1)) {
+    //                          currentWeightSum += 1.0; // Agreement
+    //                      } else {
+    //                          currentWeightSum -= 1.0; // Conflict
+    //                      }
+    //                  }
+    //             }
+
+    //             // If there's a non-zero net weight, record it
+    //             if (std::abs(currentWeightSum) > 0) {
+    //                 size_t u = readToIndex[readA];
+    //                 size_t v = readToIndex[readB];
+    //                 if (u > v) std::swap(u, v);
+    //                 edgeWeightSums[{u, v}] = currentWeightSum; // Use direct assignment, assuming weight comes only from sites within this component
+    //             }
+    //         }
+    //     }
+
+    //     // Add edges to the BGL graph
+    //     for(const auto& [edgePair, totalWeight] : edgeWeightSums) {
+    //         auto edge_desc = boost::add_edge(edgePair.first, edgePair.second, phasingGraph);
+    //         if(edge_desc.second) {
+    //             weightMap[edge_desc.first] = totalWeight;
+    //         } else {
+    //              cout << "Warning: Failed to add edge between " << edgePair.first << " and " << edgePair.second << " for component " << componentId << endl;
+    //         }
+    //     }
+
+    //     // 3. Partition the Graph (Greedy BFS/Queue-based Heuristic)
+    //     std::set<OrientedReadId> componentHaplotype1;
+    //     std::set<OrientedReadId> componentHaplotype2;
+    //     std::set<OrientedReadId> componentUnphased; // Reads that couldn't be confidently assigned
+    //     std::set<OrientedReadId> visitedInComponent;
+    //     std::queue<OrientedReadId> q;
+
+    //     for (const auto& startNodeRead : involvedReads) {
+    //         if (visitedInComponent.count(startNodeRead)) {
+    //             continue; // Already processed in this component
+    //         }
+
+    //         // Start a new sub-component phasing run
+    //         std::set<OrientedReadId> currentSubHaplotype1;
+    //         std::set<OrientedReadId> currentSubHaplotype2;
+
+    //         // Start with the current unvisited read in Haplotype 1 of the sub-component
+    //         currentSubHaplotype1.insert(startNodeRead);
+    //         visitedInComponent.insert(startNodeRead);
+    //         q.push(startNodeRead);
+
+    //         while(!q.empty()) {
+    //             OrientedReadId currentRead = q.front();
+    //             q.pop();
+    //             size_t u = readToIndex[currentRead];
+    //             bool isInSubHap1 = currentSubHaplotype1.count(currentRead);
+
+    //             PhasingGraph::adjacency_iterator neighborIt, neighborEnd;
+    //             for (boost::tie(neighborIt, neighborEnd) = boost::adjacent_vertices(u, phasingGraph); neighborIt != neighborEnd; ++neighborIt) {
+    //                 size_t v_idx = *neighborIt;
+    //                 OrientedReadId neighborRead = indexToRead[v_idx];
+
+    //                 if (visitedInComponent.count(neighborRead)) {
+    //                     // Consistency Check (Optional but recommended)
+    //                     bool neighborInSubHap1 = currentSubHaplotype1.count(neighborRead);
+    //                     bool neighborInSubHap2 = currentSubHaplotype2.count(neighborRead);
+    //                     if (neighborInSubHap1 || neighborInSubHap2) {
+    //                          auto edge_desc_check = boost::edge(u, v_idx, phasingGraph);
+    //                          if(edge_desc_check.second) {
+    //                              double weight_check = weightMap[edge_desc_check.first];
+    //                              bool consistent = (weight_check > 0 && ((isInSubHap1 && neighborInSubHap1) || (!isInSubHap1 && neighborInSubHap2))) ||
+    //                                                (weight_check < 0 && ((isInSubHap1 && neighborInSubHap2) || (!isInSubHap1 && neighborInSubHap1)));
+    //                              if (!consistent) {
+    //                                  cout << "Warning: Phasing inconsistency detected in component " << componentId << " between " << currentRead << " and " << neighborRead << ". Weight: " << weight_check << endl;
+    //                                  // Handle inconsistency: e.g., mark both reads as unphased
+    //                                  componentUnphased.insert(currentRead);
+    //                                  componentUnphased.insert(neighborRead);
+    //                                  // Remove from current sub-haplotypes if present
+    //                                  currentSubHaplotype1.erase(currentRead);
+    //                                  currentSubHaplotype2.erase(currentRead);
+    //                                  currentSubHaplotype1.erase(neighborRead);
+    //                                  currentSubHaplotype2.erase(neighborRead);
+    //                              }
+    //                          }
+    //                     }
+    //                     continue; // Already assigned or handled
+    //                 }
+
+    //                 auto edge_desc = boost::edge(u, v_idx, phasingGraph);
+    //                 if (!edge_desc.second) continue;
+    //                 double weight = weightMap[edge_desc.first];
+
+    //                 // Assign neighbor based on connection
+    //                 if (weight > 0) { // Agreement
+    //                     if (isInSubHap1) currentSubHaplotype1.insert(neighborRead);
+    //                     else currentSubHaplotype2.insert(neighborRead);
+    //                 } else { // Conflict
+    //                     if (isInSubHap1) currentSubHaplotype2.insert(neighborRead);
+    //                     else currentSubHaplotype1.insert(neighborRead);
+    //                 }
+    //                 visitedInComponent.insert(neighborRead);
+    //                 q.push(neighborRead);
+    //             }
+    //         }
+    //         // Merge sub-component results into component results
+    //         componentHaplotype1.insert(currentSubHaplotype1.begin(), currentSubHaplotype1.end());
+    //         componentHaplotype2.insert(currentSubHaplotype2.begin(), currentSubHaplotype2.end());
+    //     }
+
+    //     // Handle reads that were involved but never visited (singletons in phasing graph)
+    //     for(const auto& read : involvedReads) {
+    //         if (!visitedInComponent.count(read)) {
+    //             componentUnphased.insert(read);
+    //         }
+    //     }
+
+    //     // Remove any reads marked as unphased due to inconsistencies from final haplotypes
+    //     for(const auto& unphasedRead : componentUnphased) {
+    //         componentHaplotype1.erase(unphasedRead);
+    //         componentHaplotype2.erase(unphasedRead);
+    //     }
+
+
+    //     cout << "Component " << componentId << " phased into: Hap1=" << componentHaplotype1.size()
+    //          << ", Hap2=" << componentHaplotype2.size() << ", Unphased=" << componentUnphased.size() << endl;
+    //     totalPhasedReads += componentHaplotype1.size() + componentHaplotype2.size();
+
+
+    //     // 4. Apply Phasing Results (Update forbiddenAlignments)
+    //     // Get ReadIds for each haplotype set
+    //     auto getReadIds = [](const std::set<OrientedReadId>& orientedReads) {
+    //         std::set<ReadId> readIds;
+    //         for (const auto& orId : orientedReads) readIds.insert(orId.getReadId());
+    //         return readIds;
+    //     };
+    //     std::set<ReadId> hap1ReadIds = getReadIds(componentHaplotype1);
+    //     std::set<ReadId> hap2ReadIds = getReadIds(componentHaplotype2);
+    //     std::set<ReadId> unphasedReadIds = getReadIds(componentUnphased);
+
+
+    //     // Iterate through all alignments to forbid cross-haplotype ones within this component
+    //     for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
+    //         // Skip if already forbidden
+    //         if (forbiddenAlignments[alignmentId]) {
+    //             continue;
+    //         }
+
+    //         const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
+    //         ReadId alnReadId0 = thisAlignmentData.readIds[0];
+    //         ReadId alnReadId1 = thisAlignmentData.readIds[1];
+
+    //         // Check if both reads belong to this component's phased sets
+    //         bool read0InComp = hap1ReadIds.count(alnReadId0) || hap2ReadIds.count(alnReadId0) || unphasedReadIds.count(alnReadId0);
+    //         bool read1InComp = hap1ReadIds.count(alnReadId1) || hap2ReadIds.count(alnReadId1) || unphasedReadIds.count(alnReadId1);
+
+    //         if (read0InComp && read1InComp) {
+    //             // Both reads are in this component's scope. Check phasing.
+    //             bool read0Hap1 = hap1ReadIds.count(alnReadId0);
+    //             bool read0Hap2 = hap2ReadIds.count(alnReadId0);
+    //             bool read1Hap1 = hap1ReadIds.count(alnReadId1);
+    //             bool read1Hap2 = hap2ReadIds.count(alnReadId1);
+    //             bool read0Unphased = unphasedReadIds.count(alnReadId0);
+    //             bool read1Unphased = unphasedReadIds.count(alnReadId1);
+
+    //             // Forbid if reads are in different haplotypes
+    //             if ((read0Hap1 && read1Hap2) || (read0Hap2 && read1Hap1)) {
+    //                 // cout << "Forbidding alignment " << alignmentId << " (reads " << alnReadId0 << ", " << alnReadId1 << ") due to cross-haplotype connection in component " << componentId << endl;
+    //                 forbiddenAlignments[alignmentId] = true;
+    //                 // Optionally unmark from firstPassHetAlignments if it was marked
+    //                 if (firstPassHetAlignments[alignmentId]) {
+    //                     firstPassHetAlignments[alignmentId] = false;
+    //                 }
+    //             }
+    //             // Forbid if either read is unphased (conservative approach)
+    //             else if (read0Unphased || read1Unphased) {
+    //                 // cout << "Forbidding alignment " << alignmentId << " (reads " << alnReadId0 << ", " << alnReadId1 << ") due to unphased read in component " << componentId << endl;
+    //                 forbiddenAlignments[alignmentId] = true;
+    //                 if (firstPassHetAlignments[alignmentId]) {
+    //                     firstPassHetAlignments[alignmentId] = false;
+    //                 }
+    //             }
+                 
+    //             // If reads are in the same haplotype, confirm marking as first pass.
+    //             else if ((read0Hap1 && read1Hap1) || (read0Hap2 && read1Hap2)) {
+    //                 // This alignment is intra-haplotype within the component according to global phasing.
+    //                 // Mark or re-confirm it as a first pass alignment.
+    //                 // This might override previous decisions if the global phasing provides a clearer picture.
+    //                 if (!forbiddenAlignments[alignmentId]) { // Only mark if not already forbidden for other reasons
+    //                     firstPassHetAlignments[alignmentId] = true;
+    //                     // Optionally add a log message if needed:
+    //                     // cout << "Confirming alignment " << alignmentId << " (reads " << alnReadId0 << ", " << alnReadId1 << ") as intra-haplotype in component " << componentId << endl;
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     // --- End Apply Phasing Results ---
+
+    // }
+
+    // cout << timestamp << "Finished global phasing of " << totalComponentsPhased << " connectedComponents. Total reads phased: " << totalPhasedReads << endl;
+    // // --- Global Phasing Implementation Ends ---
+
+
+
+
 
 
     //
@@ -2944,7 +4353,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     // Loop over all alignments.
     for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
         
-        if (not firstPassHetAlignments[alignmentId]) {
+        if (!firstPassHetAlignments[alignmentId]) {
             continue;
         }
 
@@ -2965,6 +4374,15 @@ void Assembler::createReadGraph4withStrandSeparation(
         SHASTA_ASSERT(readId0 < readId1);
         const OrientedReadId orientedReadId0(readId0, 0);   // On strand 0.
         const OrientedReadId orientedReadId1(readId1, isSameStrand ? 0 : 1);   // On strand 0 or 1.
+
+        // Skip if either read involved in the alignment is forbidden
+        if (forbiddenReads[readId0] || forbiddenReads[readId1]) {
+            continue;
+        }
+
+        // if (bridgingReads.count(readId0) || bridgingReads.count(readId1)) {
+        //     continue;
+        // }
 
         // Store this pair of edges in our edgeTable.
         const uint64_t range0 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId0, 0, markers);
@@ -3084,10 +4502,8 @@ void Assembler::createReadGraph4withStrandSeparation(
             }
 
             // Add the alignment to the read graph.
-            if (!forbiddenAlignments[alignmentId]) {
-                keepAlignment[alignmentId] = true;
-                alignment.info.isInReadGraph = 1;
-            }
+            keepAlignment[alignmentId] = true;
+            alignment.info.isInReadGraph = 1;
             
 
             // Update vertex degrees
@@ -3140,7 +4556,7 @@ void Assembler::createReadGraph4withStrandSeparation(
         const AlignmentData& alignment = alignmentData[alignmentId];
 
         // If this alignment is not used in the read graph, we are done.
-        if(not keepThisAlignment) {
+        if(!keepThisAlignment) {
             continue;
         }
 
@@ -3167,7 +4583,7 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
 
-
+    // UNCOMMENT
     vector< pair<uint64_t, double> > alignmentTable;
     vector< pair<uint64_t, double> > alignmentTableNotPassFilter;
     // Flag alignments to be kept for break detection.
@@ -3210,6 +4626,11 @@ void Assembler::createReadGraph4withStrandSeparation(
         SHASTA_ASSERT(readId0 < readId1);
         const OrientedReadId orientedReadId0(readId0, 0);   // On strand 0.
         const OrientedReadId orientedReadId1(readId1, isSameStrand ? 0 : 1);   // On strand 0 or 1.
+
+        // Skip if either read involved in the alignment is forbidden
+        if (forbiddenReads[readId0] || forbiddenReads[readId1]) {
+            continue;
+        }
 
         // Store this pair of edges in our edgeTable.
         const uint64_t range0 = thisAlignmentData.info.baseRange(assemblerInfo->k, orientedReadId0, 0, markers);
@@ -6003,7 +7424,7 @@ void Assembler::flagCrossStrandReadGraphEdges4()
         {
             const ReadGraphEdge& nextEdge = readGraph.edges[edgeId + 1];
             SHASTA_ASSERT(not nextEdge.crossesStrands);
-            array<OrientedReadId, 2> nextEdgeOrientedReadIds = nextEdge.orientedReadIds;
+            std::array<OrientedReadId, 2> nextEdgeOrientedReadIds = nextEdge.orientedReadIds;
             nextEdgeOrientedReadIds[0].flipStrand();
             nextEdgeOrientedReadIds[1].flipStrand();
             SHASTA_ASSERT(nextEdgeOrientedReadIds == edge.orientedReadIds);
@@ -6333,7 +7754,7 @@ void Assembler::flagCrossStrandReadGraphEdges5()
         {
             const ReadGraphEdge& nextEdge = readGraph.edges[edgeId + 1];
             SHASTA_ASSERT(not nextEdge.crossesStrands);
-            array<OrientedReadId, 2> nextEdgeOrientedReadIds = nextEdge.orientedReadIds;
+            std::array<OrientedReadId, 2> nextEdgeOrientedReadIds = nextEdge.orientedReadIds;
             nextEdgeOrientedReadIds[0].flipStrand();
             nextEdgeOrientedReadIds[1].flipStrand();
             SHASTA_ASSERT(nextEdgeOrientedReadIds == edge.orientedReadIds);
