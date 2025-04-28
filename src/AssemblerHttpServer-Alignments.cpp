@@ -1490,7 +1490,7 @@ void Assembler::exploreAlignment(
             *this,
             {orientedReadId0, orientedReadId1},
             alignment,
-            false);
+            ProjectedAlignment::Method::All);
 
         html << "<h2>Alignment projection to base space</h2>";
 

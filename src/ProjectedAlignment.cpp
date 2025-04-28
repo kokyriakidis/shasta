@@ -16,7 +16,7 @@ ProjectedAlignment::ProjectedAlignment(
     const Assembler& assembler,
     const array<OrientedReadId, 2>& orientedReadIds,
     const Alignment& alignment,
-    bool quick) :
+    Method method) :
 
     ProjectedAlignment(
         uint32_t(assembler.assemblerInfo->k),
@@ -30,7 +30,7 @@ ProjectedAlignment::ProjectedAlignment(
             assembler.markers[orientedReadIds[0].getValue()],
             assembler.markers[orientedReadIds[1].getValue()]
         },
-        quick)
+        method)
 {
 }
 
@@ -42,7 +42,7 @@ ProjectedAlignment::ProjectedAlignment(
     const array<LongBaseSequenceView, 2>& sequences,
     const Alignment& alignment,
     const array< span<const CompressedMarker>, 2>& markers,
-    bool quick) :
+    Method method) :
     k(k),
     kHalf(k / 2),
     orientedReadIds(orientedReadIds),
@@ -52,16 +52,24 @@ ProjectedAlignment::ProjectedAlignment(
 {
     SHASTA_ASSERT((k % 2) == 0);
 
-    if(quick) {
-        constructQuick();
-    } else {
-        constructSlow();
+    switch(method) {
+        case Method::All:
+            constructAll();
+            break;
+        case Method::QuickRle:
+            constructQuickRle();
+            break;
+        case Method::QuickRaw:
+            constructQuickRaw();
+            break;
+        default:
+            SHASTA_ASSERT(0);
     }
 }
 
 
 
-void ProjectedAlignment::constructSlow()
+void ProjectedAlignment::constructAll()
 {
     mismatchCountRle = 0;
 
@@ -101,7 +109,7 @@ void ProjectedAlignment::constructSlow()
 // - RLE sequences and RLE alignments for segments for which the RLE sequences
 //   of the two oriented reads are different.
 // - Total RLE edit distance and total RLE lengths.
-void ProjectedAlignment::constructQuick()
+void ProjectedAlignment::constructQuickRle()
 {
     // Create the segment outside the loop and reuse it to reduce
     // memory allocation activity.
@@ -150,6 +158,43 @@ void ProjectedAlignment::constructQuick()
         totalEditDistanceRle += segment.rleEditDistance;
         mismatchCountRle += segment.mismatchCountRle;
         segments.push_back(segment);
+    }
+}
+
+
+
+// This stores only the raw sequences and raw alignments for segments for which the raw sequences
+//  of the two oriented reads are different.
+void ProjectedAlignment::constructQuickRaw()
+{
+    // Create the segment outside the loop and reuse it to reduce
+    // memory allocation activity.
+    ProjectedAlignmentSegment segment;
+
+    // Loop over pairs of consecutive aligned markers (A, B).
+    for(uint64_t iB=1; iB<alignment.ordinals.size(); iB++) {
+        const uint64_t iA = iB - 1;
+
+        // Store in the segment the ordinals of these pair of consecutive aligned markers.
+        segment.ordinalsA = alignment.ordinals[iA];
+        segment.ordinalsB = alignment.ordinals[iB];
+
+        // Store the corresponding positions.
+        for(uint64_t i=0; i<2; i++) {
+            segment.positionsA[i] = markers[i][segment.ordinalsA[i]].position + kHalf;
+            segment.positionsB[i] = markers[i][segment.ordinalsB[i]].position + kHalf;
+        }
+
+        // Fill in the base sequences.
+        fillSequences(segment);
+
+        // If the raw sequences are the same, don't store the segment.
+        if(segment.sequences[0] == segment.sequences[1]) {
+            continue;
+        }
+
+        // Align them.
+        segment.computeAlignment(matchScore, mismatchScore, gapScore);
     }
 }
 
