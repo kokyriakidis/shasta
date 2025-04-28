@@ -1061,6 +1061,22 @@ public:
 
 
 
+    // Functions and data related to read graph creation method 5.
+    // This assumes that createReadGraph5 is multithreaded.
+    // Simplifications are possible if this is not the case.
+    void createReadGraph5();
+    void createReadGraph5ThreadFunction(uint64_t threadId);
+
+    // Data that should be accessible to all threads.
+    // The Assembler stores a single instance of that.
+    class CreateReadGraph5Data {
+    public:
+    };
+    CreateReadGraph5Data createReadGraph5Data;
+
+
+
+
 
     // Triangle and least square analysis of the read graph
     // to flag inconsistent alignments.

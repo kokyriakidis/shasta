@@ -550,7 +550,7 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                     *this,
                     orientedReadIds,
                     alignment,
-                    true);
+                    ProjectedAlignment::Method::QuickRle);
                 alignmentInfo.errorRateRle = float(projectedAlignment.errorRateRle());
                 alignmentInfo.mismatchCountRle = uint32_t(projectedAlignment.mismatchCountRle);
             }

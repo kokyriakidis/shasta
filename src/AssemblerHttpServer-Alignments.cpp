@@ -1490,7 +1490,7 @@ void Assembler::exploreAlignment(
             *this,
             {orientedReadId0, orientedReadId1},
             alignment,
-            false);
+            ProjectedAlignment::Method::All);
 
         html << "<h2>Alignment projection to base space</h2>";
 
@@ -1502,6 +1502,36 @@ void Assembler::exploreAlignment(
 
         html << "<h3>Full details</h3>";
         projectedAlignment.writeHtml(html, false);
+
+
+        // Also write out the mismatch positions.
+        vector< array<uint32_t, 2> > mismatchPositions;
+        projectedAlignment.getMismatchPositions(mismatchPositions);
+
+        html <<
+            "<h3>Mismatch positions</h3>"
+            "<p>Found " << mismatchPositions.size() << " mismatch positions."
+            "<table><tr>"
+            "<th>" << orientedReadId0 << "<br>position"
+            "<th>" << orientedReadId1 << "<br>position"
+            "<th>" << orientedReadId0 << "<br>base"
+            "<th>" << orientedReadId1 << "<br>base";
+
+        for(const auto& mismatchPosition: mismatchPositions) {
+            const uint32_t mismatchPosition0 = mismatchPosition[0];
+            const uint32_t mismatchPosition1 = mismatchPosition[1];
+            const Base base0 = getReads().getOrientedReadBase(orientedReadId0, mismatchPosition0);
+            const Base base1 = getReads().getOrientedReadBase(orientedReadId1, mismatchPosition1);
+
+            html <<
+                "<tr>"
+                "<td class=centered>" << mismatchPosition0 <<
+                "<td class=centered>" << mismatchPosition1 <<
+                "<td class=centered style='font-family:monospace'>" << base0 <<
+                "<td class=centered style='font-family:monospace'>" << base1;
+        }
+
+        html << "</table>";
     }
 }
 

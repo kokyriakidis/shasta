@@ -608,7 +608,7 @@ void AssemblerOptions::addConfigurableOptions()
         ("ReadGraph.creationMethod",
         value<int>(&readGraphOptions.creationMethod)->
         default_value(0),
-        "The method used to create the read graph (0 default, 1 or 2 experimental).")
+        "The method used to create the read graph (0 through 5 except 1).")
 
         ("ReadGraph.maxAlignmentCount",
         value<int>(&readGraphOptions.maxAlignmentCount)->

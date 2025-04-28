@@ -279,13 +279,11 @@ void shasta::main::assemble(
             " is not valid. Valid options are 0 through 6 except 2.");
     }
 
-    if(assemblerOptions.readGraphOptions.creationMethod != 0 and
-        assemblerOptions.readGraphOptions.creationMethod != 2 and
-        assemblerOptions.readGraphOptions.creationMethod != 3 and
-        assemblerOptions.readGraphOptions.creationMethod != 4) {
+    if((assemblerOptions.readGraphOptions.creationMethod > 5) or
+       (assemblerOptions.readGraphOptions.creationMethod == 1)) {
         throw runtime_error("--ReadGraph.creationMethod " +
             to_string(assemblerOptions.readGraphOptions.creationMethod) +
-            " is not valid. Valid values are 0, 2, 3, and 4.");
+            " is not valid. Valid values are 0 through 5 except 1.");
     }
 
     // Check assemblerOptions.assemblyOptions.detangleMethod.
@@ -748,6 +746,8 @@ void shasta::main::assemble(
             assemblerOptions.readGraphOptions.WThreshold,
             assemblerOptions.readGraphOptions.WThresholdForBreaks
             );
+        }  else if(assemblerOptions.readGraphOptions.creationMethod == 5) {
+            assembler.createReadGraph5();
         }
 
         // Actual alignment criteria are as specified in the command line options

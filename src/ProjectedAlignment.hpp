@@ -100,11 +100,17 @@ class shasta::ProjectedAlignment {
 public:
     vector<ProjectedAlignmentSegment> segments;
 
+    enum class Method {
+        All,        // Do both RLE and raw alignments, store all segments.
+        QuickRle,   // Only do RLE alignments, only store segments where the two RLE sequences differ.
+        QuickRaw,   // Only do raw alignments, only store segments where the two raw sequences differ.
+    };
+
     ProjectedAlignment(
         const Assembler&,
         const array<OrientedReadId, 2>&,
         const Alignment&,
-        bool quick);
+        Method method);
 
     ProjectedAlignment(
         uint32_t k,
@@ -112,10 +118,11 @@ public:
         const array<LongBaseSequenceView, 2>&,
         const Alignment&,
         const array< span<const CompressedMarker>, 2>& markers,
-        bool quick);
+        Method method);
 
-    void constructSlow();
-    void constructQuick();
+    void constructAll();
+    void constructQuickRle();
+    void constructQuickRaw();
 
     // Marker length and its half.
     uint32_t k;
@@ -168,5 +175,8 @@ public:
 
     void writeStatisticsHtml(ostream&) const;
     void writeHtml(ostream&, bool brief) const;
+
+    // Find pairs of mismatching positions in the raw alignments.
+    void getMismatchPositions(vector< array<uint32_t, 2> >&) const;
 };
 
