@@ -195,6 +195,9 @@ void ProjectedAlignment::constructQuickRaw()
 
         // Align them.
         segment.computeAlignment(matchScore, mismatchScore, gapScore);
+
+        // Store this segment.
+        segments.push_back(segment);
     }
 }
 
