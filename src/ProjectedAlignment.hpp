@@ -175,5 +175,8 @@ public:
 
     void writeStatisticsHtml(ostream&) const;
     void writeHtml(ostream&, bool brief) const;
+
+    // Find pairs of mismatching positions in the raw alignments.
+    void getMismatchPositions(vector< array<uint32_t, 2> >&) const;
 };
 
