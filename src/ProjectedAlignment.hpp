@@ -9,6 +9,7 @@ an Alignment in marker space to base space.
 
 #include "array.hpp"
 #include "cstdint.hpp"
+#include "invalid.hpp"
 #include "iosfwd.hpp"
 #include "span.hpp"
 #include "utility.hpp"
@@ -61,7 +62,7 @@ public:
 
     // The alignment between the two sequences.
     // See seqan.hpp for its meaning.
-    int64_t editDistance;
+    int64_t editDistance = invalid<int64_t>;
     vector< pair<bool, bool> > alignment;
     void computeAlignment(
         int64_t matchScore,
@@ -74,7 +75,7 @@ public:
 
     // The alignment between the two RLE sequences.
     // See seqan.hpp for its meaning.
-    int64_t rleEditDistance;
+    int64_t rleEditDistance = invalid<int64_t>;
     vector< pair<bool, bool> > rleAlignment;
     void computeRleAlignment(
         int64_t matchScore,
@@ -82,7 +83,7 @@ public:
         int64_t gapScore);
 
     // The number of mismatches in the RLE alignment.
-    uint64_t mismatchCountRle;
+    uint64_t mismatchCountRle = invalid<uint64_t>;
 
 
     void writeAlignmentHtml(ostream&) const;
