@@ -4,7 +4,6 @@
 #include "Base.hpp"
 #include "invalid.hpp"
 #include "mode3-Anchor.hpp"
-#include "mode3-Detangler.hpp"
 #include "mode3-PhasedComponent.hpp"
 #include "mode3-Superbubbles.hpp"
 #include "MappedMemoryOwner.hpp"
@@ -995,18 +994,6 @@ private:
 
 
 
-    // Code in mode3-AssemblyGraphRun4.cpp.
-    void run4(
-        uint64_t threadCount,
-        bool assembleSequence,
-        bool debug);
-    uint64_t detangle(const Superbubbles&, Detangler&);
-    // uint64_t detangleShortSuperbubbles4(bool debug, const Superbubbles&);
-    // bool detangleShortSuperbubble4(bool debug, const vector<vertex_descriptor>& superbubble);
-    uint64_t cleanupBubbles();
-    uint64_t detangleCrossEdgesIndividually(
-        bool debug,
-        ChainPermutationDetangler&);
 
     // This detangles induced subgraphs of the AssemblyGraph
     // that are isomorphic to a given Subgraph.
