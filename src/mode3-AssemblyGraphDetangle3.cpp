@@ -16,34 +16,6 @@ using namespace mode3;
 
 
 
-void AssemblyGraph::run3(
-    uint64_t /* threadCount */,
-    bool /* assembleSequence */,
-    bool /* debug */)
-{
-    cout << "AssemblyGraph::run3 begins for component " << componentId << endl;
-
-    SHASTA_ASSERT(std::is_sorted(orientedReadIds.begin(), orientedReadIds.end()));
-    SHASTA_ASSERT(std::is_sorted(anchorIds.begin(), anchorIds.end()));
-
-    write("A");
-    detangle3();
-    write("B");
-}
-
-
-
-void AssemblyGraph::detangle3()
-{
-    AssemblyGraph& assemblyGraph = *this;
-
-    Detangle3Graph detangle3Graph(assemblyGraph);
-    cout << "The Detangle3Graph has " << num_vertices(detangle3Graph) <<
-        " vertices and " << num_edges(detangle3Graph) << " edges." << endl;
-}
-
-
-
 Detangle3Graph::Detangle3Graph(AssemblyGraph& assemblyGraph) :
     assemblyGraph(assemblyGraph)
 {

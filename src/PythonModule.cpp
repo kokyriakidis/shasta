@@ -690,10 +690,9 @@ PYBIND11_MODULE(shasta, shastaModule)
 
 
 
-    // Expose chass mode3AssemblyGraph to Python.
+    // Expose class mode3AssemblyGraph to Python.
     class_<mode3::AssemblyGraph>(shastaModule, "Mode3AssemblyGraph")
-        .def(pybind11::init<const string&, uint64_t, const Assembler&, const Mode3AssemblyOptions&>())
-        .def("detangle2", &mode3::AssemblyGraph::detangle2);
+        .def(pybind11::init<const string&, uint64_t, const Assembler&, const Mode3AssemblyOptions&>());
 
 
     // Constants.

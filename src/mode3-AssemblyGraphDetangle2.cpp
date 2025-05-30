@@ -14,44 +14,6 @@ using namespace mode3;
 
 
 
-// Detangling with path following.
-// When this is called, all the BubbleChains must consist of a single Chain.
-// This can be achieved by calling expand first.
-void AssemblyGraph::detangle2()
-{
-    AssemblyGraph& assemblyGraph = *this;
-
-    // EXPOSE WHEN CODE STABILIZES.
-    const uint64_t chainLengthThreshold = 50000;
-
-    cout << "AssemblyGraph::detangle2 called." << endl;
-    cout << "Component " << componentId << endl;
-    cout << orientedReadIds.size() << " oriented reads." << endl;
-    cout << anchorIds.size() << " anchors." << endl;
-    cout << num_vertices(assemblyGraph) << " vertices." << endl;
-    cout << num_edges(assemblyGraph) << " edges." << endl;
-
-    BGL_FORALL_EDGES(e, assemblyGraph, AssemblyGraph) {
-        SHASTA_ASSERT(assemblyGraph[e].isSimpleChain());
-    }
-
-    // Make sure we have anchor annotations.
-    annotateAnchors();
-
-    // Create the Detangle2Graph.
-    Detangle2Graph detangle2Graph(assemblyGraph, chainLengthThreshold);
-    detangle2Graph.addEdges();
-    detangle2Graph.writeGraphviz("Detangle2Graph-Initial.dot");
-    detangle2Graph.removeWeakEdges();
-    detangle2Graph.writeGraphviz("Detangle2Graph-Final.dot");
-    detangle2Graph.findLinearChains();
-    detangle2Graph.createChains();
-
-    assemblyGraph.write("Detangle2");
-}
-
-
-
 // Construct the vertices from the long Chains of the AssemblyGraph.
 Detangle2Graph::Detangle2Graph(
     AssemblyGraph& assemblyGraph,

@@ -632,12 +632,6 @@ private:
         uint64_t lowCoverageThreshold,
         uint64_t highCoverageThreshold);
 
-    // Detangling with path following.
-public:
-    void detangle2(); // Python callable.
-private:
-    void detangle3();
-
     // Cleanup/simplify superbubbles that are likely to be caused by errors,
     // completely or in part.
     uint64_t cleanupSuperbubbles(
