@@ -611,26 +611,7 @@ private:
         double epsilon,
         double minLogP);
 
-    // Detangle with read following.
-    enum class SuperbubbleCreationMethod {
-        SingleEdges,
-        ByLength
-    };
-    uint64_t detangleSuperbubblesWithReadFollowing(
-        bool debug,
-        SuperbubbleCreationMethod,
-        uint64_t maxOffset,
-        double maxLoss,
-        uint64_t lowCoverageThreshold,
-        uint64_t highCoverageThreshold);
-    bool detangleSuperbubbleWithReadFollowing(
-        bool debug,
-        const Superbubbles&,
-        uint64_t superbubbleId,
-        uint64_t maxOffset,
-        double maxLoss,
-        uint64_t lowCoverageThreshold,
-        uint64_t highCoverageThreshold);
+
 
     // Cleanup/simplify superbubbles that are likely to be caused by errors,
     // completely or in part.
