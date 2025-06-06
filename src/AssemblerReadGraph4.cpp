@@ -1755,14 +1755,14 @@ class AlignmentPositionBaseStats{
         std::set<ReadId> hetBase1ReadIds;
         std::set<uint64_t> hetBase1AlignmentIds;
         uint64_t totalNumberOfHetBase1 = 0;
-        uint64_t percentageOfHetBase1 = 0;
+        double percentageOfHetBase1 = 0;
 
         uint64_t hetBase2 = 100; // Invalid base value initially
         std::set<OrientedReadId> hetBase2OrientedReadIds;
         std::set<ReadId> hetBase2ReadIds;
         std::set<uint64_t> hetBase2AlignmentIds;
         uint64_t totalNumberOfHetBase2 = 0;
-        uint64_t percentageOfHetBase2 = 0;
+        double percentageOfHetBase2 = 0;
 };
 
 
@@ -1770,12 +1770,13 @@ class Site {
     public:
         std::set<OrientedReadId> orientedReads;
         OrientedReadId targetOrientedReadId;
+        std::set<OrientedReadId> excludedOrientedReads;
     };
 
 // Structure to hold data for the phasing threads
 struct PhasingThreadData {
     // Pointers to assembler data (const access needed in thread)
-    const Assembler* assembler; // Use const Assembler*
+    const Assembler *assembler; // Use const Assembler*
     uint64_t alignmentCount;
     uint64_t readCount; // Add readCount for checks
     uint64_t orientedReadCount; // Add orientedReadCount for checks
@@ -1786,18 +1787,16 @@ struct PhasingThreadData {
     // Thread-local storage for results
     // Each outer vector is indexed by threadId
     // Each inner vector<bool> is indexed by alignmentId
-    vector<vector<bool>> threadForbiddenAlignments;
-    vector<vector<bool>> threadFirstPassHetAlignments;
-    vector<vector<bool>> threadAlignmentsAlreadyConsidered;
-    vector<vector<Site>> threadSites;
+    vector<vector<bool> > threadForbiddenAlignments;
+    vector<vector<bool> > threadFirstPassHetAlignments;
+    vector<vector<bool> > threadAlignmentsAlreadyConsidered;
+    vector<vector<Site> > threadSites;
     vector<bool> isReadIdContained;
 
     // Mutex for thread-safe cout if debugging is needed inside threads
     // std::mutex coutMutex; // Uncomment if needed
 
-    PhasingThreadData(const Assembler* asmPtr, size_t threadCount) :
-        assembler(asmPtr)
-    {
+    PhasingThreadData(const Assembler *asmPtr, size_t threadCount) : assembler(asmPtr) {
         // --- Check asmPtr validity early ---
         SHASTA_ASSERT(assembler != nullptr);
 
@@ -1813,7 +1812,7 @@ struct PhasingThreadData {
         threadAlignmentsAlreadyConsidered.resize(threadCount);
         threadSites.resize(threadCount);
 
-        for(size_t i=0; i<threadCount; ++i) {
+        for (size_t i = 0; i < threadCount; ++i) {
             // Resize inner vectors
             threadForbiddenAlignments[i].resize(alignmentCount, false);
             threadFirstPassHetAlignments[i].resize(alignmentCount, false);
@@ -1821,8 +1820,9 @@ struct PhasingThreadData {
         }
     }
 };
+
 // Global pointer for thread access (similar pattern to computeAlignmentsData)
-PhasingThreadData* phasingThreadData = nullptr;
+PhasingThreadData *phasingThreadData = nullptr;
 
 
 // Thread function for the phasing analysis part
@@ -1879,9 +1879,15 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
         // Loop over read IDs in this batch
         for (ReadId readId = readIdBegin; readId < readIdEnd; readId++) {
 
-            // // --- Start of per-read analysis code ---
+            // --- Start of per-read analysis code ---
             // if ((readId != 2228) && (readId != 2229) && (readId != 2230) && (readId != 2231) && (readId != 2232) && (readId != 2233) && (readId != 2234) && (readId != 2235) && (readId != 2236) && (readId != 2237)) { // Keep this for debugging specific reads if needed
             //     continue;
+            // }
+
+            // if (((readId < 19300) || (readId > 19420))) { // Keep this for debugging specific reads if needed
+            //     if ((readId < 1980) || (readId > 2050)) {
+            //         continue;
+            //     }
             // }
 
             // // --- Start of per-read analysis code ---
@@ -1897,13 +1903,13 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
             const OrientedReadId orientedReadId0(readId0, strand0);
 
 
-            // We do not perform the analysis on contained reads because the longer reads that contain them will
-            // make the decisions for them (where they best belong) given that they will have more informative
-            // sites to consider.
-            if (phasingThreadData->isReadIdContained[readId0]) {
-                // Skip contained reads
-                continue;
-            }
+            // // We do not perform the analysis on contained reads because the longer reads that contain them will
+            // // make the decisions for them (where they best belong) given that they will have more informative
+            // // sites to consider.
+            // if (phasingThreadData->isReadIdContained[readId0]) {
+            //     // Skip contained reads
+            //     continue;
+            // }
 
 
 
@@ -1918,10 +1924,6 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
             for (const auto alignmentId : alignmentTableForIntervalTreeConstruction) {
 
                 const AlignmentData& ad = alignmentData[alignmentId];
-
-                // if (ad.info.data[0].leftTrim() <= 200) {
-                //     continue;
-                // }
 
                 OrientedReadId currentOrientedReadId0(ad.readIds[0], 0);
                 OrientedReadId currentOrientedReadId1(ad.readIds[1], ad.isSameStrand ? 0 : 1);
@@ -1954,6 +1956,10 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                 SHASTA_ASSERT(currentOrientedReadId0.getStrand() == strand0);
                 SHASTA_ASSERT(currentOrientedReadId0 == orientedReadId0); // Check consistency
 
+                // if ((alignmentInfo.data[0].leftTrim() <= 50) || (alignmentInfo.data[1].rightTrim() <= 50)) {
+                //     continue;
+                // }
+
                 const auto orientedReadMarkers = markers[currentOrientedReadId0.getValue()];
                 const uint32_t position0 = orientedReadMarkers[alignmentInfo.data[0].firstOrdinal].position;
                 const uint32_t position1 = orientedReadMarkers[alignmentInfo.data[0].lastOrdinal].position + uint32_t(assembler.assemblerInfo->k);
@@ -1967,7 +1973,7 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                     alignmentIntervals.add({interval, currentAlignmentInfoSet}); // Add to the map (handles overlaps)
                     debugOut << "Thread ID: " << threadId << " Added interval [" << position0 << ", " << position1 << ") for alignment " << alignmentId << " (Other Read: " << currentOrientedReadId1 << ")" << endl;
                 } else {
-                    debugOut << "Thread ID: " << threadId << " Skipping invalid interval [" << position0 << ", " << position1 << "] for alignment " << alignmentId << endl;
+                    // debugOut << "Thread ID: " << threadId << " Skipping invalid interval [" << position0 << ", " << position1 << "] for alignment " << alignmentId << endl;
                 }
             }
 
@@ -2099,22 +2105,8 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                     continue;
                 }
 
-                //debugOut << "Thread ID: " << threadId << " is processing alignment ID: " << alignmentId << endl;
-
                 const AlignmentData& ad = alignmentData[alignmentId];
                 const size_t alignedMarkerCount = ad.info.markerCount;
-
-                // if (ad.info.data[1].rightTrim() <= 10) {
-                //     // Skip alignments that are not right trimmed
-                //     continue;
-                // }
-
-
-                // // Explore only alignments that are not hanging on the left.
-                // // The target read is always in the most "left" position
-                // if ((ad.info.data[0].leftTrim() <= 200)) {
-                //     continue;
-                // }
 
                 OrientedReadId currentOrientedReadId0(ad.readIds[0], 0);
                 OrientedReadId currentOrientedReadId1(ad.readIds[1], ad.isSameStrand ? 0 : 1);
@@ -2145,6 +2137,44 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                     alignmentInfo.reverseComplement();
                 }
                 SHASTA_ASSERT(currentOrientedReadId0.getStrand() == strand0);
+
+
+
+
+
+                // if ((alignmentInfo.data[0].leftTrim() <= 50) || (alignmentInfo.data[1].rightTrim() <= 50)) {
+                //     continue;
+                // }
+
+
+
+
+
+                // // Explore only alignments that are not hanging on the left.
+                // // The target read is always in the most "left" position
+                // if ((ad.info.data[0].leftTrim() <= 200)) {
+                //     continue;
+                // }
+
+
+                // if (phasingThreadData->isReadIdContained[currentOrientedReadId1.getReadId()]) {
+                //     // Skip contained reads
+                //     continue;
+                // }
+
+
+                // if (ad.info.data[1].rightTrim() <= 50) {
+                //     // Skip alignments that are not right trimmed
+                //     continue;
+                // }
+
+                // if ((ad.info.data[1].rightTrim() <= 50) || (ad.info.offsetAtCenter() <= 0.)) {
+                //      // Skip alignments that are not right trimmed
+                //      continue;
+                // }
+
+
+
 
                 const auto orientedReadMarkers = markers[currentOrientedReadId0.getValue()];
                 const uint32_t position0 = orientedReadMarkers[alignmentInfo.data[0].firstOrdinal].position;
@@ -2224,48 +2254,48 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                             
 
 
-                            //
-                            // --- DEBUG: Print the RAW alignment sequences that have differences ---
-                            //            AND the differences are not gaps
-                            //
-                            if(hasBase1) {
-                                debugOut << endl;
-                                debugOut << "rawAlignmentSequence0 marker positionsA start: " << segment.positionsA[0] << endl;
-                                debugOut << "rawAlignmentSequence1 marker positionsA start: " << segment.positionsA[1] << endl;
-                                debugOut << "sequence0 base change positionsA start: " << segment.positionsA[0] + positionWithDetectedChange0 << endl;
-                                debugOut << "sequence1 base change positionsA start: " << segment.positionsA[1] + positionWithDetectedChange1 << endl;
-                                debugOut << "sequence0 base at base change positionsA: " << baseAtPosition0 << endl;
-                                debugOut << "sequence1 base at base change positionsA: " << baseAtPosition1 << endl;
-                                debugOut << "We found " << segment.editDistance << " edit distance differences between the RAW sequences" << endl;
-                                debugOut << "rawAlignmentSequence0: ";
-                                for(uint64_t i=0; i<rawAlignmentSequence0.size(); i++) {
-                                    const bool isDifferent = (rawAlignmentSequence0[i] != rawAlignmentSequence1[i]);
-                                    if(isDifferent) {
-                                        debugOut << "[";
-                                    }
-                                    debugOut << rawAlignmentSequence0[i].character();
-                                    if(isDifferent) {
-                                        debugOut << "]";
-                                    }
-                                }
-                                debugOut << endl;
-                            
-                                debugOut << "rawAlignmentSequence1: ";
-                                for(uint64_t i=0; i<rawAlignmentSequence1.size(); i++) {
-                                    const bool isDifferent = (rawAlignmentSequence0[i] != rawAlignmentSequence1[i]);
-                                    if(isDifferent) {
-                                        debugOut << "[";
-                                    }
-                                    debugOut << rawAlignmentSequence1[i].character();
-                                    if(isDifferent) {
-                                        debugOut << "]";
-                                    }
-                                }
-                                debugOut << endl;
-                            }
-                            //
-                            // --- END DEBUG ---
-                            //
+                            // //
+                            // // --- DEBUG: Print the RAW alignment sequences that have differences ---
+                            // //            AND the differences are not gaps
+                            // //
+                            // if(hasBase1) {
+                            //     debugOut << endl;
+                            //     debugOut << "rawAlignmentSequence0 marker positionsA start: " << segment.positionsA[0] << endl;
+                            //     debugOut << "rawAlignmentSequence1 marker positionsA start: " << segment.positionsA[1] << endl;
+                            //     debugOut << "sequence0 base change positionsA start: " << segment.positionsA[0] + positionWithDetectedChange0 << endl;
+                            //     debugOut << "sequence1 base change positionsA start: " << segment.positionsA[1] + positionWithDetectedChange1 << endl;
+                            //     debugOut << "sequence0 base at base change positionsA: " << baseAtPosition0 << endl;
+                            //     debugOut << "sequence1 base at base change positionsA: " << baseAtPosition1 << endl;
+                            //     debugOut << "We found " << segment.editDistance << " edit distance differences between the RAW sequences" << endl;
+                            //     debugOut << "rawAlignmentSequence0: ";
+                            //     for(uint64_t i=0; i<rawAlignmentSequence0.size(); i++) {
+                            //         const bool isDifferent = (rawAlignmentSequence0[i] != rawAlignmentSequence1[i]);
+                            //         if(isDifferent) {
+                            //             debugOut << "[";
+                            //         }
+                            //         debugOut << rawAlignmentSequence0[i].character();
+                            //         if(isDifferent) {
+                            //             debugOut << "]";
+                            //         }
+                            //     }
+                            //     debugOut << endl;
+
+                            //     debugOut << "rawAlignmentSequence1: ";
+                            //     for(uint64_t i=0; i<rawAlignmentSequence1.size(); i++) {
+                            //         const bool isDifferent = (rawAlignmentSequence0[i] != rawAlignmentSequence1[i]);
+                            //         if(isDifferent) {
+                            //             debugOut << "[";
+                            //         }
+                            //         debugOut << rawAlignmentSequence1[i].character();
+                            //         if(isDifferent) {
+                            //             debugOut << "]";
+                            //         }
+                            //     }
+                            //     debugOut << endl;
+                            // }
+                            // //
+                            // // --- END DEBUG ---
+                            // //
 
 
                             // XXX
@@ -2337,7 +2367,7 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
             // --- Analyze potential heterozygous sites ---
             //
 
-            // We finised analyzing all alignments for the target read (readId0).
+            // We finished analyzing all alignments for the target read (readId0).
             // Now we need to check each potential site in readId0 (in positionStatsOnOrientedReadId0) 
             // to see if it involves a heterozygous site.
             uint64_t sitesSkippedDueToInsufficientCoverage = 0;
@@ -2392,8 +2422,8 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                 if (siteIsInHomopolymerRegion) {
                     // Skip this site because it is in a homopolymer region
                     sitesSkippedDueToInsufficientCoverage++;
-                    debugOut << "Skipping position " << positionInRead0 << " due to homopolymer region." << std::endl;
-                    kmer.write(debugOut, 7) << std::endl;
+                    // debugOut << "Skipping position " << positionInRead0 << " due to homopolymer region." << std::endl;
+                    // kmer.write(debugOut, 7) << std::endl;
                     continue;
                 }
 
@@ -2424,7 +2454,9 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                 
                 // This is the minimum needed number of alignments that
                 // support a change from the base of the target read in that position
-                uint64_t minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead = 4;
+                uint64_t minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead = 3;
+
+                // Check if there is a supporting base change with sufficient coverage
                 if ((totalNumberOfA < minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead) &&
                     (totalNumberOfC < minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead) &&
                     (totalNumberOfG < minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead) &&
@@ -2433,8 +2465,8 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                     // if (positionInRead0 == 35102) {
                     //     cout << "THIS SHOULD NOT HAPPEN. Skipping position " << positionInRead0 << " due to insufficient coverage: " << totalNumberOfAlignments << endl;
                     // }
-                    debugOut << "Skipping position " << positionInRead0 << " due to insufficient coverage supporting a change from the target read: " << totalNumberOfAlignmentsWithoutGapsSupportingAChangeFromTheTargetRead << endl;
-                    debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << endl;
+                    // debugOut << "Skipping position " << positionInRead0 << " due to insufficient coverage supporting a change from the target read: " << totalNumberOfAlignmentsWithoutGapsSupportingAChangeFromTheTargetRead << endl;
+                    // debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << endl;
                     continue;
                 }
                 
@@ -2455,7 +2487,7 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                 const uint64_t highestCoverageBaseCounts = baseCounts[0].first;
                 const uint64_t secondHighestCoverageBaseCounts = baseCounts[1].first;
                 
-                // If the highest coverage base has coverage 4 or more (minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead) 
+                // If the highest coverage base has coverage 3 or more (minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead) 
                 // AND the base is not a gap, then proceede.
                 if ((highestCoverageBaseCounts >= minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead) and (baseCounts[0].second != 4)) {
 
@@ -2465,8 +2497,8 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                     // TODO: If there is a second allele base difference (complex site)
                     // then skip this site for now
                     if ((secondHighestCoverageBaseCounts > 0) and (baseCounts[1].second != 4)) {
-                        debugOut << "Skipping position " << positionInRead0 << " due to having a second highest coverage base that is not a gap: " << secondHighestCoverageBaseCounts << " (complex site)." << endl;
-                        debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << endl;
+                        // debugOut << "Skipping position " << positionInRead0 << " due to having a second highest coverage base that is not a gap: " << secondHighestCoverageBaseCounts << " (complex site)." << endl;
+                        // debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << endl;
                         continue;
                     }
 
@@ -2497,9 +2529,13 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                             uint64_t alignmentId = infoPair.first;
                             OrientedReadId storedOrientedReadId1 = infoPair.second;
                             if (positionInRead0 == 513) {
-                                debugOut << "Found covering alignment ID: " << alignmentId << " for position " << positionInRead0 << endl;
-                                debugOut << "OrientedReadId1: " << storedOrientedReadId1 << endl;
+                                // debugOut << "Found covering alignment ID: " << alignmentId << " for position " << positionInRead0 << endl;
+                                // debugOut << "OrientedReadId1: " << storedOrientedReadId1 << endl;
                             }
+                            // if (phasingThreadData->isReadIdContained[storedOrientedReadId1.getReadId()]) {
+                            //     // Skip contained reads
+                            //     continue;
+                            // }
                             coveringAlignmentIds.insert(alignmentId);
                             coveringOrientedReadIds.insert(storedOrientedReadId1);
                         }
@@ -2509,16 +2545,21 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                     // Calculate the total coverage in this position without including alignments with gaps
                     uint64_t totalCoverageInThisPositionWithoutGaps = totalCoverageInThisPosition - positionStatsInRead0.totalNumberOfGap;
 
-                    // Skip this position if the coverage supporting the target read is less than 4
-                    if (totalCoverageInThisPosition - totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead < 3) {
+                    // This is the minimum needed number of alignments that
+                    // support the target read in that position. 
+                    // This is 2 + 1(the target read) = 3
+                    uint64_t minimumNumberOfAlignmentsSupportingTheTargetRead = 2;
+
+                    // Skip this position if the coverage supporting the target read is less than 2
+                    if (totalCoverageInThisPosition - totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead < minimumNumberOfAlignmentsSupportingTheTargetRead) {
                         sitesSkippedDueToInsufficientCoverage++;
-                        debugOut << "Skipping position " << positionInRead0 << " due to insufficient coverage supporting the target read: " << totalCoverageInThisPosition - totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead << endl;
-                        debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << " Total Alignments that support a change: " << totalNumberOfAlignmentsWithoutGapsSupportingAChangeFromTheTargetRead << ". Total alignments: " << totalCoverageInThisPosition << ". Total alignments without gaps: " << totalCoverageInThisPositionWithoutGaps << "." << endl;
+                        // debugOut << "Skipping position " << positionInRead0 << " due to insufficient coverage supporting the target read: " << totalCoverageInThisPosition - totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead << endl;
+                        // debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << " Total Alignments that support a change: " << totalNumberOfAlignmentsWithoutGapsSupportingAChangeFromTheTargetRead << ". Total alignments: " << totalCoverageInThisPosition << ". Total alignments without gaps: " << totalCoverageInThisPositionWithoutGaps << "." << endl;
                         continue;
                     }
 
                     // Print position and base counts
-                    debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << " Total Alignments that support a change: " << totalNumberOfAlignmentsWithoutGapsSupportingAChangeFromTheTargetRead << ". Total alignments: " << totalCoverageInThisPosition << ". Total alignments without gaps: " << totalCoverageInThisPositionWithoutGaps << "." << endl;
+                    // debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << " Total Alignments that support a change: " << totalNumberOfAlignmentsWithoutGapsSupportingAChangeFromTheTargetRead << ". Total alignments: " << totalCoverageInThisPosition << ". Total alignments without gaps: " << totalCoverageInThisPositionWithoutGaps << "." << endl;
                     
 
                     // if (positionInRead0 == 35102) {
@@ -2648,10 +2689,10 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                     );
 
                     if (strandBiasDetected) {
-                        debugOut << "Strand bias detected at position " << positionInRead0 
-                                   << " for readId " << readId0 << ". Reads for target base on strand " << dominantStrandHet1Value
-                                   << ", reads for other base on strand " << dominantStrandHet2Value
-                                   << ". Skipping this site." << endl;
+                        // debugOut << "Strand bias detected at position " << positionInRead0 
+                        //            << " for readId " << readId0 << ". Reads for target base on strand " << dominantStrandHet1Value
+                        //            << ", reads for other base on strand " << dominantStrandHet2Value
+                        //            << ". Skipping this site." << endl;
                         sitesSkippedDueToInsufficientCoverage++; // Using existing counter, consider a new one for clarity if needed
                         potentialHetSitesOnOrientedReadId0.erase(positionInRead0);
                         continue; // Skip to the next positionStatsInRead0
@@ -2690,7 +2731,7 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                     // Skip gaps
                     continue;
                 }
-                debugOut << "Potential heterozygous site at position " << positionInRead0 
+                debugOut << "Potential heterozygous site at position " << positionInRead0
                     << " in readId " << readId0 << " in strand " << strand0 << ":" << endl
                     << "  Base of readId0: " << bases[positionStatsInRead0.baseOfReadId0] << endl
                     << "  First variant: " << bases[positionStatsInRead0.hetBase1] << " (" << positionStatsInRead0.totalNumberOfHetBase1 << " "<< positionStatsInRead0.percentageOfHetBase1 * 100 << "%)" << endl
@@ -2750,7 +2791,7 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
             // XXX
             // --- Dynamic Programming for Grouping Compatible Sites and Phasing ---
             //
-            debugOut << timestamp << "Starting DP for grouping compatible sites for read " << orientedReadId0 << endl;
+            // debugOut << timestamp << "Starting DP for grouping compatible sites for read " << orientedReadId0 << endl;
 
             // 0. Prepare sorted list of sites
             std::vector<std::pair<uint64_t, AlignmentPositionBaseStats>> sortedSites;
@@ -2763,12 +2804,12 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
 
             uint64_t N = sortedSites.size();
             if (N == 0) {
-                debugOut << "No potential het sites found after filtering for read " << orientedReadId0 << ", skipping DP and subsequent phasing." << endl;
-                debugOut << "Skipped " << sitesSkippedDueToInsufficientCoverage << " sites due to insufficient coverage" << endl;
+                // debugOut << "No potential het sites found after filtering for read " << orientedReadId0 << ", skipping DP and subsequent phasing." << endl;
+                // debugOut << "Skipped " << sitesSkippedDueToInsufficientCoverage << " sites due to insufficient coverage" << endl;
                 continue; // Skip to the next readId if no sites
             } else {
-                debugOut << "Found " << N << " potential heterozygous sites for DP in readId " << readId0 << endl;
-                debugOut << "Skipped " << sitesSkippedDueToInsufficientCoverage << " sites due to insufficient coverage" << endl;
+                // debugOut << "Found " << N << " potential heterozygous sites for DP in readId " << readId0 << endl;
+                // debugOut << "Skipped " << sitesSkippedDueToInsufficientCoverage << " sites due to insufficient coverage" << endl;
             }
 
             // Define compatibility check function locally (or move to class scope)
@@ -2881,8 +2922,8 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                 // 2. There was at least one read supporting the 0-0 linkage relative to target.
                 // 3. There was at least one read supporting the 1-1 linkage relative to target.
                 // cout << "Compatibility check for sites " << site_pair_i.first << " and " << site_pair_j.first << " relative to target " << targetReadId << ": found_phase_00=" << found_phase_00 << ", found_phase_11=" << found_phase_11 << endl;
-                return found_phase_00 && found_phase_11;
-                // return found_phase_00 && found_phase_11 && (found_phase_00_count >= 2) && (found_phase_11_count >= 2);
+                // return found_phase_00 && found_phase_11;
+                return found_phase_00 && found_phase_11 && (found_phase_00_count >= 3) && (found_phase_11_count >= 3);
 
             };
 
@@ -2908,17 +2949,20 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
 
             // Create pairs of (LCG value, index) to sort by LCG value descending
             std::vector<std::pair<uint64_t, size_t>> sortedLCGIndices;
+            std::vector<std::pair<uint64_t, size_t>> isolatedSitesIndices;
             for(size_t i = 0; i < N; ++i) {
-                if (LCG[i] > 1) { // Only consider sites that are part of a group (they have LCG > 1)
+                if (LCG[i] > 1) { // Groupped sites (they have LCG > 1)
                     sortedLCGIndices.push_back({LCG[i], i});
+                } else if (LCG[i] == 1) { // Isolated sites
+                    isolatedSitesIndices.push_back({LCG[i], i});
                 }
             }
             // Sort descending by LCG value
             std::sort(sortedLCGIndices.rbegin(), sortedLCGIndices.rend()); 
 
-            debugOut << "DP results for read " << orientedReadId0 << ": LCG values > 1:" << endl;
+            // debugOut << "DP results for read " << orientedReadId0 << ": LCG values > 1:" << endl;
             for(const auto& p : sortedLCGIndices) {
-                debugOut << "  Site Index: " << p.second << " (Pos: " << sortedSites[p.second].first << "), LCG: " << p.first << endl;
+                // debugOut << "  Site Index: " << p.second << " (Pos: " << sortedSites[p.second].first << "), LCG: " << p.first << endl;
             }
 
             std::set<OrientedReadId> tempInPhaseOrientedReads;
@@ -2928,12 +2972,13 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
 
             for (const auto& lcgPair : sortedLCGIndices) {
                 size_t current_i = lcgPair.second;
-    
+                uint64_t current_LCG = lcgPair.first;
+
                 if (!isAssigned[current_i]) {
                     std::vector<uint64_t> newClusterPositions; // Keep this for informativeSites logic later if needed
                     std::vector<size_t> newClusterIndices;    // Store indices for phasing logic
                     int traceIndex = current_i;
-                    debugOut << "Starting traceback for cluster ending at index " << current_i << " (Pos: " << sortedSites[current_i].first << ") with LCG " << LCG[current_i] << endl;
+                    // debugOut << "Starting traceback for cluster ending at index " << current_i << " (Pos: " << sortedSites[current_i].first << ") with LCG " << LCG[current_i] << endl;
     
                     while (traceIndex != -1 && !isAssigned[traceIndex]) {
     
@@ -2965,7 +3010,7 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                         newClusterPositions.push_back(sortedSites[traceIndex].first); // Store site position
                         newClusterIndices.push_back(traceIndex); // Store site index
                         isAssigned[traceIndex] = true;
-                        debugOut << "  Adding site index " << traceIndex << " (Pos: " << sortedSites[traceIndex].first << ") to compatible group." << endl;
+                        // debugOut << "  Adding site index " << traceIndex << " (Pos: " << sortedSites[traceIndex].first << ") to compatible group." << endl;
                         traceIndex = parent[traceIndex];
     
                     }
@@ -2974,9 +3019,69 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                     std::reverse(newClusterIndices.begin(), newClusterIndices.end());   // Store indices in positional order
                     //siteClusters.push_back(newClusterPositions); // Keep the original structure if needed elsewhere
                     //siteIndexClusters.push_back(newClusterIndices); // Use this for phasing
-                    debugOut << "  Finished constructing of a compatible group with " << newClusterPositions.size() << " sites." << endl;
+                    // debugOut << "  Finished constructing of a compatible group with " << newClusterPositions.size() << " sites." << endl;
                 }
             }
+
+
+            for (const auto& lcgPair : isolatedSitesIndices) {
+                size_t current_i = lcgPair.second;
+                uint64_t current_LCG = lcgPair.first;
+
+                // An isolated site is considered informative only if it is supported by a
+                // sufficient high number of reads.
+                if ((current_LCG == 1) && (!isAssigned[current_i])) {
+                    const AlignmentPositionBaseStats& currentIndexStats = sortedSites[current_i].second;
+                    uint64_t targetAllele = currentIndexStats.baseOfReadId0;
+                    uint64_t otherAllele = (targetAllele == currentIndexStats.hetBase1) ? currentIndexStats.hetBase2 : currentIndexStats.hetBase1;
+
+                    uint64_t hetBase1Coverage = currentIndexStats.hetBase1OrientedReadIds.size();
+                    uint64_t hetBase2Coverage = currentIndexStats.hetBase2OrientedReadIds.size();
+
+                    double threshold1 = 0.35;
+                    double threshold2 = 0.24;
+
+                    uint64_t minCoverageAmongHetBases = std::min(hetBase1Coverage, hetBase2Coverage);
+                    double available = minCoverageAmongHetBases;
+                    uint64_t totalCoverageAmongHetBases = hetBase1Coverage + hetBase2Coverage;
+                    available = available/((double)(totalCoverageAmongHetBases));
+
+                    if(minCoverageAmongHetBases >= 5) {
+                        if(available < threshold2 || totalCoverageAmongHetBases < 10) {
+                            continue;
+                        }
+                    } else if (available < threshold1 || hetBase1Coverage < 4 || totalCoverageAmongHetBases < 10) {
+                        continue;
+                    }
+                    
+                    // 1. Populate involved reads for this site
+                    // Add all reads supporting either heterozygous allele at this site
+                    involvedOrientedReadsInInformativeSites.insert(currentIndexStats.hetBase1OrientedReadIds.begin(), currentIndexStats.hetBase1OrientedReadIds.end());
+                    involvedOrientedReadsInInformativeSites.insert(currentIndexStats.hetBase2OrientedReadIds.begin(), currentIndexStats.hetBase2OrientedReadIds.end());
+
+                    // 2. Get in-phase and out-of-phase reads *at this specific site index* relative to the target read
+                    // Populate in-phase set (reads with the same allele as the target read at this site)
+                    if (targetAllele == currentIndexStats.hetBase1) {
+                        tempInPhaseOrientedReads.insert(currentIndexStats.hetBase1OrientedReadIds.begin(), currentIndexStats.hetBase1OrientedReadIds.end());
+                    } else { // targetAllele must be stats.hetBase2
+                        tempInPhaseOrientedReads.insert(currentIndexStats.hetBase2OrientedReadIds.begin(), currentIndexStats.hetBase2OrientedReadIds.end());
+                    }
+                    tempInPhaseOrientedReads.insert(orientedReadId0); // The target read is always in phase with itself
+
+                    // Populate out-of-phase set (reads with the other heterozygous allele)
+                    if (otherAllele == currentIndexStats.hetBase1) {
+                        excludedOutOfPhaseOrientedReads.insert(currentIndexStats.hetBase1OrientedReadIds.begin(), currentIndexStats.hetBase1OrientedReadIds.end());
+                    } else { // otherAllele must be stats.hetBase2
+                        excludedOutOfPhaseOrientedReads.insert(currentIndexStats.hetBase2OrientedReadIds.begin(), currentIndexStats.hetBase2OrientedReadIds.end());
+                    }
+
+                    isAssigned[current_i] = true;
+                    // debugOut << "  Adding site index " << current_i << " (Pos: " << sortedSites[current_i].first << ") with LCG " << current_LCG << "." << endl;
+                }
+            }
+
+
+
             
             // Find which reads exist only in the tempInPhaseOrientedReads set and not in the excludedOutOfPhaseOrientedReads set and add them to finalInPhaseOrientedReads
             for (const auto& read : tempInPhaseOrientedReads) {
@@ -3019,6 +3124,7 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                 // Swap oriented reads, if necessary.
                 if (currentOrientedReadId0.getReadId() != readId0) {
                     swap(currentOrientedReadId0, currentOrientedReadId1);
+                    alignmentInfo.swap();
                 }
                 SHASTA_ASSERT(currentOrientedReadId0.getReadId() == readId0);
 
@@ -3026,6 +3132,7 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                 if (currentOrientedReadId0.getStrand() != strand0) {
                     currentOrientedReadId0.flipStrand();
                     currentOrientedReadId1.flipStrand();
+                    alignmentInfo.reverseComplement();
                 }
                 SHASTA_ASSERT(currentOrientedReadId0.getStrand() == strand0);
 
@@ -3034,26 +3141,87 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                 bool involvesExcludedOrientedReads = (finalInPhaseOrientedReads.count(currentOrientedReadId0) && excludedOutOfPhaseOrientedReads.count(currentOrientedReadId1));
                 
                 if (involvesfinalInPhaseOrientedReads) {
+                    if (phasingThreadData->isReadIdContained[currentOrientedReadId0.getReadId()]) {
+                        continue;
+                    }
                     // Mark firstPassHet in thread-local vector
-                    debugOut << "Marking alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " as first pass (intra-phase)" << endl;
+                    // debugOut << "Marking alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " as first pass (intra-phase)" << endl;
                     firstPassHetAlignments[alignmentId] = true;
                     numberOfFirstPassHetAlignments++;
                     alignmentsAlreadyConsidered[alignmentId] = true;
                 }
 
                 if (involvesExcludedOrientedReads) {
+                    if (phasingThreadData->isReadIdContained[currentOrientedReadId0.getReadId()]) {
+                        continue;
+                    }
                     // Mark forbidden in thread-local vector
-                    debugOut << "Forbidding alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " because one read is in excludedOutOfPhaseOrientedReads." << endl;
+                    // debugOut << "Forbidding alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " because one read is in excludedOutOfPhaseOrientedReads." << endl;
                     forbiddenAlignments[alignmentId] = true;
                     alignmentsAlreadyConsidered[alignmentId] = true;
                 }
 
             }
 
+            // // Loop over all oriented reads in finalInPhaseOrientedReads 
+            // for (const auto& orientedRead : finalInPhaseOrientedReads) {
+            //     const auto alignmentTableForOrientedRead = alignmentTable[orientedRead.getValue()];
+            //     for (const auto alignmentId : alignmentTableForOrientedRead) {
+
+            //         const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+            //         ReadId currentReadId0 = thiAlignmentData.readIds[0];
+            //         ReadId currentReadId1 = thiAlignmentData.readIds[1];
+            //         OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+            //         OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+            //         AlignmentInfo alignmentInfo = thiAlignmentData.info;
+
+            //         // Swap oriented reads, if necessary.
+            //         if (currentOrientedReadId0.getReadId() != orientedRead.getReadId()) {
+            //             swap(currentOrientedReadId0, currentOrientedReadId1);
+            //             alignmentInfo.swap();
+            //         }
+            //         SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedRead.getReadId());
+
+            //         // Flip strands, if necessary
+            //         if (currentOrientedReadId0.getStrand() != orientedRead.getStrand()) {
+            //             currentOrientedReadId0.flipStrand();
+            //             currentOrientedReadId1.flipStrand();
+            //             alignmentInfo.reverseComplement();
+            //         }
+            //         SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedRead.getStrand());
+
+            //         // Check if either read in the alignment is in excludedOutOfPhaseOrientedReads
+            //         bool involvesfinalInPhaseOrientedReads = (finalInPhaseOrientedReads.count(currentOrientedReadId0) && finalInPhaseOrientedReads.count(currentOrientedReadId1));
+            //         bool involvesExcludedOrientedReads = (finalInPhaseOrientedReads.count(currentOrientedReadId0) && excludedOutOfPhaseOrientedReads.count(currentOrientedReadId1));
+                    
+            //         if (involvesfinalInPhaseOrientedReads) {
+            //             // Mark firstPassHet in thread-local vector
+            //             // debugOut << "Marking alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " as first pass (intra-phase)" << endl;
+            //             firstPassHetAlignments[alignmentId] = true;
+            //             numberOfFirstPassHetAlignments++;
+            //             alignmentsAlreadyConsidered[alignmentId] = true;
+            //         }
+
+            //         if (involvesExcludedOrientedReads) {
+            //             // Mark forbidden in thread-local vector
+            //             // debugOut << "Forbidding alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " because one read is in excludedOutOfPhaseOrientedReads." << endl;
+            //             forbiddenAlignments[alignmentId] = true;
+            //             alignmentsAlreadyConsidered[alignmentId] = true;
+            //         }
+                    
+            //     }
+            // }
+            
+
+
+
+
+
+
             // // We do not perform the analysis on contained reads because the longer reads will
             // // make the decision for them (where they best belong) given that they will have more informative
             // // sites to consider. However, these contained reads should be assigned to one cluster of reads only.
-            // // Otherwise, we observe between-haplotypes alignments that connect to 
+            // // Otherwise, we observe between-haplotypes alignments that connect to
             // // these contained reads from both sides of a het region.
             // // So, we also need to forbid alignments between contained reads and excludedOutOfPhaseOrientedReads.
             // for (const auto& orientedRead : finalInPhaseOrientedReads) {
@@ -3061,43 +3229,43 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
             //         const auto alignmentTableForContainedRead = alignmentTable[orientedRead.getValue()];
             //         // Loop over alignments involving contained read.
             //         for (const auto alignmentId : alignmentTableForContainedRead) {
-
+            //
             //             const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
             //             ReadId currentReadId0 = thiAlignmentData.readIds[0];
             //             ReadId currentReadId1 = thiAlignmentData.readIds[1];
             //             OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
             //             OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
-
+            //
             //             // Swap oriented reads, if necessary.
             //             if (currentOrientedReadId0.getReadId() != orientedRead.getReadId()) {
             //                 swap(currentOrientedReadId0, currentOrientedReadId1);
             //             }
             //             SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedRead.getReadId());
-
+            //
             //             // Flip strands, if necessary
             //             if (currentOrientedReadId0.getStrand() != orientedRead.getStrand()) {
             //                 currentOrientedReadId0.flipStrand();
             //                 currentOrientedReadId1.flipStrand();
             //             }
             //             SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedRead.getStrand());
-
+            //
             //             // Check if either read in the alignment is in excludedOutOfPhaseOrientedReads
             //             bool involvesExcludedOrientedReads = (finalInPhaseOrientedReads.count(currentOrientedReadId0) && excludedOutOfPhaseOrientedReads.count(currentOrientedReadId1));
-                        
+            //
             //             if (involvesExcludedOrientedReads) {
             //                 debugOut << "Forbidding alignment " << alignmentId << " involving contained read: " << currentReadId0 << " and read: " << currentReadId1 << " because the other read is in excludedOutOfPhaseOrientedReads." << endl;
             //                 forbiddenAlignments[alignmentId] = true;
             //                 alignmentsAlreadyConsidered[alignmentId] = true;
             //             }
-
+            //
             //         }
-                    
+            //
             //     }
             // }
 
-            cout << "Number of first pass het alignments for readId " << readId0 << ": " << numberOfFirstPassHetAlignments << endl;
+            // cout << "Number of first pass het alignments for readId " << readId0 << ": " << numberOfFirstPassHetAlignments << endl;
 
-            debugOut << timestamp << "Finished DP for grouping compatible sites for read " << orientedReadId0 << endl;
+            // debugOut << timestamp << "Finished DP for grouping compatible sites for read " << orientedReadId0 << endl;
 
             // XXX
             // --- END OF: Keep the correct alignments and forbid the bad alignments based on the compatible site phasing ---
@@ -3113,10 +3281,29 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
             Site newSite;
             newSite.orientedReads.insert(finalInPhaseOrientedReads.begin(), finalInPhaseOrientedReads.end());
             newSite.targetOrientedReadId = orientedReadId0;
+            newSite.excludedOrientedReads.insert(excludedOutOfPhaseOrientedReads.begin(), excludedOutOfPhaseOrientedReads.end());
 
             if (!newSite.orientedReads.empty()) {
-                sites.push_back(newSite); // Add the single Site object populated above
+                sites.push_back(newSite);
             }
+
+            // Create a site of the reverse strand
+            Site newSiteReverseStrand;
+            for (const auto& orientedRead : finalInPhaseOrientedReads) {
+                OrientedReadId reverseOrientedRead(orientedRead.getReadId(), orientedRead.getStrand() == 0 ? 1 : 0);
+                newSiteReverseStrand.orientedReads.insert(reverseOrientedRead);
+            }
+            for (const auto& orientedRead : excludedOutOfPhaseOrientedReads) {
+                OrientedReadId reverseOrientedRead(orientedRead.getReadId(), orientedRead.getStrand() == 0 ? 1 : 0);
+                newSiteReverseStrand.excludedOrientedReads.insert(reverseOrientedRead);
+            }
+            newSiteReverseStrand.targetOrientedReadId = OrientedReadId(orientedReadId0.getReadId(), orientedReadId0.getStrand() == 0 ? 1 : 0);
+
+            if (!newSiteReverseStrand.orientedReads.empty()) {
+                sites.push_back(newSiteReverseStrand);
+            }
+
+
             // XXX
             // --- END OF: Populate the sites vector for this read's haplotype block ---
             //
@@ -3125,7 +3312,7 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
         } // End loop over read IDs in batch
 
     } // End while getNextBatch
-    
+
 }
 
 
@@ -3156,8 +3343,10 @@ void Assembler::createReadGraph4withStrandSeparation(
 
     // --- Parallel Phasing Section ---
     cout << timestamp << "Starting parallel phasing analysis." << endl;
-    // const uint64_t threadCount = std::thread::hardware_concurrency();
-    const uint64_t threadCount = std::thread::hardware_concurrency();
+    uint64_t threadCount = assemblerInfo->threadCount;
+    if (threadCount == 0) {
+        threadCount = std::thread::hardware_concurrency();
+    }
     cout << "Using " << threadCount << " threads." << endl;
 
     // Initialize shared data structure for threads
@@ -3176,36 +3365,70 @@ void Assembler::createReadGraph4withStrandSeparation(
         const auto alignmentTable0 = alignmentTable[orientedReadId0.getValue()];
         for (const auto alignmentId : alignmentTable0) {
 
-            const AlignmentData& ad = alignmentData[alignmentId];
+            const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+            ReadId currentReadId0 = thiAlignmentData.readIds[0];
+            ReadId currentReadId1 = thiAlignmentData.readIds[1];
+            OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+            OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+            AlignmentInfo alignmentInfo = thiAlignmentData.info;
 
-            ReadId readId0 = ad.readIds[0];
-            ReadId readId1 = ad.readIds[1];
+            // Swap oriented reads, if necessary.
+            if (currentOrientedReadId0.getReadId() != readId0) {
+                swap(currentOrientedReadId0, currentOrientedReadId1);
+                alignmentInfo.swap();
+            }
+            SHASTA_ASSERT(currentOrientedReadId0.getReadId() == readId0);
 
-            const uint64_t leftTrim0 = ad.info.data[0].leftTrim();
-            const uint64_t leftTrim1 = ad.info.data[1].leftTrim();
-            const uint64_t rightTrim0 = ad.info.data[0].rightTrim();
-            const uint64_t rightTrim1 = ad.info.data[1].rightTrim();
-            const uint64_t maxTrim = assemblerInfo->actualMaxTrim;
+            // Flip strands, if necessary
+            if (currentOrientedReadId0.getStrand() != strand0) {
+                currentOrientedReadId0.flipStrand();
+                currentOrientedReadId1.flipStrand();
+                alignmentInfo.reverseComplement();
+            }
+            SHASTA_ASSERT(currentOrientedReadId0.getStrand() == strand0);
+
+            const uint64_t leftTrim0 = alignmentInfo.data[0].leftTrim();
+            const uint64_t rightTrim0 = alignmentInfo.data[0].rightTrim();
+
+            const uint64_t leftTrim1 = alignmentInfo.data[1].leftTrim();
+            const uint64_t rightTrim1 = alignmentInfo.data[1].rightTrim();
+
+            // TODO: this is wrong
+            // const uint64_t maxTrim = assemblerInfo->actualMaxTrim;
+            // assemblerOptions.alignOptions.maxTrim
+            const uint64_t maxTrim = 50;
+
+            // Check for containment.
             const bool isContained0 = (leftTrim0<=maxTrim) && (rightTrim0<=maxTrim);
             const bool isContained1 = (leftTrim1<=maxTrim) && (rightTrim1<=maxTrim);
 
-            if (isContained0) {
-                phasingThreadData->isReadIdContained[readId0] = true;
+            if (isContained0 && !isContained1) {
+                // 0 is unambiguously contained in 1.
+                phasingThreadData->isReadIdContained[currentReadId0] = true;
             }
-            if (isContained1) {
-                phasingThreadData->isReadIdContained[readId1] = true;
+            if(isContained1 && !isContained0) {
+                // 1 is unambiguously contained in 0.
+                phasingThreadData->isReadIdContained[currentReadId1] = true;
             }
+            if(isContained0 && isContained1) {
+                // Near complete overlap.
+                continue;
+            }
+
         }
     }
 
     // Print the contained reads
+    uint64_t containedReads = 0;
     cout << "Contained reads: " << endl;
     for (ReadId readId = 0; readId < readCount; readId++) {
         if (phasingThreadData->isReadIdContained[readId]) {
             cout << "  ReadId: " << readId << endl;
+            containedReads++;
         }
     }
     cout << "Finished printing contained reads." << endl;
+    cout << "Total number of contained reads is: " << containedReads << endl;
 
     // Copy the isReadIdContained from threads
     vector<bool> isReadIdContained;
@@ -3262,80 +3485,1258 @@ void Assembler::createReadGraph4withStrandSeparation(
 
 
 
-    // // Loop over all sites and check if a read is included in both strands in the site
-    // vector<bool> sitesThatHaveStrandIssuesForbidden(sites.size(), false);
-    // for(uint64_t siteId=0; siteId<sites.size(); siteId++) {
-    //     const Site& site = sites[siteId];
-    //     std::set<ReadId> readIdsInSite;
-    //     for(const OrientedReadId orientedReadId: site.orientedReads) {
-    //         readIdsInSite.insert(orientedReadId.getReadId());
+    vector <bool> isReadIdContained2;
+    isReadIdContained2.resize(readCount);
+    // Loop over read IDs to find contained reads
+    for (ReadId readId = 0; readId < readCount; readId++) {
+
+        const ReadId readId0 = readId;
+        const Strand strand0 = 0; // Analyze strand 0 arbitrarily, results should be consistent
+        const OrientedReadId orientedReadId0(readId0, strand0);
+
+        // Loop over alignments involving this read
+        const auto alignmentTable0 = alignmentTable[orientedReadId0.getValue()];
+        for (const auto alignmentId : alignmentTable0) {
+
+            if (!firstPassHetAlignments[alignmentId]) {
+                continue;
+            }
+            
+            if (forbiddenAlignments[alignmentId]) {
+                continue;
+            }
+
+            const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+            ReadId currentReadId0 = thiAlignmentData.readIds[0];
+            ReadId currentReadId1 = thiAlignmentData.readIds[1];
+            OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+            OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+            AlignmentInfo alignmentInfo = thiAlignmentData.info;
+
+            // Swap oriented reads, if necessary.
+            if (currentOrientedReadId0.getReadId() != readId0) {
+                swap(currentOrientedReadId0, currentOrientedReadId1);
+                alignmentInfo.swap();
+            }
+            SHASTA_ASSERT(currentOrientedReadId0.getReadId() == readId0);
+
+            // Flip strands, if necessary
+            if (currentOrientedReadId0.getStrand() != strand0) {
+                currentOrientedReadId0.flipStrand();
+                currentOrientedReadId1.flipStrand();
+                alignmentInfo.reverseComplement();
+            }
+            SHASTA_ASSERT(currentOrientedReadId0.getStrand() == strand0);
+
+            const uint64_t leftTrim0 = alignmentInfo.data[0].leftTrim();
+            const uint64_t rightTrim0 = alignmentInfo.data[0].rightTrim();
+
+            const uint64_t leftTrim1 = alignmentInfo.data[1].leftTrim();
+            const uint64_t rightTrim1 = alignmentInfo.data[1].rightTrim();
+
+            // TODO: this is wrong
+            // const uint64_t maxTrim = assemblerInfo->actualMaxTrim;
+            // assemblerOptions.alignOptions.maxTrim
+            const uint64_t maxTrim = 50;
+
+            // Check for containment.
+            const bool isContained0 = (leftTrim0<=maxTrim) && (rightTrim0<=maxTrim);
+            const bool isContained1 = (leftTrim1<=maxTrim) && (rightTrim1<=maxTrim);
+
+            if (isContained0 && !isContained1) {
+                // 0 is unambiguously contained in 1.
+                isReadIdContained2[currentReadId0] = true;
+            }
+            if(isContained1 && !isContained0) {
+                // 1 is unambiguously contained in 0.
+                isReadIdContained2[currentReadId1] = true;
+            }
+            if(isContained0 && isContained1) {
+                // Near complete overlap.
+                continue;
+            }
+
+        }
+    }
+
+    // Print the contained reads
+    uint64_t newContainedReads = 0;
+    cout << "Contained reads: " << endl;
+    for (ReadId readId = 0; readId < readCount; readId++) {
+        if (isReadIdContained2[readId]) {
+            cout << "  ReadId: " << readId << endl;
+            newContainedReads++;
+        }
+    }
+    cout << "Finished printing contained reads." << endl;
+    cout << "New total number of contained reads is: " << newContainedReads << endl;
+
+
+
+
+
+
+
+
+
+    // // XXX
+    // // --- Keep the correct alignments and forbid the bad alignments based on the compatible site phasing ---
+    // //
+
+    // uint64_t numberOfFirstPassHetAlignments = 0;
+    // // --- Update thread-local boolean vectors ---
+    // // Loop over all alignments and mark those involving only reads within finalInPhaseOrientedReads
+    // // Also forbid alignments involving reads in excludedOutOfPhaseOrientedReads
+
+    // // Loop over alignments involving the target read (readId0)
+    // for (const auto alignmentId : alignmentTable0) {
+
+    //     const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+    //     ReadId currentReadId0 = thiAlignmentData.readIds[0];
+    //     ReadId currentReadId1 = thiAlignmentData.readIds[1];
+    //     OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+    //     OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+    //     AlignmentInfo alignmentInfo = thiAlignmentData.info;
+
+    //     // Swap oriented reads, if necessary.
+    //     if (currentOrientedReadId0.getReadId() != readId0) {
+    //         swap(currentOrientedReadId0, currentOrientedReadId1);
+    //         alignmentInfo.swap();
     //     }
-    //     // Check if both strands of the same read are present in the site
-    //     for(const ReadId readId: readIdsInSite) {
-    //         OrientedReadId orientedReadId0(readId, 0);
-    //         OrientedReadId orientedReadId1(readId, 1);
-    //         if (site.orientedReads.count(orientedReadId0) && site.orientedReads.count(orientedReadId1)) {
-    //             cout << timestamp << "Found both strands of read " << readId << " in site " << siteId << "." << endl;
-    //             sitesThatHaveStrandIssuesForbidden[siteId] = true;
+    //     SHASTA_ASSERT(currentOrientedReadId0.getReadId() == readId0);
+
+    //     // Flip strands, if necessary
+    //     if (currentOrientedReadId0.getStrand() != strand0) {
+    //         currentOrientedReadId0.flipStrand();
+    //         currentOrientedReadId1.flipStrand();
+    //         alignmentInfo.reverseComplement();
+    //     }
+    //     SHASTA_ASSERT(currentOrientedReadId0.getStrand() == strand0);
+
+    //     // Check if either read in the alignment is in excludedOutOfPhaseOrientedReads
+    //     bool involvesfinalInPhaseOrientedReads = (finalInPhaseOrientedReads.count(currentOrientedReadId0) && finalInPhaseOrientedReads.count(currentOrientedReadId1));
+    //     bool involvesExcludedOrientedReads = (finalInPhaseOrientedReads.count(currentOrientedReadId0) && excludedOutOfPhaseOrientedReads.count(currentOrientedReadId1));
+        
+    //     if (involvesfinalInPhaseOrientedReads) {
+    //         // if (phasingThreadData->isReadIdContained[currentOrientedReadId0.getReadId()]) {
+    //         //     continue;
+    //         // }
+    //         // Mark firstPassHet in thread-local vector
+    //         // debugOut << "Marking alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " as first pass (intra-phase)" << endl;
+    //         firstPassHetAlignments[alignmentId] = true;
+    //         numberOfFirstPassHetAlignments++;
+    //         alignmentsAlreadyConsidered[alignmentId] = true;
+    //     }
+
+    //     if (involvesExcludedOrientedReads) {
+    //         if (phasingThreadData->isReadIdContained[currentOrientedReadId0.getReadId()]) {
+    //             continue;
     //         }
+    //         // Mark forbidden in thread-local vector
+    //         // debugOut << "Forbidding alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " because one read is in excludedOutOfPhaseOrientedReads." << endl;
+    //         forbiddenAlignments[alignmentId] = true;
+    //         alignmentsAlreadyConsidered[alignmentId] = true;
     //     }
+
     // }
 
 
-    // // We need to find, for each orientedReadId, the sites that are associated with it
-    // // and fill in the orientedReadSites
-    // vector< vector<uint64_t> > orientedReadSites(readCount * 2); // Indexed via OrientedReadId::getValue()
 
-    // for(uint64_t siteId=0; siteId<sites.size(); siteId++) {
-    //     if (sitesThatHaveStrandIssuesForbidden[siteId]) {
-    //         continue; // Skip sites that have strand issues
+
+
+
+
+
+
+
+
+    // for (ReadId readId = 0; readId < readCount; readId++) {
+    //
+    //     if (readId != 8156 && readId != 8157 && readId != 16706) {
+    //         continue;
     //     }
-    //     const Site& site = sites[siteId];
-    //     OrientedReadId targetOrientedReadId = site.targetOrientedReadId;
-    //     // for(const OrientedReadId orientedReadId: site.orientedReads) {
-    //     //     orientedReadSites[orientedReadId.getValue()].push_back(siteId);
+    //
+    //     const ReadId readId0 = readId;
+    //     const Strand strand0 = 0;
+    //     const OrientedReadId orientedReadId0(readId0, strand0);
+    //     const auto alignmentTableForOrientedReadId0 = alignmentTable[orientedReadId0.getValue()];
+    //     std::set <OrientedReadId> rightHangingOrientedReadIds;
+    //     std::set <OrientedReadId> leftHangingOrientedReadIds;
+    //     uint64_t numberOfRightHangingReads = 0;
+    //     uint64_t numberOfLeftHangingReads = 0;
+    //     for (const auto alignmentId : alignmentTableForOrientedReadId0) {
+    //
+    //         if (firstPassHetAlignments[alignmentId] != true) {
+    //             continue;
+    //         }
+    //
+    //         const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+    //         ReadId currentReadId0 = thiAlignmentData.readIds[0];
+    //         ReadId currentReadId1 = thiAlignmentData.readIds[1];
+    //         OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+    //         OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+    //
+    //         // Swap oriented reads, if necessary.
+    //         if (currentOrientedReadId0.getReadId() != orientedReadId0.getReadId()) {
+    //             swap(currentOrientedReadId0, currentOrientedReadId1);
+    //         }
+    //         SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedReadId0.getReadId());
+    //
+    //         // Flip strands, if necessary
+    //         if (currentOrientedReadId0.getStrand() != orientedReadId0.getStrand()) {
+    //             currentOrientedReadId0.flipStrand();
+    //             currentOrientedReadId1.flipStrand();
+    //         }
+    //         SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedReadId0.getStrand());
+    //
+    //         if (thiAlignmentData.info.rightTrim(1) >= 50) {
+    //             // This currentOrientedReadId1 is hanging on the right of currentOrientedReadId0
+    //             rightHangingOrientedReadIds.insert(currentOrientedReadId1);
+    //             continue;
+    //         }
+    //
+    //         if (thiAlignmentData.info.leftTrim(1) >= 50) {
+    //             // This currentOrientedReadId1 is hanging on the right of currentOrientedReadId0
+    //             leftHangingOrientedReadIds.insert(currentOrientedReadId1);
+    //             continue;
+    //         }
+    //
+    //
+    //     }
+    //     numberOfRightHangingReads = rightHangingOrientedReadIds.size();
+    //     numberOfLeftHangingReads = leftHangingOrientedReadIds.size();
+    //
+    //
+    //     bool foundRightHangingOrientedReadsThatDoNotOverlap = false;
+    //
+    //     // Loop over right-Hanging-OrientedReadIds
+    //     for (const auto rightHangingOrientedRead: rightHangingOrientedReadIds) {
+    //         uint64_t numberOfRightHangingReadsOnNeighboringOrientedRead = 0;
+    //         const auto alignmentTableForRightHangingOrientedRead = alignmentTable[rightHangingOrientedRead.getValue()];
+    //         for (const auto alignmentId : alignmentTableForRightHangingOrientedRead) {
+    //
+    //             const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+    //             ReadId currentReadId0 = thiAlignmentData.readIds[0];
+    //             ReadId currentReadId1 = thiAlignmentData.readIds[1];
+    //             OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+    //             OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+    //
+    //             // Swap oriented reads, if necessary.
+    //             if (currentOrientedReadId0.getReadId() != rightHangingOrientedRead.getReadId()) {
+    //                 swap(currentOrientedReadId0, currentOrientedReadId1);
+    //             }
+    //             SHASTA_ASSERT(currentOrientedReadId0.getReadId() == rightHangingOrientedRead.getReadId());
+    //
+    //             // Flip strands, if necessary
+    //             if (currentOrientedReadId0.getStrand() != rightHangingOrientedRead.getStrand()) {
+    //                 currentOrientedReadId0.flipStrand();
+    //                 currentOrientedReadId1.flipStrand();
+    //             }
+    //             SHASTA_ASSERT(currentOrientedReadId0.getStrand() == rightHangingOrientedRead.getStrand());
+    //
+    //             // check if currentOrientedReadId1 is in rightHangingOrientedReadIds
+    //             if (rightHangingOrientedReadIds.count(currentOrientedReadId1)) {
+    //                 numberOfRightHangingReadsOnNeighboringOrientedRead++;
+    //                 continue;
+    //             }
+    //         }
+    //
+    //         cout << "The number of Right Hanging Oriented Reads of " << readId0 << " is:" << rightHangingOrientedReadIds.size() << endl;
+    //         cout << "The number of Left Hanging Oriented Reads of " << readId0 << " is:" << leftHangingOrientedReadIds.size() << endl;
+    //         cout << "The number Of Right Hanging Oriented Reads of " << rightHangingOrientedRead << " is:" << numberOfRightHangingReadsOnNeighboringOrientedRead << endl;
+    //         cout << endl;
+    //
+    //         if (numberOfRightHangingReadsOnNeighboringOrientedRead < rightHangingOrientedReadIds.size() * 0.50) {
+    //             foundRightHangingOrientedReadsThatDoNotOverlap = true;
+    //             break;
+    //         }
+    //
+    //         if (foundRightHangingOrientedReadsThatDoNotOverlap == true) {
+    //             break;
+    //         }
+    //
+    //     }
+    //
+    //     if (foundRightHangingOrientedReadsThatDoNotOverlap == true) {
+    //         // find all alignmentId involving readId0 and forbid them
+    //
+    //     }
+    //
+    //
+    //
+    // }
+    //
+    //
+    //
+    //
+    //
+    //
+    
+    
+    
+    
+    // Loop over all sites and check if a read is included in both strands in the site
+    vector<bool> sitesThatHaveStrandIssuesForbidden(sites.size(), false);
+    for(uint64_t siteId=0; siteId<sites.size(); siteId++) {
+        const Site& site = sites[siteId];
+        std::set<ReadId> readIdsInSite;
+        for(const OrientedReadId orientedReadId: site.orientedReads) {
+            readIdsInSite.insert(orientedReadId.getReadId());
+        }
+        // Check if both strands of the same read are present in the site
+        for(const ReadId readId: readIdsInSite) {
+            OrientedReadId orientedReadId0(readId, 0);
+            OrientedReadId orientedReadId1(readId, 1);
+            if (site.orientedReads.count(orientedReadId0) && site.orientedReads.count(orientedReadId1)) {
+                cout << timestamp << "Found both strands of read " << readId << " in site " << siteId << "." << endl;
+                // print all reads in the site
+                cout << "Reads in site " << siteId << ": ";
+                for(const OrientedReadId orientedReadId: site.orientedReads) {
+                    cout << orientedReadId.getReadId() << " ";
+                }
+                cout << endl;
+                // Mark the site as having strand issues
+                sitesThatHaveStrandIssuesForbidden[siteId] = true;
+            }
+        }
+    }
+    
+    
+    // We need to find, for each orientedReadId, the sites that are associated with it
+    // and fill in the orientedReadSites
+    vector< vector<uint64_t> > orientedReadSites(readCount * 2); // Indexed via OrientedReadId::getValue()
+    
+    for(uint64_t siteId=0; siteId<sites.size(); siteId++) {
+        // if (sitesThatHaveStrandIssuesForbidden[siteId]) {
+        //     continue; // Skip sites that have strand issues
+        // }
+        const Site& site = sites[siteId];
+        OrientedReadId targetOrientedReadId = site.targetOrientedReadId;
+        // for(const OrientedReadId orientedReadId: site.orientedReads) {
+        //     orientedReadSites[orientedReadId.getValue()].push_back(siteId);
+        // }
+        orientedReadSites[targetOrientedReadId.getValue()].push_back(siteId);
+    }
+    
+    // for(uint64_t siteId=0; siteId<sites.size(); siteId++) {
+    //     // if (sitesThatHaveStrandIssuesForbidden[siteId]) {
+    //     //     continue; // Skip sites that have strand issues
     //     // }
-    //     orientedReadSites[targetOrientedReadId.getValue()].push_back(siteId);
-    // }
-
-    // for(uint64_t siteId=0; siteId<sites.size(); siteId++) {
-    //     if (sitesThatHaveStrandIssuesForbidden[siteId]) {
-    //         continue; // Skip sites that have strand issues
-    //     }
     //     const Site& site = sites[siteId];
     //     for(const OrientedReadId orientedReadId: site.orientedReads) {
     //         orientedReadSites[orientedReadId.getValue()].push_back(siteId);
     //     }
     // }
+    
+    cout << timestamp << "Finished finding for each orientedReadId, the sites that are associated with it." << endl;
 
-    // cout << timestamp << "Finished finding for each orientedReadId, the sites that are associated with it." << endl;
+
+
+    for(uint64_t siteId=0; siteId<sites.size(); siteId++) {
+        const Site& site = sites[siteId];
+        OrientedReadId targetOrientedReadId = site.targetOrientedReadId;
+        if (isReadIdContained[targetOrientedReadId.getReadId()] && !isReadIdContained2[targetOrientedReadId.getReadId()]) {
+            cout << "Trying to analyze readId: " << targetOrientedReadId.getReadId() << endl;
+            const auto alignmentTable0 = alignmentTable[targetOrientedReadId.getValue()];
+            for (const auto alignmentId : alignmentTable0) {
+
+                const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+                ReadId currentReadId0 = thiAlignmentData.readIds[0];
+                ReadId currentReadId1 = thiAlignmentData.readIds[1];
+                OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+                OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+                AlignmentInfo alignmentInfo = thiAlignmentData.info;
+
+                // Swap oriented reads, if necessary.
+                if (currentOrientedReadId0.getReadId() != targetOrientedReadId.getReadId()) {
+                    swap(currentOrientedReadId0, currentOrientedReadId1);
+                    alignmentInfo.swap();
+                }
+                SHASTA_ASSERT(currentOrientedReadId0.getReadId() == targetOrientedReadId.getReadId());
+
+                // Flip strands, if necessary
+                if (currentOrientedReadId0.getStrand() != targetOrientedReadId.getStrand()) {
+                    currentOrientedReadId0.flipStrand();
+                    currentOrientedReadId1.flipStrand();
+                    alignmentInfo.reverseComplement();
+                }
+                SHASTA_ASSERT(currentOrientedReadId0.getStrand() == targetOrientedReadId.getStrand());
+
+                // Check if either read in the alignment is in excludedOutOfPhaseOrientedReads
+                bool involvesfinalInPhaseOrientedReads = (site.orientedReads.count(currentOrientedReadId0) && site.orientedReads.count(currentOrientedReadId1));
+                bool involvesExcludedOrientedReads = (site.excludedOrientedReads.count(currentOrientedReadId0) && site.excludedOrientedReads.count(currentOrientedReadId1));
+                
+                if (involvesfinalInPhaseOrientedReads) {
+                    cout << "Added firstPassHetAlignments alignmentId: " << alignmentId << endl;
+                    // if (phasingThreadData->isReadIdContained[currentOrientedReadId0.getReadId()]) {
+                    //     continue;
+                    // }
+                    // Mark firstPassHet in thread-local vector
+                    // debugOut << "Marking alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " as first pass (intra-phase)" << endl;
+                    firstPassHetAlignments[alignmentId] = true;
+                    // numberOfFirstPassHetAlignments++;
+                    alignmentsAlreadyConsidered[alignmentId] = true;
+                }
+
+                if (involvesExcludedOrientedReads) {
+                    cout << "Added forbiddenAlignments alignmentId: " << alignmentId << endl;
+                    // Mark forbidden in thread-local vector
+                    // debugOut << "Forbidding alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " because one read is in excludedOutOfPhaseOrientedReads." << endl;
+                    forbiddenAlignments[alignmentId] = true;
+                    alignmentsAlreadyConsidered[alignmentId] = true;
+                }
+
+            }
+        }
+        
+    }
 
     
+
+
+
+
+    // // Loop over read IDs to find contained reads
+    // for (ReadId readId = 0; readId < readCount; readId++) {
+
+    //     const ReadId readId0 = readId;
+    //     const Strand strand0 = 0; // Analyze strand 0 arbitrarily, results should be consistent
+    //     const OrientedReadId orientedReadId0(readId0, strand0);
+
+    //     // Loop over alignments involving this read
+    //     const auto alignmentTable0 = alignmentTable[orientedReadId0.getValue()];
+    //     for (const auto alignmentId : alignmentTable0) {
+
+    //         const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+    //         ReadId currentReadId0 = thiAlignmentData.readIds[0];
+    //         ReadId currentReadId1 = thiAlignmentData.readIds[1];
+    //         OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+    //         OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+    //         AlignmentInfo alignmentInfo = thiAlignmentData.info;
+
+    //         // Swap oriented reads, if necessary.
+    //         if (currentOrientedReadId0.getReadId() != readId0) {
+    //             swap(currentOrientedReadId0, currentOrientedReadId1);
+    //             alignmentInfo.swap();
+    //         }
+    //         SHASTA_ASSERT(currentOrientedReadId0.getReadId() == readId0);
+
+    //         // Flip strands, if necessary
+    //         if (currentOrientedReadId0.getStrand() != strand0) {
+    //             currentOrientedReadId0.flipStrand();
+    //             currentOrientedReadId1.flipStrand();
+    //             alignmentInfo.reverseComplement();
+    //         }
+    //         SHASTA_ASSERT(currentOrientedReadId0.getStrand() == strand0);
+    //     }
+    // }
+
+
+    // for(uint64_t alignmentId=0; alignmentId<alignmentData.size(); alignmentId++) {
+    //     const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+    //     ReadId currentReadId0 = thiAlignmentData.readIds[0];
+    //     ReadId currentReadId1 = thiAlignmentData.readIds[1];
+    //     OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+    //     OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+    //     AlignmentInfo alignmentInfo = thiAlignmentData.info;
+
+    //     // Procede only if both reads are contained.
+    //     if (!isReadIdContained[currentReadId0] || !isReadIdContained[currentReadId1]) {
+    //         continue;
+    //     }
+
+    //     bool foundNonContainedReadThatIsPartOfTheSiteReadSet = false;
+    //     for (const uint64_t siteId: orientedReadSites[currentOrientedReadId0.getValue()]) {
+    //         const Site &site = sites[siteId];
+    //         for (const OrientedReadId &orientedReadId: site.orientedReads) {
+    //             if (!isReadIdContained[orientedReadId.getReadId()]) {
+    //                 foundNonContainedReadThatIsPartOfTheSiteReadSet = true;
+    //                 break;
+    //                 // forbiddenAlignments[alignmentId] = true;
+    //                 // break;
+    //             }
+    //         }
+    //     }
+
+    //     if (foundNonContainedReadThatIsPartOfTheSiteReadSet) {
+    //         for (const uint64_t siteId: orientedReadSites[currentOrientedReadId0.getValue()]) {
+    //             const Site &site = sites[siteId];
+    //             for (const OrientedReadId &orientedReadId: site.orientedReads) {
+    //                 if (isReadIdContained[orientedReadId.getReadId()] && (orientedReadId.getReadId() == currentReadId1)) {
+    //                     forbiddenAlignments[alignmentId] = true;
+    //                     break;
+    //                 }
+    //             }
+    //         }
+    //     }
+
+    // }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    // // print all the reads in each site of the orientedReadId 19364-1
+    // OrientedReadId testOrientedReadId(3094, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId2(3117, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId2 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId2 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId2.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId3(3119, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId3 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId3 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId3.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId4(2949, 1);
+    // cout << "OrientedReadId: " << testOrientedReadId4 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId4 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId4.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId5(2957, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId5 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId5 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId5.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId6(2935, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId6 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId6 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId6.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId7(1180, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId7 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId7 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId7.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId8(1185, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId8 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId8 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId8.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId9(1191, 1);
+    // cout << "OrientedReadId: " << testOrientedReadId9 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId9 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId9.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId10(1194, 1);
+    // cout << "OrientedReadId: " << testOrientedReadId10 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId10 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId10.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId11(1200, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId11 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId11 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId11.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId12(3118, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId12 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId12 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId12.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+
+
+    // // print all the reads in each site of the orientedReadId 19364-1
+    // OrientedReadId testOrientedReadId(3094, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId2(3117, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId2 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId2 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId2.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId3(3119, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId3 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId3 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId3.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId4(2949, 1);
+    // cout << "OrientedReadId: " << testOrientedReadId4 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId4 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId4.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId5(1055, 1);
+    // cout << "OrientedReadId: " << testOrientedReadId5 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId5 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId5.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId6(1045, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId6 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId6 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId6.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId7(1057, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId7 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId7 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId7.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId8(1043, 1);
+    // cout << "OrientedReadId: " << testOrientedReadId8 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId8 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId8.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId9(1498, 1);
+    // cout << "OrientedReadId: " << testOrientedReadId9 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId9 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId9.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId10(1494, 1);
+    // cout << "OrientedReadId: " << testOrientedReadId10 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId10 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId10.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId11(1489, 1);
+    // cout << "OrientedReadId: " << testOrientedReadId11 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId11 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId11.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+    // OrientedReadId testOrientedReadId12(1488, 0);
+    // cout << "OrientedReadId: " << testOrientedReadId12 << endl;
+    // cout << "Sites and their reads associated with orientedReadId " << testOrientedReadId12 << ": " << endl;
+    // for (const uint64_t siteId: orientedReadSites[testOrientedReadId12.getValue()]) {
+    //     cout << "Site " << siteId << " reads:" << endl;
+    //     const Site &site = sites[siteId];
+    //     for (const OrientedReadId &readId: site.orientedReads) {
+    //         cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+    //     }
+    // }
+    // cout << endl;
+
+
+
+    //*
+    //
+    // Create the dynamically adjustable boost readGraph using 
+    // all the alignments that are not forbidden.
+    //
+    //*
+    
+    // The vertex_descriptor is OrientedReadId::getValue().
+    ReadGraph4AllAlignments readGraphAllAlignments(orientedReadCount);
+
+    // Initially, each alignment generates two edges.
+    for(uint64_t alignmentId=0; alignmentId<alignmentData.size(); alignmentId++) {
+
+        // if (!firstPassHetAlignments[alignmentId]) {
+        //     continue;
+        // }
+
+        if (forbiddenAlignments[alignmentId]) {
+            continue;
+        }
+
+        // Get information for this alignment.
+        AlignmentData& thisAlignmentData = alignmentData[alignmentId];
+
+        // Get the OrientedReadIds.
+        OrientedReadId orientedReadId0(thisAlignmentData.readIds[0], 0);
+        OrientedReadId orientedReadId1(thisAlignmentData.readIds[1], thisAlignmentData.isSameStrand ? 0 : 1);
+        SHASTA_ASSERT(orientedReadId0 < orientedReadId1);
+        AlignmentInfo alignmentInfo = thisAlignmentData.info;
+
+        // Swap them if necessary, depending on the average alignment offset at center.
+        if(alignmentInfo.offsetAtCenter() < 0.) {
+            swap(orientedReadId0, orientedReadId1);
+            alignmentInfo.swap();
+        }
+
+        // Create the edge.
+        add_edge(orientedReadId0.getValue(), orientedReadId1.getValue(), ReadGraph4AllAlignmentsEdge(alignmentId), readGraphAllAlignments);
+
+        // Also create the reverse complemented edge.
+        orientedReadId0.flipStrand();
+        orientedReadId1.flipStrand();
+        add_edge(orientedReadId1.getValue(), orientedReadId0.getValue(), ReadGraph4AllAlignmentsEdge(alignmentId), readGraphAllAlignments);
+    }
+    
+    cout << "The read graph with all alignments that are not forbidden has " << num_vertices(readGraphAllAlignments) << " vertices and " << num_edges(readGraphAllAlignments) << " edges." << endl;
+
+
+
+
+    
+
+    // for (ReadId readId = 0; readId < readCount; readId++) {
+
+    //     if (readId != 3094) {
+    //         continue;
+    //     }
+
+    //     std::set <OrientedReadId> orientedReadsThatShouldBeForbidden;
+
+    //     const ReadId readId0 = readId;
+    //     const Strand strand0 = 0;
+    //     const OrientedReadId orientedReadId0(readId0, strand0);
+    //     const auto alignmentTableForOrientedReadId0 = alignmentTable[orientedReadId0.getValue()];
+        
+    //     std::set <OrientedReadId> rightHangingOrientedReadIds;
+    //     std::set <OrientedReadId> leftHangingOrientedReadIds;
+    //     uint64_t numberOfRightHangingReads = 0;
+    //     uint64_t numberOfLeftHangingReads = 0;
+
+
+    //     for (const auto alignmentId : alignmentTableForOrientedReadId0) {
+
+    //         const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+    //         ReadId currentReadId0 = thiAlignmentData.readIds[0];
+    //         ReadId currentReadId1 = thiAlignmentData.readIds[1];
+    //         OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+    //         OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+    //         AlignmentInfo alignmentInfo = thiAlignmentData.info;
+    
+    //         // Swap oriented reads, if necessary.
+    //         if (currentOrientedReadId0.getReadId() != orientedReadId0.getReadId()) {
+    //             swap(currentOrientedReadId0, currentOrientedReadId1);
+    //             alignmentInfo.swap();
+    //         }
+    //         SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedReadId0.getReadId());
+    
+    //         // Flip strands, if necessary
+    //         if (currentOrientedReadId0.getStrand() != orientedReadId0.getStrand()) {
+    //             currentOrientedReadId0.flipStrand();
+    //             currentOrientedReadId1.flipStrand();
+    //             alignmentInfo.reverseComplement();
+    //         }
+    //         SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedReadId0.getStrand());
+
+    //         if (firstPassHetAlignments[alignmentId] && !forbiddenAlignments[alignmentId]) {
+    //             // cout << "First pass het alignment between " << orientedReadId0.getReadId() << "-" << currentOrientedReadId0.getStrand() << " and " << currentOrientedReadId1.getReadId() << "-" << currentOrientedReadId1.getStrand() << " is not forbidden." << endl;
+    //             continue;
+    //         }
+    
+    //         if (alignmentInfo.rightTrim(1) >= 50 && alignmentInfo.offsetAtCenter() > 0) {
+    //             orientedReadsThatShouldBeForbidden.insert(currentOrientedReadId1);
+    //         }
+
+    //     }
+
+
+    //     for (const auto alignmentId : alignmentTableForOrientedReadId0) {
+
+    //         const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+    //         ReadId currentReadId0 = thiAlignmentData.readIds[0];
+    //         ReadId currentReadId1 = thiAlignmentData.readIds[1];
+    //         OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+    //         OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+    //         AlignmentInfo alignmentInfo = thiAlignmentData.info;
+    
+    //         // Swap oriented reads, if necessary.
+    //         if (currentOrientedReadId0.getReadId() != orientedReadId0.getReadId()) {
+    //             swap(currentOrientedReadId0, currentOrientedReadId1);
+    //             alignmentInfo.swap();
+    //         }
+    //         SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedReadId0.getReadId());
+    
+    //         // Flip strands, if necessary
+    //         if (currentOrientedReadId0.getStrand() != orientedReadId0.getStrand()) {
+    //             currentOrientedReadId0.flipStrand();
+    //             currentOrientedReadId1.flipStrand();
+    //             alignmentInfo.reverseComplement();
+    //         }
+    //         SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedReadId0.getStrand());
+
+    //         if (!firstPassHetAlignments[alignmentId] || forbiddenAlignments[alignmentId]) {
+    //             continue;
+    //         }
+    
+    //         if (alignmentInfo.rightTrim(1) >= 50 && alignmentInfo.offsetAtCenter() > 0) {
+    //             for (const uint64_t siteId: orientedReadSites[currentOrientedReadId1.getValue()]) {
+    //                 const Site &site = sites[siteId];
+    //                 for (const OrientedReadId &orientedReadId: site.orientedReads) {
+    //                     // check if the orientedReadId is in the orientedReadsThatShouldBeForbidden
+    //                     if (orientedReadsThatShouldBeForbidden.find(orientedReadId) != orientedReadsThatShouldBeForbidden.end()) {
+    //                         forbiddenAlignments[alignmentId] = true;
+    //                         break;
+    //                     }
+    //                 }
+    //             }
+    //         }
+
+    //     }
+
+
+
+
+
+
+        // for (const auto alignmentId : alignmentTableForOrientedReadId0) {
+
+        //     const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+        //     ReadId currentReadId0 = thiAlignmentData.readIds[0];
+        //     ReadId currentReadId1 = thiAlignmentData.readIds[1];
+        //     OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+        //     OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+        //     AlignmentInfo alignmentInfo = thiAlignmentData.info;
+    
+        //     // Swap oriented reads, if necessary.
+        //     if (currentOrientedReadId0.getReadId() != orientedReadId0.getReadId()) {
+        //         swap(currentOrientedReadId0, currentOrientedReadId1);
+        //         alignmentInfo.swap();
+        //     }
+        //     SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedReadId0.getReadId());
+    
+        //     // Flip strands, if necessary
+        //     if (currentOrientedReadId0.getStrand() != orientedReadId0.getStrand()) {
+        //         currentOrientedReadId0.flipStrand();
+        //         currentOrientedReadId1.flipStrand();
+        //         alignmentInfo.reverseComplement();
+        //     }
+        //     SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedReadId0.getStrand());
+
+        //     if (firstPassHetAlignments[alignmentId] && !forbiddenAlignments[alignmentId]) {
+        //         // cout << "First pass het alignment between " << orientedReadId0.getReadId() << "-" << currentOrientedReadId0.getStrand() << " and " << currentOrientedReadId1.getReadId() << "-" << currentOrientedReadId1.getStrand() << " is not forbidden." << endl;
+        //         continue;
+        //     }
+    
+        //     if (alignmentInfo.rightTrim(1) >= 50 && alignmentInfo.offsetAtCenter() > 0) {
+        //         for (const uint64_t siteId: orientedReadSites[currentOrientedReadId1.getValue()]) {
+        //             const Site &site = sites[siteId];
+        //             for (const OrientedReadId &readId: site.orientedReads) {
+        //                 orientedReadsThatShouldBeForbidden.insert(readId);
+        //             }
+        //         }
+        //     }
+        // }
+
+        // // // print the orientedReadsThatShouldBeForbidden
+        // // cout << "Oriented reads that should be forbidden:" << endl;
+        // // for (const OrientedReadId &readId: orientedReadsThatShouldBeForbidden) {
+        // //     cout << "  ReadId: " << readId.getReadId() << "-" << readId.getStrand() << endl;
+        // // }
+        // // cout << endl;
+
+        // if (orientedReadsThatShouldBeForbidden.size() > 0) {
+            
+        //     for (const auto alignmentId : alignmentTableForOrientedReadId0) {
+
+        //         const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+        //         ReadId currentReadId0 = thiAlignmentData.readIds[0];
+        //         ReadId currentReadId1 = thiAlignmentData.readIds[1];
+        //         OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+        //         OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+        //         AlignmentInfo alignmentInfo = thiAlignmentData.info;
+        
+        //         // Swap oriented reads, if necessary.
+        //         if (currentOrientedReadId0.getReadId() != orientedReadId0.getReadId()) {
+        //             swap(currentOrientedReadId0, currentOrientedReadId1);
+        //             alignmentInfo.swap();
+        //         }
+        //         SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedReadId0.getReadId());
+        
+        //         // Flip strands, if necessary
+        //         if (currentOrientedReadId0.getStrand() != orientedReadId0.getStrand()) {
+        //             currentOrientedReadId0.flipStrand();
+        //             currentOrientedReadId1.flipStrand();
+        //             alignmentInfo.reverseComplement();
+        //         }
+        //         SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedReadId0.getStrand());
+        
+        //         if (alignmentInfo.rightTrim(1) >= 50 && alignmentInfo.offsetAtCenter() > 0) {
+        //             cout << "Forbidden alignment between " << currentOrientedReadId0.getReadId() << "-" << currentOrientedReadId0.getStrand() << " and " << currentOrientedReadId1.getReadId() << "-" << currentOrientedReadId1.getStrand() << " is not forbidden." << endl;
+        //             if (orientedReadsThatShouldBeForbidden.find(currentOrientedReadId1) != orientedReadsThatShouldBeForbidden.end()) {
+        //                 cout << "Forbidden alignment between " << currentOrientedReadId0.getReadId() << "-" << currentOrientedReadId0.getStrand() << " and " << currentOrientedReadId1.getReadId() << "-" << currentOrientedReadId1.getStrand() << " is forbidden." << endl;
+        //                 forbiddenAlignments[alignmentId] = true;
+        //             }
+        //         }
+        //     }
+            
+        // }
+
+
+
+        // for (const auto alignmentId : alignmentTableForOrientedReadId0) {
+
+        //     const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+        //     ReadId currentReadId0 = thiAlignmentData.readIds[0];
+        //     ReadId currentReadId1 = thiAlignmentData.readIds[1];
+        //     OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+        //     OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+        //     AlignmentInfo alignmentInfo = thiAlignmentData.info;
+    
+        //     // Swap oriented reads, if necessary.
+        //     if (currentOrientedReadId0.getReadId() != orientedReadId0.getReadId()) {
+        //         swap(currentOrientedReadId0, currentOrientedReadId1);
+        //         alignmentInfo.swap();
+        //     }
+        //     SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedReadId0.getReadId());
+    
+        //     // Flip strands, if necessary
+        //     if (currentOrientedReadId0.getStrand() != orientedReadId0.getStrand()) {
+        //         currentOrientedReadId0.flipStrand();
+        //         currentOrientedReadId1.flipStrand();
+        //         alignmentInfo.reverseComplement();
+        //     }
+        //     SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedReadId0.getStrand());
+
+        //     if (!firstPassHetAlignments[alignmentId] || forbiddenAlignments[alignmentId]) {
+        //         continue;
+        //     }
+    
+        //     if (alignmentInfo.rightTrim(1) >= 50 && alignmentInfo.offsetAtCenter() > 0) {
+        //         for (const uint64_t siteId: orientedReadSites[currentOrientedReadId1.getValue()]) {
+        //             const Site &site = sites[siteId];
+        //             for (const OrientedReadId &orientedReadId: site.orientedReads) {
+        //                 // check if the orientedReadId is in the orientedReadsThatShouldBeForbidden
+        //                 if (orientedReadsThatShouldBeForbidden.find(orientedReadId) != orientedReadsThatShouldBeForbidden.end()) {
+        //                     forbiddenAlignments[alignmentId] = true;
+        //                     break;
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+
+
+
+    
+    // }
+
+
+
+
+    // for (ReadId readId = 0; readId < readCount; readId++) {
+
+    //     if (isReadIdContained[readId]) {
+    //         continue;
+    //     }
+
+    //     const ReadId readId0 = readId;
+    //     const Strand strand0 = 0;
+    //     const OrientedReadId orientedReadId0(readId0, strand0);
+    //     const auto alignmentTableForOrientedReadId0 = alignmentTable[orientedReadId0.getValue()];
+    //     std::set <OrientedReadId> rightHangingOrientedReadIds;
+    //     std::set <OrientedReadId> leftHangingOrientedReadIds;
+    //     uint64_t numberOfRightHangingReads = 0;
+    //     uint64_t numberOfLeftHangingReads = 0;
+
+    //     bool foundRightHangingOrientedReadsThatAreNotContained = false;
+    //     for (const auto alignmentId : alignmentTableForOrientedReadId0) {
+
+    //         if (!firstPassHetAlignments[alignmentId]) {
+    //             continue;
+    //         }
+
+    //         if (forbiddenAlignments[alignmentId]) {
+    //             continue;
+    //         }
+
+    //         const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+    //         ReadId currentReadId0 = thiAlignmentData.readIds[0];
+    //         ReadId currentReadId1 = thiAlignmentData.readIds[1];
+    //         OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+    //         OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+    //         AlignmentInfo alignmentInfo = thiAlignmentData.info;
+    
+    //         // Swap oriented reads, if necessary.
+    //         if (currentOrientedReadId0.getReadId() != orientedReadId0.getReadId()) {
+    //             swap(currentOrientedReadId0, currentOrientedReadId1);
+    //             alignmentInfo.swap();
+    //         }
+    //         SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedReadId0.getReadId());
+    
+    //         // Flip strands, if necessary
+    //         if (currentOrientedReadId0.getStrand() != orientedReadId0.getStrand()) {
+    //             currentOrientedReadId0.flipStrand();
+    //             currentOrientedReadId1.flipStrand();
+    //             alignmentInfo.reverseComplement();
+    //         }
+    //         SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedReadId0.getStrand());
+    
+    //         if (alignmentInfo.rightTrim(1) >= 50) {
+    //             if (!isReadIdContained[currentOrientedReadId1.getReadId()]) {
+    //                 foundRightHangingOrientedReadsThatAreNotContained = true;
+    //                 break;
+    //             }
+    //         }
+    //     }
+
+    //     if (foundRightHangingOrientedReadsThatAreNotContained) {
+            
+    //         for (const auto alignmentId : alignmentTableForOrientedReadId0) {
+
+    //             if (!firstPassHetAlignments[alignmentId]) {
+    //                 continue;
+    //             }
+
+    //             if (forbiddenAlignments[alignmentId]) {
+    //                 continue;
+    //             }
+
+    //             const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+    //             ReadId currentReadId0 = thiAlignmentData.readIds[0];
+    //             ReadId currentReadId1 = thiAlignmentData.readIds[1];
+    //             OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+    //             OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+    //             AlignmentInfo alignmentInfo = thiAlignmentData.info;
+        
+    //             // Swap oriented reads, if necessary.
+    //             if (currentOrientedReadId0.getReadId() != orientedReadId0.getReadId()) {
+    //                 swap(currentOrientedReadId0, currentOrientedReadId1);
+    //                 alignmentInfo.swap();
+    //             }
+    //             SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedReadId0.getReadId());
+        
+    //             // Flip strands, if necessary
+    //             if (currentOrientedReadId0.getStrand() != orientedReadId0.getStrand()) {
+    //                 currentOrientedReadId0.flipStrand();
+    //                 currentOrientedReadId1.flipStrand();
+    //                 alignmentInfo.reverseComplement();
+    //             }
+    //             SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedReadId0.getStrand());
+        
+    //             if (alignmentInfo.rightTrim(1) >= 50) {
+    //                 if (isReadIdContained[currentOrientedReadId1.getReadId()]) {
+    //                     forbiddenAlignments[alignmentId] = true;
+    //                 }
+    //             }
+    //         }
+            
+    //     }
+    
+    // }
+    
+    
+    
+    
+    
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+    
+
+
+
     // // loop over the indices of the orientedReadSites and check if the orientedReadId0 is present in the sites
     // vector< pair<uint64_t, uint64_t> > pairsOfSites;
     // for (uint64_t readId = 0; readId < readCount; readId++) {
-        
+    //
     //     if (readId != 1112) {
     //         continue; // Skip if not the specific readId we are interested in
     //     }
-
+    //
     //     OrientedReadId orientedReadId0(readId, 0);
-
+    //
     //     vector<uint64_t> v = orientedReadSites[orientedReadId0.getValue()];
-
+    //
     //     // Add a check to prevent accessing v.size()-1 when v is empty or has only one element.
     //     if (v.size() == 0) {
     //         cout << timestamp << "Skipping site pair generation for orientedReadId with less than 2 associated sites." << endl;
     //         continue; // Skip if there are not enough elements to form a pair
     //     }
-        
+    //
     //     if (v.size() == 1) {
     //         const uint64_t siteId0 = v[0];
     //         pairsOfSites.push_back(make_pair(siteId0, siteId0));
     //         // cout << timestamp << "Skipping site pair generation for orientedReadId with less than 2 associated sites." << endl;
     //         continue; // Skip if there are not enough elements to form a pair
     //     }
-
+    //
     //     for(uint64_t i0=0; i0<v.size()-1; i0++) {
     //         const uint64_t siteId0 = v[i0];
     //         if (sitesThatHaveStrandIssuesForbidden[siteId0]) {
@@ -3349,30 +4750,28 @@ void Assembler::createReadGraph4withStrandSeparation(
     //             pairsOfSites.push_back(make_pair(siteId0, siteId1));
     //         }
     //     }
-        
-
-
+    //
     // }
-
-
+    //
+    //
     // // We need to generate all possible pairs of sites from the orientedReadSites.
     // // The siteId of the first site in each pair will always be less than the siteId of the second site in each pair
     // vector< pair<uint64_t, uint64_t> > pairsOfSites;
     // for(const vector<uint64_t>& v: orientedReadSites) {
-
+    //
     //     // Add a check to prevent accessing v.size()-1 when v is empty or has only one element.
     //     if (v.size() == 0) {
     //         cout << timestamp << "Skipping site pair generation for orientedReadId with less than 2 associated sites." << endl;
     //         continue; // Skip if there are not enough elements to form a pair
     //     }
-        
+    //
     //     if (v.size() == 1) {
     //         const uint64_t siteId0 = v[0];
     //         pairsOfSites.push_back(make_pair(siteId0, siteId0));
     //         // cout << timestamp << "Skipping site pair generation for orientedReadId with less than 2 associated sites." << endl;
     //         continue; // Skip if there are not enough elements to form a pair
     //     }
-
+    //
     //     for(uint64_t i0=0; i0<v.size()-1; i0++) {
     //         const uint64_t siteId0 = v[i0];
     //         if (sitesThatHaveStrandIssuesForbidden[siteId0]) {
@@ -3387,17 +4786,17 @@ void Assembler::createReadGraph4withStrandSeparation(
     //         }
     //     }
     // }
-
-    cout << timestamp << "Finished generating all possible pairs of sites from the orientedReadSites." << endl;
-
-
-    // // Because the siteId of the first site in each pair will always be less than the siteId of 
+    //
+    // cout << timestamp << "Finished generating all possible pairs of sites from the orientedReadSites." << endl;
+    //
+    //
+    // // Because the siteId of the first site in each pair will always be less than the siteId of
     // // the second site in each pair, we will have to deduplicate the pairs.
     // // --- Deduplicate pairs and count common reads ---
     // vector<uint64_t> commonReadsCount; // Stores the count of common reads for each unique pair
     // deduplicateAndCount(pairsOfSites, commonReadsCount);
     // SHASTA_ASSERT(commonReadsCount.size() == pairsOfSites.size());
-
+    //
     // cout << timestamp << "Finished deduplicating pairs." << endl;
 
 
@@ -3532,8 +4931,12 @@ void Assembler::createReadGraph4withStrandSeparation(
     //
     //
 
+
     // Flag all alignments as not to be kept.
     vector<bool> keepAlignment(alignmentCount, false);
+    // vector<bool> keepAlignment(alignmentCount, true);
+    // createReadGraphUsingSelectedAlignments(keepAlignment);
+    // return;
 
     // for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
 
@@ -3577,6 +4980,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     const double logWThresholdForBreaks = log(WThresholdForBreaks);
 
     vector< pair<uint64_t, double> > alignmentTableHetSites;
+    vector< pair<uint64_t, double> > alignmentTableHetSitesPlusNotForbidden;
     
     // Keep track of which readIds were used in alignments
     vector<bool> readUsed(readCount, false);
@@ -3598,6 +5002,8 @@ void Assembler::createReadGraph4withStrandSeparation(
 
     // Loop over all alignments.
     for(uint64_t alignmentId=0; alignmentId<alignmentCount; alignmentId++) {
+
+        cout << "Processing alignment " << alignmentId << endl;
         
         if (!firstPassHetAlignments[alignmentId]) {
             continue;
@@ -3614,14 +5020,38 @@ void Assembler::createReadGraph4withStrandSeparation(
         // and readId1 on strand 0 or 1 depending on the value of isSameStrand.
         // The reverse complement alignment also exists, but is not stored explicitly.
         
-        const ReadId readId0 = thisAlignmentData.readIds[0];
-        const ReadId readId1 = thisAlignmentData.readIds[1];
-        const bool isSameStrand = thisAlignmentData.isSameStrand;
+        ReadId readId0 = thisAlignmentData.readIds[0];
+        ReadId readId1 = thisAlignmentData.readIds[1];
+        bool isSameStrand = thisAlignmentData.isSameStrand;
         SHASTA_ASSERT(readId0 < readId1);
-        const OrientedReadId orientedReadId0(readId0, 0);   // On strand 0.
-        const OrientedReadId orientedReadId1(readId1, isSameStrand ? 0 : 1);   // On strand 0 or 1.
+        OrientedReadId orientedReadId0(readId0, 0);   // On strand 0.
+        OrientedReadId orientedReadId1(readId1, isSameStrand ? 0 : 1);   // On strand 0 or 1.
+        AlignmentInfo alignmentInfo = thisAlignmentData.info;
+
+        // // Swap them if necessary, depending on the average alignment offset at center.
+        // if(alignmentInfo.offsetAtCenter() < 0.) {
+        //     swap(orientedReadId0, orientedReadId1);
+        //     alignmentInfo.swap();
+        // }
+
+        // if (readId0 == 3118 || readId1 == 3118 || readId0 == 3251 || readId1 == 3251) {
+        //     continue;
+        // }
 
         // if (bridgingReads.count(readId0) || bridgingReads.count(readId1)) {
+        //     continue;
+        // }
+
+        // // Swap them if necessary, depending on the average alignment offset at center.
+        // if(thisAlignmentData.info.offsetAtCenter() < 0.) {
+        //     swap(orientedReadId0, orientedReadId1);
+        // }
+
+        // if (isReadIdContained2[readId0] || isReadIdContained2[readId1]) {
+        //     continue;
+        // }
+
+        // if (isReadIdContained2[readId1]) {
         //     continue;
         // }
 
@@ -3642,12 +5072,58 @@ void Assembler::createReadGraph4withStrandSeparation(
         readUsed[readId0] = true;
         readUsed[readId1] = true;
 
+        keepAlignment[alignmentId] = true;
+        thisAlignmentData.info.isInReadGraph = 1;
+        cout << "Added alignment " << alignmentId << " to the read graph." << endl;
+
+        // // This time use the regular Bayesian filtering
+        // if (logQ <= logWThreshold) {
+        //     alignmentTableHetSites.push_back(make_pair(alignmentId, logQ));
+        //     alignmentsAlreadyConsidered[alignmentId] = true;
+        //     readUsed[readId0] = true;
+        //     readUsed[readId1] = true;
+        //     keepAlignment[alignmentId] = true;
+        //     thisAlignmentData.info.isInReadGraph = 1;
+        // }
+        // } else if(logQ <= logWThresholdForBreaks){
+        //     alignmentTableNotPassFilter.push_back(make_pair(alignmentId, logQ));
+        //     alignmentsAlreadyConsidered[alignmentId] = true;
+        //     keepAlignmentsForBreaks[alignmentId] = true;
+        // }
+
     }
 
     sort(alignmentTableHetSites.begin(), alignmentTableHetSites.end(), OrderPairsBySecondOnly<uint64_t, double>());
     cout << "The alignmentTableHetSites has " << alignmentTableHetSites.size() << " entries." << endl;
 
 
+
+    createReadGraphUsingSelectedAlignments(keepAlignment);
+    return;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
 
 
     // Maintain a vector containing the degree of each vertex
@@ -3708,6 +5184,15 @@ void Assembler::createReadGraph4withStrandSeparation(
             SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
 
 
+            if (isReadIdContained[readId0] || isReadIdContained[readId1]) {
+                continue;
+            }
+
+            // if (readId0 == 8156 || readId0 == 8156 || readId1 == 8157 || readId1 == 8157) {
+            //     continue;
+            // }
+
+
             // keepAlignment[alignmentId] = true;
             // alignment.info.isInReadGraph = 1;
             // continue;
@@ -3735,10 +5220,10 @@ void Assembler::createReadGraph4withStrandSeparation(
 
             
 
-            // If both vertices of the potential edge have at least the required minimum number 
-            // of neighbors, the alignment is also skipped. 
-            const uint64_t degreeA0 = verticesDegree[A0.getValue()];
-            const uint64_t degreeB0 = verticesDegree[B0.getValue()];
+            // // If both vertices of the potential edge have at least the required minimum number 
+            // // of neighbors, the alignment is also skipped. 
+            // const uint64_t degreeA0 = verticesDegree[A0.getValue()];
+            // const uint64_t degreeB0 = verticesDegree[B0.getValue()];
 
 
 
@@ -3783,6 +5268,124 @@ void Assembler::createReadGraph4withStrandSeparation(
     cout << "Found " << crossStrandEdgeCountHet << " cross strand edges in HET SITES during disjointSets construction." << endl;
 
 
+
+
+
+
+
+
+
+
+    // Process alignments in order of increasing Q
+    // vector alignmentTablesToProcess({alignmentTableHetSites});
+    
+    // uint64_t crossStrandEdgeCountHet = 0;
+
+    for (auto alignmentTableToProcess : alignmentTablesToProcess) {
+        for(auto it=alignmentTableToProcess.begin(); it!=alignmentTableToProcess.end(); ++it) {
+            const pair<uint64_t, double>& p = *it;
+            const uint64_t alignmentId = p.first;
+            // const double logQ = p.second;
+
+            // Get the alignment data
+            AlignmentData& alignment = alignmentData[alignmentId];
+            const ReadId readId0 = alignment.readIds[0];
+            const ReadId readId1 = alignment.readIds[1];
+            const bool isSameStrand = alignment.isSameStrand;
+            SHASTA_ASSERT(readId0 < readId1);
+            const OrientedReadId A0 = OrientedReadId(readId0, 0);
+            const OrientedReadId B0 = OrientedReadId(readId1, isSameStrand ? 0 : 1);
+            const OrientedReadId A1 = OrientedReadId(readId0, 1);
+            const OrientedReadId B1 = OrientedReadId(readId1, isSameStrand ? 1 : 0);
+
+            SHASTA_ASSERT(A0.getReadId() == A1.getReadId());
+            SHASTA_ASSERT(B0.getReadId() == B1.getReadId());
+            SHASTA_ASSERT(A0.getStrand() == 1 - A1.getStrand());
+            SHASTA_ASSERT(B0.getStrand() == 1 - B1.getStrand());
+
+
+            // if (isReadIdContained[readId0] || isReadIdContained[readId1]) {
+            //     continue;
+            // }
+
+            // if (readId0 == 8156 || readId0 == 8156 || readId1 == 8157 || readId1 == 8157) {
+            //     continue;
+            // }
+
+
+            // keepAlignment[alignmentId] = true;
+            // alignment.info.isInReadGraph = 1;
+            // continue;
+
+            // Get the connected components that these oriented reads are in.
+            const uint64_t a0 = disjointSets.find_set(A0.getValue());
+            const uint64_t b0 = disjointSets.find_set(B0.getValue());
+            const uint64_t a1 = disjointSets.find_set(A1.getValue());
+            const uint64_t b1 = disjointSets.find_set(B1.getValue());
+
+
+            // If the alignment breaks strand separation, it is skipped.
+            // If A0 and B1 are in the same connected component,
+            // A1 and B0 also must be in the same connected component.
+            // Adding this pair of edges would create a self-complementary
+            // connected component containing A0, B0, A1, and B1,
+            // and to ensure strand separation we don't want to do that.
+            // So we mark these edges as cross-strand edges
+            // and don't use them to update the disjoint set data structure.
+            if(a0 == b1) {
+                SHASTA_ASSERT(a1 == b0);
+                crossStrandEdgeCountHet += 2;
+                continue;
+            }
+
+            
+
+            // // If both vertices of the potential edge have at least the required minimum number 
+            // // of neighbors, the alignment is also skipped. 
+            // const uint64_t degreeA0 = verticesDegree[A0.getValue()];
+            // const uint64_t degreeB0 = verticesDegree[B0.getValue()];
+
+
+
+            // if(degreeA0 >= maxAlignmentCount && degreeB0 >= maxAlignmentCount) {
+            //     // cout << "Skipping alignment " << alignmentId << " because vertex " << A0.getValue() << " has degree " << degreeA0 << " and vertex " << B0.getValue() << " has degree " << degreeB0 << endl;
+            //     continue;
+            // }
+
+            // Add the alignment to the read graph.
+            keepAlignment[alignmentId] = true;
+            alignment.info.isInReadGraph = 1;
+            
+
+            // Update vertex degrees
+            verticesDegree[A0.getValue()]++;
+            verticesDegree[B0.getValue()]++;
+            verticesDegree[A1.getValue()]++;
+            verticesDegree[B1.getValue()]++;
+            
+
+            // Update disjoint sets
+            disjointSets.union_set(a0, b0);
+            disjointSets.union_set(a1, b1);
+
+        }
+
+        // Verify that for any read the two oriented reads are in distinct
+        // connected components.
+        for(ReadId readId=0; readId<readCount; readId++) {
+            const OrientedReadId orientedReadId0(readId, 0);
+            const OrientedReadId orientedReadId1(readId, 1);
+            SHASTA_ASSERT(
+                disjointSets.find_set(orientedReadId0.getValue()) !=
+                disjointSets.find_set(orientedReadId1.getValue())
+            );
+        }
+    }
+
+
+
+
+    
 
 
 
@@ -4127,6 +5730,7 @@ void Assembler::createReadGraph4withStrandSeparation(
             alignmentsAlreadyConsidered[alignmentId] = true;
             keepAlignmentsForBreaks[alignmentId] = true;
         }
+        
 
     }
 
@@ -4309,7 +5913,7 @@ void Assembler::createReadGraph4withStrandSeparation(
     //*
     
     // The vertex_descriptor is OrientedReadId::getValue().
-    ReadGraph4AllAlignments readGraphAllAlignments(orientedReadCount);
+    // ReadGraph4AllAlignments readGraphAllAlignments(orientedReadCount);
 
     // Initially, each alignment generates two edges.
     for(uint64_t alignmentId=0; alignmentId<alignmentData.size(); alignmentId++) {
