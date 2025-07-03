@@ -935,6 +935,7 @@ void Assembler::displayAlignments(
         html << "<th colspan=5>Markers on oriented read " <<
             alignments.front().first;
     }
+    html << "<th rowspan=2 title='Error rate of the alignment'>Error<br>rate";
     html <<
         "<th rowspan=2>Alignment sketch"
         "<tr>"
@@ -948,6 +949,7 @@ void Assembler::displayAlignments(
             "<th title='Number of aligned markers on the right of the alignment'>Right<br>unaligned"
             "<th title='Total number of markers on the oriented read'>Total"
             "<th title='Fraction of aligned markers in the alignment range'>Aligned<br>fraction";
+            "<th title='Error rate of the alignment'>Error<br>rate";
     }
 
 
@@ -1003,7 +1005,9 @@ void Assembler::displayAlignments(
             "<td class=centered>" << alignmentInfo.rightTrim(1) <<
             "<td class=centered>" << markerCount1 <<
             "<td class=centered>" << std::setprecision(3) <<
-            alignmentInfo.alignedFraction(1);
+            alignmentInfo.alignedFraction(1) <<
+            "<td class=centered>" << std::setprecision(3) <<
+            alignmentInfo.errorRate;
 
 
 

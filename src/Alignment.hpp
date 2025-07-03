@@ -213,6 +213,8 @@ public:
     // Only computed for read graph creation method 4.
     float errorRateRle = invalid<float>;
     uint32_t mismatchCountRle = invalid<uint32_t>;
+    float errorRate = invalid<float>;
+    uint32_t mismatchCount = invalid<uint32_t>;
 
     void clearFlags()
     {

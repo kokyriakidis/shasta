@@ -545,14 +545,28 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
             // If getting here, this is a good alignment.
 
             // Compute projected alignment metrics, if requested.
+            // if(computeProjectedAlignmentMetrics) {
+            //     const ProjectedAlignment projectedAlignment(
+            //         *this,
+            //         orientedReadIds,
+            //         alignment,
+            //         ProjectedAlignment::Method::QuickRle);
+            //     alignmentInfo.errorRate = float(projectedAlignment.errorRateRle());
+            //     alignmentInfo.mismatchCount = uint32_t(projectedAlignment.mismatchCount);
+            // }
             if(computeProjectedAlignmentMetrics) {
                 const ProjectedAlignment projectedAlignment(
                     *this,
                     orientedReadIds,
                     alignment,
-                    ProjectedAlignment::Method::QuickRle);
-                alignmentInfo.errorRateRle = float(projectedAlignment.errorRateRle());
-                alignmentInfo.mismatchCountRle = uint32_t(projectedAlignment.mismatchCountRle);
+                    ProjectedAlignment::Method::QuickRaw);
+                alignmentInfo.errorRate = float(projectedAlignment.errorRate());
+                alignmentInfo.mismatchCount = uint32_t(projectedAlignment.mismatchCount);
+            }
+            
+            // Skip alignments with error rate greater than 0.07.
+            if (alignmentInfo.errorRate > 0.07) {
+                continue;
             }
 
             // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " good." << endl;

@@ -83,6 +83,9 @@ public:
 
     // The number of mismatches in the RLE alignment.
     uint64_t mismatchCountRle;
+    
+    // The number of mismatches in the RAW alignment.
+    uint64_t mismatchCount;
 
 
     void writeAlignmentHtml(ostream&) const;
@@ -166,6 +169,9 @@ public:
 
     // The number of mismatches in the RLE alignment.
     uint64_t mismatchCountRle;
+
+    // The number of mismatches in the RAW alignment.
+    uint64_t mismatchCount;
 
     void computeStatistics();
     double errorRate() const;

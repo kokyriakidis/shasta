@@ -1064,8 +1064,16 @@ public:
     // Functions and data related to read graph creation method 5.
     // This assumes that createReadGraph5 is multithreaded.
     // Simplifications are possible if this is not the case.
-    void createReadGraph5();
+    void createReadGraph5(
+        uint64_t maxAlignmentCount,
+        double epsilon,
+        double delta,
+        double WThreshold,
+        double WThresholdForBreaks
+        );
     void createReadGraph5ThreadFunction(uint64_t threadId);
+    void createReadGraph4PhasingThreadFunction(uint64_t threadId);
+    
 
     // Data that should be accessible to all threads.
     // The Assembler stores a single instance of that.

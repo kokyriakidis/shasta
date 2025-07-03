@@ -716,7 +716,9 @@ void shasta::main::assemble(
 
 
     // Compute alignments.
-    const bool computeProjectedAlignmentMetrics = assemblerOptions.readGraphOptions.creationMethod == 4;
+    const bool computeProjectedAlignmentMetrics =
+        assemblerOptions.readGraphOptions.creationMethod == 4 ||
+        assemblerOptions.readGraphOptions.creationMethod == 5;
     assembler.computeAlignments(
         assemblerOptions.alignOptions,
         computeProjectedAlignmentMetrics,
@@ -747,7 +749,13 @@ void shasta::main::assemble(
             assemblerOptions.readGraphOptions.WThresholdForBreaks
             );
         }  else if(assemblerOptions.readGraphOptions.creationMethod == 5) {
-            assembler.createReadGraph5();
+            assembler.createReadGraph5(
+            assemblerOptions.readGraphOptions.maxAlignmentCount,
+            assemblerOptions.readGraphOptions.epsilon,
+            assemblerOptions.readGraphOptions.delta,
+            assemblerOptions.readGraphOptions.WThreshold,
+            assemblerOptions.readGraphOptions.WThresholdForBreaks
+            );
         }
 
         // Actual alignment criteria are as specified in the command line options

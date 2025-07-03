@@ -1793,6 +1793,8 @@ struct PhasingThreadData {
     vector<vector<Site> > threadSites;
     vector<bool> isReadIdContained;
 
+    vector< vector<uint32_t> > hetPos;      // size = 2*readCount
+
     // Mutex for thread-safe cout if debugging is needed inside threads
     // std::mutex coutMutex; // Uncomment if needed
 
@@ -1818,6 +1820,9 @@ struct PhasingThreadData {
             threadFirstPassHetAlignments[i].resize(alignmentCount, false);
             threadAlignmentsAlreadyConsidered[i].resize(alignmentCount, false);
         }
+
+
+
     }
 };
 
@@ -2368,7 +2373,7 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
             //
 
             // We finished analyzing all alignments for the target read (readId0).
-            // Now we need to check each potential site in readId0 (in positionStatsOnOrientedReadId0) 
+            // Now we need to check each potential site in readId0 (in positionStatsOnOrientedReadId0)
             // to see if it involves a heterozygous site.
             uint64_t sitesSkippedDueToInsufficientCoverage = 0;
             for (auto const& [positionInRead0, positionStatsInRead0] : positionStatsOnOrientedReadId0) {
@@ -2482,7 +2487,7 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
 
                 
                 // Check if this is a potential heterozygous site
-                // Criteria: The 2 alleles with the highest coverage are above 4 coverage each 
+                // Criteria: The 2 alleles with the highest coverage are above 3 coverage each 
                 // and the target read supports the base of one of them
                 const uint64_t highestCoverageBaseCounts = baseCounts[0].first;
                 const uint64_t secondHighestCoverageBaseCounts = baseCounts[1].first;
@@ -2496,7 +2501,8 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                     // or it might include alignments with gaps (which make the site suspicious)
                     // TODO: If there is a second allele base difference (complex site)
                     // then skip this site for now
-                    if ((secondHighestCoverageBaseCounts > 0) and (baseCounts[1].second != 4)) {
+                    // if ((secondHighestCoverageBaseCounts > 0) and (baseCounts[1].second != 4)) {
+                    if (secondHighestCoverageBaseCounts > 0) {
                         // debugOut << "Skipping position " << positionInRead0 << " due to having a second highest coverage base that is not a gap: " << secondHighestCoverageBaseCounts << " (complex site)." << endl;
                         // debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << endl;
                         continue;
@@ -2528,10 +2534,10 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                         for (const AlignmentInfoPair& infoPair : coveringAlignmentInfo) {
                             uint64_t alignmentId = infoPair.first;
                             OrientedReadId storedOrientedReadId1 = infoPair.second;
-                            if (positionInRead0 == 513) {
-                                // debugOut << "Found covering alignment ID: " << alignmentId << " for position " << positionInRead0 << endl;
-                                // debugOut << "OrientedReadId1: " << storedOrientedReadId1 << endl;
-                            }
+                            // if (positionInRead0 == 513) {
+                            //     // debugOut << "Found covering alignment ID: " << alignmentId << " for position " << positionInRead0 << endl;
+                            //     // debugOut << "OrientedReadId1: " << storedOrientedReadId1 << endl;
+                            // }
                             // if (phasingThreadData->isReadIdContained[storedOrientedReadId1.getReadId()]) {
                             //     // Skip contained reads
                             //     continue;
@@ -2551,7 +2557,8 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                     uint64_t minimumNumberOfAlignmentsSupportingTheTargetRead = 2;
 
                     // Skip this position if the coverage supporting the target read is less than 2
-                    if (totalCoverageInThisPosition - totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead < minimumNumberOfAlignmentsSupportingTheTargetRead) {
+                    // if (totalCoverageInThisPosition - totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead < minimumNumberOfAlignmentsSupportingTheTargetRead) {
+                    if (totalCoverageInThisPosition - highestCoverageBaseCounts < minimumNumberOfAlignmentsSupportingTheTargetRead) {
                         sitesSkippedDueToInsufficientCoverage++;
                         // debugOut << "Skipping position " << positionInRead0 << " due to insufficient coverage supporting the target read: " << totalCoverageInThisPosition - totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead << endl;
                         // debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << " Total Alignments that support a change: " << totalNumberOfAlignmentsWithoutGapsSupportingAChangeFromTheTargetRead << ". Total alignments: " << totalCoverageInThisPosition << ". Total alignments without gaps: " << totalCoverageInThisPositionWithoutGaps << "." << endl;
@@ -2702,9 +2709,22 @@ void Assembler::createReadGraph4PhasingThreadFunction(size_t threadId) {
                     // --- END OF: Check if we have strand bias issues in this position ---
                     //
 
+
+
+
+
+
+
                 } // --- End of loop over a specific potential heterozygous site ---
 
             } // --- End of loop over all potential heterozygous sites ---
+
+
+
+
+
+
+            
             
 
 
@@ -3867,7 +3887,7 @@ void Assembler::createReadGraph4withStrandSeparation(
                 bool involvesExcludedOrientedReads = (site.excludedOrientedReads.count(currentOrientedReadId0) && site.excludedOrientedReads.count(currentOrientedReadId1));
                 
                 if (involvesfinalInPhaseOrientedReads) {
-                    cout << "Added firstPassHetAlignments alignmentId: " << alignmentId << endl;
+                    //cout << "Added firstPassHetAlignments alignmentId: " << alignmentId << endl;
                     // if (phasingThreadData->isReadIdContained[currentOrientedReadId0.getReadId()]) {
                     //     continue;
                     // }
@@ -3879,7 +3899,7 @@ void Assembler::createReadGraph4withStrandSeparation(
                 }
 
                 if (involvesExcludedOrientedReads) {
-                    cout << "Added forbiddenAlignments alignmentId: " << alignmentId << endl;
+                    //cout << "Added forbiddenAlignments alignmentId: " << alignmentId << endl;
                     // Mark forbidden in thread-local vector
                     // debugOut << "Forbidding alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " because one read is in excludedOutOfPhaseOrientedReads." << endl;
                     forbiddenAlignments[alignmentId] = true;

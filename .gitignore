@@ -7,3 +7,6 @@ docs/doxygen/latex
 
 cmake-build-debug/
 build/
+
+/.cache/
+/.vscode/
