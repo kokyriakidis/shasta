@@ -560,13 +560,26 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                     orientedReadIds,
                     alignment,
                     ProjectedAlignment::Method::QuickRaw);
-                alignmentInfo.errorRate = float(projectedAlignment.errorRate());
+
+                
+                float errorRate = projectedAlignment.errorRate();
+                
+                // Skip alignments with error rate greater than 0.07.
+                if (errorRate > 0.07) {
+                    continue;
+                }
+
+                alignmentInfo.errorRate = errorRate;
                 alignmentInfo.mismatchCount = uint32_t(projectedAlignment.mismatchCount);
-            }
-            
-            // Skip alignments with error rate greater than 0.07.
-            if (alignmentInfo.errorRate > 0.07) {
-                continue;
+
+                alignmentInfo.startingAlignmentBasePosition[0] = projectedAlignment.startingAlignmentBasePosition[0];
+                alignmentInfo.startingAlignmentBasePosition[1] = projectedAlignment.startingAlignmentBasePosition[1];
+                alignmentInfo.endingAlignmentBasePosition[0] = projectedAlignment.endingAlignmentBasePosition[0];
+                alignmentInfo.endingAlignmentBasePosition[1] = projectedAlignment.endingAlignmentBasePosition[1];
+                alignmentInfo.leftTrimBases[0] = projectedAlignment.leftTrimBases[0];
+                alignmentInfo.leftTrimBases[1] = projectedAlignment.leftTrimBases[1];
+                alignmentInfo.rightTrimBases[0] = projectedAlignment.rightTrimBases[0];
+                alignmentInfo.rightTrimBases[1] = projectedAlignment.rightTrimBases[1];
             }
 
             // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " good." << endl;

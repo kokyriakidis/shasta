@@ -216,6 +216,12 @@ public:
     float errorRate = invalid<float>;
     uint32_t mismatchCount = invalid<uint32_t>;
 
+    // Base-space alignment positions and trim information
+    array<uint32_t, 2> startingAlignmentBasePosition = {invalid<uint32_t>, invalid<uint32_t>};
+    array<uint32_t, 2> endingAlignmentBasePosition   = {invalid<uint32_t>, invalid<uint32_t>};
+    array<uint32_t, 2> leftTrimBases                 = {invalid<uint32_t>, invalid<uint32_t>};
+    array<uint32_t, 2> rightTrimBases                = {invalid<uint32_t>, invalid<uint32_t>};
+
     void clearFlags()
     {
         isInReadGraph = 0;
@@ -260,6 +266,11 @@ public:
         minOrdinalOffset = -minOrdinalOffset;
         maxOrdinalOffset = -maxOrdinalOffset;
         averageOrdinalOffset = -averageOrdinalOffset;
+
+        std::swap(startingAlignmentBasePosition[0], startingAlignmentBasePosition[1]);
+        std::swap(endingAlignmentBasePosition[0], endingAlignmentBasePosition[1]);
+        std::swap(leftTrimBases[0], leftTrimBases[1]);
+        std::swap(rightTrimBases[0], rightTrimBases[1]);
     }
 
     // Update to reflect reverse complementing of the two oriented reads.

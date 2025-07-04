@@ -172,6 +172,8 @@ void ProjectedAlignment::constructQuickRaw()
     totalLength = {0, 0};
     totalEditDistance = 0;
     mismatchCount = 0;
+    startingAlignmentBasePosition = {0, 0};
+    endingAlignmentBasePosition = {0, 0};
 
     // Loop over pairs of consecutive aligned markers (A, B).
     for(uint64_t iB=1; iB<alignment.ordinals.size(); iB++) {
@@ -186,6 +188,14 @@ void ProjectedAlignment::constructQuickRaw()
             segment.positionsA[i] = markers[i][segment.ordinalsA[i]].position + kHalf;
             segment.positionsB[i] = markers[i][segment.ordinalsB[i]].position + kHalf;
         }
+
+        if (iB == 1) {
+            startingAlignmentBasePosition[0] = segment.positionsA[0] - kHalf;
+            startingAlignmentBasePosition[1] = segment.positionsA[1] - kHalf;
+        }
+
+        endingAlignmentBasePosition[0] = segment.positionsB[0] + kHalf;
+        endingAlignmentBasePosition[1] = segment.positionsB[1] + kHalf;
 
         // Fill in the base sequences.
         fillSequences(segment);
@@ -207,6 +217,36 @@ void ProjectedAlignment::constructQuickRaw()
         // Store this segment.
         segments.push_back(segment);
     }
+
+
+    // Get the starting and ending base positions of the aligned portions of the two oriented reads.
+    const auto& startingAlignmentBasePosition0 = startingAlignmentBasePosition[0];
+    const auto& startingAlignmentBasePosition1 = startingAlignmentBasePosition[1];
+    const auto& endingAlignmentBasePosition0 = endingAlignmentBasePosition[0];
+    const auto& endingAlignmentBasePosition1 = endingAlignmentBasePosition[1];
+
+    // Get the length of the reads.
+    const auto& read0Length = sequences[0].baseCount;
+    const auto& read1Length = sequences[1].baseCount;
+
+    // Calculate the 5end and 3end unaligned portions of orientedReadId 0.
+    if (startingAlignmentBasePosition0 < endingAlignmentBasePosition0) {
+        leftTrimBases[0] = startingAlignmentBasePosition0;
+        rightTrimBases[0] = read0Length - endingAlignmentBasePosition0;
+    } else {
+        leftTrimBases[0] = read0Length - startingAlignmentBasePosition0;
+        rightTrimBases[0] = endingAlignmentBasePosition0;
+    }
+
+    // Calculate the 5end and 3end unaligned portions of orientedReadId 1.
+    if (startingAlignmentBasePosition1 < endingAlignmentBasePosition1) {
+        leftTrimBases[1] = startingAlignmentBasePosition1;
+        rightTrimBases[1] = read1Length - endingAlignmentBasePosition1;
+    } else {
+        leftTrimBases[1] = read1Length - startingAlignmentBasePosition1;
+        rightTrimBases[1] = endingAlignmentBasePosition1;
+    }
+
 }
 
 

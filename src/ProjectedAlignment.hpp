@@ -163,6 +163,21 @@ public:
     array<uint64_t, 2> totalLength;
     array<uint64_t, 2> totalLengthRle;
 
+    // Statistics.
+    array<uint64_t, 2> totalLengthBases;
+    array<uint64_t, 2> totalLengthRleBases;
+
+    // The starting and ending base positions of the aligned portions of the two oriented reads.
+    array<uint32_t, 2> startingAlignmentBasePosition;
+    array<uint32_t, 2> endingAlignmentBasePosition;
+
+    // The number of bases trimmed from the 5end of each read.
+    array<uint32_t, 2> leftTrimBases;
+
+    // The number of bases trimmed from the 3end of each read.
+    array<uint32_t, 2> rightTrimBases;
+
+
     // Total edit distance (raw and RLE).
     int64_t totalEditDistance;
     int64_t totalEditDistanceRle;

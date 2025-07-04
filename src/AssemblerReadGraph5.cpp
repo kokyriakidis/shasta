@@ -2413,11 +2413,9 @@ void Assembler::createReadGraph5(
         const auto alignmentTable0 = alignmentTable[orientedReadId0.getValue()];
         for (const auto alignmentId : alignmentTable0) {
 
-            // if (readId0 == 3743) {
-            //     cout << "AlignmentId: " << alignmentId << endl;
-            //     cout << "FirstPassHetAlignments: " << firstPassHetAlignments[alignmentId] << endl;
-            //     cout << "ForbiddenAlignments: " << forbiddenAlignments[alignmentId] << endl;
-            // }
+            if (readId0 != 3743) {
+                continue;
+            }
 
             if (!firstPassHetAlignments[alignmentId]) {
                 continue;
@@ -2448,6 +2446,35 @@ void Assembler::createReadGraph5(
                 alignmentInfo.reverseComplement();
             }
             SHASTA_ASSERT(currentOrientedReadId0.getStrand() == strand0);
+
+            const uint32_t startingAlignmentBasePosition0 = alignmentInfo.startingAlignmentBasePosition[0];
+            const uint32_t startingAlignmentBasePosition1 = alignmentInfo.startingAlignmentBasePosition[1];
+            const uint32_t endingAlignmentBasePosition0 = alignmentInfo.endingAlignmentBasePosition[0];
+            const uint32_t endingAlignmentBasePosition1 = alignmentInfo.endingAlignmentBasePosition[1];
+            const uint32_t leftTrimBases0 = alignmentInfo.leftTrimBases[0];
+            const uint32_t leftTrimBases1 = alignmentInfo.leftTrimBases[1];
+            const uint32_t rightTrimBases0 = alignmentInfo.rightTrimBases[0];
+            const uint32_t rightTrimBases1 = alignmentInfo.rightTrimBases[1];
+
+            cout << "AlignmentId: " << alignmentId << endl;
+            cout << "startingAlignmentBasePosition0: " << startingAlignmentBasePosition0 << endl;
+            cout << "startingAlignmentBasePosition1: " << startingAlignmentBasePosition1 << endl;
+            cout << "endingAlignmentBasePosition0: " << endingAlignmentBasePosition0 << endl;
+            cout << "endingAlignmentBasePosition1: " << endingAlignmentBasePosition1 << endl;
+            cout << "leftTrimBases0: " << leftTrimBases0 << endl;
+            cout << "leftTrimBases1: " << leftTrimBases1 << endl;
+            cout << "rightTrimBases0: " << rightTrimBases0 << endl;
+            cout << "rightTrimBases1: " << rightTrimBases1 << endl;
+
+            if (leftTrimBases0 > leftTrimBases1 && rightTrimBases0 > rightTrimBases1) {
+                cout << "ReadId: " << currentOrientedReadId1.getReadId() << " is contained in readId: " << currentOrientedReadId0.getReadId() << endl;
+            }
+
+            if (leftTrimBases0 < leftTrimBases1 && rightTrimBases0 < rightTrimBases1) {
+                cout << "ReadId: " << currentOrientedReadId0.getReadId() << " is contained in readId: " << currentOrientedReadId1.getReadId() << endl;
+            }
+
+
 
             const uint64_t leftTrim0 = alignmentInfo.data[0].leftTrim();
             const uint64_t rightTrim0 = alignmentInfo.data[0].rightTrim();
