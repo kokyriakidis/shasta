@@ -544,6 +544,74 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
 
             // If getting here, this is a good alignment.
 
+            const auto orientedReadMarkers0 = markers[orientedReadIds[0].getValue()];
+            const uint32_t positionStart0 = orientedReadMarkers0[alignmentInfo.data[0].firstOrdinal].position;
+            const uint32_t positionEnd0 = orientedReadMarkers0[alignmentInfo.data[0].lastOrdinal].position + uint32_t(assemblerInfo->k);
+            const uint32_t overlapLength0 = positionEnd0 - positionStart0;
+
+            const auto orientedReadMarkers1 = markers[orientedReadIds[1].getValue()];
+            const uint32_t positionStart1 = orientedReadMarkers1[alignmentInfo.data[1].firstOrdinal].position;
+            const uint32_t positionEnd1 = orientedReadMarkers1[alignmentInfo.data[1].lastOrdinal].position + uint32_t(assemblerInfo->k);
+            const uint32_t overlapLength1 = positionEnd1 - positionStart1;
+
+            const uint64_t readLength0 = reads->getRead(orientedReadIds[0].getReadId()).baseCount;
+            const uint64_t readLength1 = reads->getRead(orientedReadIds[1].getReadId()).baseCount;
+
+            const uint32_t leftTrimBases0 = positionStart0;
+            const uint32_t rightTrimBases0 = readLength0 - positionEnd0;
+
+            const uint32_t leftTrimBases1 = positionStart1;
+            const uint32_t rightTrimBases1 = readLength1 - positionEnd1;
+
+            // Calculate the "effective" 5end and 3end hanging lengths.
+            // This is the minimum of the left trim bases and minimum of the right trim bases.
+            // This basically calculates the overlaping portion of the two reads that is not covered by the alignment.
+            uint32_t min5endHangingLength = 0;
+            uint32_t min3endHangingLength = 0;
+
+            if (leftTrimBases0 < leftTrimBases1) {
+                min5endHangingLength = leftTrimBases0;
+            } else {
+                min5endHangingLength = leftTrimBases1;
+            }
+
+            if (rightTrimBases0 < rightTrimBases1) {
+                min3endHangingLength = rightTrimBases0;
+            } else {
+                min3endHangingLength = rightTrimBases1;
+            }
+
+            // If the hanging lengths are too long, skip the alignment.
+            const uint32_t maxHangingLength = 1000;
+
+            if (min5endHangingLength > maxHangingLength || min3endHangingLength > maxHangingLength) {
+                // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " long hanging lengths." << endl;
+                continue;
+            }
+
+            // At least 80% of the overlap should be covered by the alignment.
+            // At least 80% of the physical span that would go into the graph
+            // must actually be aligned.
+            const float minOverlapFraction = 0.80;
+
+            if (overlapLength0 < minOverlapFraction * (overlapLength0 + min5endHangingLength + min3endHangingLength) || 
+                overlapLength1 < minOverlapFraction * (overlapLength1 + min5endHangingLength + min3endHangingLength)) 
+            {
+                // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " low overlap fraction." << endl;
+                continue;
+            }
+
+            // Remove alignments with short overlaps.
+            const uint32_t minOverlap = 50;
+
+            if ((overlapLength0 + min5endHangingLength + min3endHangingLength) < minOverlap || 
+                (overlapLength1 + min5endHangingLength + min3endHangingLength) < minOverlap) 
+            {
+                // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " short overlap." << endl;
+                continue;
+            }
+
+
             // Compute projected alignment metrics, if requested.
             // if(computeProjectedAlignmentMetrics) {
             //     const ProjectedAlignment projectedAlignment(
@@ -561,25 +629,275 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                     alignment,
                     ProjectedAlignment::Method::QuickRaw);
 
-                
-                float errorRate = projectedAlignment.errorRate();
+
+                // ---------------------------------------------------
+                //   START OF: Total Overlap Error Rate filtering    
+                // ---------------------------------------------------
+
+                float alignmentErrorRate = projectedAlignment.errorRate();
                 
                 // Skip alignments with error rate greater than 0.07.
-                if (errorRate > 0.07) {
+                if (alignmentErrorRate > 0.07) {
                     continue;
                 }
 
-                alignmentInfo.errorRate = errorRate;
-                alignmentInfo.mismatchCount = uint32_t(projectedAlignment.mismatchCount);
+                // ---------------------------------------------------
+                //   END OF: Total Overlap Error Rate filtering    
+                // ---------------------------------------------------
 
-                alignmentInfo.startingAlignmentBasePosition[0] = projectedAlignment.startingAlignmentBasePosition[0];
-                alignmentInfo.startingAlignmentBasePosition[1] = projectedAlignment.startingAlignmentBasePosition[1];
-                alignmentInfo.endingAlignmentBasePosition[0] = projectedAlignment.endingAlignmentBasePosition[0];
-                alignmentInfo.endingAlignmentBasePosition[1] = projectedAlignment.endingAlignmentBasePosition[1];
-                alignmentInfo.leftTrimBases[0] = projectedAlignment.leftTrimBases[0];
-                alignmentInfo.leftTrimBases[1] = projectedAlignment.leftTrimBases[1];
-                alignmentInfo.rightTrimBases[0] = projectedAlignment.rightTrimBases[0];
-                alignmentInfo.rightTrimBases[1] = projectedAlignment.rightTrimBases[1];
+                
+
+                // ----------------------------------------------
+                //   Sliding-window error filtering (read-0)    
+                // ----------------------------------------------
+                
+
+                // Window length.
+                const uint64_t windowLength = 375;
+
+                // Determine the number of windows.
+                const uint64_t span0 = positionEnd0 - positionStart0 + 1;   // real number of bases
+
+                // How many full windows do we need? – ceiling division
+                const size_t numberOfWindows = (span0 + windowLength - 1) / windowLength;
+
+                // How many bases fall into the last window?
+                const uint64_t remainderBases = span0 % windowLength;              // 0 … L-1
+
+                vector<uint32_t> windowBases(numberOfWindows, windowLength);        // start with L everywhere
+
+                if (remainderBases != 0) {
+                    windowBases.back() = remainderBases;               // shrink the last one
+                }   
+
+
+
+                // ---------------------------------------------------
+                // START OF: Preparation for the chemical window filtering.
+                // ---------------------------------------------------
+
+                uint64_t chemicalWindowLength = 384;
+                uint64_t dn = 2000;
+                double dr = 0.1;
+                bool runChemicalWindowFiltering = false;
+                if (span0 > chemicalWindowLength) {
+                    
+                    if (dn > (span0 * dr)) {
+                        dn = span0 * dr;
+                    }
+
+                    if ((dn > chemicalWindowLength) && (span0 > dn)) {
+                        runChemicalWindowFiltering = true;
+                    }
+
+                }
+
+                uint64_t errorsInFirstDnBases = 0;
+                uint64_t errorsInLastDnBases = 0;
+
+                // ---------------------------------------------------
+                //   END OF: Preparation for the chemical window filtering.
+                // ---------------------------------------------------
+
+
+                vector<uint32_t> windowErrors(numberOfWindows, 0);
+                
+                // Loop over the RAW segments of the projectedAlignment and find windows with high error rate.
+                for (const ProjectedAlignmentSegment& segment : projectedAlignment.segments) {
+                    
+                    // Get the RAW sequences
+                    const vector<Base>& sequence0 = segment.sequences[0];
+                    const vector<Base>& sequence1 = segment.sequences[1];
+
+                    const uint32_t segmentPositionStart0 = segment.positionsA[0];
+                    const uint32_t segmentPositionEnd0 = segment.positionsB[0];
+                    
+
+                    // Align them base by base to get the right sequence alignment representation.
+                    uint64_t localPosition0 = 0;
+                    uint64_t localPosition1 = 0;
+
+                    // Retreive the RAW alignment sequences.
+                    for (const pair<bool, bool>& p: segment.alignment) {
+                        const bool hasBase0 = p.first;
+                        const bool hasBase1 = p.second;
+
+                        // Find the window that contains this position.
+                        uint64_t windowIndex = (segmentPositionStart0 + localPosition0 - positionStart0) / windowLength;
+
+                        if (hasBase0 && hasBase1) {
+                            if (sequence0[localPosition0] != sequence1[localPosition1]) {
+                                // Increment the error count for this window.
+                                ++windowErrors[windowIndex];
+
+                                // Check if the position is in the first or last dn bases.
+                                if ( ((segmentPositionStart0 + localPosition0 - positionStart0) <= dn) ) {
+                                    ++errorsInFirstDnBases;
+                                } else if ( ((segmentPositionStart0 + localPosition0) >= (positionEnd0 - dn))) {
+                                    ++errorsInLastDnBases;
+                                }
+
+                            }
+                            // Advance the position.
+                            ++localPosition0;
+                            ++localPosition1;
+                            continue;
+                        }
+
+                        if (hasBase0 && !hasBase1) {
+                            // Increment the error count for this window.
+                            ++windowErrors[windowIndex];
+
+                            // Check if the position is in the first or last dn bases.
+                            if ( ((segmentPositionStart0 + localPosition0 - positionStart0) <= dn) ) {
+                                ++errorsInFirstDnBases;
+                            } else if ( ((segmentPositionStart0 + localPosition0) >= (positionEnd0 - dn))) {
+                                ++errorsInLastDnBases;
+                            }
+
+                            // Advance the position.
+                            ++localPosition0;    
+                            continue;
+                        }
+
+                        if (!hasBase0 && hasBase1) {       
+                            // Increment the error count for this window.
+                            ++windowErrors[windowIndex];
+
+                            // Check if the position is in the first or last dn bases.
+                            if ( ((segmentPositionStart0 + localPosition0 - positionStart0) <= dn) ) {
+                                ++errorsInFirstDnBases;
+                            } else if ( ((segmentPositionStart0 + localPosition0) >= (positionEnd0 - dn))) {
+                                ++errorsInLastDnBases;
+                            }
+
+                            // Advance the position.
+                            ++localPosition1;
+                            continue;
+                        }
+                    }
+                }
+
+                uint64_t basesThatManagedToAlignAcrossWindows = 0;
+
+                // Find windows with high error rate.
+                for (uint64_t i = 0; i < numberOfWindows; i++) {
+                    
+                    // Calculate the number of errors per window threshold using a 7% error rate.
+                    uint64_t numberOfErrorsPerWindowThreshold = windowBases[i] * 0.07;
+                    
+                    // If the window is small, set the threshold to 1.
+                    if (numberOfErrorsPerWindowThreshold == 0 && windowBases[i] > 4) {
+                        numberOfErrorsPerWindowThreshold = 1;
+                    }
+                    
+                    // Cap the number of errors per window at 31.
+                    if (numberOfErrorsPerWindowThreshold > 31) {
+                        numberOfErrorsPerWindowThreshold = 31;
+                    }
+                    
+                    // Edit distance threshold filtering.
+                    if (windowErrors[i] > numberOfErrorsPerWindowThreshold) {
+                        // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " window " << i << " has " << windowErrors[i] << " errors." << endl;
+                        continue;
+                    }
+
+                    basesThatManagedToAlignAcrossWindows += windowBases[i];
+
+                }
+
+                // Check if the number of bases that managed to align across windows
+                // that passed the sliding-window error filtering cover at least 90% of the total span.
+                if (basesThatManagedToAlignAcrossWindows < 0.9 * span0) {
+                    // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " too few bases that managed to align across windows." << endl;
+                    continue;
+                }
+
+                // ---------------------------------------------------
+                //   END OF: Sliding-window error filtering (read-0)    
+                // ---------------------------------------------------
+
+
+
+
+
+                
+
+
+                
+                
+
+                // ---------------------------------------------------
+                //   START OF: Max Gap filtering
+                //   - Filter out alignments with too many consecutive gaps of size >= 6 bases length (alignmentMaxGaps = 64).
+                //   - Filter out alignments with too high gap rate (alignmentMaxGapRate = 0.06).
+                // ---------------------------------------------------
+
+                // Add the hanging lengths to the total edit distance.
+                // Treat the hanging lengths as unaligned bases.
+                const uint64_t totalLength0 = projectedAlignment.totalLength[0];
+                const uint64_t totalLength1 = projectedAlignment.totalLength[1];
+                
+                const uint64_t alignmentMaxGaps = 64;
+                const double alignmentMaxGapRate = 0.06;
+
+                uint64_t totalSVGaps = projectedAlignment.largeGapSum;
+                uint64_t longestSVGap = std::max(projectedAlignment.longestGap[0], projectedAlignment.longestGap[1]);
+
+                if(totalSVGaps > alignmentMaxGaps) {
+                    // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " have a long SVGap: " << longestSVGap << endl;
+                    // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " total SVGap sum (gaps >= 6): " << totalSVGaps << endl;
+                    continue;
+                }
+
+                if((totalSVGaps > (alignmentMaxGapRate * double(totalLength0))) || (totalSVGaps > (alignmentMaxGapRate * double(totalLength1)))) {
+                    // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " too high SVGap rate: " << totalSVGaps << " " << (alignmentMaxGapRate * double(totalLength0)) << " " << (alignmentMaxGapRate * double(totalLength1)) << endl;
+                    continue;
+                }
+
+                // ---------------------------------------------------
+                //   END OF: Max Gap filtering    
+                // ---------------------------------------------------
+
+
+
+                // ---------------------------------------------------
+                //   START OF: Chemical Window Filtering
+                //   Count for errors in the terminal regions of the read.
+                //   - ONT reads often have one bad end
+                //   - Chimeric reads may have one good end and one bad end
+                //   - Terminal degradation is typically assymetric
+                //   Check if in either end of the read:
+                //   - We have more than min_err errors (min_err = 128)
+                //   - The number of errors is greater than the error rate threshold (er = 0.36)
+                //   If both conditions are met, the alignment is discarded.
+                // ---------------------------------------------------
+
+                double er = 0.36;
+                uint64_t min_err = 128;
+
+                if (runChemicalWindowFiltering) {
+                    if ( (errorsInFirstDnBases > min_err) && (errorsInFirstDnBases > (dn * er)) ) {
+                        // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " too many errors in first " << dn << " bases." << endl;
+                        // cout << errorsInFirstDnBases << " " << dn * er << endl;
+                        continue;
+                    }
+
+                    if ( (errorsInLastDnBases > min_err) && (errorsInLastDnBases > (dn * er)) ) {
+                        // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " too many errors in last " << dn << " bases." << endl;
+                        // cout << errorsInLastDnBases << " " << dn * er << endl;
+                        continue;
+                    }
+                }
+
+                // ---------------------------------------------------
+                //   END OF: Chemical Window Filtering
+                // ---------------------------------------------------
+                
+            
+            
+                alignmentInfo.errorRate = alignmentErrorRate;
+                alignmentInfo.mismatchCount = uint32_t(projectedAlignment.mismatchCount);
             }
 
             // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " good." << endl;

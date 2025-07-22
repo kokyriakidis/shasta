@@ -52,6 +52,10 @@ ProjectedAlignment::ProjectedAlignment(
 {
     SHASTA_ASSERT((k % 2) == 0);
 
+    // Initialize gap statistics.
+    longestGap = {0,0};
+    largeGapSum = 0;
+
     switch(method) {
         case Method::All:
             constructAll();
@@ -61,6 +65,9 @@ ProjectedAlignment::ProjectedAlignment(
             break;
         case Method::QuickRaw:
             constructQuickRaw();
+            break;
+        case Method::QuickRawSimple:
+            constructQuickRawSimple();
             break;
         default:
             SHASTA_ASSERT(0);
@@ -163,17 +170,13 @@ void ProjectedAlignment::constructQuickRle()
 
 
 
-void ProjectedAlignment::constructQuickRaw()
+// This stores only the raw sequences and raw alignments for segments for which the raw sequences
+//  of the two oriented reads are different.
+void ProjectedAlignment::constructQuickRawSimple()
 {
     // Create the segment outside the loop and reuse it to reduce
     // memory allocation activity.
     ProjectedAlignmentSegment segment;
-
-    totalLength = {0, 0};
-    totalEditDistance = 0;
-    mismatchCount = 0;
-    startingAlignmentBasePosition = {0, 0};
-    endingAlignmentBasePosition = {0, 0};
 
     // Loop over pairs of consecutive aligned markers (A, B).
     for(uint64_t iB=1; iB<alignment.ordinals.size(); iB++) {
@@ -189,13 +192,76 @@ void ProjectedAlignment::constructQuickRaw()
             segment.positionsB[i] = markers[i][segment.ordinalsB[i]].position + kHalf;
         }
 
-        if (iB == 1) {
-            startingAlignmentBasePosition[0] = segment.positionsA[0] - kHalf;
-            startingAlignmentBasePosition[1] = segment.positionsA[1] - kHalf;
+        // Fill in the base sequences.
+        fillSequences(segment);
+
+        // If the raw sequences are the same, don't store the segment.
+        if(segment.sequences[0] == segment.sequences[1]) {
+            continue;
         }
 
-        endingAlignmentBasePosition[0] = segment.positionsB[0] + kHalf;
-        endingAlignmentBasePosition[1] = segment.positionsB[1] + kHalf;
+        // Align them.
+        segment.computeAlignmentSimple(matchScore, mismatchScore, gapScore);
+
+        // Store this segment.
+        segments.push_back(segment);
+    }
+}
+
+
+void ProjectedAlignmentSegment::computeAlignmentSimple(
+    int64_t matchScore,
+    int64_t mismatchScore,
+    int64_t gapScore)
+{
+    const vector<uint8_t>& sequence0 = reinterpret_cast< const vector<uint8_t>& >(sequences[0]);
+    const vector<uint8_t>& sequence1 = reinterpret_cast< const vector<uint8_t>& >(sequences[1]);
+
+    if(sequence0 == sequence1) {
+        editDistance = 0;
+        alignment.resize(sequence0.size());
+        fill(alignment.begin(), alignment.end(), make_pair(true, true));
+
+    } else {
+        editDistance =  -seqanAlign(
+            sequence0.begin(), sequence0.end(),
+            sequence1.begin(), sequence1.end(),
+            matchScore,
+            mismatchScore,
+            gapScore,
+            false,
+            false,
+            alignment);
+    }
+
+}
+
+
+void ProjectedAlignment::constructQuickRaw()
+{
+    // Create the segment outside the loop and reuse it to reduce
+    // memory allocation activity.
+    ProjectedAlignmentSegment segment;
+
+    totalLength = {0, 0};
+    totalEditDistance = 0;
+    mismatchCount = 0;
+    longestGap = {0,0};
+    largeGapSum = 0;
+
+    // Loop over pairs of consecutive aligned markers (A, B).
+    for(uint64_t iB=1; iB<alignment.ordinals.size(); iB++) {
+        const uint64_t iA = iB - 1;
+
+        // Store in the segment the ordinals of these pair of consecutive aligned markers.
+        segment.ordinalsA = alignment.ordinals[iA];
+        segment.ordinalsB = alignment.ordinals[iB];
+
+        // Store the corresponding positions.
+        for(uint64_t i=0; i<2; i++) {
+            segment.positionsA[i] = markers[i][segment.ordinalsA[i]].position + kHalf;
+            segment.positionsB[i] = markers[i][segment.ordinalsB[i]].position + kHalf;
+        }
 
         // Fill in the base sequences.
         fillSequences(segment);
@@ -214,40 +280,70 @@ void ProjectedAlignment::constructQuickRaw()
         totalEditDistance += segment.editDistance;
         mismatchCount += segment.mismatchCount;
 
+        // Update overall longest gap and large-gap sums using values computed in segment.
+        longestGap[0] = std::max(longestGap[0], segment.longestGap[0]);
+        longestGap[1] = std::max(longestGap[1], segment.longestGap[1]);
+
+        largeGapSum += segment.largeGapSum;
+
         // Store this segment.
         segments.push_back(segment);
     }
-
-
-    // Get the starting and ending base positions of the aligned portions of the two oriented reads.
-    const auto& startingAlignmentBasePosition0 = startingAlignmentBasePosition[0];
-    const auto& startingAlignmentBasePosition1 = startingAlignmentBasePosition[1];
-    const auto& endingAlignmentBasePosition0 = endingAlignmentBasePosition[0];
-    const auto& endingAlignmentBasePosition1 = endingAlignmentBasePosition[1];
-
-    // Get the length of the reads.
-    const auto& read0Length = sequences[0].baseCount;
-    const auto& read1Length = sequences[1].baseCount;
-
-    // Calculate the 5end and 3end unaligned portions of orientedReadId 0.
-    if (startingAlignmentBasePosition0 < endingAlignmentBasePosition0) {
-        leftTrimBases[0] = startingAlignmentBasePosition0;
-        rightTrimBases[0] = read0Length - endingAlignmentBasePosition0;
-    } else {
-        leftTrimBases[0] = read0Length - startingAlignmentBasePosition0;
-        rightTrimBases[0] = endingAlignmentBasePosition0;
-    }
-
-    // Calculate the 5end and 3end unaligned portions of orientedReadId 1.
-    if (startingAlignmentBasePosition1 < endingAlignmentBasePosition1) {
-        leftTrimBases[1] = startingAlignmentBasePosition1;
-        rightTrimBases[1] = read1Length - endingAlignmentBasePosition1;
-    } else {
-        leftTrimBases[1] = read1Length - startingAlignmentBasePosition1;
-        rightTrimBases[1] = endingAlignmentBasePosition1;
-    }
-
 }
+
+// void ProjectedAlignment::constructQuickRaw()
+// {
+//     // Create the segment outside the loop and reuse it to reduce
+//     // memory allocation activity.
+//     ProjectedAlignmentSegment segment;
+
+//     totalLength = {0, 0};
+//     totalEditDistance = 0;
+//     mismatchCount = 0;
+//     longestGap = {0,0};
+//     largeGapSum = 0;
+
+//     // Loop over pairs of consecutive aligned markers (A, B).
+//     for(uint64_t iB=1; iB<alignment.ordinals.size(); iB++) {
+//         const uint64_t iA = iB - 1;
+
+//         // Store in the segment the ordinals of these pair of consecutive aligned markers.
+//         segment.ordinalsA = alignment.ordinals[iA];
+//         segment.ordinalsB = alignment.ordinals[iB];
+
+//         // Store the corresponding positions.
+//         for(uint64_t i=0; i<2; i++) {
+//             segment.positionsA[i] = markers[i][segment.ordinalsA[i]].position + kHalf;
+//             segment.positionsB[i] = markers[i][segment.ordinalsB[i]].position + kHalf;
+//         }
+
+//         // Fill in the base sequences.
+//         fillSequences(segment);
+
+//         totalLength[0] += segment.sequences[0].size();
+//         totalLength[1] += segment.sequences[1].size();
+
+//         // If the raw sequences are the same, don't store the segment.
+//         if(segment.sequences[0] == segment.sequences[1]) {
+//             continue;
+//         }
+
+//         // Align them.
+//         segment.computeAlignment(matchScore, mismatchScore, gapScore);
+
+//         totalEditDistance += segment.editDistance;
+//         mismatchCount += segment.mismatchCount;
+
+//         // Update overall longest gap and large-gap sums using values computed in segment.
+//         longestGap[0] = std::max(longestGap[0], segment.longestGap[0]);
+//         longestGap[1] = std::max(longestGap[1], segment.longestGap[1]);
+
+//         largeGapSum += segment.largeGapSum;
+
+//         // Store this segment.
+//         segments.push_back(segment);
+//     }
+// }
 
 
 
@@ -295,12 +391,44 @@ void ProjectedAlignmentSegment::computeAlignment(
 
     // Compute the number of mismatches in the RAW alignment.
     mismatchCount = 0;
+    // Track longest consecutive gaps for each read and sum of large gaps (>= threshold).
+    const uint64_t largeGapThreshold = 6;
+    uint64_t currentGap0 = 0;
+    uint64_t currentGap1 = 0;
+    longestGap = {0, 0};
+    largeGapSum = 0;
+
     uint64_t position0 = 0;
     uint64_t position1 = 0;
     for(const pair<bool, bool>& p: alignment) {
-        if(p.first and p.second and (sequence0[position0] != sequence1[position1])) {
+        // Mismatch counting (both reads have a base but differ).
+        if(p.first && p.second && (sequence0[position0] != sequence1[position1])) {
             ++mismatchCount;
         }
+
+        // Update gap counters for read 0 (p.first == false means a gap).
+        if(!p.first && p.second) {
+            ++currentGap0;
+        } else {
+            longestGap[0] = std::max(longestGap[0], currentGap0);
+            if(currentGap0 >= largeGapThreshold) {
+                largeGapSum += currentGap0;
+            }
+            currentGap0 = 0;
+        }
+
+        // Update gap counters for read 1 (p.second == false means a gap).s
+        if(!p.second && p.first) {
+            ++currentGap1;
+        } else {
+            longestGap[1] = std::max(longestGap[1], currentGap1);
+            if(currentGap1 >= largeGapThreshold) {
+                largeGapSum += currentGap1;
+            }
+            currentGap1 = 0;
+        }
+
+        // Advance sequence positions.
         if(p.first) {
             ++position0;
         }
@@ -308,9 +436,19 @@ void ProjectedAlignmentSegment::computeAlignment(
             ++position1;
         }
     }
+
+    // Ensure final gaps at end of alignment are considered.
+    longestGap[0] = std::max(longestGap[0], currentGap0);
+    longestGap[1] = std::max(longestGap[1], currentGap1);
+    if(currentGap0 >= largeGapThreshold) {
+        largeGapSum += currentGap0;
+    }
+    if(currentGap1 >= largeGapThreshold) {
+        largeGapSum += currentGap1;
+    }
+
     SHASTA_ASSERT(position0 == sequence0.size());
     SHASTA_ASSERT(position1 == sequence1.size());
-
 }
 
 

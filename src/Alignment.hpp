@@ -266,11 +266,6 @@ public:
         minOrdinalOffset = -minOrdinalOffset;
         maxOrdinalOffset = -maxOrdinalOffset;
         averageOrdinalOffset = -averageOrdinalOffset;
-
-        std::swap(startingAlignmentBasePosition[0], startingAlignmentBasePosition[1]);
-        std::swap(endingAlignmentBasePosition[0], endingAlignmentBasePosition[1]);
-        std::swap(leftTrimBases[0], leftTrimBases[1]);
-        std::swap(rightTrimBases[0], rightTrimBases[1]);
     }
 
     // Update to reflect reverse complementing of the two oriented reads.

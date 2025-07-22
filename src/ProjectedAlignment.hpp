@@ -63,6 +63,10 @@ public:
     // See seqan.hpp for its meaning.
     int64_t editDistance;
     vector< pair<bool, bool> > alignment;
+    void computeAlignmentSimple(
+        int64_t matchScore,
+        int64_t mismatchScore,
+        int64_t gapScore);
     void computeAlignment(
         int64_t matchScore,
         int64_t mismatchScore,
@@ -87,6 +91,15 @@ public:
     // The number of mismatches in the RAW alignment.
     uint64_t mismatchCount;
 
+    // Longest consecutive gap length (number of bases) encountered in the raw alignment
+    // for each of the two oriented reads. Index 0 corresponds to orientedReadIds[0],
+    // index 1 to orientedReadIds[1].
+    array<uint64_t, 2> longestGap;
+
+    // Sum of lengths (in bases) of all gap runs that are at least
+    // largeGapThreshold bases long, across BOTH reads.
+    uint64_t largeGapSum;
+
 
     void writeAlignmentHtml(ostream&) const;
     void writeRleAlignmentHtml(ostream&) const;
@@ -107,6 +120,7 @@ public:
         All,        // Do both RLE and raw alignments, store all segments.
         QuickRle,   // Only do RLE alignments, only store segments where the two RLE sequences differ.
         QuickRaw,   // Only do raw alignments, only store segments where the two raw sequences differ.
+        QuickRawSimple,   // Only do raw alignments, only store segments where the two raw sequences differ.
     };
 
     ProjectedAlignment(
@@ -126,6 +140,7 @@ public:
     void constructAll();
     void constructQuickRle();
     void constructQuickRaw();
+    void constructQuickRawSimple();
 
     // Marker length and its half.
     uint32_t k;
@@ -167,17 +182,6 @@ public:
     array<uint64_t, 2> totalLengthBases;
     array<uint64_t, 2> totalLengthRleBases;
 
-    // The starting and ending base positions of the aligned portions of the two oriented reads.
-    array<uint32_t, 2> startingAlignmentBasePosition;
-    array<uint32_t, 2> endingAlignmentBasePosition;
-
-    // The number of bases trimmed from the 5end of each read.
-    array<uint32_t, 2> leftTrimBases;
-
-    // The number of bases trimmed from the 3end of each read.
-    array<uint32_t, 2> rightTrimBases;
-
-
     // Total edit distance (raw and RLE).
     int64_t totalEditDistance;
     int64_t totalEditDistanceRle;
@@ -187,6 +191,14 @@ public:
 
     // The number of mismatches in the RAW alignment.
     uint64_t mismatchCount;
+
+    // Longest consecutive gap (in bases) across ALL segments, for each read.
+    // Index 0 corresponds to orientedReadIds[0], index 1 to orientedReadIds[1].
+    array<uint64_t, 2> longestGap;
+
+    // Sum of lengths of all gap runs size >= largeGapThreshold across ALL segments
+    // and both reads combined.
+    uint64_t largeGapSum;
 
     void computeStatistics();
     double errorRate() const;

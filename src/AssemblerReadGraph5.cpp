@@ -1,3 +1,5 @@
+
+
 #include "Assembler.hpp"
 #include "ReadId.hpp"
 #include "Reads.hpp"
@@ -298,6 +300,164 @@ bool isSiteInHomopolymerRegionReadGraph5(
 
 
 
+bool isSiteInHomopolymerRegion(
+    uint64_t sitePositionInRead,
+    const shasta::LongBaseSequenceView& readSequence,
+    uint64_t homopolymerContextLength = 12,  // HPC_PL (homopolymer flank length)
+    uint64_t maxRepeatLength = 4,            // HPC_RR (homopolymer repeat range)
+    uint64_t homopolymerCutoff = 2           // HPC_CC (homopolymer cutoff)
+) {
+    const uint64_t readLength = readSequence.baseCount;
+    SHASTA_ASSERT(sitePositionInRead < readLength);
+
+    // Convert to int64_t for compatibility with hifiasm logic
+    int64_t p = static_cast<int64_t>(sitePositionInRead);
+    int64_t sn = static_cast<int64_t>(readLength);
+    int64_t hpc_flk = static_cast<int64_t>(homopolymerContextLength);
+    int64_t hpc_rr = static_cast<int64_t>(maxRepeatLength);
+    int64_t hpc_cutoff = static_cast<int64_t>(homopolymerCutoff);
+
+    // Calculate boundaries (same as hifiasm)
+    int64_t s = ((p >= hpc_flk) ? (p - hpc_flk) : 0);
+    int64_t e = (((p + hpc_flk) <= sn) ? (p + hpc_flk) : sn);
+
+    // Safety checks
+    if (s < 0) s = 0;
+    if (e > sn) e = sn;
+    SHASTA_ASSERT(s < e);
+
+    for (int64_t r = 1; r <= hpc_rr; r++) {
+        int64_t rc = r * hpc_cutoff;
+        
+        // Pattern 1: Including site (forward and backward)
+        int64_t k, zs, ze;
+        
+        // Forward scan from position p + r
+        for (k = p + r; (k < e) && ((k - r) >= s) && 
+             (readSequence[static_cast<uint64_t>(k)].value == readSequence[static_cast<uint64_t>(k - r)].value); k++);
+        ze = k;
+        if (ze > e) ze = e;
+        
+        // Backward scan from position p - 1
+        for (k = p - 1; (k >= s) && ((k + r) < e) && 
+             (readSequence[static_cast<uint64_t>(k)].value == readSequence[static_cast<uint64_t>(k + r)].value); k--);
+        zs = k + 1;
+        if (zs < s) zs = s;
+        
+        if (((ze - zs) > r) && ((ze - zs) >= rc)) {
+            return true;
+        }
+
+        // Pattern 2: Excluding site (forward only)
+        for (k = p + r + 1; (k < e) && ((k - r) >= s) && 
+             (readSequence[static_cast<uint64_t>(k)].value == readSequence[static_cast<uint64_t>(k - r)].value); k++);
+        zs = p + 1;
+        if (zs < s) zs = s;
+        ze = k;
+        if (ze > e) ze = e;
+        
+        if (((ze - zs) > r) && ((ze - zs) >= rc)) {
+            return true;
+        }
+
+        // Pattern 3: Including site (backward and forward)
+        for (k = p - r; (k >= s) && ((k + r) < e) && 
+             (readSequence[static_cast<uint64_t>(k)].value == readSequence[static_cast<uint64_t>(k + r)].value); k--);
+        zs = k + 1;
+        if (zs < s) zs = s;
+        
+        for (k = p + 1; (k < e) && ((k - r) >= s) && 
+             (readSequence[static_cast<uint64_t>(k)].value == readSequence[static_cast<uint64_t>(k - r)].value); k++);
+        ze = k;
+        if (ze > e) ze = e;
+        
+        if (((ze - zs) > r) && ((ze - zs) >= rc)) {
+            return true;
+        }
+
+        // Pattern 4: Excluding site (backward only)
+        for (k = p - r - 1; (k >= s) && ((k + r) < e) && 
+             (readSequence[static_cast<uint64_t>(k)].value == readSequence[static_cast<uint64_t>(k + r)].value); k--);
+        zs = k + 1;
+        if (zs < s) zs = s;
+        ze = p;
+        if (ze > e) ze = e;
+        
+        if (((ze - zs) > r) && ((ze - zs) >= rc)) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+
+
+// -----------------------------------------------------------------------------
+// Overload: isSiteInHomopolymerRegion accepting a vector<Base> sequence
+// -----------------------------------------------------------------------------
+inline bool isSiteInHomopolymerRegion(
+    uint64_t sitePositionInRead,
+    const std::vector<shasta::Base>& readSequence,
+    uint64_t homopolymerContextLength = 12,  // HPC_PL (homopolymer flank length)
+    uint64_t maxRepeatLength        = 4,     // HPC_RR (homopolymer repeat range)
+    uint64_t homopolymerCutoff      = 2)     // HPC_CC (homopolymer cutoff)
+{
+    const uint64_t readLength = readSequence.size();
+    SHASTA_ASSERT(sitePositionInRead < readLength);
+
+    // Convert to int64_t for computation identical to the other overload.
+    int64_t p          = static_cast<int64_t>(sitePositionInRead);
+    int64_t sn         = static_cast<int64_t>(readLength);
+    int64_t hpc_flk    = static_cast<int64_t>(homopolymerContextLength);
+    int64_t hpc_rr     = static_cast<int64_t>(maxRepeatLength);
+    int64_t hpc_cutoff = static_cast<int64_t>(homopolymerCutoff);
+
+    int64_t s = (p >= hpc_flk) ? (p - hpc_flk) : 0;
+    int64_t e = ((p + hpc_flk) <= sn) ? (p + hpc_flk) : sn;
+    if(s < 0) s = 0;
+    if(e > sn) e = sn;
+    SHASTA_ASSERT(s < e);
+
+    for(int64_t r = 1; r <= hpc_rr; ++r) {
+        int64_t rc = r * hpc_cutoff;
+        int64_t k, zs, ze;
+
+        // Pattern 1: Including site (forward & backward)
+        for(k = p + r; (k < e) && ((k - r) >= s) && (readSequence[k].value == readSequence[k - r].value); ++k) {}
+        ze = (k > e) ? e : k;
+        for(k = p - 1; (k >= s) && ((k + r) < e) && (readSequence[k].value == readSequence[k + r].value); --k) {}
+        zs = k + 1;
+        if(zs < s) zs = s;
+        if(((ze - zs) > r) && ((ze - zs) >= rc)) return true;
+
+        // Pattern 2: Excluding site (forward only)
+        for(k = p + r + 1; (k < e) && ((k - r) >= s) && (readSequence[k].value == readSequence[k - r].value); ++k) {}
+        zs = p + 1;
+        if(zs < s) zs = s;
+        ze = (k > e) ? e : k;
+        if(((ze - zs) > r) && ((ze - zs) >= rc)) return true;
+
+        // Pattern 3: Including site (backward & forward)
+        for(k = p - r; (k >= s) && ((k + r) < e) && (readSequence[k].value == readSequence[k + r].value); --k) {}
+        zs = k + 1;
+        if(zs < s) zs = s;
+        for(k = p + 1; (k < e) && ((k - r) >= s) && (readSequence[k].value == readSequence[k - r].value); ++k) {}
+        ze = (k > e) ? e : k;
+        if(((ze - zs) > r) && ((ze - zs) >= rc)) return true;
+
+        // Pattern 4: Excluding site (backward only)
+        for(k = p - r - 1; (k >= s) && ((k + r) < e) && (readSequence[k].value == readSequence[k + r].value); --k) {}
+        zs = k + 1;
+        if(zs < s) zs = s;
+        ze = p;
+        if(ze > e) ze = e;
+        if(((ze - zs) > r) && ((ze - zs) >= rc)) return true;
+    }
+
+    return false;
+}
+
 
 // Function to check for a specific strand bias pattern
 // Returns true if the strand bias is detected, and populates outDominantStrandHet1 and outDominantStrandHet2.
@@ -359,55 +519,85 @@ bool hasSiteStrandBiasReadGraph5(
 
 
 
-class AlignmentPositionBaseStats{
+
+
+
+
+class HaplotypeEvidence{    
     public:
-        //
-        // Fields for potential heterozygous site analysis
-        //
-        uint64_t positionInRead0 = 0;
-        uint64_t baseOfReadId0 = 0; // Base value (0=A, 1=C, 2=G, 3=T, 4=Gap)
+        OrientedReadId orientedReadId; // The oriented read ID
+        uint64_t positionInOrientedRead = invalid<uint64_t>; // The position in the oriented read
+        AlignedBase baseOfOrientedRead; // Base value (0=A, 1=C, 2=G, 3=T, 4=Gap)
+        uint64_t alignmentId;
+        bool isInHomopolymerRegion = false;
+};
 
-        uint64_t totalNumberOfA = 0;
-        uint64_t totalNumberOfC = 0;
-        uint64_t totalNumberOfG = 0;
-        uint64_t totalNumberOfT = 0;
-        uint64_t totalNumberOfGap = 0;
-        uint64_t totalNumberOfAlignments = 0;
 
-        std::set<OrientedReadId> orientedReadIdsWithA;
-        std::set<OrientedReadId> orientedReadIdsWithC;
-        std::set<OrientedReadId> orientedReadIdsWithG;
-        std::set<OrientedReadId> orientedReadIdsWithT;
-        std::set<OrientedReadId> orientedReadIdsWithGap;
+class AlignmentPositionBaseStatsSingleEntry{
+    public:
 
-        std::set<ReadId> readIdsWithA;
-        std::set<ReadId> readIdsWithC;
-        std::set<ReadId> readIdsWithG;
-        std::set<ReadId> readIdsWithT;
-        std::set<ReadId> readIdsWithGap;
+        uint64_t positionInTargetRead = invalid<uint64_t>;
+        AlignedBase baseOfTargetRead; // Base value (0=A, 1=C, 2=G, 3=T, 4=Gap)
 
-        std::set<uint64_t> alignmentIdsWithA;
-        std::set<uint64_t> alignmentIdsWithC;
-        std::set<uint64_t> alignmentIdsWithG;
-        std::set<uint64_t> alignmentIdsWithT;
-        std::set<uint64_t> alignmentIdsWithGap;
+        uint64_t coverage = 0;
 
-        //
-        // Fields for heterozygous site analysis
-        //
-        uint64_t hetBase1 = 100; // Invalid base value initially
-        std::set<OrientedReadId> hetBase1OrientedReadIds;
-        std::set<ReadId> hetBase1ReadIds;
-        std::set<uint64_t> hetBase1AlignmentIds;
-        uint64_t totalNumberOfHetBase1 = 0;
-        double percentageOfHetBase1 = 0;
+        HaplotypeEvidence haplotypeEvidence;
 
-        uint64_t hetBase2 = 100; // Invalid base value initially
-        std::set<OrientedReadId> hetBase2OrientedReadIds;
-        std::set<ReadId> hetBase2ReadIds;
-        std::set<uint64_t> hetBase2AlignmentIds;
-        uint64_t totalNumberOfHetBase2 = 0;
-        double percentageOfHetBase2 = 0;
+        bool isInHomopolymerRegion = false;
+
+        // Add a comparison operator to allow sorting by position.
+        bool operator<(const AlignmentPositionBaseStatsSingleEntry& other) const
+        {
+            return positionInTargetRead < other.positionInTargetRead;
+        }
+};
+
+class AlignmentPositionBaseStatsMergedEntries{
+    public:
+
+        uint64_t positionInTargetRead = invalid<uint64_t>;
+        AlignedBase baseOfTargetRead; // Base value (0=A, 1=C, 2=G, 3=T, 4=Gap)
+
+        uint64_t haplotypeEvidenceCoverage = 0;
+
+        std::array<std::vector<HaplotypeEvidence>, 5> haplotypeEvidenceByBase;
+
+        bool isInHomopolymerRegion = false;
+
+        // Add a comparison operator to allow sorting by position.
+        bool operator<(const AlignmentPositionBaseStatsMergedEntries& other) const
+        {
+            return positionInTargetRead < other.positionInTargetRead;
+        }
+};
+
+class SnpStats{
+    public:
+    
+        uint64_t positionInTargetRead = invalid<uint64_t>;
+
+        AlignedBase hetBase0;
+        vector<OrientedReadId> hetBase0OrientedReadIds;
+        bool isInHomopolymerRegion = false;
+
+        AlignedBase hetBase1;
+        vector<HaplotypeEvidence> hetBase1OrientedReadIdsHE;
+
+        uint64_t occ_0 = 0;
+        uint64_t occ_1 = 0;
+
+        uint64_t overlap_num = 0;
+
+        bool isHpcVector = false;
+        bool hasSufficentCoverage = false;
+        int64_t score = -1;
+
+        // Add a comparison operator to allow sorting by position.
+        bool operator<(const SnpStats& other) const
+        {
+            return positionInTargetRead < other.positionInTargetRead;
+        }
+        
 };
 
 
@@ -534,6 +724,9 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
     // Access assembler data via the pointer
     const Assembler& assembler = *(phasingThreadDataReadGraph5->assembler);
 
+
+
+
     // Get batches of read IDs to process
     uint64_t readIdBegin;
     uint64_t readIdEnd; // variable to receive the end of the batch
@@ -562,78 +755,66 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             // }
 
             // // --- Start of per-read analysis code ---
-            // if ((readId != 0) && (readId != 1)) {
+            // if ((readId != 0)) {
             //     continue;
             // }
 
             debugOut << "Thread ID: " << threadId << " is processing read ID: " << readId << endl;
             debugOut << timestamp << endl;
 
-            const ReadId readId0 = readId;
-            const Strand strand0 = 0; // Analyze strand 0 arbitrarily, results should be consistent
-            const OrientedReadId orientedReadId0(readId0, strand0);
-
-
-            // // We do not perform the analysis on contained reads because the longer reads that contain them will
-            // // make the decisions for them (where they best belong) given that they will have more informative
-            // // sites to consider.
-            // if (phasingThreadDataReadGraph5->isReadIdContained[readId0]) {
-            //     // Skip contained reads
-            //     continue;
-            // }
-
+            const ReadId targetReadId = readId;
+            const Strand targetReadStrand = 0; // Analyze strand 0 arbitrarily, results should be consistent
+            const OrientedReadId targetOrientedReadId(targetReadId, targetReadStrand);
 
 
             // XXX
-            // --- Build Interval Tree for alignments relative to orientedReadId0 ---
+            // --- START OF: Build Interval Tree for alignments relative to targetOrientedReadId ---
             //
-            AlignmentIntervalMap alignmentIntervals; // Create the interval map for this readId0
-            
-            debugOut << timestamp << "Thread ID: " << threadId << " Building interval tree for read ID: " << readId0 << endl;
 
-            const auto alignmentTableForIntervalTreeConstruction = alignmentTable[orientedReadId0.getValue()];
+            AlignmentIntervalMap alignmentIntervals; // Create the interval map for this targetReadId
+            
+            debugOut << timestamp << "Thread ID: " << threadId << " Building interval tree for read ID: " << targetReadId << endl;
+
+            const auto alignmentTableForIntervalTreeConstruction = alignmentTable[targetOrientedReadId.getValue()];
             for (const auto alignmentId : alignmentTableForIntervalTreeConstruction) {
 
-                const AlignmentData& ad = alignmentData[alignmentId];
+                const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
 
-                OrientedReadId currentOrientedReadId0(ad.readIds[0], 0);
-                OrientedReadId currentOrientedReadId1(ad.readIds[1], ad.isSameStrand ? 0 : 1);
-                AlignmentInfo alignmentInfo = ad.info;
+                OrientedReadId currentOrientedReadId0(thisAlignmentData.readIds[0], 0);
+                OrientedReadId currentOrientedReadId1(thisAlignmentData.readIds[1], thisAlignmentData.isSameStrand ? 0 : 1);
+                AlignmentInfo alignmentInfo = thisAlignmentData.info;
 
                 Alignment alignment;
                 span<const char> compressedAlignment = assembler.compressedAlignments[alignmentId];
                 shasta::decompress(compressedAlignment, alignment);
-            
+                
                 // Swap oriented reads, if necessary.
-                if (currentOrientedReadId0.getReadId() != readId0) {
+                if (currentOrientedReadId0.getReadId() != targetReadId) {
                     swap(currentOrientedReadId0, currentOrientedReadId1);
                     alignmentInfo.swap();
                     alignment.swap();
                 }
-                SHASTA_ASSERT(currentOrientedReadId0.getReadId() == readId0);
+                SHASTA_ASSERT(currentOrientedReadId0.getReadId() == targetReadId);
 
                 uint32_t markerCount0 = uint32_t(markers[currentOrientedReadId0.getValue()].size());
                 uint32_t markerCount1 = uint32_t(markers[currentOrientedReadId1.getValue()].size());
 
                 // Reverse complement if necessary
-                if (currentOrientedReadId0.getStrand() != strand0) {
+                if (currentOrientedReadId0.getStrand() != targetReadStrand) {
                     // Ensure marker counts are valid before calling reverseComplement
                     alignment.reverseComplement(markerCount0, markerCount1);
-                    // alignment.checkStrictlyIncreasing(); // Can be expensive, maybe remove in production
                     currentOrientedReadId0.flipStrand();
                     currentOrientedReadId1.flipStrand();
                     alignmentInfo.reverseComplement();
                 }
-                SHASTA_ASSERT(currentOrientedReadId0.getStrand() == strand0);
-                SHASTA_ASSERT(currentOrientedReadId0 == orientedReadId0); // Check consistency
-
-                // if ((alignmentInfo.data[0].leftTrim() <= 50) || (alignmentInfo.data[1].rightTrim() <= 50)) {
-                //     continue;
-                // }
+                SHASTA_ASSERT(currentOrientedReadId0.getStrand() == targetReadStrand);
+                SHASTA_ASSERT(currentOrientedReadId0 == targetOrientedReadId); // Check consistency
 
                 const auto orientedReadMarkers = markers[currentOrientedReadId0.getValue()];
                 const uint32_t position0 = orientedReadMarkers[alignmentInfo.data[0].firstOrdinal].position;
                 const uint32_t position1 = orientedReadMarkers[alignmentInfo.data[0].lastOrdinal].position + uint32_t(assembler.assemblerInfo->k);
+
+                SHASTA_ASSERT(position0 < position1);
 
                 // --- Add interval to the map ---
                 if (position1 > position0) { // Ensure a valid interval
@@ -648,120 +829,87 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                 }
             }
 
-            debugOut << timestamp << "Thread ID: " << threadId << " Finished building interval tree for read ID: " << readId0 << endl;
+            debugOut << timestamp << "Thread ID: " << threadId << " Finished building interval tree for read ID: " << targetReadId << endl;
 
             // XXX
-            // --- END OF: Build Interval Tree for alignments relative to orientedReadId0 ---
+            // --- END OF: Build Interval Tree for alignments relative to targetOrientedReadId ---
             //
             
 
+            debugOut << timestamp << "Thread ID: " << threadId << " Starting looping over alignments for read ID: " << targetReadId << endl;
 
 
-            // // --- DEBUG: Query interval tree for position 35102 ---
-            // uint32_t debugPosition = 35102;
-            // auto it = alignmentIntervals.find(debugPosition);
 
-            // if (it != alignmentIntervals.end()) {
-            //     debugOut << "--- DEBUG INFO: Alignments covering position " << debugPosition << " in read " << orientedReadId0 << " ---" << endl;
-            //     // The value type is now AlignmentInfoSet
-            //     const AlignmentInfoSet& coveringAlignmentInfo = it->second;
 
-            //     // Get the count directly from the size of the set
-            //     uint64_t alignmentCountAtPosition = coveringAlignmentInfo.size();
-            //     debugOut << "  Number of alignments covering position: " << alignmentCountAtPosition << endl;
 
-            //     debugOut << "  Alignment Info (ID, OtherRead): " << endl;
-            //     // Iterate through the pairs in the set
-            //     for (const AlignmentInfoPair& infoPair : coveringAlignmentInfo) {
-            //         uint64_t alignmentId = infoPair.first;
-            //         OrientedReadId storedOrientedReadId1 = infoPair.second; // Get the stored OrientedReadId
 
-            //         // Print the alignment ID and the stored OrientedReadId1
-            //         debugOut << "(" << alignmentId << ", " << storedOrientedReadId1 << ") " << endl;
+
+            // std::map<uint64_t, AlignmentPositionBaseStats> positionStatsOnTargetOrientedReadId;
+            vector<AlignmentPositionBaseStatsSingleEntry> positionStatsOnTargetOrientedReadIdSingleEntries;
+            vector<AlignmentPositionBaseStatsMergedEntries> positionStatsOnTargetOrientedReadIdMergedEntries;
+            vector<SnpStats> potentialHetSitesOnTargetOrientedReadId;
+            vector<SnpStats> potentialHetSitesOnTargetOrientedReadIdFiltered;
+
+
+            // Loop over alignments involving the target read (targetOrientedReadId)
+            const auto alignmentTableForTargetOrientedReadId = alignmentTable[targetOrientedReadId.getValue()];
+
+            
+            // // XXX
+            // // --- Find and forbid alignments between the same read on different strands.
+            // //
+            // vector <bool> readIdsUsed(phasingThreadDataReadGraph5->readCount, false);
+            // vector <bool> forbiddenReadIds(phasingThreadDataReadGraph5->readCount, false);
+
+            // for (const auto alignmentId : alignmentTableForTargetOrientedReadId) {
+                
+            //     const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
+            //     OrientedReadId currentOrientedReadId0(thisAlignmentData.readIds[0], 0);
+            //     OrientedReadId currentOrientedReadId1(thisAlignmentData.readIds[1], thisAlignmentData.isSameStrand ? 0 : 1);
+            //     AlignmentInfo alignmentInfo = thisAlignmentData.info;
+
+            
+            //     const ReadId currentReadId0 = thisAlignmentData.readIds[0];
+            //     const ReadId currentReadId1 = thisAlignmentData.readIds[1];
+            //     if (currentReadId0 == targetReadId) {
+            //         if(readIdsUsed[currentReadId1]) {
+            //             forbiddenAlignments[alignmentId] = true;
+            //             forbiddenReadIds[currentReadId1] = true;
+            //             continue;
+            //         }
+            //         readIdsUsed[currentReadId1] = true;
+            //     } else if (currentReadId1 == targetReadId) {
+            //         if(readIdsUsed[currentReadId0]) {
+            //             forbiddenAlignments[alignmentId] = true;
+            //             forbiddenReadIds[currentReadId0] = true;
+            //             continue;
+            //         }
+            //         readIdsUsed[currentReadId0] = true;                
             //     }
-            //     debugOut << endl;
-            //     debugOut << "--- END DEBUG INFO for position " << debugPosition << " ---" << endl;
-            // } else {
-            //     debugOut << "--- DEBUG INFO: No alignments found covering position " << debugPosition << " in read " << orientedReadId0 << " ---" << endl;
+                
             // }
-            // // --- END DEBUG ---
 
-
-
-
-
-
-
-
-
-
-            debugOut << timestamp << "Thread ID: " << threadId << " Starting looping over alignments for read ID: " << readId0 << endl;
-
-            std::map<uint64_t, AlignmentPositionBaseStats> positionStatsOnOrientedReadId0;
-            std::map<uint64_t, AlignmentPositionBaseStats> potentialHetSitesOnOrientedReadId0;
-
-
-
-
-            // Loop over alignments involving the target read (readId0)
-            const auto alignmentTable0 = alignmentTable[orientedReadId0.getValue()];
-
-            
-            // XXX
-            // --- Find and forbid alignments between the same read on different strands.
-            //
-            vector <bool> readIdsUsed(phasingThreadDataReadGraph5->readCount, false);
-            vector <bool> forbiddenReadIds(phasingThreadDataReadGraph5->readCount, false);
-
-            for (const auto alignmentId : alignmentTable0) {
+            // // We need a second loop over the alignments to forbid the second alignment instance in some cases
+            // for (const auto alignmentId : alignmentTableForTargetOrientedReadId) {
                 
-                const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
-                OrientedReadId orientedReadId0(thisAlignmentData.readIds[0], 0);
-                OrientedReadId orientedReadId1(thisAlignmentData.readIds[1], thisAlignmentData.isSameStrand ? 0 : 1);
-                AlignmentInfo alignmentInfo = thisAlignmentData.info;
+            //     const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
+            //     const ReadId currentReadId0 = thisAlignmentData.readIds[0];
+            //     const ReadId currentReadId1 = thisAlignmentData.readIds[1];
+            //     if (currentReadId0 == targetReadId) {
+            //         if(forbiddenReadIds[currentReadId1]) {
+            //             forbiddenAlignments[alignmentId] = true;
+            //         }
+            //     } else if (currentReadId1 == targetReadId) {
+            //         if(forbiddenReadIds[currentReadId0]) {
+            //             forbiddenAlignments[alignmentId] = true;
+            //         }               
+            //     }
 
-            
-                const ReadId currentReadId0 = thisAlignmentData.readIds[0];
-                const ReadId currentReadId1 = thisAlignmentData.readIds[1];
-                if (currentReadId0 == readId0) {
-                    if(readIdsUsed[currentReadId1]) {
-                        forbiddenAlignments[alignmentId] = true;
-                        forbiddenReadIds[currentReadId1] = true;
-                        continue;
-                    }
-                    readIdsUsed[currentReadId1] = true;
-                } else if (currentReadId1 == readId0) {
-                    if(readIdsUsed[currentReadId0]) {
-                        forbiddenAlignments[alignmentId] = true;
-                        forbiddenReadIds[currentReadId0] = true;
-                        continue;
-                    }
-                    readIdsUsed[currentReadId0] = true;                
-                }
-                
-            }
+            // }
 
-            // We need a second loop over the alignments to forbid the second alignment instance in some cases
-            for (const auto alignmentId : alignmentTable0) {
-                
-                const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
-                const ReadId currentReadId0 = thisAlignmentData.readIds[0];
-                const ReadId currentReadId1 = thisAlignmentData.readIds[1];
-                if (currentReadId0 == readId0) {
-                    if(forbiddenReadIds[currentReadId1]) {
-                        forbiddenAlignments[alignmentId] = true;
-                    }
-                } else if (currentReadId1 == readId0) {
-                    if(forbiddenReadIds[currentReadId0]) {
-                        forbiddenAlignments[alignmentId] = true;
-                    }               
-                }
-
-            }
-
-            // XXX
-            // --- END OF: Find and forbid alignments between the same read on different strands.
-            //
+            // // XXX
+            // // --- END OF: Find and forbid alignments between the same read on different strands.
+            // //
 
             
 
@@ -769,44 +917,35 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             // --- We found and forbid alignments between the same read on different strands.
             //     Now we can proceed with the analysis of the rest of alignments.
 
-            for (const auto alignmentId : alignmentTable0) {
+            for (const auto alignmentId : alignmentTableForTargetOrientedReadId) {
 
                 if (forbiddenAlignments[alignmentId]) {
                     // Skip alignments that are forbidden due to strand issues
                     continue;
                 }
-                debugOut << timestamp << "Thread ID: " << threadId << " SKATA 1: " << alignmentId << endl;
 
                 const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
-                const size_t alignedMarkerCount = thisAlignmentData.info.markerCount;
-
                 OrientedReadId currentOrientedReadId0(thisAlignmentData.readIds[0], 0);
                 OrientedReadId currentOrientedReadId1(thisAlignmentData.readIds[1], thisAlignmentData.isSameStrand ? 0 : 1);
                 AlignmentInfo alignmentInfo = thisAlignmentData.info;
-
-                debugOut << timestamp << "Thread ID: " << threadId << " SKATA 2: " << alignmentId << endl;
 
                 Alignment alignment;
                 span<const char> compressedAlignment = assembler.compressedAlignments[alignmentId];
                 shasta::decompress(compressedAlignment, alignment);
 
                 // Swap oriented reads, if necessary.
-                if (currentOrientedReadId0.getReadId() != readId0) {
+                if (currentOrientedReadId0.getReadId() != targetReadId) {
                     swap(currentOrientedReadId0, currentOrientedReadId1);
                     alignmentInfo.swap();
                     alignment.swap();
                 }
-                SHASTA_ASSERT(currentOrientedReadId0.getReadId() == readId0);
-
-                debugOut << timestamp << "Thread ID: " << threadId << " SKATA 3: " << alignmentId << endl;
+                SHASTA_ASSERT(currentOrientedReadId0.getReadId() == targetReadId);
 
                 uint32_t markerCount0 = uint32_t(markers[currentOrientedReadId0.getValue()].size());
                 uint32_t markerCount1 = uint32_t(markers[currentOrientedReadId1.getValue()].size());
                 
-                debugOut << timestamp << "Thread ID: " << threadId << " SKATA 4: " << alignmentId << endl;
-
                 // Reverse complement if necessary
-                if (currentOrientedReadId0.getStrand() != strand0) {
+                if (currentOrientedReadId0.getStrand() != targetReadStrand) {
                     // Ensure marker counts are valid before calling reverseComplement
                     alignment.reverseComplement(markerCount0, markerCount1);
                     // alignment.checkStrictlyIncreasing(); // Can be expensive, maybe remove in production
@@ -814,56 +953,12 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                     currentOrientedReadId1.flipStrand();
                     alignmentInfo.reverseComplement();
                 }
-                SHASTA_ASSERT(currentOrientedReadId0.getStrand() == strand0);
+                SHASTA_ASSERT(currentOrientedReadId0.getStrand() == targetReadStrand);
                 
-
-                debugOut << timestamp << "Thread ID: " << threadId << " SKATA 5: " << alignmentId << endl;
-
-
-
-
-                // if ((alignmentInfo.data[0].leftTrim() <= 50) || (alignmentInfo.data[1].rightTrim() <= 50)) {
-                //     continue;
-                // }
-
-
-
-
-
-                // // Explore only alignments that are not hanging on the left.
-                // // The target read is always in the most "left" position
-                // if ((ad.info.data[0].leftTrim() <= 200)) {
-                //     continue;
-                // }
-
-
-                // if (phasingThreadDataReadGraph5->isReadIdContained[currentOrientedReadId1.getReadId()]) {
-                //     // Skip contained reads
-                //     continue;
-                // }
-
-
-                // if (ad.info.data[1].rightTrim() <= 50) {
-                //     // Skip alignments that are not right trimmed
-                //     continue;
-                // }
-
-                // if ((ad.info.data[1].rightTrim() <= 50) || (ad.info.offsetAtCenter() <= 0.)) {
-                //      // Skip alignments that are not right trimmed
-                //      continue;
-                // }
-
-
                 debugOut << timestamp << "Thread ID: " << threadId << " Processing alignment ID: " << alignmentId 
                          << " between ReadId: " << currentOrientedReadId0.getReadId() << "-" << currentOrientedReadId0.getStrand() 
-                         << " and ReadId: " << currentOrientedReadId1.getReadId() << "-" << currentOrientedReadId1.getStrand() 
-                         << " with marker count: " << alignedMarkerCount << endl;
+                         << " and ReadId: " << currentOrientedReadId1.getReadId() << "-" << currentOrientedReadId1.getStrand() << endl;
 
-                const auto orientedReadMarkers = markers[currentOrientedReadId0.getValue()];
-                const uint32_t position0 = orientedReadMarkers[alignmentInfo.data[0].firstOrdinal].position;
-                const uint32_t position1 = orientedReadMarkers[alignmentInfo.data[0].lastOrdinal].position + uint32_t(assembler.assemblerInfo->k);
-
-                debugOut << timestamp << "Thread ID: " << threadId << " SKATA 6: " << alignmentId << endl;
                 
                 // XXX
                 // --- Project this alignment to base space.
@@ -885,12 +980,6 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                          << " and ReadId: " << currentOrientedReadId1.getReadId() << "-" << currentOrientedReadId1.getStrand() 
                          << " with segments count: " << projectedAlignment.segments.size() << endl;
 
-
-                // ofstream html("a.html");
-                // projectedAlignment.writeHtml(html, false);
-                // SHASTA_ASSERT(0);
-
-                // debugOut << "Projected alignment between ReadId: " << currentOrientedReadId0.getReadId() << "-" << currentOrientedReadId0.getStrand() << " and ReadId: " << currentOrientedReadId1.getReadId() << "-" << currentOrientedReadId1.getStrand() << " completed." << endl;
                 
                 // Loop over the RAW segments of the projectedAlignment.
                 for (const ProjectedAlignmentSegment& segment : projectedAlignment.segments) {
@@ -940,8 +1029,6 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                         // The number of alignments with gaps in this position is important to infer statistics
                         // about this position later (like the total alignments in that position).
                         if (hasBase0 && (baseAtPosition0 != baseAtPosition1)) {
-                            
-
 
                             // //
                             // // --- DEBUG: Print the RAW alignment sequences that have differences ---
@@ -987,55 +1074,61 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                             // //
 
 
+
+
                             // XXX
-                            // --- Update statistics for positionInRead0 ---
+                            // --- Update statistics for positionInTheTargetRead ---
                             //
 
-                            uint64_t positionInRead0 = segment.positionsA[0] + positionWithDetectedChange0;
-                            uint64_t positionInRead1 = segment.positionsA[1] + positionWithDetectedChange1;
-                            // Initialize stats for this position if not already present
-                            if(not positionStatsOnOrientedReadId0.contains(positionInRead0)) {
-                                AlignmentPositionBaseStats thisPositionStats;
-                                thisPositionStats.positionInRead0 = positionInRead0;
-                                thisPositionStats.baseOfReadId0 = baseAtPosition0.value; 
-                                positionStatsOnOrientedReadId0.emplace(positionInRead0, thisPositionStats);
+                            uint64_t positionInTheTargetRead = segment.positionsA[0] + positionWithDetectedChange0;
+                            uint64_t positionInTheOtherRead = segment.positionsA[1] + positionWithDetectedChange1;
+
+                            HaplotypeEvidence haplotypeEvidence;
+                            haplotypeEvidence.orientedReadId = currentOrientedReadId1;
+                            haplotypeEvidence.positionInOrientedRead = positionInTheOtherRead;
+                            haplotypeEvidence.baseOfOrientedRead = baseAtPosition1;
+                            haplotypeEvidence.alignmentId = alignmentId;
+                            haplotypeEvidence.isInHomopolymerRegion = false;
+
+                            // XXX
+                            // --- START OF: Check if this potential het site in the other read
+                            //     is in a homopolymer region.
+                            //
+
+                            const LongBaseSequenceView currentOrientedReadId1Sequence = reads->getRead(currentOrientedReadId1.getReadId());
+
+                            uint64_t homopolymerContextLength = 12;
+                            uint64_t maxRepeatLength = 4;
+                            uint64_t homopolymerCutoff = 2;
+
+                            if (currentOrientedReadId1.getStrand() == 0) {
+                                bool isInHomopolymerRegion = isSiteInHomopolymerRegion(positionInTheOtherRead, currentOrientedReadId1Sequence, homopolymerContextLength, maxRepeatLength, homopolymerCutoff);
+                                if (isInHomopolymerRegion) {
+                                    haplotypeEvidence.isInHomopolymerRegion = true;
+                                }
                             }
 
-                            // Update counts based on rawAlignmentSequence1[i]
-                            auto& positionStatsInRead0 = positionStatsOnOrientedReadId0[positionInRead0];
-
-                            // // Increment alignment count for this position
-                            // // if (hasBase0 && hasBase1 && (baseAtPosition0 != baseAtPosition1)) {
-                            // if (hasBase0 && hasBase1 && (baseAtPosition0 != baseAtPosition1)) {
-                            //     positionStatsInRead0.totalNumberOfAlignments++;
-                            // }
-                                           
-                            if(baseAtPosition1.value == 0) { // A in sequence1
-                                positionStatsInRead0.totalNumberOfA++;
-                                positionStatsInRead0.orientedReadIdsWithA.insert(currentOrientedReadId1);
-                                positionStatsInRead0.readIdsWithA.insert(currentOrientedReadId1.getReadId());
-                                positionStatsInRead0.alignmentIdsWithA.insert(alignmentId);
-                            } else if(baseAtPosition1.value == 1) { // C in sequence1
-                                positionStatsInRead0.totalNumberOfC++;
-                                positionStatsInRead0.orientedReadIdsWithC.insert(currentOrientedReadId1);
-                                positionStatsInRead0.readIdsWithC.insert(currentOrientedReadId1.getReadId());
-                                positionStatsInRead0.alignmentIdsWithC.insert(alignmentId);
-                            } else if(baseAtPosition1.value == 2) { // G in sequence1
-                                positionStatsInRead0.totalNumberOfG++;
-                                positionStatsInRead0.orientedReadIdsWithG.insert(currentOrientedReadId1);
-                                positionStatsInRead0.readIdsWithG.insert(currentOrientedReadId1.getReadId());
-                                positionStatsInRead0.alignmentIdsWithG.insert(alignmentId);
-                            } else if(baseAtPosition1.value == 3) { // T in sequence1
-                                positionStatsInRead0.totalNumberOfT++;
-                                positionStatsInRead0.orientedReadIdsWithT.insert(currentOrientedReadId1);
-                                positionStatsInRead0.readIdsWithT.insert(currentOrientedReadId1.getReadId());
-                                positionStatsInRead0.alignmentIdsWithT.insert(alignmentId);
-                            } else if(baseAtPosition1.value == 4) { // Gap in sequence1
-                                positionStatsInRead0.totalNumberOfGap++;
-                                positionStatsInRead0.orientedReadIdsWithGap.insert(currentOrientedReadId1);
-                                positionStatsInRead0.readIdsWithGap.insert(currentOrientedReadId1.getReadId());
-                                positionStatsInRead0.alignmentIdsWithGap.insert(alignmentId);
+                            // If the other read is on the reverse strand, we need to convert the position to the forward strand.
+                            if (currentOrientedReadId1.getStrand() == 1) {
+                                uint64_t positionInTheOtherReadConvertedToForwardStrand = (currentOrientedReadId1Sequence.baseCount - 1) - positionInTheOtherRead;
+                                bool isInHomopolymerRegion = isSiteInHomopolymerRegion(positionInTheOtherReadConvertedToForwardStrand, currentOrientedReadId1Sequence, homopolymerContextLength, maxRepeatLength, homopolymerCutoff);
+                                if (isInHomopolymerRegion) {
+                                    haplotypeEvidence.isInHomopolymerRegion = true;
+                                }
                             }
+    
+                            // XXX
+                            // --- END OF: Check if this potential het site in the other read ---
+                            //     is in a homopolymer region.
+                            //
+
+                            AlignmentPositionBaseStatsSingleEntry thisPositionStatsSingleEntry;
+                            thisPositionStatsSingleEntry.positionInTargetRead = positionInTheTargetRead;
+                            thisPositionStatsSingleEntry.baseOfTargetRead = baseAtPosition0;
+                            thisPositionStatsSingleEntry.haplotypeEvidence = haplotypeEvidence;
+                            thisPositionStatsSingleEntry.coverage = 1;
+                            positionStatsOnTargetOrientedReadIdSingleEntries.push_back(thisPositionStatsSingleEntry);
+
 
                         } // --- End of printing the sequences that have differences and updating the stats of this position ---
 
@@ -1046,9 +1139,45 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
 
                 // debugOut << "Loop over the RAW segments of the Projected alignment between ReadId: " << currentOrientedReadId0.getReadId() << "-" << currentOrientedReadId0.getStrand() << " and ReadId: " << currentOrientedReadId1.getReadId() << "-" << currentOrientedReadId1.getStrand() << " completed." << endl;  
             
-            } // --- End loop over alignments for readId0 ---
+            } // --- End loop over alignments for targetReadId ---
 
-            debugOut << timestamp << "Thread ID: " << threadId << " Finished looping over alignments for read ID: " << readId0 << endl;
+            debugOut << timestamp << "Thread ID: " << threadId << " Finished looping over alignments for read ID: " << targetReadId << endl;
+
+            // Sort the positionStatsOnTargetOrientedReadId by positionInTargetRead.
+            std::sort(positionStatsOnTargetOrientedReadIdSingleEntries.begin(), positionStatsOnTargetOrientedReadIdSingleEntries.end());
+
+
+            for(auto streakBegin=positionStatsOnTargetOrientedReadIdSingleEntries.begin(); streakBegin!=positionStatsOnTargetOrientedReadIdSingleEntries.end(); ) {
+                auto streakEnd = streakBegin + 1;
+
+                // Find the streak of positions with the same positionInTargetRead.
+                for(;
+                    streakEnd!=positionStatsOnTargetOrientedReadIdSingleEntries.end() && streakEnd->positionInTargetRead==streakBegin->positionInTargetRead;
+                    streakEnd++) {
+                }
+
+                // Create a merged representation of the streak.
+                AlignmentPositionBaseStatsMergedEntries thisPositionStatsMergedEntries;
+                thisPositionStatsMergedEntries.positionInTargetRead = streakBegin->positionInTargetRead;
+                thisPositionStatsMergedEntries.baseOfTargetRead = streakBegin->baseOfTargetRead;
+
+                for(auto it=streakBegin; it!=streakEnd; it++) {
+                    thisPositionStatsMergedEntries.haplotypeEvidenceByBase[it->haplotypeEvidence.baseOfOrientedRead.value].push_back(it->haplotypeEvidence);
+                    thisPositionStatsMergedEntries.haplotypeEvidenceCoverage += 1;
+                }
+
+                positionStatsOnTargetOrientedReadIdMergedEntries.push_back(thisPositionStatsMergedEntries);
+
+                // Process the next streak.
+                streakBegin = streakEnd;
+
+            }
+
+
+            // // DEBUG: Print the positionStatsOnTargetOrientedReadIdMergedEntries.
+            // for(const auto& positionStatsMergedEntries : positionStatsOnTargetOrientedReadIdMergedEntries) {
+            //     debugOut << "Position: " << positionStatsMergedEntries.positionInTargetRead << " Base: " << positionStatsMergedEntries.baseOfTargetRead.character() << " Total Coverage: " << positionStatsMergedEntries.totalCoverage << endl;
+            // }
 
             
             
@@ -1056,81 +1185,54 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             // --- Analyze potential heterozygous sites ---
             //
 
-            // We finished analyzing all alignments for the target read (readId0).
-            // Now we need to check each potential site in readId0 (in positionStatsOnOrientedReadId0)
+            // We finished analyzing all alignments for the target read (targetReadId).
+            // Now we need to check each potential site in targetReadId (in positionStatsOnOrientedReadId0)
             // to see if it involves a heterozygous site.
             uint64_t sitesSkippedDueToInsufficientCoverage = 0;
-            for (auto const& [positionInRead0, positionStatsInRead0] : positionStatsOnOrientedReadId0) {
-
-                // if (positionInRead0 == 35102) {
-                //     cout << "positionInRead0: " << positionInRead0 << endl;
-                //     cout << "positionStatsInRead0.totalNumberOfAlignments: " << positionStatsInRead0.totalNumberOfAlignments << endl;
-                //     cout << "positionStatsInRead0.totalNumberOfA: " << positionStatsInRead0.totalNumberOfA << endl;
-                //     cout << "positionStatsInRead0.totalNumberOfC: " << positionStatsInRead0.totalNumberOfC << endl;
-                //     cout << "positionStatsInRead0.totalNumberOfG: " << positionStatsInRead0.totalNumberOfG << endl;
-                //     cout << "positionStatsInRead0.totalNumberOfT: " << positionStatsInRead0.totalNumberOfT << endl;
-                //     cout << "positionStatsInRead0.totalNumberOfGap: " << positionStatsInRead0.totalNumberOfGap << endl;
-                //     cout << "positionStatsInRead0.baseOfReadId0: " << positionStatsInRead0.baseOfReadId0 << endl;
-                //     cout << "positionStatsInRead0.orientedReadIdsWithA.size(): " << positionStatsInRead0.orientedReadIdsWithA.size() << endl;
-                //     cout << "positionStatsInRead0.orientedReadIdsWithC.size(): " << positionStatsInRead0.orientedReadIdsWithC.size() << endl;
-                //     cout << "positionStatsInRead0.orientedReadIdsWithG.size(): " << positionStatsInRead0.orientedReadIdsWithG.size() << endl;
-                //     cout << "positionStatsInRead0.orientedReadIdsWithT.size(): " << positionStatsInRead0.orientedReadIdsWithT.size() << endl;
-                //     cout << "positionStatsInRead0.orientedReadIdsWithGap.size(): " << positionStatsInRead0.orientedReadIdsWithGap.size() << endl;
-                //     cout << "positionStatsInRead0.readIdsWithA.size(): " << positionStatsInRead0.readIdsWithA.size() << endl;
-                //     cout << "positionStatsInRead0.readIdsWithC.size(): " << positionStatsInRead0.readIdsWithC.size() << endl;
-                //     cout << "positionStatsInRead0.readIdsWithG.size(): " << positionStatsInRead0.readIdsWithG.size() << endl;
-                //     cout << "positionStatsInRead0.readIdsWithT.size(): " << positionStatsInRead0.readIdsWithT.size() << endl;
-                //     cout << "positionStatsInRead0.readIdsWithGap.size(): " << positionStatsInRead0.readIdsWithGap.size() << endl;
-                //     cout << "positionStatsInRead0.alignmentIdsWithA.size(): " << positionStatsInRead0.alignmentIdsWithA.size() << endl;
-                //     cout << "positionStatsInRead0.alignmentIdsWithC.size(): " << positionStatsInRead0.alignmentIdsWithC.size() << endl;
-                //     cout << "positionStatsInRead0.alignmentIdsWithG.size(): " << positionStatsInRead0.alignmentIdsWithG.size() << endl;
-                //     cout << "positionStatsInRead0.alignmentIdsWithT.size(): " << positionStatsInRead0.alignmentIdsWithT.size() << endl;
-                //     cout << "positionStatsInRead0.alignmentIdsWithGap.size(): " << positionStatsInRead0.alignmentIdsWithGap.size() << endl;
-                // }
-
-
-
-
+            for (auto positionStatsOnTargetOrientedRead: positionStatsOnTargetOrientedReadIdMergedEntries) {
 
 
                 // XXX
-                // --- Check if this potential het site in this position ---
-                //     is in a homopolymer region.
+                // --- Check if this potential het site in the target read ---
+                //     is in a homopolymer region. The target reas is always 
+                //     on the forward strand.
                 //
 
-                ShortBaseSequence8 kmer;
+                // ShortBaseSequence8 kmer;
+                ShortBaseSequence32 kmer;
 
-                const LongBaseSequenceView readId0Sequence = reads->getRead(readId0);
+                const LongBaseSequenceView targetReadSequence = reads->getRead(targetReadId);
 
-                // Extract the kmer from the readId0 sequence that includes
-                // the 2 preceding and the 2 following bases on that position.
-                extractKmer(readId0Sequence, positionInRead0-3, 7, kmer);
+                // Extract the kmer from the targetReadId sequence that includes
+                // the 12 preceding and 12 following bases on that position.
+                // Ensure we don't go out of bounds
+                uint64_t kmerStart = (positionStatsOnTargetOrientedRead.positionInTargetRead >= 12) ? positionStatsOnTargetOrientedRead.positionInTargetRead - 12 : 0;
+                uint64_t kmerLength = min(25UL, targetReadSequence.baseCount - kmerStart);
+                extractKmer(targetReadSequence, kmerStart, kmerLength, kmer);
                 
-                uint64_t homopolymerThreshold = 3;
-                bool siteIsInHomopolymerRegion = isSiteInHomopolymerRegionReadGraph5(positionInRead0, readId0Sequence, homopolymerThreshold);
+                uint64_t homopolymerContextLength = 12;
+                uint64_t maxRepeatLength = 4;
+                uint64_t homopolymerCutoff = 2;
+                bool siteIsInHomopolymerRegion = isSiteInHomopolymerRegion(positionStatsOnTargetOrientedRead.positionInTargetRead, targetReadSequence, homopolymerContextLength, maxRepeatLength, homopolymerCutoff);
                 if (siteIsInHomopolymerRegion) {
-                    // Skip this site because it is in a homopolymer region
-                    sitesSkippedDueToInsufficientCoverage++;
-                    // debugOut << "Skipping position " << positionInRead0 << " due to homopolymer region." << std::endl;
-                    // kmer.write(debugOut, 7) << std::endl;
-                    continue;
+                    // debugOut << "Position " << positionStatsOnTargetOrientedRead.positionInTargetRead << " is in a homopolymer region." << std::endl;
+                    // kmer.write(debugOut, kmerLength) << std::endl;
+                    positionStatsOnTargetOrientedRead.isInHomopolymerRegion = true;
                 }
 
+
                 // XXX
-                // --- END OF: Check if this potential het site in this position ---
-                //             is in a homopolymer region.
+                // --- END OF: Check if this potential het site in the target read ---
+                //     is in a homopolymer region.
                 //
-
-
-                
-
+            
 
                 // Get the number of alignment supporting each base.
-                const uint64_t totalNumberOfA = positionStatsInRead0.totalNumberOfA;
-                const uint64_t totalNumberOfC = positionStatsInRead0.totalNumberOfC;
-                const uint64_t totalNumberOfG = positionStatsInRead0.totalNumberOfG;
-                const uint64_t totalNumberOfT = positionStatsInRead0.totalNumberOfT;
-                const uint64_t totalNumberOfGap = positionStatsInRead0.totalNumberOfGap;
+                const uint64_t totalNumberOfA = positionStatsOnTargetOrientedRead.haplotypeEvidenceByBase[0].size();
+                const uint64_t totalNumberOfC = positionStatsOnTargetOrientedRead.haplotypeEvidenceByBase[1].size();
+                const uint64_t totalNumberOfG = positionStatsOnTargetOrientedRead.haplotypeEvidenceByBase[2].size();
+                const uint64_t totalNumberOfT = positionStatsOnTargetOrientedRead.haplotypeEvidenceByBase[3].size();
+                const uint64_t totalNumberOfGap = positionStatsOnTargetOrientedRead.haplotypeEvidenceByBase[4].size();
 
                 uint64_t totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead =
                     totalNumberOfA +
@@ -1139,274 +1241,501 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                     totalNumberOfT +
                     totalNumberOfGap;
 
-                uint64_t totalNumberOfAlignmentsWithoutGapsSupportingAChangeFromTheTargetRead = totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead - totalNumberOfGap;
-                
+
                 // This is the minimum needed number of alignments that
                 // support a change from the base of the target read in that position
                 uint64_t minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead = 3;
 
-                // Check if there is a supporting base change with sufficient coverage
-                if ((totalNumberOfA < minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead) &&
-                    (totalNumberOfC < minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead) &&
-                    (totalNumberOfG < minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead) &&
-                    (totalNumberOfT < minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead)) {
-                    sitesSkippedDueToInsufficientCoverage++;
-                    // if (positionInRead0 == 35102) {
-                    //     cout << "THIS SHOULD NOT HAPPEN. Skipping position " << positionInRead0 << " due to insufficient coverage: " << totalNumberOfAlignments << endl;
-                    // }
-                    // debugOut << "Skipping position " << positionInRead0 << " due to insufficient coverage supporting a change from the target read: " << totalNumberOfAlignmentsWithoutGapsSupportingAChangeFromTheTargetRead << endl;
-                    // debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << endl;
+                bool baseAHasEnoughCoverage = totalNumberOfA >= minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead;
+                bool baseCHasEnoughCoverage = totalNumberOfC >= minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead;
+                bool baseGHasEnoughCoverage = totalNumberOfG >= minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead;
+                bool baseTHasEnoughCoverage = totalNumberOfT >= minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead;
+                bool baseGapHasEnoughCoverage = totalNumberOfGap >= minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead;
+
+
+                // Skip this position if there is no allele base with enough coverage
+                if (!(baseAHasEnoughCoverage || baseCHasEnoughCoverage || baseGHasEnoughCoverage || baseTHasEnoughCoverage)) {
                     continue;
                 }
-                
-                // Sort the base counts in descending order
-                vector<pair<uint64_t, uint64_t>> baseCounts = {
-                    {totalNumberOfA, 0},
-                    {totalNumberOfC, 1},
-                    {totalNumberOfG, 2},
-                    {totalNumberOfT, 3},
-                    {totalNumberOfGap, 4}
-                };
-                std::sort(baseCounts.begin(), baseCounts.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
 
-                
-                // Check if this is a potential heterozygous site
-                // Criteria: The 2 alleles with the highest coverage are above 3 coverage each 
-                // and the target read supports the base of one of them
-                const uint64_t highestCoverageBaseCounts = baseCounts[0].first;
-                const uint64_t secondHighestCoverageBaseCounts = baseCounts[1].first;
-                
-                // If the highest coverage base has coverage 3 or more (minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead) 
-                // AND the base is not a gap, then proceede.
-                if ((highestCoverageBaseCounts >= minimumNumberOfAlignmentsSupportingAChangeFromTheTargetRead) and (baseCounts[0].second != 4)) {
 
-                    // If the second highest coverage base has coverage more than 0 then skip this site for now.
-                    // This site might be a complex one with a second allele base difference
-                    // or it might include alignments with gaps (which make the site suspicious)
-                    // TODO: If there is a second allele base difference (complex site)
-                    // then skip this site for now
-                    // if ((secondHighestCoverageBaseCounts > 0) and (baseCounts[1].second != 4)) {
-                    if (secondHighestCoverageBaseCounts > 0) {
-                        // debugOut << "Skipping position " << positionInRead0 << " due to having a second highest coverage base that is not a gap: " << secondHighestCoverageBaseCounts << " (complex site)." << endl;
-                        // debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << endl;
-                        continue;
+                //
+                // This is a potential heterozygous site
+                //
+
+
+                // Find the orientedReadIds supporting a change from the target read
+                std::set<OrientedReadId> orientedReadIdsSupportingAChangeFromTheTargetRead;
+                for (const auto& haplotypeEvidenceOfBase : positionStatsOnTargetOrientedRead.haplotypeEvidenceByBase) {
+                    for (const HaplotypeEvidence& haplotypeEvidence : haplotypeEvidenceOfBase) {
+                        orientedReadIdsSupportingAChangeFromTheTargetRead.insert(haplotypeEvidence.orientedReadId);
+                    }
+                }
+
+
+                // We don't have the number of alignments that agree with the base of the target read
+                // in that specific position. We only have the number of alignments that support a change.
+                // So, we need to find the total coverage of that position from the intervalTree.
+                uint64_t totalCoverageInThisPosition = 0;
+                std::set<OrientedReadId> coveringOrientedReadIds;
+                std::set<uint64_t> coveringAlignmentIds;
+                
+                auto it = alignmentIntervals.find(positionStatsOnTargetOrientedRead.positionInTargetRead);
+                if (it != alignmentIntervals.end()) {
+                    
+                    // Retrieve the covering alignment info pairs of this position,
+                    // which include the pairs (alignmentId, orientedReadId of the other read).
+                    const AlignmentInfoSet& coveringAlignmentInfo = it->second;
+                    
+                    // Calculate the total coverage in this position. 
+                    totalCoverageInThisPosition = coveringAlignmentInfo.size();
+
+                    // Iterate through the pairs in coveringAlignmentInfo to
+                    // extract the alignmentId and the orientedReadId of the other read.
+                    for (const AlignmentInfoPair& infoPair : coveringAlignmentInfo) {
+                        uint64_t alignmentId = infoPair.first;
+                        OrientedReadId storedOrientedReadId1 = infoPair.second;
+                        coveringAlignmentIds.insert(alignmentId);
+                        coveringOrientedReadIds.insert(storedOrientedReadId1);
                     }
 
-                    //
-                    // This is a potential heterozygous site
+                }
+
+                // Add the target read to the coverage
+                totalCoverageInThisPosition += 1; 
+
+
+
+                // Calculate the total coverage of the reads supporting the target read
+                uint64_t totalNumberOfAlignmentsSupportingTheTargetRead = totalCoverageInThisPosition - totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead;
+
+
+                // Skip this position if the coverage supporting the target read is less than 3
+                uint64_t minimumNumberOfAlignmentsSupportingTheTargetRead = 3;
+                if (totalNumberOfAlignmentsSupportingTheTargetRead < minimumNumberOfAlignmentsSupportingTheTargetRead) {
+                    sitesSkippedDueToInsufficientCoverage++;
+                    // debugOut << "Skipping position " << positionInRead0 << " due to insufficient coverage supporting the target read: " << totalCoverageInThisPosition - totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead << endl;
+                    // debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << " Total Alignments that support a change: " << totalNumberOfAlignmentsWithoutGapsSupportingAChangeFromTheTargetRead << ". Total alignments: " << totalCoverageInThisPosition << ". Total alignments without gaps: " << totalCoverageInThisPositionWithoutGaps << "." << endl;
+                    continue;
+                }
+
+
+                // Now find the orientedReadIds that support the target base by:
+                // 1. Taking all covering reads
+                // 2. Subtracting reads that support any other alternative bases (C, G, T, Gap)
+
+                std::set<OrientedReadId> orientedReadIdsSupportingTheTargetReadBase;
+
+                // Start with all covering reads
+                orientedReadIdsSupportingTheTargetReadBase = coveringOrientedReadIds;
+
+                // Remove reads supporting the specific alternative base
+                std::set<OrientedReadId> tempResult;
+                std::set_difference(
+                    orientedReadIdsSupportingTheTargetReadBase.begin(), orientedReadIdsSupportingTheTargetReadBase.end(),
+                    orientedReadIdsSupportingAChangeFromTheTargetRead.begin(), orientedReadIdsSupportingAChangeFromTheTargetRead.end(),
+                    std::inserter(tempResult, tempResult.begin())
+                );
+                orientedReadIdsSupportingTheTargetReadBase.swap(tempResult);
+
+                // Add the target read to the set of reads supporting the target read base
+                orientedReadIdsSupportingTheTargetReadBase.insert(OrientedReadId(targetReadId, targetReadStrand));
+
+
+
+                // XXX
+                // --- Check for strand bias ---
+                // 
+
+                double st_rate = 0.05;
+                uint64_t st_max = 2;
+
+                // Find how many of the hetBase1OrientedReadIds are on the same strand as the target read (0)
+                uint64_t orientedReadIdsSupportingTheTargetReadBaseOnStrand0 = 0;
+                for (const OrientedReadId& orientedReadId : orientedReadIdsSupportingTheTargetReadBase) {
+                    if (orientedReadId.getStrand() == 0) {
+                        orientedReadIdsSupportingTheTargetReadBaseOnStrand0++;
+                    }
+                }
+
+                if (((orientedReadIdsSupportingTheTargetReadBaseOnStrand0 + st_max) >= totalNumberOfAlignmentsSupportingTheTargetRead) && ((totalNumberOfAlignmentsSupportingTheTargetRead*(st_rate) + orientedReadIdsSupportingTheTargetReadBaseOnStrand0) >= totalNumberOfAlignmentsSupportingTheTargetRead) ) {
+                    // debugOut << "Strand bias detected at position " << positionStatsOnTargetOrientedRead.positionInTargetRead << endl;
+                    // debugOut << "Total number of alignments supporting the target read on strand 0: " << orientedReadIdsSupportingTheTargetReadBaseOnStrand0 << endl;
+                    // debugOut << "Total number of alignments supporting the target read: " << totalNumberOfAlignmentsSupportingTheTargetRead << endl;
+                    continue;
+                }
+
+                // XXX
+                // --- END OF: Check for strand bias ---
+                //
+
+
+
+                if (baseAHasEnoughCoverage) {
+
+                    // Populate the SnpStats object
+                    SnpStats hetPositionStatsInTargetRead;
+                    hetPositionStatsInTargetRead.positionInTargetRead = positionStatsOnTargetOrientedRead.positionInTargetRead;
+                    hetPositionStatsInTargetRead.hetBase0 = positionStatsOnTargetOrientedRead.baseOfTargetRead;
+                    hetPositionStatsInTargetRead.hetBase1 = AlignedBase::fromCharacter('A');
+                    hetPositionStatsInTargetRead.isInHomopolymerRegion = positionStatsOnTargetOrientedRead.isInHomopolymerRegion;
+                    hetPositionStatsInTargetRead.occ_0 = totalNumberOfAlignmentsSupportingTheTargetRead; // Occurrence of the target base
+                    hetPositionStatsInTargetRead.occ_1 = totalNumberOfA; // Occurrence of the alternative base
+                    hetPositionStatsInTargetRead.score = -1;
+                    hetPositionStatsInTargetRead.overlap_num = totalCoverageInThisPosition;
+
+
+                    const double supportingTheTargetReadBaseA = double(totalNumberOfAlignmentsSupportingTheTargetRead) / double(totalCoverageInThisPosition);
+                    const double supportingTheHetReadBaseA = double(totalNumberOfA) / double(totalCoverageInThisPosition);
+
+
+                    // Get the haplotypeEvidence for the orientedReadIds supporting the alternative base
+                    for (const HaplotypeEvidence& haplotypeEvidence : positionStatsOnTargetOrientedRead.haplotypeEvidenceByBase[AlignedBase::fromCharacter('A').value]) {
+                        hetPositionStatsInTargetRead.hetBase1OrientedReadIdsHE.push_back(haplotypeEvidence);
+                    }
+
+                    for (const OrientedReadId& orientedReadId : orientedReadIdsSupportingTheTargetReadBase) {
+                        hetPositionStatsInTargetRead.hetBase0OrientedReadIds.push_back(orientedReadId);
+                    }
+
+
+                    // XXX
+                    // --- START OF: Check if the haplotypeEvidence in this position suggests a HPC region ---
                     //
 
-                    // We don't have the number of alignments that agree with the base of the target read
-                    // in that specific position. We only have the number of alignments that support a change.
-                    // So, we need to find the total coverage of that position from the intervalTree.
-                    uint64_t totalCoverageInThisPosition = 0;
-                    std::set<OrientedReadId> coveringOrientedReadIds;
-                    std::set<uint64_t> coveringAlignmentIds;
-                    
-                    auto it = alignmentIntervals.find(positionInRead0);
-                    if (it != alignmentIntervals.end()) {
-                        
-                        // Retrieve the covering alignment info pairs of this position,
-                        // which include the pairs (alignmentId, orientedReadId of the other read).
-                        const AlignmentInfoSet& coveringAlignmentInfo = it->second;
-                        
-                        // Calculate the total coverage in this position. 
-                        totalCoverageInThisPosition = coveringAlignmentInfo.size();
+                    uint64_t occ_1_temp = hetPositionStatsInTargetRead.occ_1;
 
-                        // Iterate through the pairs in coveringAlignmentInfo to
-                        // extract the alignmentId and the orientedReadId of the other read.
-                        for (const AlignmentInfoPair& infoPair : coveringAlignmentInfo) {
-                            uint64_t alignmentId = infoPair.first;
-                            OrientedReadId storedOrientedReadId1 = infoPair.second;
-                            // if (positionInRead0 == 513) {
-                            //     // debugOut << "Found covering alignment ID: " << alignmentId << " for position " << positionInRead0 << endl;
-                            //     // debugOut << "OrientedReadId1: " << storedOrientedReadId1 << endl;
-                            // }
-                            // if (phasingThreadDataReadGraph5->isReadIdContained[storedOrientedReadId1.getReadId()]) {
-                            //     // Skip contained reads
-                            //     continue;
-                            // }
-                            coveringAlignmentIds.insert(alignmentId);
-                            coveringOrientedReadIds.insert(storedOrientedReadId1);
+                    // Loop over the haplotype evidence and check if any of the reads are in a homopolymer region
+                    for (const HaplotypeEvidence& hapEvidence : hetPositionStatsInTargetRead.hetBase1OrientedReadIdsHE) {
+                        
+                        if (hapEvidence.isInHomopolymerRegion) {
+                            occ_1_temp--;
+                            continue;
                         }
 
                     }
 
-                    // Calculate the total coverage in this position without including alignments with gaps
-                    uint64_t totalCoverageInThisPositionWithoutGaps = totalCoverageInThisPosition - positionStatsInRead0.totalNumberOfGap;
-
-                    // This is the minimum needed number of alignments that
-                    // support the target read in that position. 
-                    // This is 2 + 1(the target read) = 3
-                    uint64_t minimumNumberOfAlignmentsSupportingTheTargetRead = 2;
-
-                    // Skip this position if the coverage supporting the target read is less than 2
-                    // if (totalCoverageInThisPosition - totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead < minimumNumberOfAlignmentsSupportingTheTargetRead) {
-                    if (totalCoverageInThisPosition - highestCoverageBaseCounts < minimumNumberOfAlignmentsSupportingTheTargetRead) {
-                        sitesSkippedDueToInsufficientCoverage++;
-                        // debugOut << "Skipping position " << positionInRead0 << " due to insufficient coverage supporting the target read: " << totalCoverageInThisPosition - totalNumberOfAlignmentsSupportingAChangeFromTheTargetRead << endl;
-                        // debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << " Total Alignments that support a change: " << totalNumberOfAlignmentsWithoutGapsSupportingAChangeFromTheTargetRead << ". Total alignments: " << totalCoverageInThisPosition << ". Total alignments without gaps: " << totalCoverageInThisPositionWithoutGaps << "." << endl;
-                        continue;
-                    }
-
-                    // Print position and base counts
-                    // debugOut << "Position: " << positionInRead0 << " A: " << totalNumberOfA << " C: " << totalNumberOfC << " G: " << totalNumberOfG << " T: " << totalNumberOfT << " Gap: " << totalNumberOfGap << " Total Alignments that support a change: " << totalNumberOfAlignmentsWithoutGapsSupportingAChangeFromTheTargetRead << ". Total alignments: " << totalCoverageInThisPosition << ". Total alignments without gaps: " << totalCoverageInThisPositionWithoutGaps << "." << endl;
-                    
-
-                    // if (positionInRead0 == 35102) {
-                    //     cout << "Position " << positionInRead0 << " is a potential heterozygous site with " << totalCoverageInThisPosition << " total alignments and " << positionStatsInRead0.totalNumberOfAlignments << " alignments supporting the other allele." << endl;
-                    // }
-
-                    
-                    const double supportingTheTargetReadBaseCountsPercentage = double(totalCoverageInThisPositionWithoutGaps - highestCoverageBaseCounts) / double(totalCoverageInThisPositionWithoutGaps);
-                    const double supportingTheHetReadBaseCountsPercentage = double(highestCoverageBaseCounts) / double(totalCoverageInThisPositionWithoutGaps);
-
-
-                    potentialHetSitesOnOrientedReadId0[positionInRead0] = positionStatsInRead0;
-                    // hetBase1 will always be the base of the target read in that position
-                    potentialHetSitesOnOrientedReadId0[positionInRead0].hetBase1 = positionStatsInRead0.baseOfReadId0;
-                    potentialHetSitesOnOrientedReadId0[positionInRead0].hetBase2 = baseCounts[0].second;
-
-                    // if (positionInRead0 == 35102) {
-                    //     cout << "In position " << positionInRead0 << ", the base of the readId0 is one of the top two het bases." << endl;
-                    //     cout << "hetBase1 (The base of the target read): " << potentialHetSitesOnOrientedReadId0[positionInRead0].hetBase1 << endl;
-                    //     cout << "hetBase2: " << potentialHetSitesOnOrientedReadId0[positionInRead0].hetBase2 << endl;
-                    // }
-
-                    auto& orientedReadIdsSupportingTheTargetReadBase = potentialHetSitesOnOrientedReadId0[positionInRead0].hetBase1OrientedReadIds;
-                    auto& orientedReadIdsSupportingTheOtherBase = potentialHetSitesOnOrientedReadId0[positionInRead0].hetBase2OrientedReadIds;
-                    if (baseCounts[0].second == 0) { // A is the 'other' base
-                        orientedReadIdsSupportingTheOtherBase = positionStatsInRead0.orientedReadIdsWithA;
-
-                        // Calculate the difference: coveringOrientedReadIds - orientedReadIdsSupportingTheOtherBase
-                        std::set_difference(
-                            coveringOrientedReadIds.begin(), coveringOrientedReadIds.end(),
-                            orientedReadIdsSupportingTheOtherBase.begin(), orientedReadIdsSupportingTheOtherBase.end(),
-                            std::inserter(orientedReadIdsSupportingTheTargetReadBase, orientedReadIdsSupportingTheTargetReadBase.begin())
-                        );
-
-                    } else if (baseCounts[0].second == 1) { // C is the 'other' base
-                        orientedReadIdsSupportingTheOtherBase = positionStatsInRead0.orientedReadIdsWithC;
-                    
-                        std::set_difference(
-                            coveringOrientedReadIds.begin(), coveringOrientedReadIds.end(),
-                            orientedReadIdsSupportingTheOtherBase.begin(), orientedReadIdsSupportingTheOtherBase.end(),
-                            std::inserter(orientedReadIdsSupportingTheTargetReadBase, orientedReadIdsSupportingTheTargetReadBase.begin())
-                        );
-                    
-                    } else if (baseCounts[0].second == 2) { // G is the 'other' base
-                        orientedReadIdsSupportingTheOtherBase = positionStatsInRead0.orientedReadIdsWithG;
-                    
-                        std::set_difference(
-                            coveringOrientedReadIds.begin(), coveringOrientedReadIds.end(),
-                            orientedReadIdsSupportingTheOtherBase.begin(), orientedReadIdsSupportingTheOtherBase.end(),
-                            std::inserter(orientedReadIdsSupportingTheTargetReadBase, orientedReadIdsSupportingTheTargetReadBase.begin())
-                        );
-                    
-                    } else if (baseCounts[0].second == 3) { // T is the 'other' base
-                        orientedReadIdsSupportingTheOtherBase = positionStatsInRead0.orientedReadIdsWithT;
-                    
-                        std::set_difference(
-                            coveringOrientedReadIds.begin(), coveringOrientedReadIds.end(),
-                            orientedReadIdsSupportingTheOtherBase.begin(), orientedReadIdsSupportingTheOtherBase.end(),
-                            std::inserter(orientedReadIdsSupportingTheTargetReadBase, orientedReadIdsSupportingTheTargetReadBase.begin())
-                        );
-                    
-                    } else if (baseCounts[0].second == 4) { // Gap is the 'other' base
-                        orientedReadIdsSupportingTheOtherBase = positionStatsInRead0.orientedReadIdsWithGap;
-                    
-                        std::set_difference(
-                            coveringOrientedReadIds.begin(), coveringOrientedReadIds.end(),
-                            orientedReadIdsSupportingTheOtherBase.begin(), orientedReadIdsSupportingTheOtherBase.end(),
-                            std::inserter(orientedReadIdsSupportingTheTargetReadBase, orientedReadIdsSupportingTheTargetReadBase.begin())
-                        );
-                    }
-
-                    // There are cases where the coveringOrientedReadIds also include orientedReadIds that support a gap.
-                    // We should remove those alignments to get the accurate set of orientedReadIds that support the target read base.
-                    std::set<OrientedReadId> tempResult;
-                    std::set_difference(
-                        orientedReadIdsSupportingTheTargetReadBase.begin(), orientedReadIdsSupportingTheTargetReadBase.end(),
-                        positionStatsInRead0.orientedReadIdsWithGap.begin(), positionStatsInRead0.orientedReadIdsWithGap.end(),
-                        std::inserter(tempResult, tempResult.begin())
-                    );
-                    orientedReadIdsSupportingTheTargetReadBase.swap(tempResult);
-
-                    // if (positionInRead0 == 35102) {
-                    //     // print which orientedReadIds are supporting the target read base
-                    //     cout << "OrientedReadIds supporting the target read base: " << endl;
-                    //     for (const OrientedReadId& orientedReadId : orientedReadIdsSupportingTheTargetReadBase) {
-                    //         cout << orientedReadId << endl;
-                    //     }
-                    //     // print which orientedReadIds are supporting the other base
-                    //     cout << "OrientedReadIds supporting the other base: " << endl;
-                    //     for (const OrientedReadId& orientedReadId : orientedReadIdsSupportingTheOtherBase) {
-                    //         cout << orientedReadId << endl;
-                    //     }
-                    // }
-                    
-                    potentialHetSitesOnOrientedReadId0[positionInRead0].totalNumberOfHetBase1 = (totalCoverageInThisPositionWithoutGaps - highestCoverageBaseCounts);
-                    potentialHetSitesOnOrientedReadId0[positionInRead0].totalNumberOfHetBase2 = highestCoverageBaseCounts;
-                    potentialHetSitesOnOrientedReadId0[positionInRead0].percentageOfHetBase1 = supportingTheTargetReadBaseCountsPercentage;
-                    potentialHetSitesOnOrientedReadId0[positionInRead0].percentageOfHetBase2 = supportingTheHetReadBaseCountsPercentage;
-                    
-                    // // // Optional: Log information about this site
-                    // char bases[] = {'A', 'C', 'G', 'T', '-'};
-                    // cout << "Potential heterozygous site at position " << positionInRead0 
-                    //     << " in readId " << readId0 << ":" << endl
-                    //     << "  Base of readId0: " << bases[positionStatsInRead0.baseOfReadId0] << endl
-                    //     << "  First variant: " << bases[baseCounts[0].second] << " (" << firstBasePercentage * 100 << "%)" << endl
-                    //     << "  Second variant: " << bases[baseCounts[1].second] << " (" << secondBasePercentage * 100 << "%)" << endl;
-                    
-
-
-
+                    if (occ_1_temp < 3) {
+                        hetPositionStatsInTargetRead.isHpcVector = true;
+                    } 
 
                     // XXX
-                    // --- Check for strand bias ---
-                    // This site is strand biased if:
-                    // 1. All reads supporting the target read's base (hetBase1) are on one specific strand.
-                    // 2. AND all reads supporting the other heterozygous base (hetBase2) are on the *opposite* strand.
-                    //
-
-                    uint64_t dominantStrandHet1Value;
-                    uint64_t dominantStrandHet2Value;
-
-                    bool strandBiasDetected = hasSiteStrandBiasReadGraph5(
-                        potentialHetSitesOnOrientedReadId0[positionInRead0].hetBase1OrientedReadIds,
-                        potentialHetSitesOnOrientedReadId0[positionInRead0].hetBase2OrientedReadIds,
-                        dominantStrandHet1Value,
-                        dominantStrandHet2Value
-                    );
-
-                    if (strandBiasDetected) {
-                        // debugOut << "Strand bias detected at position " << positionInRead0 
-                        //            << " for readId " << readId0 << ". Reads for target base on strand " << dominantStrandHet1Value
-                        //            << ", reads for other base on strand " << dominantStrandHet2Value
-                        //            << ". Skipping this site." << endl;
-                        sitesSkippedDueToInsufficientCoverage++; // Using existing counter, consider a new one for clarity if needed
-                        potentialHetSitesOnOrientedReadId0.erase(positionInRead0);
-                        continue; // Skip to the next positionStatsInRead0
-                    }
-
-                    // XXX
-                    // --- END OF: Check if we have strand bias issues in this position ---
+                    // --- END OF: Check if the haplotypeEvidence in this position suggests a HPC region ---
                     //
 
 
 
 
+                    // XXX
+                    // --- START OF: Check if the position has sufficent coverage ---
+                    //
+
+                    // TODO: WE NEED ADJUSTABLE HOM_COV
+                    double cut_rate = 0.7;
+                    uint64_t cut_bd = 6;
+                    int64_t hom_cov = 44;
+                    int64_t n_hap = 2;
+
+                    uint64_t cc = (hom_cov/n_hap);
+                    cc *= cut_rate;
+                    if (cc < cut_bd) {
+                        cc = cut_bd;
+                    }
+
+                    if (hetPositionStatsInTargetRead.occ_0 >= cc) {
+                        hetPositionStatsInTargetRead.hasSufficentCoverage = true;
+                    }
+
+                    // XXX
+                    // --- END OF: Check if the position has sufficent coverage ---
+                    //
 
 
 
-                } // --- End of loop over a specific potential heterozygous site ---
+                    // This Snp position passed all the filters
+                    // We can now populate the potentialHetSitesOnOrientedReadId0
+                    potentialHetSitesOnTargetOrientedReadId.push_back(hetPositionStatsInTargetRead);
+
+                    
+                }
+
+
+                if (baseCHasEnoughCoverage) {
+
+                    // Populate the SnpStats object
+                    SnpStats hetPositionStatsInTargetRead;
+                    hetPositionStatsInTargetRead.positionInTargetRead = positionStatsOnTargetOrientedRead.positionInTargetRead;
+                    hetPositionStatsInTargetRead.hetBase0 = positionStatsOnTargetOrientedRead.baseOfTargetRead;
+                    hetPositionStatsInTargetRead.hetBase1 = AlignedBase::fromCharacter('C');
+                    hetPositionStatsInTargetRead.isInHomopolymerRegion = positionStatsOnTargetOrientedRead.isInHomopolymerRegion;
+                    hetPositionStatsInTargetRead.occ_0 = totalNumberOfAlignmentsSupportingTheTargetRead; // Occurrence of the target base
+                    hetPositionStatsInTargetRead.occ_1 = totalNumberOfC; // Occurrence of the alternative base
+                    hetPositionStatsInTargetRead.score = -1;
+                    hetPositionStatsInTargetRead.overlap_num = totalCoverageInThisPosition;
+
+
+                    const double supportingTheTargetReadBaseC = double(totalNumberOfAlignmentsSupportingTheTargetRead) / double(totalCoverageInThisPosition);
+                    const double supportingTheHetReadBaseC = double(totalNumberOfC) / double(totalCoverageInThisPosition);
+
+
+                    // Get the haplotypeEvidence for the orientedReadIds supporting the alternative base
+                    for (const HaplotypeEvidence& haplotypeEvidence : positionStatsOnTargetOrientedRead.haplotypeEvidenceByBase[AlignedBase::fromCharacter('C').value]) {
+                        hetPositionStatsInTargetRead.hetBase1OrientedReadIdsHE.push_back(haplotypeEvidence);
+                    }
+
+                    for (const OrientedReadId& orientedReadId : orientedReadIdsSupportingTheTargetReadBase) {
+                        hetPositionStatsInTargetRead.hetBase0OrientedReadIds.push_back(orientedReadId);
+                    }
+
+                    // XXX
+                    // --- START OF: Check if the haplotypeEvidence in this position suggests a HPC region ---
+                    //
+
+                    uint64_t occ_1_temp = hetPositionStatsInTargetRead.occ_1;
+
+                    // Loop over the haplotype evidence and check if any of the reads are in a homopolymer region
+                    for (const HaplotypeEvidence& hapEvidence : hetPositionStatsInTargetRead.hetBase1OrientedReadIdsHE) {
+                        
+                        if (hapEvidence.isInHomopolymerRegion) {
+                            occ_1_temp--;
+                            continue;
+                        }
+
+                    }
+
+                    if (occ_1_temp < 3) {
+                        hetPositionStatsInTargetRead.isHpcVector = true;
+                    } 
+
+                    // XXX
+                    // --- END OF: Check if the haplotypeEvidence in this position suggests a HPC region ---
+                    //
+
+
+
+
+                    // XXX
+                    // --- START OF: Check if the position has sufficent coverage ---
+                    //
+
+                    double cut_rate = 0.7;
+                    uint64_t cut_bd = 6;
+                    int64_t hom_cov = 44;
+                    int64_t n_hap = 2;
+
+                    uint64_t cc = (hom_cov/n_hap);
+                    cc *= cut_rate;
+                    if (cc < cut_bd) {
+                        cc = cut_bd;
+                    }
+
+                    if (hetPositionStatsInTargetRead.occ_0 >= cc) {
+                        hetPositionStatsInTargetRead.hasSufficentCoverage = true;
+                    }
+
+                    // XXX
+                    // --- END OF: Check if the position has sufficent coverage ---
+                    //
+
+
+
+                    // This Snp position passed all the filters
+                    // We can now populate the potentialHetSitesOnOrientedReadId0
+                    potentialHetSitesOnTargetOrientedReadId.push_back(hetPositionStatsInTargetRead);
+
+                    
+                }
+
+
+                if (baseGHasEnoughCoverage) {
+
+                    // Populate the SnpStats object
+                    SnpStats hetPositionStatsInTargetRead;
+                    hetPositionStatsInTargetRead.positionInTargetRead = positionStatsOnTargetOrientedRead.positionInTargetRead;
+                    hetPositionStatsInTargetRead.hetBase0 = positionStatsOnTargetOrientedRead.baseOfTargetRead;
+                    hetPositionStatsInTargetRead.hetBase1 = AlignedBase::fromCharacter('G');
+                    hetPositionStatsInTargetRead.isInHomopolymerRegion = positionStatsOnTargetOrientedRead.isInHomopolymerRegion;
+                    hetPositionStatsInTargetRead.occ_0 = totalNumberOfAlignmentsSupportingTheTargetRead; // Occurrence of the target base
+                    hetPositionStatsInTargetRead.occ_1 = totalNumberOfG; // Occurrence of the alternative base
+                    hetPositionStatsInTargetRead.score = -1;
+                    hetPositionStatsInTargetRead.overlap_num = totalCoverageInThisPosition;
+
+
+                    const double supportingTheTargetReadBaseG = double(totalNumberOfAlignmentsSupportingTheTargetRead) / double(totalCoverageInThisPosition);
+                    const double supportingTheHetReadBaseG = double(totalNumberOfG) / double(totalCoverageInThisPosition);
+
+
+                    // Get the haplotypeEvidence for the orientedReadIds supporting the alternative base
+                    for (const HaplotypeEvidence& haplotypeEvidence : positionStatsOnTargetOrientedRead.haplotypeEvidenceByBase[AlignedBase::fromCharacter('G').value]) {
+                        hetPositionStatsInTargetRead.hetBase1OrientedReadIdsHE.push_back(haplotypeEvidence);
+                    }
+
+                    for (const OrientedReadId& orientedReadId : orientedReadIdsSupportingTheTargetReadBase) {
+                        hetPositionStatsInTargetRead.hetBase0OrientedReadIds.push_back(orientedReadId);
+                    }
+
+                    // XXX
+                    // --- START OF: Check if the haplotypeEvidence in this position suggests a HPC region ---
+                    //
+
+                    uint64_t occ_1_temp = hetPositionStatsInTargetRead.occ_1;
+
+                    // Loop over the haplotype evidence and check if any of the reads are in a homopolymer region
+                    for (const HaplotypeEvidence& hapEvidence : hetPositionStatsInTargetRead.hetBase1OrientedReadIdsHE) {
+                        
+                        if (hapEvidence.isInHomopolymerRegion) {
+                            occ_1_temp--;
+                            continue;
+                        }
+
+                    }
+
+                    if (occ_1_temp < 3) {
+                        hetPositionStatsInTargetRead.isHpcVector = true;
+                    } 
+
+                    // XXX
+                    // --- END OF: Check if the haplotypeEvidence in this position suggests a HPC region ---
+                    //
+
+
+
+
+                    // XXX
+                    // --- START OF: Check if the position has sufficent coverage ---
+                    //
+
+                    double cut_rate = 0.7;
+                    uint64_t cut_bd = 6;
+                    int64_t hom_cov = 44;
+                    int64_t n_hap = 2;
+
+                    uint64_t cc = (hom_cov/n_hap);
+                    cc *= cut_rate;
+                    if (cc < cut_bd) {
+                        cc = cut_bd;
+                    }
+
+                    if (hetPositionStatsInTargetRead.occ_0 >= cc) {
+                        hetPositionStatsInTargetRead.hasSufficentCoverage = true;
+                    }
+
+                    // XXX
+                    // --- END OF: Check if the position has sufficent coverage ---
+                    //
+
+
+
+                    // This Snp position passed all the filters
+                    // We can now populate the potentialHetSitesOnOrientedReadId0
+                    potentialHetSitesOnTargetOrientedReadId.push_back(hetPositionStatsInTargetRead);
+
+                    
+                }
+
+
+
+                if (baseTHasEnoughCoverage) {
+
+                    // Populate the SnpStats object
+                    SnpStats hetPositionStatsInTargetRead;
+                    hetPositionStatsInTargetRead.positionInTargetRead = positionStatsOnTargetOrientedRead.positionInTargetRead;
+                    hetPositionStatsInTargetRead.hetBase0 = positionStatsOnTargetOrientedRead.baseOfTargetRead;
+                    hetPositionStatsInTargetRead.hetBase1 = AlignedBase::fromCharacter('T');
+                    hetPositionStatsInTargetRead.isInHomopolymerRegion = positionStatsOnTargetOrientedRead.isInHomopolymerRegion;
+                    hetPositionStatsInTargetRead.occ_0 = totalNumberOfAlignmentsSupportingTheTargetRead; // Occurrence of the target base
+                    hetPositionStatsInTargetRead.occ_1 = totalNumberOfT; // Occurrence of the alternative base
+                    hetPositionStatsInTargetRead.score = -1;
+                    hetPositionStatsInTargetRead.overlap_num = totalCoverageInThisPosition;
+
+
+                    const double supportingTheTargetReadBaseT = double(totalNumberOfAlignmentsSupportingTheTargetRead) / double(totalCoverageInThisPosition);
+                    const double supportingTheHetReadBaseT = double(totalNumberOfT) / double(totalCoverageInThisPosition);
+
+
+                    // Get the haplotypeEvidence for the orientedReadIds supporting the alternative base
+                    for (const HaplotypeEvidence& haplotypeEvidence : positionStatsOnTargetOrientedRead.haplotypeEvidenceByBase[AlignedBase::fromCharacter('T').value]) {
+                        hetPositionStatsInTargetRead.hetBase1OrientedReadIdsHE.push_back(haplotypeEvidence);
+                    }
+
+                    for (const OrientedReadId& orientedReadId : orientedReadIdsSupportingTheTargetReadBase) {
+                        hetPositionStatsInTargetRead.hetBase0OrientedReadIds.push_back(orientedReadId);
+                    }
+
+                    // XXX
+                    // --- START OF: Check if the haplotypeEvidence in this position suggests a HPC region ---
+                    //
+
+                    uint64_t occ_1_temp = hetPositionStatsInTargetRead.occ_1;
+
+                    // Loop over the haplotype evidence and check if any of the reads are in a homopolymer region
+                    for (const HaplotypeEvidence& hapEvidence : hetPositionStatsInTargetRead.hetBase1OrientedReadIdsHE) {
+                        
+                        if (hapEvidence.isInHomopolymerRegion) {
+                            occ_1_temp--;
+                            continue;
+                        }
+
+                    }
+
+                    if (occ_1_temp < 3 || hetPositionStatsInTargetRead.isInHomopolymerRegion) {
+                        hetPositionStatsInTargetRead.isHpcVector = true;
+                    } 
+
+                    // XXX
+                    // --- END OF: Check if the haplotypeEvidence in this position suggests a HPC region ---
+                    //
+
+
+
+
+                    // XXX
+                    // --- START OF: Check if the position has sufficent coverage ---
+                    //
+
+                    double cut_rate = 0.7;
+                    uint64_t cut_bd = 6;
+                    int64_t hom_cov = 44;
+                    int64_t n_hap = 2;
+
+                    uint64_t cc = (hom_cov/n_hap);
+                    cc *= cut_rate;
+                    if (cc < cut_bd) {
+                        cc = cut_bd;
+                    }
+
+                    cc = 6;
+
+                    if (hetPositionStatsInTargetRead.occ_0 >= cc) {
+                        hetPositionStatsInTargetRead.hasSufficentCoverage = true;
+                    }
+
+                    // XXX
+                    // --- END OF: Check if the position has sufficent coverage ---
+                    //
+
+
+
+                    // This Snp position passed all the filters
+                    // We can now populate the potentialHetSitesOnOrientedReadId0
+                    potentialHetSitesOnTargetOrientedReadId.push_back(hetPositionStatsInTargetRead);
+
+                    
+                }
+
+
+
 
             } // --- End of loop over all potential heterozygous sites ---
 
 
 
 
-            debugOut << "Thread ID: " << threadId << " Finished analyzing potential heterozygous sites for read ID: " << readId0 << endl;
+            debugOut << "Thread ID: " << threadId << " Finished analyzing potential heterozygous sites for read ID: " << targetReadId << endl;
+
+            // Clear the positionStatsOnOrientedReadId0 map
+            // positionStatsOnTargetOrientedReadId.clear();
+
 
 
 
@@ -1414,138 +1743,96 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             // --- Now we need to analyze the potential heterozygous sites and try to find sets of reads that belong to the same haplotype ---
             //
 
-            if (potentialHetSitesOnOrientedReadId0.size() > 0) {
+            if (potentialHetSitesOnTargetOrientedReadId.size() > 0) {
                 debugOut << endl;
-                debugOut << "Found " << potentialHetSitesOnOrientedReadId0.size() << " potential heterozygous sites in readId " << readId0 << endl;
+                debugOut << "Found " << potentialHetSitesOnTargetOrientedReadId.size() << " potential heterozygous sites in readId " << targetReadId << endl;
                 debugOut << "Skipped " << sitesSkippedDueToInsufficientCoverage << " sites due to insufficient coverage" << endl;
             } else {
                 debugOut << endl;
-                debugOut << "Found no potential heterozygous sites in readId " << readId0 << endl;
+                debugOut << "Found no potential heterozygous sites in readId " << targetReadId << endl;
                 debugOut << "Skipped " << sitesSkippedDueToInsufficientCoverage << " sites due to insufficient coverage" << endl;
                 continue;
             }
 
             // Loop over the potential heterozygous sites and print them
             char bases[] = {'A', 'C', 'G', 'T', '-'};
-            for (const auto& [positionInRead0, positionStatsInRead0] : potentialHetSitesOnOrientedReadId0) {
-                if (positionStatsInRead0.hetBase1 == 4 || positionStatsInRead0.hetBase2 == 4) {
-                    // Skip gaps
-                    continue;
-                }
-                debugOut << "Potential heterozygous site at position " << positionInRead0
-                    << " in readId " << readId0 << " in strand " << strand0 << ":" << endl
-                    << "  Base of readId0: " << bases[positionStatsInRead0.baseOfReadId0] << endl
-                    << "  First variant: " << bases[positionStatsInRead0.hetBase1] << " (" << positionStatsInRead0.totalNumberOfHetBase1 << " "<< positionStatsInRead0.percentageOfHetBase1 * 100 << "%)" << endl
-                    << "  Second variant: " << bases[positionStatsInRead0.hetBase2] << " (" << positionStatsInRead0.totalNumberOfHetBase2 << " " << positionStatsInRead0.percentageOfHetBase2 * 100 << "%)" << endl;
+            for (const auto& positionStatsInTargetRead : potentialHetSitesOnTargetOrientedReadId) {
+
+                debugOut << "Potential heterozygous site at position " << positionStatsInTargetRead.positionInTargetRead
+                    << " in readId " << targetReadId << " in strand " << targetReadStrand << ":" << endl
+                    << "  Base of targetReadId: " << bases[positionStatsInTargetRead.hetBase0.value] << endl
+                    << "  First variant: " << bases[positionStatsInTargetRead.hetBase0.value] << " (" << positionStatsInTargetRead.occ_0 << " "<< positionStatsInTargetRead.occ_0 / positionStatsInTargetRead.overlap_num * 100 << "%)" << endl
+                    << "  Second variant: " << bases[positionStatsInTargetRead.hetBase1.value] << " (" << positionStatsInTargetRead.occ_1 << " " << positionStatsInTargetRead.occ_1 / positionStatsInTargetRead.overlap_num * 100 << "%)" << endl;
                 
                 debugOut << "ReadIds that support the first variant: " << endl;
-                if (positionStatsInRead0.hetBase1 == 0) {
-                    for (const auto& orientedReadId : positionStatsInRead0.hetBase1OrientedReadIds) {
-                        debugOut << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
-                    }
-                } else if (positionStatsInRead0.hetBase1 == 1) {
-                    for (const auto& orientedReadId : positionStatsInRead0.hetBase1OrientedReadIds) {
-                        debugOut << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
-                    }
-                } else if (positionStatsInRead0.hetBase1 == 2) {
-                    for (const auto& orientedReadId : positionStatsInRead0.hetBase1OrientedReadIds) {
-                        debugOut << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
-                    }
-                } else if (positionStatsInRead0.hetBase1 == 3) {
-                    for (const auto& orientedReadId : positionStatsInRead0.hetBase1OrientedReadIds) {
-                        debugOut << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
-                    }
-                } else if (positionStatsInRead0.hetBase1 == 4) {
-                    for (const auto& orientedReadId : positionStatsInRead0.hetBase1OrientedReadIds) {
-                        debugOut << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
-                    }
+                for (const auto& orientedReadId : positionStatsInTargetRead.hetBase0OrientedReadIds) {
+                    debugOut << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
+                }
+                debugOut << "ReadIds that support the second variant: " << endl;
+                for (const auto& haplotypeEvidence : positionStatsInTargetRead.hetBase1OrientedReadIdsHE) {
+                    debugOut << "ReadId: " << haplotypeEvidence.orientedReadId.getReadId() << " Strand: " << haplotypeEvidence.orientedReadId.getStrand() << endl;
                 }
                 
-
-                debugOut << "ReadIds that support the second variant: " << endl;
-                if (positionStatsInRead0.hetBase2 == 0) {
-                    for (const auto& orientedReadId : positionStatsInRead0.hetBase2OrientedReadIds) {
-                        debugOut << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
-                    }
-                } else if (positionStatsInRead0.hetBase2 == 1) {
-                    for (const auto& orientedReadId : positionStatsInRead0.hetBase2OrientedReadIds) {
-                        debugOut << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
-                    }
-                } else if (positionStatsInRead0.hetBase2 == 2) {
-                    for (const auto& orientedReadId : positionStatsInRead0.hetBase2OrientedReadIds) {
-                        debugOut << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
-                    }
-                } else if (positionStatsInRead0.hetBase2 == 3) {
-                    for (const auto& orientedReadId : positionStatsInRead0.hetBase2OrientedReadIds) {
-                        debugOut << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
-                    }
-                } else if (positionStatsInRead0.hetBase2 == 4) {
-                    for (const auto& orientedReadId : positionStatsInRead0.hetBase2OrientedReadIds) {
-                        debugOut << "ReadId: " << orientedReadId.getReadId() << " Strand: " << orientedReadId.getStrand() << endl;
-                    }
-                }
             }
 
+            debugOut << "Thread ID: " << threadId << " Finished analyzing potential heterozygous sites for read ID: " << targetReadId << endl;
 
-            debugOut << "Thread ID: " << threadId << " Finished analyzing potential heterozygous sites for read ID: " << readId0 << endl;
+            
 
             // XXX
             // --- Dynamic Programming for Grouping Compatible Sites and Phasing ---
             //
-            // debugOut << timestamp << "Starting DP for grouping compatible sites for read " << orientedReadId0 << endl;
+            
+            // debugOut << timestamp << "Starting DP for grouping compatible sites for read " << targetOrientedReadId << endl;
 
-            // 0. Prepare sorted list of sites
-            std::vector<std::pair<uint64_t, AlignmentPositionBaseStats>> sortedSites;
-            for (const auto& pair : potentialHetSitesOnOrientedReadId0) {
-                sortedSites.push_back(pair);
-            }
-            // Ensure sites are sorted by position (map iteration order is usually sorted, but explicit sort is safer)
-            std::sort(sortedSites.begin(), sortedSites.end(),
-                    [](const auto& a, const auto& b) { return a.first < b.first; });
-
-            uint64_t N = sortedSites.size();
+            uint64_t N = potentialHetSitesOnTargetOrientedReadId.size();
             if (N == 0) {
-                // debugOut << "No potential het sites found after filtering for read " << orientedReadId0 << ", skipping DP and subsequent phasing." << endl;
-                // debugOut << "Skipped " << sitesSkippedDueToInsufficientCoverage << " sites due to insufficient coverage" << endl;
+                debugOut << "No potential het sites found after filtering for read " << targetOrientedReadId << ", skipping DP and subsequent phasing." << endl;
                 continue; // Skip to the next readId if no sites
             } else {
-                // debugOut << "Found " << N << " potential heterozygous sites for DP in readId " << readId0 << endl;
+                debugOut << "Found " << N << " potential heterozygous sites for DP in readId " << targetReadId << endl;
                 // debugOut << "Skipped " << sitesSkippedDueToInsufficientCoverage << " sites due to insufficient coverage" << endl;
             }
 
             // Define compatibility check function locally (or move to class scope)
             auto areCompatibleSites =
-                [&](const std::pair<uint64_t, AlignmentPositionBaseStats>& site_pair_i,
-                    const std::pair<uint64_t, AlignmentPositionBaseStats>& site_pair_j,
-                    const OrientedReadId& targetReadId) -> bool
-            {
-                const AlignmentPositionBaseStats& stats_i = site_pair_i.second;
-                const AlignmentPositionBaseStats& stats_j = site_pair_j.second;
+                [&](const SnpStats& stats_i,
+                    const SnpStats& stats_j,
+                    const OrientedReadId& targetOrientedReadId) -> bool
+            {   
 
-                // --- Check if target read covers both sites informatively ---
-                // Target read must have one of the two identified heterozygous bases at each site
-                // for a meaningful phase comparison relative to the target.
-                bool target_covers_i = (stats_i.baseOfReadId0 == stats_i.hetBase1 || stats_i.baseOfReadId0 == stats_i.hetBase2);
-                bool target_covers_j = (stats_j.baseOfReadId0 == stats_j.hetBase1 || stats_j.baseOfReadId0 == stats_j.hetBase2);
-
-                if (!target_covers_i || !target_covers_j) {
-                    // Target read doesn't provide a consistent reference phase across both sites.
-                    // cout << "Target read " << targetReadId << " does not cover sites " << site_pair_i.first << " and " << site_pair_j.first << " informatively for relative phasing." << endl;
+                // Never link a SNP to itself
+                if (stats_i.positionInTargetRead == stats_j.positionInTargetRead) {
                     return false;
                 }
-                // --- Target read covers both sites informatively ---
+
 
                 // 1a. Get all reads overlapping site i
-                std::set<OrientedReadId> reads_at_i = stats_i.hetBase1OrientedReadIds;
-                reads_at_i.insert(stats_i.hetBase2OrientedReadIds.begin(), stats_i.hetBase2OrientedReadIds.end());
-                // Add target read since we know it covers informatively
-                // reads_at_i.insert(targetReadId);
+                std::vector<OrientedReadId> reads_at_i;
+                std::vector<OrientedReadId> reads_at_i_0;
+                std::vector<OrientedReadId> reads_at_i_1;
+                reads_at_i.reserve(stats_i.hetBase0OrientedReadIds.size() + stats_i.hetBase1OrientedReadIdsHE.size());
+                reads_at_i.insert(reads_at_i.end(), stats_i.hetBase0OrientedReadIds.begin(), stats_i.hetBase0OrientedReadIds.end());
+                reads_at_i_0.insert(reads_at_i_0.end(), stats_i.hetBase0OrientedReadIds.begin(), stats_i.hetBase0OrientedReadIds.end());
+                for (const HaplotypeEvidence& haplotypeEvidence : stats_i.hetBase1OrientedReadIdsHE) {
+                    reads_at_i.push_back(haplotypeEvidence.orientedReadId);
+                    reads_at_i_1.push_back(haplotypeEvidence.orientedReadId);
+                }
+                std::sort(reads_at_i.begin(), reads_at_i.end());
 
                 // 1b. Get all reads overlapping site j
-                std::set<OrientedReadId> reads_at_j = stats_j.hetBase1OrientedReadIds;
-                reads_at_j.insert(stats_j.hetBase2OrientedReadIds.begin(), stats_j.hetBase2OrientedReadIds.end());
-                // Add target read since we know it covers informatively
-                // reads_at_j.insert(targetReadId);
+                std::vector<OrientedReadId> reads_at_j;
+                std::vector<OrientedReadId> reads_at_j_0;
+                std::vector<OrientedReadId> reads_at_j_1;
+                reads_at_j.reserve(stats_j.hetBase0OrientedReadIds.size() + stats_j.hetBase1OrientedReadIdsHE.size());
+                reads_at_j.insert(reads_at_j.end(), stats_j.hetBase0OrientedReadIds.begin(), stats_j.hetBase0OrientedReadIds.end());
+                reads_at_j_0.insert(reads_at_j_0.end(), stats_j.hetBase0OrientedReadIds.begin(), stats_j.hetBase0OrientedReadIds.end());
+                for (const HaplotypeEvidence& haplotypeEvidence : stats_j.hetBase1OrientedReadIdsHE) {
+                    reads_at_j.push_back(haplotypeEvidence.orientedReadId);
+                    reads_at_j_1.push_back(haplotypeEvidence.orientedReadId);
+                }
+                std::sort(reads_at_j.begin(), reads_at_j.end());
+
 
                 // 2. Find common overlapping reads
                 std::vector<OrientedReadId> commonOverlappingReads;
@@ -1553,48 +1840,47 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                                     reads_at_j.begin(), reads_at_j.end(),
                                     std::back_inserter(commonOverlappingReads));
 
+
                 bool found_phase_00 = false; // Flag for reads matching target at both sites (Phase 0-0)
                 bool found_phase_11 = false; // Flag for reads differing from target at both sites (Phase 1-1)
                 uint64_t found_phase_00_count = 0; // Count of reads matching target at both sites
                 uint64_t found_phase_11_count = 0; // Count of reads differing from target at both sites
+
+
                 // 3. Check phase consistency for each common read relative to target 
                 //    and also evidence for both phase patterns
-                for (const auto& read : commonOverlappingReads) {
+                for (const auto& orientedReadId : commonOverlappingReads) {
                     // Determine phase at site i (0: matches target, 1: differs from target, -1: unknown/not informative)
                     int phase_i = -1;
-                    uint64_t allele_at_i = 100; // Invalid allele
-                    if (stats_i.hetBase1OrientedReadIds.count(read)) {
+                    AlignedBase allele_at_i; // Invalid allele
+                    if (std::find(reads_at_i_0.begin(), reads_at_i_0.end(), orientedReadId) != reads_at_i_0.end()) {
+                        allele_at_i = stats_i.hetBase0;
+                    } else if (std::find(reads_at_i_1.begin(), reads_at_i_1.end(), orientedReadId) != reads_at_i_1.end()) {
                         allele_at_i = stats_i.hetBase1;
-                    } else if (stats_i.hetBase2OrientedReadIds.count(read)) {
-                        allele_at_i = stats_i.hetBase2;
                     }
 
-                    if (allele_at_i <= 4) { // Is the allele valid (A,C,G,T,-)?
-                        if (allele_at_i == stats_i.baseOfReadId0) {
-                            phase_i = 0; // Matches the base of the target read
-                        } else {
-                            phase_i = 1; // Differs from the base of the target read
-                        }
-                    } // else phase_i remains -1 (read doesn't support either het allele at this site)
+                    if (allele_at_i == stats_i.hetBase0) {
+                        phase_i = 0; // Matches the base of the target read
+                    } else {
+                        phase_i = 1; // Differs from the base of the target read
+                    }
 
                     // debugOut << "Read " << read << " at site " << site_pair_i.first << " has phase " << phase_i << endl;
 
                     // Determine phase at site j (0: matches target, 1: differs from target, -1: unknown/not informative)
                     int phase_j = -1;
-                    uint64_t allele_at_j = 100;
-                    if (stats_j.hetBase1OrientedReadIds.count(read)) {
+                    AlignedBase allele_at_j;
+                    if (std::find(reads_at_j_0.begin(), reads_at_j_0.end(), orientedReadId) != reads_at_j_0.end()) {
+                        allele_at_j = stats_j.hetBase0;
+                    } else if (std::find(reads_at_j_1.begin(), reads_at_j_1.end(), orientedReadId) != reads_at_j_1.end()) {
                         allele_at_j = stats_j.hetBase1;
-                    } else if (stats_j.hetBase2OrientedReadIds.count(read)) {
-                        allele_at_j = stats_j.hetBase2;
                     }
 
-                    if (allele_at_j <= 4) {
-                        if (allele_at_j == stats_j.baseOfReadId0) {
-                            phase_j = 0; // Matches target
-                        } else {
-                            phase_j = 1; // Differs from target
-                        } 
-                    } // else phase_j remains -1
+                    if (allele_at_j == stats_j.hetBase0) {
+                        phase_j = 0; // Matches target
+                    } else {
+                        phase_j = 1; // Differs from target
+                    } 
 
                     // debugOut << "Read " << read << " at site " << site_pair_j.first << " has phase " << phase_j << endl;
 
@@ -1623,10 +1909,10 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                 // 2. There was at least one read supporting the 0-0 linkage relative to target.
                 // 3. There was at least one read supporting the 1-1 linkage relative to target.
                 // cout << "Compatibility check for sites " << site_pair_i.first << " and " << site_pair_j.first << " relative to target " << targetReadId << ": found_phase_00=" << found_phase_00 << ", found_phase_11=" << found_phase_11 << endl;
-                // return found_phase_00 && found_phase_11;
-                return found_phase_00 && found_phase_11 && (found_phase_00_count >= 3) && (found_phase_11_count >= 3);
+                return found_phase_00 && found_phase_11;
 
             };
+
 
             // 1. Initialize DP table and parent pointers
             std::vector<uint64_t> LCG(N, 1); // LCG[i] = size of largest compatible group ending at i
@@ -1636,7 +1922,7 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             for (uint64_t i = 1; i < N; ++i) {
                 for (uint64_t j = 0; j < i; ++j) {
                     // Check compatibility S[j] <-> S[i]
-                    if (areCompatibleSites(sortedSites[i], sortedSites[j], orientedReadId0)) {
+                    if (areCompatibleSites(potentialHetSitesOnTargetOrientedReadId[i], potentialHetSitesOnTargetOrientedReadId[j], targetOrientedReadId)) {
                         if (LCG[j] + 1 > LCG[i]) {
                             LCG[i] = LCG[j] + 1;
                             parent[i] = j;
@@ -1661,148 +1947,357 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             // Sort descending by LCG value
             std::sort(sortedLCGIndices.rbegin(), sortedLCGIndices.rend()); 
 
-            // debugOut << "DP results for read " << orientedReadId0 << ": LCG values > 1:" << endl;
-            for(const auto& p : sortedLCGIndices) {
-                // debugOut << "  Site Index: " << p.second << " (Pos: " << sortedSites[p.second].first << "), LCG: " << p.first << endl;
-            }
+    
 
-            std::set<OrientedReadId> tempInPhaseOrientedReads;
-            std::set<OrientedReadId> excludedOutOfPhaseOrientedReads;
-            std::set<OrientedReadId> involvedOrientedReadsInInformativeSites;
-            std::set<OrientedReadId> finalInPhaseOrientedReads;
+            // Data structure for storing the chains of compatible sites.
+            // Each inner vector contains the indices of SnpStats that form a compatible chain.
+            std::vector<std::vector<uint64_t>> siteChains;
+            std::vector<std::vector<uint64_t>> siteChainsIsolatedSites;
 
+            // --- Traceback to build the chains ---
+            // First, process the multi-site chains from the DP results.
             for (const auto& lcgPair : sortedLCGIndices) {
-                size_t current_i = lcgPair.second;
-                uint64_t current_LCG = lcgPair.first;
+                size_t endOfChainIndex = lcgPair.second;
 
-                if (!isAssigned[current_i]) {
-                    std::vector<uint64_t> newClusterPositions; // Keep this for informativeSites logic later if needed
-                    std::vector<size_t> newClusterIndices;    // Store indices for phasing logic
-                    int traceIndex = current_i;
-                    // debugOut << "Starting traceback for cluster ending at index " << current_i << " (Pos: " << sortedSites[current_i].first << ") with LCG " << LCG[current_i] << endl;
-    
+                if (!isAssigned[endOfChainIndex]) {
+                    std::vector<uint64_t> newChain;
+                    int traceIndex = endOfChainIndex;
+
+                    // Trace back from the end of the chain to the beginning using the parent pointers.
                     while (traceIndex != -1 && !isAssigned[traceIndex]) {
-    
-                        const AlignmentPositionBaseStats& currentIndexStats = sortedSites[traceIndex].second;
-                        uint64_t targetAllele = currentIndexStats.baseOfReadId0;
-                        uint64_t otherAllele = (targetAllele == currentIndexStats.hetBase1) ? currentIndexStats.hetBase2 : currentIndexStats.hetBase1;
-    
-                        // 1. Populate involved reads for this site
-                        // Add all reads supporting either heterozygous allele at this site
-                        involvedOrientedReadsInInformativeSites.insert(currentIndexStats.hetBase1OrientedReadIds.begin(), currentIndexStats.hetBase1OrientedReadIds.end());
-                        involvedOrientedReadsInInformativeSites.insert(currentIndexStats.hetBase2OrientedReadIds.begin(), currentIndexStats.hetBase2OrientedReadIds.end());
-    
-                        // 2. Get in-phase and out-of-phase reads *at this specific site index* relative to the target read
-                        // Populate in-phase set (reads with the same allele as the target read at this site)
-                        if (targetAllele == currentIndexStats.hetBase1) {
-                            tempInPhaseOrientedReads.insert(currentIndexStats.hetBase1OrientedReadIds.begin(), currentIndexStats.hetBase1OrientedReadIds.end());
-                        } else { // targetAllele must be stats.hetBase2
-                            tempInPhaseOrientedReads.insert(currentIndexStats.hetBase2OrientedReadIds.begin(), currentIndexStats.hetBase2OrientedReadIds.end());
-                        }
-                        tempInPhaseOrientedReads.insert(orientedReadId0); // The target read is always in phase with itself
-    
-                        // Populate out-of-phase set (reads with the other heterozygous allele)
-                        if (otherAllele == currentIndexStats.hetBase1) {
-                            excludedOutOfPhaseOrientedReads.insert(currentIndexStats.hetBase1OrientedReadIds.begin(), currentIndexStats.hetBase1OrientedReadIds.end());
-                        } else { // otherAllele must be stats.hetBase2
-                            excludedOutOfPhaseOrientedReads.insert(currentIndexStats.hetBase2OrientedReadIds.begin(), currentIndexStats.hetBase2OrientedReadIds.end());
-                        }
-    
-                        newClusterPositions.push_back(sortedSites[traceIndex].first); // Store site position
-                        newClusterIndices.push_back(traceIndex); // Store site index
+                        newChain.push_back(traceIndex);
                         isAssigned[traceIndex] = true;
-                        // debugOut << "  Adding site index " << traceIndex << " (Pos: " << sortedSites[traceIndex].first << ") to compatible group." << endl;
                         traceIndex = parent[traceIndex];
-    
                     }
-    
-                    std::reverse(newClusterPositions.begin(), newClusterPositions.end()); // Store cluster in positional order
-                    std::reverse(newClusterIndices.begin(), newClusterIndices.end());   // Store indices in positional order
-                    //siteClusters.push_back(newClusterPositions); // Keep the original structure if needed elsewhere
-                    //siteIndexClusters.push_back(newClusterIndices); // Use this for phasing
-                    // debugOut << "  Finished constructing of a compatible group with " << newClusterPositions.size() << " sites." << endl;
+
+                    // The chain was built backwards, so reverse it to store it in positional order.
+                    std::reverse(newChain.begin(), newChain.end());
+                    siteChains.push_back(newChain);
                 }
             }
 
-
-            for (const auto& lcgPair : isolatedSitesIndices) {
-                size_t current_i = lcgPair.second;
-                uint64_t current_LCG = lcgPair.first;
-
-                // An isolated site is considered informative only if it is supported by a
-                // sufficient high number of reads.
-                if ((current_LCG == 1) && (!isAssigned[current_i])) {
-                    const AlignmentPositionBaseStats& currentIndexStats = sortedSites[current_i].second;
-                    uint64_t targetAllele = currentIndexStats.baseOfReadId0;
-                    uint64_t otherAllele = (targetAllele == currentIndexStats.hetBase1) ? currentIndexStats.hetBase2 : currentIndexStats.hetBase1;
-
-                    uint64_t hetBase1Coverage = currentIndexStats.hetBase1OrientedReadIds.size();
-                    uint64_t hetBase2Coverage = currentIndexStats.hetBase2OrientedReadIds.size();
-
-                    double threshold1 = 0.35;
-                    double threshold2 = 0.24;
-
-                    uint64_t minCoverageAmongHetBases = std::min(hetBase1Coverage, hetBase2Coverage);
-                    double available = minCoverageAmongHetBases;
-                    uint64_t totalCoverageAmongHetBases = hetBase1Coverage + hetBase2Coverage;
-                    available = available/((double)(totalCoverageAmongHetBases));
-
-                    if(minCoverageAmongHetBases >= 5) {
-                        if(available < threshold2 || totalCoverageAmongHetBases < 10) {
-                            continue;
-                        }
-                    } else if (available < threshold1 || hetBase1Coverage < 4 || totalCoverageAmongHetBases < 10) {
-                        continue;
-                    }
-                    
-                    // 1. Populate involved reads for this site
-                    // Add all reads supporting either heterozygous allele at this site
-                    involvedOrientedReadsInInformativeSites.insert(currentIndexStats.hetBase1OrientedReadIds.begin(), currentIndexStats.hetBase1OrientedReadIds.end());
-                    involvedOrientedReadsInInformativeSites.insert(currentIndexStats.hetBase2OrientedReadIds.begin(), currentIndexStats.hetBase2OrientedReadIds.end());
-
-                    // 2. Get in-phase and out-of-phase reads *at this specific site index* relative to the target read
-                    // Populate in-phase set (reads with the same allele as the target read at this site)
-                    if (targetAllele == currentIndexStats.hetBase1) {
-                        tempInPhaseOrientedReads.insert(currentIndexStats.hetBase1OrientedReadIds.begin(), currentIndexStats.hetBase1OrientedReadIds.end());
-                    } else { // targetAllele must be stats.hetBase2
-                        tempInPhaseOrientedReads.insert(currentIndexStats.hetBase2OrientedReadIds.begin(), currentIndexStats.hetBase2OrientedReadIds.end());
-                    }
-                    tempInPhaseOrientedReads.insert(orientedReadId0); // The target read is always in phase with itself
-
-                    // Populate out-of-phase set (reads with the other heterozygous allele)
-                    if (otherAllele == currentIndexStats.hetBase1) {
-                        excludedOutOfPhaseOrientedReads.insert(currentIndexStats.hetBase1OrientedReadIds.begin(), currentIndexStats.hetBase1OrientedReadIds.end());
-                    } else { // otherAllele must be stats.hetBase2
-                        excludedOutOfPhaseOrientedReads.insert(currentIndexStats.hetBase2OrientedReadIds.begin(), currentIndexStats.hetBase2OrientedReadIds.end());
-                    }
-
-                    isAssigned[current_i] = true;
-                    // debugOut << "  Adding site index " << current_i << " (Pos: " << sortedSites[current_i].first << ") with LCG " << current_LCG << "." << endl;
+            // Now, handle the isolated sites (those not part of any larger chain) as chains of size 1.
+            for (const auto& isolatedPair : isolatedSitesIndices) {
+                uint64_t siteIndex = isolatedPair.second;
+                if (!isAssigned[siteIndex]) {
+                    siteChainsIsolatedSites.push_back({siteIndex}); // A chain containing a single site.
                 }
             }
 
 
 
-            
-            // Find which reads exist only in the tempInPhaseOrientedReads set and not in the excludedOutOfPhaseOrientedReads set and add them to finalInPhaseOrientedReads
-            for (const auto& read : tempInPhaseOrientedReads) {
-                if (excludedOutOfPhaseOrientedReads.find(read) == excludedOutOfPhaseOrientedReads.end()) {
-                    finalInPhaseOrientedReads.insert(read);
+            // XXX
+            // --- START OF: Chain Scoring ---
+            //
+
+            // Long chain are inherently more reliable because they have more linked SNPs.
+            // So initialy all SNP positions in the chain get a score of 1.
+            for (const auto& chain : siteChains) {
+                for (const uint64_t siteIndex : chain) {
+                    if(potentialHetSitesOnTargetOrientedReadId[siteIndex].hasSufficentCoverage){
+                        potentialHetSitesOnTargetOrientedReadId[siteIndex].score = 1;
+                    } else {
+                        potentialHetSitesOnTargetOrientedReadId[siteIndex].score = -1;
+                    }
                 }
             }
-            debugOut << "Final in-phase reads for read " << orientedReadId0 << ": " << endl;
-            for (const auto& read : finalInPhaseOrientedReads) {
-                debugOut << "  ReadId: " << read.getReadId() << " Strand: " << read.getStrand() << endl;
+
+            for (const auto& chain : siteChainsIsolatedSites) {
+                for (const uint64_t siteIndex : chain) {
+                    if(potentialHetSitesOnTargetOrientedReadId[siteIndex].hasSufficentCoverage && !potentialHetSitesOnTargetOrientedReadId[siteIndex].isHpcVector){
+                        potentialHetSitesOnTargetOrientedReadId[siteIndex].score = 1;
+                    } else {
+                        potentialHetSitesOnTargetOrientedReadId[siteIndex].score = -1;
+                    }
+                }
             }
 
             // XXX
-            // --- END OF: Dynamic Programming for Grouping Compatible Sites and Phasing ---
+            // --- END OF: Chain Scoring ---
             //
 
 
 
 
-            debugOut << "Thread ID: " << threadId << " Finished grouping compatible sites for read ID: " << readId0 << endl;
+            // Print the chains keeping only the sites that have a score of 1
+            debugOut << "DP results for read " << targetOrientedReadId << ": LCG values > 1:" << endl;
+            for(const auto& chain : siteChains) {
+                bool foundGoodChain = false;
+                for(const auto& siteIndex : chain) {
+                    if(potentialHetSitesOnTargetOrientedReadId[siteIndex].score == 1){
+                        foundGoodChain = true;
+                        debugOut << "SCORE 1:  Site Index: " << siteIndex << " (Pos: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead << ") LCG: " << LCG[siteIndex] << endl;
+                    }
+                }
+                if (foundGoodChain){
+                    debugOut << endl;
+                }
+            }
+
+            for(const auto& chain : siteChains) {
+                bool foundGoodChain = false;
+                for(const auto& siteIndex : chain) {
+                    debugOut << "SCORE ALL:  Site Index: " << siteIndex << " (Pos: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead << ") LCG: " << LCG[siteIndex] << endl;
+                }
+                
+            }
+
+            debugOut << "DP results for read " << targetOrientedReadId << ": LCG values == 1:" << endl;
+            for(const auto& chain : siteChainsIsolatedSites) {
+                bool foundGoodChain = false;
+                for(const auto& siteIndex : chain) {
+                    if(potentialHetSitesOnTargetOrientedReadId[siteIndex].score == 1){
+                        // if (potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead == 22129) {
+                        //     debugOut << "  Site Index: " << siteIndex << " hasSufficentCoverage: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].hasSufficentCoverage << " isHpcVector: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].isHpcVector << " occ_0: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].occ_0 << " occ_1: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].occ_1 << endl;
+                        // }
+                        foundGoodChain = true;
+                        debugOut << "SCORE 1:  Site Index: " << siteIndex << " (Pos: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead << ") LCG: " << LCG[siteIndex] << endl;
+                    }
+                }
+                if (foundGoodChain){
+                    debugOut << endl;
+                }
+            }
+
+            for(const auto& chain : siteChainsIsolatedSites) {
+                for(const auto& siteIndex : chain) {
+                    debugOut << "SCORE ALL ISOLATED:  Site Index: " << siteIndex << " (Pos: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead << ") LCG: " << LCG[siteIndex] << endl;
+                    debugOut << "Has good coverage: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].hasSufficentCoverage << endl;
+                    debugOut << "Is HPC vector: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].isHpcVector << endl;
+                    debugOut << "Occ_0: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].occ_0 << endl;
+                    debugOut << "Occ_1: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].occ_1 << endl;
+                    debugOut << "Score: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].score << endl;
+                }
+                
+            }
+
+
+            // Loop over all the sites of the chains and if they have a score of 1
+            // add them to the filtered vector
+            for (const auto& chain : siteChains) {
+                for (const uint64_t siteIndex : chain) {
+                    if (potentialHetSitesOnTargetOrientedReadId[siteIndex].score == 1) {
+                        potentialHetSitesOnTargetOrientedReadIdFiltered.push_back(potentialHetSitesOnTargetOrientedReadId[siteIndex]);
+                    }
+                }
+            }
+
+            for (const auto& chain : siteChainsIsolatedSites) {
+                for (const uint64_t siteIndex : chain) {
+                    if (potentialHetSitesOnTargetOrientedReadId[siteIndex].score == 1) {
+                        potentialHetSitesOnTargetOrientedReadIdFiltered.push_back(potentialHetSitesOnTargetOrientedReadId[siteIndex]);
+                    }
+                }
+            }
+
+            // Sort the filtered vector by position in target read
+            std::sort(potentialHetSitesOnTargetOrientedReadIdFiltered.begin(), potentialHetSitesOnTargetOrientedReadIdFiltered.end());
+
+
+            debugOut << "Filtered vector size: " << potentialHetSitesOnTargetOrientedReadIdFiltered.size() << endl;
+
+            // Print the filtered vector
+            for (const auto& site : potentialHetSitesOnTargetOrientedReadIdFiltered) {
+                debugOut << "  Site Index: " << site.positionInTargetRead << " (Pos: " << site.positionInTargetRead << ")" << endl;
+            }
+
+            N = potentialHetSitesOnTargetOrientedReadIdFiltered.size();
+            if (N == 0) {
+                debugOut << "No potential het sites found after filtering for read " << targetOrientedReadId << ", skipping DP and subsequent phasing." << endl;
+                continue; // Skip to the next readId if no sites
+            }
+
+
+
+
+
+
+
+
+
+            // // XXX
+            // // --- START OF: NAIVE PHASING ---
+            // // generate_haplotypes_naive_HiFi
+
+
+            // // Filter out streaks of adjacent site positions.
+            // std::vector<SnpStats> potentialHetSitesOnTargetOrientedReadIdFilteredNoAdjacentSnps;
+            // if (!potentialHetSitesOnTargetOrientedReadIdFiltered.empty()) {
+            //     for (uint64_t i = 0; i < potentialHetSitesOnTargetOrientedReadIdFiltered.size(); ) {
+            //         // Start a new streak with the index of the current site.
+            //         std::vector<uint64_t> currentStreakIndices;
+            //         currentStreakIndices.push_back(i);
+
+            //         // Look ahead to find all adjacent sites for the current streak.
+            //         uint64_t j = i + 1;
+            //         for (; j < potentialHetSitesOnTargetOrientedReadIdFiltered.size(); ++j) {
+            //             // A site is adjacent if its position is the same as the previous
+            //             // or exactly one greater.
+            //             if ((potentialHetSitesOnTargetOrientedReadIdFiltered[j].positionInTargetRead == potentialHetSitesOnTargetOrientedReadIdFiltered[j-1].positionInTargetRead) || 
+            //                 (potentialHetSitesOnTargetOrientedReadIdFiltered[j].positionInTargetRead == potentialHetSitesOnTargetOrientedReadIdFiltered[j-1].positionInTargetRead + 1)) {
+            //                 currentStreakIndices.push_back(j);
+            //             } else {
+            //                 // The streak is broken.
+            //                 break;
+            //             }
+            //         }
+                    
+            //         // Add the completed streak to the list of all streaks, but only if it contains multiple sites.
+            //         if (currentStreakIndices.size() == 1) {
+            //             for (const uint64_t siteStreakIndex : currentStreakIndices) {
+            //                 potentialHetSitesOnTargetOrientedReadIdFilteredNoAdjacentSnps.push_back(potentialHetSitesOnTargetOrientedReadIdFiltered[siteStreakIndex]);
+            //             }
+            //         }
+                    
+            //         // Move the main index to the start of the next potential streak.
+            //         i = j;
+            //     }
+            // }
+
+            // // Print the size of the filtered vector
+            // debugOut << "Filtered vector size before filtering out streaks: " << potentialHetSitesOnTargetOrientedReadIdFiltered.size() << endl;
+            // debugOut << "Filtered vector size after filtering out streaks: " << potentialHetSitesOnTargetOrientedReadIdFilteredNoAdjacentSnps.size() << endl;
+
+            // // Print the filtered vector
+            // for (const auto& site : potentialHetSitesOnTargetOrientedReadIdFilteredNoAdjacentSnps) {
+            //     debugOut << "  Site Index: " << site.positionInTargetRead << " (Pos: " << site.positionInTargetRead << ")" << endl;
+            // }
+
+            // if (potentialHetSitesOnTargetOrientedReadIdFilteredNoAdjacentSnps.size() == 0) {
+            //     debugOut << "No potential het sites found after filtering for read " << targetOrientedReadId << ", skipping DP and subsequent phasing." << endl;
+            //     continue; // Skip to the next readId if no sites
+            // }
+
+
+            // // XXX
+            // // --- END OF: NAIVE PHASING ---
+            // //
+
+            
+
+
+            // XXX
+            // --- START OF: Filter out clusters of SNPs ---
+            //
+            // Sequencing error and artifacts often appear as clusters of nearby SNPs.
+            // To avoid clusters of errors, the informative SNPs need to be well-separated.
+            // Only SNPs at least 32bp apart are considered.
+            // E.g. If we have SNPs on positions: [9992, 33364, 33368, 40000]
+            // We want to keep the SNPs on positions: [9992, 40000]
+            std::vector<SnpStats> potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated;
+            const auto& inputSnps = potentialHetSitesOnTargetOrientedReadIdFiltered;
+
+            // If there are 0 or 1 SNPs, they are all "well-separated" by definition and should be kept.
+            if (inputSnps.size() < 2) {
+                potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated = inputSnps;
+            } else {
+                for (size_t i = 0; i < inputSnps.size(); ++i) {
+                    const bool hasPrev = (i > 0);
+                    const bool hasNext = (i < inputSnps.size() - 1);
+
+                    // A SNP is "too close" if the distance is > 0 and < 32.
+                    // This correctly preserves multi-allelic sites (distance == 0), which should not be filtered.
+                    const bool prevIsTooClose = hasPrev &&
+                        (inputSnps[i].positionInTargetRead > inputSnps[i-1].positionInTargetRead) &&
+                        (inputSnps[i].positionInTargetRead - inputSnps[i-1].positionInTargetRead < 32);
+
+                    // Check distance to next SNP.
+                    const bool nextIsTooClose = hasNext &&
+                        (inputSnps[i+1].positionInTargetRead > inputSnps[i].positionInTargetRead) &&
+                        (inputSnps[i+1].positionInTargetRead - inputSnps[i].positionInTargetRead < 32);
+
+                    // Only keep the SNP if it is not too close to an adjacent, different SNP.
+                    if (!prevIsTooClose && !nextIsTooClose) {
+                        potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated.push_back(inputSnps[i]);
+                    }
+                }
+            }
+
+
+            // print the size of the filtered vector and the sites
+            debugOut << "Filtered vector size after filtering out well separated SNPs: " << potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated.size() << endl;
+            for (const auto& site : potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated) {
+                debugOut << "  Site Index: " << site.positionInTargetRead << " (Pos: " << site.positionInTargetRead << ")" << endl;
+            }
+
+
+            // Only if at least 2 filtered and well separated het SNPs are found, continue with the phasing.
+            if (potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated.size() < 2) {
+                debugOut << "Less than 2 filtered and well separated het SNPs found for read " << targetOrientedReadId << ", skipping DP and subsequent phasing." << endl;
+                continue;
+            }
+
+            // XXX
+            // --- END OF: Filtering out clusters of SNPs ---
+            //
+
+
+
+            
+
+            
+
+
+
+            // XXX
+            // --- START OF: Phasing based on the filtered, well-separated SNPs ---
+            //
+
+            // For clarity, create a reference to the final list of SNPs to be used for phasing.
+            const auto& informativeSnps = potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated;
+            // const auto& informativeSnps = potentialHetSitesOnTargetOrientedReadIdFiltered;
+
+            // 1. Collect all in-phase and out-of-phase reads from all informative sites.
+            std::vector<OrientedReadId> inPhaseReads;
+            std::vector<OrientedReadId> outOfPhaseReads;
+
+            for (const auto& snp : informativeSnps) {
+                // In-phase reads are those that match the reference allele (hetBase0).
+                inPhaseReads.insert(inPhaseReads.end(), snp.hetBase0OrientedReadIds.begin(), snp.hetBase0OrientedReadIds.end());
+
+                // Out-of-phase reads are those that match the alternate allele (hetBase1).
+                for (const auto& evidence : snp.hetBase1OrientedReadIdsHE) {
+                    outOfPhaseReads.push_back(evidence.orientedReadId);
+                }
+            }
+
+            // 2. Sort and remove duplicates to create unique sets for comparison.
+            std::sort(inPhaseReads.begin(), inPhaseReads.end());
+            inPhaseReads.erase(std::unique(inPhaseReads.begin(), inPhaseReads.end()), inPhaseReads.end());
+
+            std::sort(outOfPhaseReads.begin(), outOfPhaseReads.end());
+            outOfPhaseReads.erase(std::unique(outOfPhaseReads.begin(), outOfPhaseReads.end()), outOfPhaseReads.end());
+
+            // 3. Find reads that are in the in-phase set but NOT in the out-of-phase set.
+            // A read is considered consistently in-phase only if it never supports an out-of-phase allele.
+            std::vector<OrientedReadId> finalInPhaseReads;
+            std::set_difference(
+                inPhaseReads.begin(), inPhaseReads.end(),
+                outOfPhaseReads.begin(), outOfPhaseReads.end(),
+                std::back_inserter(finalInPhaseReads)
+            );
+
+            // 4. The target read is always considered in-phase with itself.
+            finalInPhaseReads.push_back(targetOrientedReadId);
+            // Sort and unique again to handle the case where the target read was already present.
+            std::sort(finalInPhaseReads.begin(), finalInPhaseReads.end());
+            finalInPhaseReads.erase(std::unique(finalInPhaseReads.begin(), finalInPhaseReads.end()), finalInPhaseReads.end());
+
+            // Debug print the final set of consistently in-phase reads.
+            debugOut << "Final in-phase reads for read " << targetOrientedReadId << ": " << endl;
+            for (const auto& read : finalInPhaseReads) {
+                debugOut << "  ReadId: " << read.getReadId() << " Strand: " << read.getStrand() << endl;
+            }
+
+            // XXX
+            // --- END OF: Phasing based on the filtered, well-separated SNPs ---
+            //
+
+
+
+
+
+            debugOut << "Thread ID: " << threadId << " Finished grouping compatible sites for read ID: " << targetReadId << endl;
 
             // XXX
             // --- Keep the correct alignments and forbid the bad alignments based on the compatible site phasing ---
@@ -1813,8 +2308,8 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             // Loop over all alignments and mark those involving only reads within finalInPhaseOrientedReads
             // Also forbid alignments involving reads in excludedOutOfPhaseOrientedReads
 
-            // Loop over alignments involving the target read (readId0)
-            for (const auto alignmentId : alignmentTable0) {
+            // Loop over alignments involving the target read (targetReadId)
+            for (const auto alignmentId : alignmentTableForTargetOrientedReadId) {
 
                 const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
                 ReadId currentReadId0 = thiAlignmentData.readIds[0];
@@ -1824,23 +2319,25 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                 AlignmentInfo alignmentInfo = thiAlignmentData.info;
 
                 // Swap oriented reads, if necessary.
-                if (currentOrientedReadId0.getReadId() != readId0) {
+                if (currentOrientedReadId0.getReadId() != targetReadId) {
                     swap(currentOrientedReadId0, currentOrientedReadId1);
                     alignmentInfo.swap();
                 }
-                SHASTA_ASSERT(currentOrientedReadId0.getReadId() == readId0);
+                SHASTA_ASSERT(currentOrientedReadId0.getReadId() == targetReadId);
 
                 // Flip strands, if necessary
-                if (currentOrientedReadId0.getStrand() != strand0) {
+                if (currentOrientedReadId0.getStrand() != targetReadStrand) {
                     currentOrientedReadId0.flipStrand();
                     currentOrientedReadId1.flipStrand();
                     alignmentInfo.reverseComplement();
                 }
-                SHASTA_ASSERT(currentOrientedReadId0.getStrand() == strand0);
+                SHASTA_ASSERT(currentOrientedReadId0.getStrand() == targetReadStrand);
 
-                // Check if either read in the alignment is in excludedOutOfPhaseOrientedReads
-                bool involvesfinalInPhaseOrientedReads = (finalInPhaseOrientedReads.count(currentOrientedReadId0) && finalInPhaseOrientedReads.count(currentOrientedReadId1));
-                bool involvesExcludedOrientedReads = (finalInPhaseOrientedReads.count(currentOrientedReadId0) && excludedOutOfPhaseOrientedReads.count(currentOrientedReadId1));
+                // Check if the alignment involves reads that are in-phase or out-of-phase.
+                // The vectors are sorted, so we use std::binary_search for efficient lookups.
+                const bool read0IsInPhase = std::binary_search(finalInPhaseReads.begin(), finalInPhaseReads.end(), currentOrientedReadId0);
+                const bool read1IsInPhase = std::binary_search(finalInPhaseReads.begin(), finalInPhaseReads.end(), currentOrientedReadId1);
+                const bool involvesfinalInPhaseOrientedReads = read0IsInPhase && read1IsInPhase;
                 
                 if (involvesfinalInPhaseOrientedReads) {
                     if (phasingThreadDataReadGraph5->isReadIdContained[currentOrientedReadId0.getReadId()]) {
@@ -1851,9 +2348,7 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                     firstPassHetAlignments[alignmentId] = true;
                     numberOfFirstPassHetAlignments++;
                     alignmentsAlreadyConsidered[alignmentId] = true;
-                }
-
-                if (involvesExcludedOrientedReads) {
+                } else {
                     if (phasingThreadDataReadGraph5->isReadIdContained[currentOrientedReadId0.getReadId()]) {
                         continue;
                     }
@@ -1865,54 +2360,7 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
 
             }
 
-            // // Loop over all oriented reads in finalInPhaseOrientedReads 
-            // for (const auto& orientedRead : finalInPhaseOrientedReads) {
-            //     const auto alignmentTableForOrientedRead = alignmentTable[orientedRead.getValue()];
-            //     for (const auto alignmentId : alignmentTableForOrientedRead) {
-
-            //         const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
-            //         ReadId currentReadId0 = thiAlignmentData.readIds[0];
-            //         ReadId currentReadId1 = thiAlignmentData.readIds[1];
-            //         OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
-            //         OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
-            //         AlignmentInfo alignmentInfo = thiAlignmentData.info;
-
-            //         // Swap oriented reads, if necessary.
-            //         if (currentOrientedReadId0.getReadId() != orientedRead.getReadId()) {
-            //             swap(currentOrientedReadId0, currentOrientedReadId1);
-            //             alignmentInfo.swap();
-            //         }
-            //         SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedRead.getReadId());
-
-            //         // Flip strands, if necessary
-            //         if (currentOrientedReadId0.getStrand() != orientedRead.getStrand()) {
-            //             currentOrientedReadId0.flipStrand();
-            //             currentOrientedReadId1.flipStrand();
-            //             alignmentInfo.reverseComplement();
-            //         }
-            //         SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedRead.getStrand());
-
-            //         // Check if either read in the alignment is in excludedOutOfPhaseOrientedReads
-            //         bool involvesfinalInPhaseOrientedReads = (finalInPhaseOrientedReads.count(currentOrientedReadId0) && finalInPhaseOrientedReads.count(currentOrientedReadId1));
-            //         bool involvesExcludedOrientedReads = (finalInPhaseOrientedReads.count(currentOrientedReadId0) && excludedOutOfPhaseOrientedReads.count(currentOrientedReadId1));
-                    
-            //         if (involvesfinalInPhaseOrientedReads) {
-            //             // Mark firstPassHet in thread-local vector
-            //             // debugOut << "Marking alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " as first pass (intra-phase)" << endl;
-            //             firstPassHetAlignments[alignmentId] = true;
-            //             numberOfFirstPassHetAlignments++;
-            //             alignmentsAlreadyConsidered[alignmentId] = true;
-            //         }
-
-            //         if (involvesExcludedOrientedReads) {
-            //             // Mark forbidden in thread-local vector
-            //             // debugOut << "Forbidding alignment " << alignmentId << " involving reads: " << currentReadId0 << " and " << currentReadId1 << " because one read is in excludedOutOfPhaseOrientedReads." << endl;
-            //             forbiddenAlignments[alignmentId] = true;
-            //             alignmentsAlreadyConsidered[alignmentId] = true;
-            //         }
-                    
-            //     }
-            // }
+           
             
 
 
@@ -1920,91 +2368,101 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
 
 
 
-            // // We do not perform the analysis on contained reads because the longer reads will
-            // // make the decision for them (where they best belong) given that they will have more informative
-            // // sites to consider. However, these contained reads should be assigned to one cluster of reads only.
-            // // Otherwise, we observe between-haplotypes alignments that connect to
-            // // these contained reads from both sides of a het region.
-            // // So, we also need to forbid alignments between contained reads and excludedOutOfPhaseOrientedReads.
-            // for (const auto& orientedRead : finalInPhaseOrientedReads) {
-            //     if (phasingThreadDataReadGraph5->isReadIdContained[orientedRead.getReadId()]) {
-            //         const auto alignmentTableForContainedRead = alignmentTable[orientedRead.getValue()];
-            //         // Loop over alignments involving contained read.
-            //         for (const auto alignmentId : alignmentTableForContainedRead) {
-            //
-            //             const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
-            //             ReadId currentReadId0 = thiAlignmentData.readIds[0];
-            //             ReadId currentReadId1 = thiAlignmentData.readIds[1];
-            //             OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
-            //             OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
-            //
-            //             // Swap oriented reads, if necessary.
-            //             if (currentOrientedReadId0.getReadId() != orientedRead.getReadId()) {
-            //                 swap(currentOrientedReadId0, currentOrientedReadId1);
-            //             }
-            //             SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedRead.getReadId());
-            //
-            //             // Flip strands, if necessary
-            //             if (currentOrientedReadId0.getStrand() != orientedRead.getStrand()) {
-            //                 currentOrientedReadId0.flipStrand();
-            //                 currentOrientedReadId1.flipStrand();
-            //             }
-            //             SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedRead.getStrand());
-            //
-            //             // Check if either read in the alignment is in excludedOutOfPhaseOrientedReads
-            //             bool involvesExcludedOrientedReads = (finalInPhaseOrientedReads.count(currentOrientedReadId0) && excludedOutOfPhaseOrientedReads.count(currentOrientedReadId1));
-            //
-            //             if (involvesExcludedOrientedReads) {
-            //                 debugOut << "Forbidding alignment " << alignmentId << " involving contained read: " << currentReadId0 << " and read: " << currentReadId1 << " because the other read is in excludedOutOfPhaseOrientedReads." << endl;
-            //                 forbiddenAlignments[alignmentId] = true;
-            //                 alignmentsAlreadyConsidered[alignmentId] = true;
-            //             }
-            //
-            //         }
-            //
-            //     }
+            // // // We do not perform the analysis on contained reads because the longer reads will
+            // // // make the decision for them (where they best belong) given that they will have more informative
+            // // // sites to consider. However, these contained reads should be assigned to one cluster of reads only.
+            // // // Otherwise, we observe between-haplotypes alignments that connect to
+            // // // these contained reads from both sides of a het region.
+            // // // So, we also need to forbid alignments between contained reads and excludedOutOfPhaseOrientedReads.
+            // // for (const auto& orientedRead : finalInPhaseOrientedReads) {
+            // //     if (phasingThreadDataReadGraph5->isReadIdContained[orientedRead.getReadId()]) {
+            // //         const auto alignmentTableForContainedRead = alignmentTable[orientedRead.getValue()];
+            // //         // Loop over alignments involving contained read.
+            // //         for (const auto alignmentId : alignmentTableForContainedRead) {
+            // //
+            // //             const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
+            // //             ReadId currentReadId0 = thiAlignmentData.readIds[0];
+            // //             ReadId currentReadId1 = thiAlignmentData.readIds[1];
+            // //             OrientedReadId currentOrientedReadId0(thiAlignmentData.readIds[0], 0);
+            // //             OrientedReadId currentOrientedReadId1(thiAlignmentData.readIds[1], thiAlignmentData.isSameStrand ? 0 : 1);
+            // //
+            // //             // Swap oriented reads, if necessary.
+            // //             if (currentOrientedReadId0.getReadId() != orientedRead.getReadId()) {
+            // //                 swap(currentOrientedReadId0, currentOrientedReadId1);
+            // //             }
+            // //             SHASTA_ASSERT(currentOrientedReadId0.getReadId() == orientedRead.getReadId());
+            // //
+            // //             // Flip strands, if necessary
+            // //             if (currentOrientedReadId0.getStrand() != orientedRead.getStrand()) {
+            // //                 currentOrientedReadId0.flipStrand();
+            // //                 currentOrientedReadId1.flipStrand();
+            // //             }
+            // //             SHASTA_ASSERT(currentOrientedReadId0.getStrand() == orientedRead.getStrand());
+            // //
+            // //             // Check if either read in the alignment is in excludedOutOfPhaseOrientedReads
+            // //             bool involvesExcludedOrientedReads = (finalInPhaseOrientedReads.count(currentOrientedReadId0) && excludedOutOfPhaseOrientedReads.count(currentOrientedReadId1));
+            // //
+            // //             if (involvesExcludedOrientedReads) {
+            // //                 debugOut << "Forbidding alignment " << alignmentId << " involving contained read: " << currentReadId0 << " and read: " << currentReadId1 << " because the other read is in excludedOutOfPhaseOrientedReads." << endl;
+            // //                 forbiddenAlignments[alignmentId] = true;
+            // //                 alignmentsAlreadyConsidered[alignmentId] = true;
+            // //             }
+            // //
+            // //         }
+            // //
+            // //     }
+            // // }
+
+            // // cout << "Number of first pass het alignments for readId " << targetReadId << ": " << numberOfFirstPassHetAlignments << endl;
+
+            // // debugOut << timestamp << "Finished DP for grouping compatible sites for read " << targetOrientedReadId << endl;
+
+            // // XXX
+            // // --- END OF: Keep the correct alignments and forbid the bad alignments based on the compatible site phasing ---
+            // //
+
+
+            // debugOut << "Thread ID: " << threadId << " Finished processing read ID: " << targetReadId << endl;
+
+            // // XXX
+            // // --- Populate the sites vector for this read's haplotype block ---
+            // //
+
+            // // Create a new Site object for the identified orientedReadId cluster of the target read
+            // Site newSite;
+            // newSite.orientedReads.insert(finalInPhaseOrientedReads.begin(), finalInPhaseOrientedReads.end());
+            // newSite.targetOrientedReadId = targetOrientedReadId;
+            // newSite.excludedOrientedReads.insert(excludedOutOfPhaseOrientedReads.begin(), excludedOutOfPhaseOrientedReads.end());
+
+            // if (!newSite.orientedReads.empty()) {
+            //     sites.push_back(newSite);
             // }
 
-            // cout << "Number of first pass het alignments for readId " << readId0 << ": " << numberOfFirstPassHetAlignments << endl;
+            // // Create a site of the reverse strand
+            // Site newSiteReverseStrand;
+            // for (const auto& orientedRead : finalInPhaseOrientedReads) {
+            //     OrientedReadId reverseOrientedRead(orientedRead.getReadId(), orientedRead.getStrand() == 0 ? 1 : 0);
+            //     newSiteReverseStrand.orientedReads.insert(reverseOrientedRead);
+            // }
+            // for (const auto& orientedRead : excludedOutOfPhaseOrientedReads) {
+            //     OrientedReadId reverseOrientedRead(orientedRead.getReadId(), orientedRead.getStrand() == 0 ? 1 : 0);
+            //     newSiteReverseStrand.excludedOrientedReads.insert(reverseOrientedRead);
+            // }
+            // newSiteReverseStrand.targetOrientedReadId = OrientedReadId(targetOrientedReadId.getReadId(), targetOrientedReadId.getStrand() == 0 ? 1 : 0);
 
-            // debugOut << timestamp << "Finished DP for grouping compatible sites for read " << orientedReadId0 << endl;
-
-            // XXX
-            // --- END OF: Keep the correct alignments and forbid the bad alignments based on the compatible site phasing ---
-            //
+            // if (!newSiteReverseStrand.orientedReads.empty()) {
+            //     sites.push_back(newSiteReverseStrand);
+            // }
 
 
-            debugOut << "Thread ID: " << threadId << " Finished processing read ID: " << readId0 << endl;
 
-            // XXX
-            // --- Populate the sites vector for this read's haplotype block ---
-            //
 
-            // Create a new Site object for the identified orientedReadId cluster of the target read
-            Site newSite;
-            newSite.orientedReads.insert(finalInPhaseOrientedReads.begin(), finalInPhaseOrientedReads.end());
-            newSite.targetOrientedReadId = orientedReadId0;
-            newSite.excludedOrientedReads.insert(excludedOutOfPhaseOrientedReads.begin(), excludedOutOfPhaseOrientedReads.end());
 
-            if (!newSite.orientedReads.empty()) {
-                sites.push_back(newSite);
-            }
 
-            // Create a site of the reverse strand
-            Site newSiteReverseStrand;
-            for (const auto& orientedRead : finalInPhaseOrientedReads) {
-                OrientedReadId reverseOrientedRead(orientedRead.getReadId(), orientedRead.getStrand() == 0 ? 1 : 0);
-                newSiteReverseStrand.orientedReads.insert(reverseOrientedRead);
-            }
-            for (const auto& orientedRead : excludedOutOfPhaseOrientedReads) {
-                OrientedReadId reverseOrientedRead(orientedRead.getReadId(), orientedRead.getStrand() == 0 ? 1 : 0);
-                newSiteReverseStrand.excludedOrientedReads.insert(reverseOrientedRead);
-            }
-            newSiteReverseStrand.targetOrientedReadId = OrientedReadId(orientedReadId0.getReadId(), orientedReadId0.getStrand() == 0 ? 1 : 0);
 
-            if (!newSiteReverseStrand.orientedReads.empty()) {
-                sites.push_back(newSiteReverseStrand);
-            }
+
+
+
 
 
             // // XXX
@@ -2013,7 +2471,7 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
 
 
             
-            // debugOut << "Thread ID: " << threadId << " Finished creating site for read ID: " << readId0 << endl;
+            // debugOut << "Thread ID: " << threadId << " Finished creating site for read ID: " << targetReadId << endl;
 
             // // Second loop over alignments to make decisions based on the now-complete site info for this read.
             // for (const auto alignmentId : alignmentTable0) {
@@ -2030,11 +2488,11 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             //     AlignmentInfo alignmentInfo = thiAlignmentData.info;
 
             //     // Swap oriented reads, if necessary.
-            //     if (currentOrientedReadId0.getReadId() != readId0) {
+            //     if (currentOrientedReadId0.getReadId() != targetReadId) {
             //         swap(currentOrientedReadId0, currentOrientedReadId1);
             //         alignmentInfo.swap();
             //     }
-            //     SHASTA_ASSERT(currentOrientedReadId0.getReadId() == readId0);
+            //     SHASTA_ASSERT(currentOrientedReadId0.getReadId() == targetReadId);
 
             //     // Flip strands, if necessary
             //     if (currentOrientedReadId0.getStrand() != strand0) {
@@ -2085,7 +2543,7 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
 
             //     if (sharedHet > 0 || uniqueHet0 > 0 || uniqueHet1 > 0) {
             //         debugOut << "Alignment " << alignmentId << " between reads " << currentReadId0 << " and " << currentReadId1
-            //                  << " from perspective of " << orientedReadId0
+            //                  << " from perspective of " << targetOrientedReadId
             //                  << ": shared=" << sharedHet
             //                  << ", shared_match=" << sharedMatch
             //                  << ", shared_mismatch=" << sharedMismatch
@@ -2094,7 +2552,7 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             //     }
             // }
 
-            // debugOut << "Thread ID: " << threadId << " Finished second loop over alignments for read ID: " << readId0 << endl;
+            // debugOut << "Thread ID: " << threadId << " Finished second loop over alignments for read ID: " << targetReadId << endl;
 
             // // --- END OF: Second loop over alignments to make decisions based on the now-complete site info for this read. ---
 
@@ -2120,11 +2578,11 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             //     AlignmentInfo alignmentInfo = thisAlignmentData.info;
 
             //     // Swap oriented reads, if necessary.
-            //     if (currentOrientedReadId0.getReadId() != readId0) {
+            //     if (currentOrientedReadId0.getReadId() != targetReadId) {
             //         swap(currentOrientedReadId0, currentOrientedReadId1);
             //         alignmentInfo.swap();
             //     }
-            //     SHASTA_ASSERT(currentOrientedReadId0.getReadId() == readId0);
+            //     SHASTA_ASSERT(currentOrientedReadId0.getReadId() == targetReadId);
 
             //     // Flip strands, if necessary
             //     if (currentOrientedReadId0.getStrand() != strand0) {
@@ -2270,10 +2728,10 @@ void Assembler::createReadGraph5(
 
         const ReadId readId0 = readId;
         const Strand strand0 = 0; // Analyze strand 0 arbitrarily, results should be consistent
-        const OrientedReadId orientedReadId0(readId0, strand0);
+        const OrientedReadId targetOrientedReadId(readId0, strand0);
 
         // Loop over alignments involving this read
-        const auto alignmentTable0 = alignmentTable[orientedReadId0.getValue()];
+        const auto alignmentTable0 = alignmentTable[targetOrientedReadId.getValue()];
         for (const auto alignmentId : alignmentTable0) {
 
             const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
@@ -2407,10 +2865,10 @@ void Assembler::createReadGraph5(
 
         const ReadId readId0 = readId;
         const Strand strand0 = 0; // Analyze strand 0 arbitrarily, results should be consistent
-        const OrientedReadId orientedReadId0(readId0, strand0);
+        const OrientedReadId targetOrientedReadId(readId0, strand0);
 
         // Loop over alignments involving this read
-        const auto alignmentTable0 = alignmentTable[orientedReadId0.getValue()];
+        const auto alignmentTable0 = alignmentTable[targetOrientedReadId.getValue()];
         for (const auto alignmentId : alignmentTable0) {
 
             if (readId0 != 3743) {
@@ -2685,10 +3143,10 @@ void Assembler::createReadGraph5(
 
         const ReadId readId0 = readId;
         const Strand strand0 = 0; // Analyze strand 0 arbitrarily, results should be consistent
-        const OrientedReadId orientedReadId0(readId0, strand0);
+        const OrientedReadId targetOrientedReadId(readId0, strand0);
 
         // Loop over alignments involving this read
-        const auto alignmentTable0 = alignmentTable[orientedReadId0.getValue()];
+        const auto alignmentTable0 = alignmentTable[targetOrientedReadId.getValue()];
         for (const auto alignmentId : alignmentTable0) {
 
             const AlignmentData& thiAlignmentData = alignmentData[alignmentId];
@@ -2794,7 +3252,7 @@ void Assembler::createReadGraph5(
 
         const ReadId readId0 = readId;
         const Strand strand0 = 0; // Analyze strand 0 arbitrarily, results should be consistent
-        const OrientedReadId orientedReadId0(readId0, strand0);
+        const OrientedReadId targetOrientedReadId(readId0, strand0);
 
         if (!isReadIdContained3[readId0]) {
             continue;
@@ -2803,7 +3261,7 @@ void Assembler::createReadGraph5(
         vector <uint32_t> readsContainingReadId0;
 
         // Loop over alignments involving this read
-        const auto alignmentTable0 = alignmentTable[orientedReadId0.getValue()];
+        const auto alignmentTable0 = alignmentTable[targetOrientedReadId.getValue()];
         for (const auto alignmentId : alignmentTable0) {
 
             if (!firstPassHetAlignments[alignmentId]) {
@@ -3538,6 +3996,4 @@ void Assembler::createReadGraph5(
 
 
 }
-
-
 
