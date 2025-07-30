@@ -754,10 +754,10 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             //     }
             // }
 
-            // // --- Start of per-read analysis code ---
-            // if ((readId != 0)) {
-            //     continue;
-            // }
+            // --- Start of per-read analysis code ---
+            if ( (readId > 40) && ((readId < 410) || (readId > 500))) {
+                continue;
+            }
 
             debugOut << "Thread ID: " << threadId << " is processing read ID: " << readId << endl;
             debugOut << timestamp << endl;
@@ -783,26 +783,16 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                 OrientedReadId currentOrientedReadId0(thisAlignmentData.readIds[0], 0);
                 OrientedReadId currentOrientedReadId1(thisAlignmentData.readIds[1], thisAlignmentData.isSameStrand ? 0 : 1);
                 AlignmentInfo alignmentInfo = thisAlignmentData.info;
-
-                Alignment alignment;
-                span<const char> compressedAlignment = assembler.compressedAlignments[alignmentId];
-                shasta::decompress(compressedAlignment, alignment);
                 
                 // Swap oriented reads, if necessary.
                 if (currentOrientedReadId0.getReadId() != targetReadId) {
                     swap(currentOrientedReadId0, currentOrientedReadId1);
                     alignmentInfo.swap();
-                    alignment.swap();
                 }
                 SHASTA_ASSERT(currentOrientedReadId0.getReadId() == targetReadId);
 
-                uint32_t markerCount0 = uint32_t(markers[currentOrientedReadId0.getValue()].size());
-                uint32_t markerCount1 = uint32_t(markers[currentOrientedReadId1.getValue()].size());
-
                 // Reverse complement if necessary
                 if (currentOrientedReadId0.getStrand() != targetReadStrand) {
-                    // Ensure marker counts are valid before calling reverseComplement
-                    alignment.reverseComplement(markerCount0, markerCount1);
                     currentOrientedReadId0.flipStrand();
                     currentOrientedReadId1.flipStrand();
                     alignmentInfo.reverseComplement();
@@ -810,23 +800,19 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                 SHASTA_ASSERT(currentOrientedReadId0.getStrand() == targetReadStrand);
                 SHASTA_ASSERT(currentOrientedReadId0 == targetOrientedReadId); // Check consistency
 
-                const auto orientedReadMarkers = markers[currentOrientedReadId0.getValue()];
-                const uint32_t position0 = orientedReadMarkers[alignmentInfo.data[0].firstOrdinal].position;
-                const uint32_t position1 = orientedReadMarkers[alignmentInfo.data[0].lastOrdinal].position + uint32_t(assembler.assemblerInfo->k);
+                const auto currentOrientedReadMarkers0 = markers[currentOrientedReadId0.getValue()];
+                const uint32_t positionStart0 = currentOrientedReadMarkers0[alignmentInfo.data[0].firstOrdinal].position;
+                const uint32_t positionEnd0 = currentOrientedReadMarkers0[alignmentInfo.data[0].lastOrdinal].position + uint32_t(assemblerInfo->k);
 
-                SHASTA_ASSERT(position0 < position1);
+                SHASTA_ASSERT(positionStart0 < positionEnd0);
 
                 // --- Add interval to the map ---
-                if (position1 > position0) { // Ensure a valid interval
-                    Interval interval = Interval::closed(position0, position1); // Create a [position0, position1) interval
-                    // Create a pair with alignmentId and the correctly oriented other read
-                    AlignmentInfoPair infoPair = {alignmentId, currentOrientedReadId1};
-                    AlignmentInfoSet currentAlignmentInfoSet = {infoPair}; // Create a set with the pair
-                    alignmentIntervals.add({interval, currentAlignmentInfoSet}); // Add to the map (handles overlaps)
-                    debugOut << "Thread ID: " << threadId << " Added interval [" << position0 << ", " << position1 << ") for alignment " << alignmentId << " (Other Read: " << currentOrientedReadId1 << ")" << endl;
-                } else {
-                    // debugOut << "Thread ID: " << threadId << " Skipping invalid interval [" << position0 << ", " << position1 << "] for alignment " << alignmentId << endl;
-                }
+                Interval interval = Interval::closed(positionStart0, positionEnd0); // Create a [position0, position1] interval
+                // Create a pair with alignmentId and the correctly oriented other read
+                AlignmentInfoPair infoPair = {alignmentId, currentOrientedReadId1};
+                AlignmentInfoSet currentAlignmentInfoSet = {infoPair}; // Create a set with the pair
+                alignmentIntervals.add({interval, currentAlignmentInfoSet}); // Add to the map (handles overlaps)
+                debugOut << "Thread ID: " << threadId << " Added interval [" << positionStart0 << ", " << positionEnd0 << ") for alignment " << alignmentId << " (Other Read: " << currentOrientedReadId1 << ")" << endl;
             }
 
             debugOut << timestamp << "Thread ID: " << threadId << " Finished building interval tree for read ID: " << targetReadId << endl;
@@ -1704,6 +1690,7 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                         cc = cut_bd;
                     }
 
+                    // TODO: AUTO ADJUSTED?
                     cc = 6;
 
                     if (hetPositionStatsInTargetRead.occ_0 >= cc) {
@@ -1776,6 +1763,7 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             }
 
             debugOut << "Thread ID: " << threadId << " Finished analyzing potential heterozygous sites for read ID: " << targetReadId << endl;
+
 
             
 
@@ -1947,6 +1935,7 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             // Sort descending by LCG value
             std::sort(sortedLCGIndices.rbegin(), sortedLCGIndices.rend()); 
 
+
     
 
             // Data structure for storing the chains of compatible sites.
@@ -2015,6 +2004,8 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             // XXX
             // --- END OF: Chain Scoring ---
             //
+
+            
 
 
 
@@ -2422,37 +2413,37 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             // //
 
 
-            // debugOut << "Thread ID: " << threadId << " Finished processing read ID: " << targetReadId << endl;
+            debugOut << "Thread ID: " << threadId << " Finished processing read ID: " << targetReadId << endl;
 
-            // // XXX
-            // // --- Populate the sites vector for this read's haplotype block ---
-            // //
+            // XXX
+            // --- Populate the sites vector for this read's haplotype block ---
+            //
 
-            // // Create a new Site object for the identified orientedReadId cluster of the target read
-            // Site newSite;
-            // newSite.orientedReads.insert(finalInPhaseOrientedReads.begin(), finalInPhaseOrientedReads.end());
-            // newSite.targetOrientedReadId = targetOrientedReadId;
-            // newSite.excludedOrientedReads.insert(excludedOutOfPhaseOrientedReads.begin(), excludedOutOfPhaseOrientedReads.end());
+            // Create a new Site object for the identified orientedReadId cluster of the target read
+            Site newSite;
+            newSite.orientedReads.insert(finalInPhaseReads.begin(), finalInPhaseReads.end());
+            newSite.targetOrientedReadId = targetOrientedReadId;
+            newSite.excludedOrientedReads.insert(outOfPhaseReads.begin(), outOfPhaseReads.end());
 
-            // if (!newSite.orientedReads.empty()) {
-            //     sites.push_back(newSite);
-            // }
+            if (!newSite.orientedReads.empty()) {
+                sites.push_back(newSite);
+            }
 
-            // // Create a site of the reverse strand
-            // Site newSiteReverseStrand;
-            // for (const auto& orientedRead : finalInPhaseOrientedReads) {
-            //     OrientedReadId reverseOrientedRead(orientedRead.getReadId(), orientedRead.getStrand() == 0 ? 1 : 0);
-            //     newSiteReverseStrand.orientedReads.insert(reverseOrientedRead);
-            // }
-            // for (const auto& orientedRead : excludedOutOfPhaseOrientedReads) {
-            //     OrientedReadId reverseOrientedRead(orientedRead.getReadId(), orientedRead.getStrand() == 0 ? 1 : 0);
-            //     newSiteReverseStrand.excludedOrientedReads.insert(reverseOrientedRead);
-            // }
-            // newSiteReverseStrand.targetOrientedReadId = OrientedReadId(targetOrientedReadId.getReadId(), targetOrientedReadId.getStrand() == 0 ? 1 : 0);
+            // Create a site of the reverse strand
+            Site newSiteReverseStrand;
+            for (const auto& orientedRead : finalInPhaseReads) {
+                OrientedReadId reverseOrientedRead(orientedRead.getReadId(), orientedRead.getStrand() == 0 ? 1 : 0);
+                newSiteReverseStrand.orientedReads.insert(reverseOrientedRead);
+            }
+            for (const auto& orientedRead : outOfPhaseReads) {
+                OrientedReadId reverseOrientedRead(orientedRead.getReadId(), orientedRead.getStrand() == 0 ? 1 : 0);
+                newSiteReverseStrand.excludedOrientedReads.insert(reverseOrientedRead);
+            }
+            newSiteReverseStrand.targetOrientedReadId = OrientedReadId(targetOrientedReadId.getReadId(), targetOrientedReadId.getStrand() == 0 ? 1 : 0);
 
-            // if (!newSiteReverseStrand.orientedReads.empty()) {
-            //     sites.push_back(newSiteReverseStrand);
-            // }
+            if (!newSiteReverseStrand.orientedReads.empty()) {
+                sites.push_back(newSiteReverseStrand);
+            }
 
 
 
@@ -2558,121 +2549,7 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
 
 
 
-            // // XXX
-            // // --- Target read overlaps filtering ---
-            // //
-
-            // uint64_t numberOfAlignmentsToKeep = 0;
-
-            // for (const auto alignmentId : alignmentTable0) {
-
-            //     if (forbiddenAlignments[alignmentId]) {
-            //         continue;
-            //     }
-
-            //     const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
-            //     ReadId currentReadId0 = thisAlignmentData.readIds[0];
-            //     ReadId currentReadId1 = thisAlignmentData.readIds[1];
-            //     OrientedReadId currentOrientedReadId0(thisAlignmentData.readIds[0], 0);
-            //     OrientedReadId currentOrientedReadId1(thisAlignmentData.readIds[1], thisAlignmentData.isSameStrand ? 0 : 1);
-            //     AlignmentInfo alignmentInfo = thisAlignmentData.info;
-
-            //     // Swap oriented reads, if necessary.
-            //     if (currentOrientedReadId0.getReadId() != targetReadId) {
-            //         swap(currentOrientedReadId0, currentOrientedReadId1);
-            //         alignmentInfo.swap();
-            //     }
-            //     SHASTA_ASSERT(currentOrientedReadId0.getReadId() == targetReadId);
-
-            //     // Flip strands, if necessary
-            //     if (currentOrientedReadId0.getStrand() != strand0) {
-            //         currentOrientedReadId0.flipStrand();
-            //         currentOrientedReadId1.flipStrand();
-            //         alignmentInfo.reverseComplement();
-            //     }
-            //     SHASTA_ASSERT(currentOrientedReadId0.getStrand() == strand0);
-
-            //     // // TODO: Skip reads that have been marked as forbidden
-            //     // if (forbiddenReads[currentReadId0] || forbiddenReads[currentReadId1]) {
-            //     //     continue;
-            //     // }
-
-            //     // Get the base ranges of the oriented reads.
-            //     const uint64_t baseRange0 = alignmentInfo.baseRange(assemblerInfo->k, currentOrientedReadId0, 0, markers);
-            //     const uint64_t baseRange1 = alignmentInfo.baseRange(assemblerInfo->k, currentOrientedReadId1, 1, markers);
-
-            //     // Find the alignment range of the oriented reads.
-            //     const uint64_t range0 = alignmentInfo.data[0].range();
-            //     const uint64_t range1 = alignmentInfo.data[1].range();
-
-            //     // Find the leftTrim and rightTrim of the target read in this alignment.
-            //     const uint64_t leftTrim0 = alignmentInfo.data[0].leftTrim();
-            //     const uint64_t rightTrim0 = alignmentInfo.data[0].rightTrim();
-
-            //     // Find the leftTrim and rightTrim of the query read in this alignment.
-            //     const uint64_t leftTrim1 = alignmentInfo.data[1].leftTrim();
-            //     const uint64_t rightTrim1 = alignmentInfo.data[1].rightTrim();
-
-            //     const uint64_t minimumOfLeftTrims = std::min(leftTrim0, leftTrim1);
-            //     const uint64_t minimumOfRightTrims = std::min(rightTrim0, rightTrim1);
-
-            //     // The legth of the aligned segment on the query read must be at least 80% 
-            //     // of the total span of the alignment (aligned segment + rightTrim + leftTrim).
-            //     // If the aligned part is too small compared to the overhangs, it's likely
-            //     // a spurious or low-quality alignment.
-            //     const double minimumAlignedFraction = 0.8;
-
-            //     const uint64_t max_hang = 1000;
-
-                
-            //     if (minimumOfLeftTrims > max_hang || minimumOfRightTrims > max_hang) {
-            //         // If either left or right trim is too large, skip this alignment.
-            //         // This is to avoid very long overhangs that might indicate a poor alignment.
-            //         // debugOut << "Skipping alignment " << alignmentId << " due to excessive left or right trim." << endl;
-            //         forbiddenAlignments[alignmentId] = true;
-            //         continue;
-
-            //     }
-
-            //     // The legth of the aligned segment on the target read must be at least [minimumAlignedFraction]% 
-            //     // of the total span of the alignment (aligned range + rightTrim + leftTrim).
-            //     if (range0 < minimumAlignedFraction * (range0 + minimumOfLeftTrims + minimumOfRightTrims)) {
-            //         // If the aligned part is too small compared to the overhangs, it's likely
-            //         // a spurious or low-quality alignment.
-            //         forbiddenAlignments[alignmentId] = true;
-            //         continue;
-
-            //     }
-
-            //     // The legth of the aligned segment on the query read must be at least [minimumAlignedFraction]% 
-            //     // of the total span of the alignment (aligned range + rightTrim + leftTrim).
-            //     if (range1 < minimumAlignedFraction * (range1 + minimumOfLeftTrims + minimumOfRightTrims)) {
-            //         // If the aligned part is too small compared to the overhangs, it's likely
-            //         // a spurious or low-quality alignment.
-            //         forbiddenAlignments[alignmentId] = true;
-            //         continue;
-
-            //     }
-
-
-            //     // // Classify alignment
-            //     // if (alignmentInfo.classify(20) == AlignmentType::read0IsContained) {
-            //     //     // 0 is unambiguously contained in 1.
-            //     //     forbiddenAlignments[alignmentId] = true;
-            //     //     continue;
-            //     // }
-
-            //     // if (alignmentInfo.classify(20) == AlignmentType::read1IsContained) {
-            //     //     // 1 is unambiguously contained in 0.
-            //     //     forbiddenAlignments[alignmentId] = true;
-            //     //     continue;
-            //     // }
-
-
-
-
-            // }
-
+            
 
 
 
@@ -3050,16 +2927,36 @@ void Assembler::createReadGraph5(
         // }
         orientedReadSites[targetOrientedReadId.getValue()].push_back(siteId);
     }
+
+    // Print the orientedReadSites
+    for(uint64_t orientedReadId=0; orientedReadId<orientedReadSites.size(); orientedReadId++) {
+        cout << "OrientedReadId: " << orientedReadId << " has " << orientedReadSites[orientedReadId].size() << " sites." << endl;
+        for(uint64_t siteId: orientedReadSites[orientedReadId]) {
+            cout << "  SiteId: " << siteId << endl;
+            const Site& site = sites[siteId];
+            for(const OrientedReadId orientedReadId: site.orientedReads) {
+                cout << "    OrientedReadId: " << orientedReadId.getReadId() << " " << orientedReadId.getStrand() << endl;
+            }
+        }
+    }
     
-    // for(uint64_t siteId=0; siteId<sites.size(); siteId++) {
-    //     // if (sitesThatHaveStrandIssuesForbidden[siteId]) {
-    //     //     continue; // Skip sites that have strand issues
-    //     // }
-    //     const Site& site = sites[siteId];
-    //     for(const OrientedReadId orientedReadId: site.orientedReads) {
-    //         orientedReadSites[orientedReadId.getValue()].push_back(siteId);
-    //     }
-    // }
+    for(uint64_t siteId=0; siteId<sites.size(); siteId++) {
+        // if (sitesThatHaveStrandIssuesForbidden[siteId]) {
+        //     continue; // Skip sites that have strand issues
+        // }
+        const Site& site = sites[siteId];
+        for(const OrientedReadId orientedReadId: site.orientedReads) {
+            orientedReadSites[orientedReadId.getValue()].push_back(siteId);
+        }
+    }
+
+    // Print the orientedReadSites
+    for(uint64_t orientedReadId=0; orientedReadId<orientedReadSites.size(); orientedReadId++) {
+        cout << "OrientedReadId: " << orientedReadId << " has " << orientedReadSites[orientedReadId].size() << " sites." << endl;
+        for(uint64_t siteId: orientedReadSites[orientedReadId]) {
+            cout << "  SiteId: " << siteId << endl;
+        }
+    }
     
     cout << timestamp << "Finished finding for each orientedReadId, the sites that are associated with it." << endl;
 

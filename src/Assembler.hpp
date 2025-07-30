@@ -299,7 +299,7 @@ public:
     // Throw away vertices with coverage (number of markers)
     // less than minCoverage or more than maxCoverage.
     // Also throw away "bad" vertices - that is, vertices
-    // with more than one marker on the same oriented read.
+    // with more than one marker on the same oriented read id on a single marker graph vertex.
     void createMarkerGraphVertices(
 
         // Minimum coverage (number of markers) for a vertex
@@ -964,7 +964,7 @@ private:
     MemoryMapped::VectorOfVectors<uint32_t, uint32_t> alignmentTable;
     void computeAlignmentTable();
 
-
+    void enforceAlignmentTransitivity(const AlignOptions &alignOptions);
 
     // Private functions and data used by computeAlignments.
     void computeAlignmentsThreadFunction(size_t threadId);
@@ -982,6 +982,25 @@ private:
         vector< shared_ptr< MemoryMapped::VectorOfVectors<char, uint64_t> > > threadCompressedAlignments;
     };
     ComputeAlignmentsData computeAlignmentsData;
+
+
+
+    // Private functions and data used by enforceAlignmentTransitivity.
+    void enforceAlignmentTransitivityGatherThreadFunction(size_t threadId);
+    void enforceAlignmentTransitivityThreadFunction(size_t threadId);
+    class EnforceTransitivityData {
+    public:
+        const AlignOptions* alignOptions = 0;
+        vector<pair<OrientedReadId, OrientedReadId>> pairsToAlign;
+
+        // The results computed by the gather threads.
+        vector<vector<pair<OrientedReadId, OrientedReadId>>> threadPairsToAlign;
+
+        // The results computed by the alignment threads.
+        vector< vector<AlignmentData> > threadAlignmentData;
+        vector< shared_ptr< MemoryMapped::VectorOfVectors<char, uint64_t> > > threadCompressedAlignments;
+    };
+    EnforceTransitivityData enforceTransitivityData;
 
 
 

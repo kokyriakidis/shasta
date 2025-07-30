@@ -321,6 +321,8 @@ void Assembler::computeAlignments(
     cout << "Found and stored " << alignmentData.size() << " good alignments." << endl;
     performanceLog << timestamp << "Creating alignment table." << endl;
     computeAlignmentTable();
+    enforceAlignmentTransitivity(alignOptions);
+    
 
     const auto tEnd = steady_clock::now();
     const double tTotal = seconds(tEnd - tBegin);
@@ -329,6 +331,333 @@ void Assembler::computeAlignments(
 
     performanceLog << timestamp;
 }
+
+
+// XXX
+// --- START OF: Enforce transitivity of the alignments.
+// If read r0 is aligned with r1 and r2, but r1 and r2 are not aligned,
+// we attempt to compute an alignment between r1 and r2.
+// If a good alignment is found, it is added to the alignment data.
+// 1. Iterate through all reads and their neighbors in the alignmentTable.
+// 2. For each pair of neighbors (readId1, readId2) of a read (readId0), check if an alignment already exists between them.
+// 3. If no alignment exists, compute one using the same method as computeAlignmentsThreadFunction.
+// 4. If the new alignment is good (i.e., meets the criteria), add it to a temporary vector of new AlignmentData.
+// 5. After checking all reads, add the new alignments to the main alignmentData vector.
+// 6. Finally, recompute the alignmentTable to include the newly added alignments.
+void Assembler::enforceAlignmentTransitivity(const AlignOptions& alignOptions)
+{
+    const auto tBegin = steady_clock::now();
+    performanceLog << timestamp << "Begin enforcing alignment transitivity." << endl;
+
+    // --- Gather pairs that need alignment in parallel ---
+    const ReadId readCount = reads->readCount();
+    size_t threadCount = std::thread::hardware_concurrency();
+    enforceTransitivityData.threadPairsToAlign.assign(threadCount, {});
+    setupLoadBalancing(readCount, 1);
+    runThreads(&Assembler::enforceAlignmentTransitivityGatherThreadFunction, threadCount);
+
+    // --- Consolidate the pairs from all threads ---
+    vector<pair<OrientedReadId, OrientedReadId>> pairsToAlign;
+    for(const auto& threadPairs : enforceTransitivityData.threadPairsToAlign) {
+        pairsToAlign.insert(pairsToAlign.end(), threadPairs.begin(), threadPairs.end());
+    }
+    enforceTransitivityData.threadPairsToAlign.clear();
+    
+    // Sort and unique the oriented pairs first to remove exact duplicates
+    sort(pairsToAlign.begin(), pairsToAlign.end());
+    pairsToAlign.erase(unique(pairsToAlign.begin(), pairsToAlign.end()), pairsToAlign.end());
+
+    // Now, unique by the pair of unoriented ReadIds.
+    // To do this efficiently without a set, we create a temporary vector
+    // of canonical unoriented pairs, sort it, then unique it.
+    vector<pair<pair<ReadId, ReadId>, pair<OrientedReadId, OrientedReadId>>> tempPairs;
+    tempPairs.reserve(pairsToAlign.size());
+    for(const auto& orientedPair : pairsToAlign) {
+        ReadId r1 = orientedPair.first.getReadId();
+        ReadId r2 = orientedPair.second.getReadId();
+        if(r1 > r2) {
+            std::swap(r1, r2);
+        }
+        tempPairs.push_back({{r1, r2}, orientedPair});
+    }
+    std::sort(tempPairs.begin(), tempPairs.end(),
+        [](const auto& a, const auto& b) {
+            return a.first < b.first;
+    });
+    auto last = std::unique(tempPairs.begin(), tempPairs.end(),
+        [](const auto& a, const auto& b) {
+        return a.first == b.first;
+    });
+    tempPairs.erase(last, tempPairs.end());
+
+    // Now extract the final list of oriented pairs to align.
+    vector<pair<OrientedReadId, OrientedReadId>> uniquePairsToAlign;
+    uniquePairsToAlign.reserve(tempPairs.size());
+    for(const auto& p : tempPairs) {
+        uniquePairsToAlign.push_back(p.second);
+    }
+    
+    performanceLog << timestamp << "Found " << uniquePairsToAlign.size() << " unique pairs to align." << endl;
+    
+    // // DEBUG: Print the first 20 pairs
+    // for(size_t i=0; i<20; i++) {
+    //     performanceLog << uniquePairsToAlign[i].first.getReadId() << " " << " Strand " << uniquePairsToAlign[i].first.getStrand() << " " << uniquePairsToAlign[i].second.getReadId() << " " << " Strand " << uniquePairsToAlign[i].second.getStrand() << endl;
+    // }
+
+    // --- Align pairs in parallel ---
+    enforceTransitivityData.alignOptions = &alignOptions;
+    enforceTransitivityData.pairsToAlign = std::move(uniquePairsToAlign);
+    enforceTransitivityData.threadAlignmentData.resize(threadCount);
+    enforceTransitivityData.threadCompressedAlignments.resize(threadCount);
+    for(size_t threadId=0; threadId<threadCount; ++threadId) {
+        enforceTransitivityData.threadCompressedAlignments[threadId] =
+            make_shared<MemoryMapped::VectorOfVectors<char, uint64_t>>();
+        enforceTransitivityData.threadCompressedAlignments[threadId]->createNew(
+            largeDataName("tmp-enforceTransitivity-CompressedAlignments-" + to_string(threadId)),
+            largeDataPageSize);
+    }
+
+    setupLoadBalancing(enforceTransitivityData.pairsToAlign.size(), 1);
+    runThreads(&Assembler::enforceAlignmentTransitivityThreadFunction, threadCount);
+
+    // --- Store new alignments ---
+    vector<AlignmentData> newAlignmentData;
+    for (size_t threadId = 0; threadId < threadCount; threadId++) {
+        for (const auto& ad : enforceTransitivityData.threadAlignmentData[threadId]) {
+            newAlignmentData.push_back(ad);
+        }
+        enforceTransitivityData.threadAlignmentData[threadId].clear();
+    }
+
+    if (!newAlignmentData.empty()) {
+        performanceLog << timestamp << "Adding " << newAlignmentData.size() << " new alignments to enforce transitivity." << endl;
+
+        for(const auto& ad : newAlignmentData) {
+            alignmentData.push_back(ad);
+        }
+        for (size_t threadId = 0; threadId < threadCount; threadId++) {
+            const auto& threadCompressedAlignments = *enforceTransitivityData.threadCompressedAlignments[threadId];
+            for (size_t i = 0; i < threadCompressedAlignments.size(); i++) {
+                compressedAlignments.appendVector(threadCompressedAlignments[i].begin(), threadCompressedAlignments[i].end());
+            }
+            enforceTransitivityData.threadCompressedAlignments[threadId]->remove();
+        }
+
+        alignmentData.unreserve();
+        compressedAlignments.unreserve();
+
+        performanceLog << timestamp << "Recomputing alignment table." << endl;
+        computeAlignmentTable();
+    }
+
+    const auto tEnd = steady_clock::now();
+    const double tTotal = seconds(tEnd - tBegin);
+    performanceLog << timestamp << "Enforcing alignment transitivity completed in " << tTotal << " s." << endl;
+}
+
+void Assembler::enforceAlignmentTransitivityGatherThreadFunction(size_t threadId)
+{
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+        for(ReadId readId0 = begin; readId0 < end; ++readId0) {
+            const Strand strand0 = 0;
+            OrientedReadId orientedReadId0(readId0, strand0);
+
+            const span<uint32_t> alignmentIds = alignmentTable[orientedReadId0.getValue()];
+            vector<pair<OrientedReadId, uint32_t>> neighbors0;
+            neighbors0.reserve(alignmentIds.size());
+            for (const auto alignmentId : alignmentIds) {
+                neighbors0.emplace_back(alignmentData[alignmentId].getOther(orientedReadId0), alignmentId);
+            }
+
+            for (size_t i = 0; i < neighbors0.size(); i++) {
+                const OrientedReadId orientedReadId1 = neighbors0[i].first;
+                if (orientedReadId1 < orientedReadId0) continue;
+
+                for (size_t j = i + 1; j < neighbors0.size(); j++) {
+                    const OrientedReadId orientedReadId2 = neighbors0[j].first;
+                    bool areNeighbors = false;
+                    const span<uint32_t> neighbors1AlignmentIds = alignmentTable[orientedReadId1.getValue()];
+                    for (const auto alignmentId1 : neighbors1AlignmentIds) {
+                        if (alignmentData[alignmentId1].getOther(orientedReadId1) == orientedReadId2) {
+                            areNeighbors = true;
+                            break;
+                        }
+                    }
+                    if (!areNeighbors) {
+                        // Canonicalize the pair before adding it to ensure uniqueness.
+                        auto id1 = orientedReadId1;
+                        auto id2 = orientedReadId2;
+                        if(id2 < id1) {
+                            std::swap(id1, id2);
+                        }
+                        enforceTransitivityData.threadPairsToAlign[threadId].push_back({id1, id2});
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Assembler::enforceAlignmentTransitivityThreadFunction(size_t threadId)
+{
+    const auto& alignOptions = *enforceTransitivityData.alignOptions;
+
+    // Work areas used inside the loop
+    Alignment alignment;
+    AlignmentInfo alignmentInfo;
+
+    // Get the batch of pairs to process
+    uint64_t begin, end;
+    while(getNextBatch(begin, end)) {
+        for (uint64_t i = begin; i < end; ++i) {
+            const auto& pair = enforceTransitivityData.pairsToAlign[i];
+            OrientedReadId orientedReadId1 = pair.first;
+            OrientedReadId orientedReadId2 = pair.second;
+            
+            try {
+                ofstream nullStream;
+                alignOrientedReads5(orientedReadId1, orientedReadId2,
+                    alignOptions.matchScore, alignOptions.mismatchScore, alignOptions.gapScore,
+                    alignOptions.align5DriftRateTolerance, alignOptions.align5MinBandExtend,
+                    alignment, alignmentInfo,
+                    nullStream);
+
+            } catch (std::exception& e) {
+                continue; // Skip if alignment fails
+            }
+
+            const auto orientedReadMarkers1 = markers[orientedReadId1.getValue()];
+            const uint32_t positionStart1 = orientedReadMarkers1[alignmentInfo.data[0].firstOrdinal].position;
+            const uint32_t positionEnd1 = orientedReadMarkers1[alignmentInfo.data[0].lastOrdinal].position + uint32_t(assemblerInfo->k);
+            const uint32_t overlapLength1 = positionEnd1 - positionStart1;
+
+            const auto orientedReadMarkers2 = markers[orientedReadId2.getValue()];
+            const uint32_t positionStart2 = orientedReadMarkers2[alignmentInfo.data[1].firstOrdinal].position;
+            const uint32_t positionEnd2 = orientedReadMarkers2[alignmentInfo.data[1].lastOrdinal].position + uint32_t(assemblerInfo->k);
+            const uint32_t overlapLength2 = positionEnd2 - positionStart2;
+
+            // XXX
+            // --- START OF: Require at least 1000 bases of overlap. ---
+            //
+            const uint32_t minOverlap = 1000;
+            if (overlapLength1 < minOverlap || overlapLength2 < minOverlap) {
+                continue;
+            }
+            // XXX
+            // --- END OF: Require at least 1000 bases of overlap. ---
+            //
+
+            const uint64_t readLength1 = reads->getRead(orientedReadId1.getReadId()).baseCount;
+            const uint64_t readLength2 = reads->getRead(orientedReadId2.getReadId()).baseCount;
+
+            const uint32_t leftTrimBases1 = positionStart1;
+            const uint32_t rightTrimBases1 = readLength1 - positionEnd1;
+
+            const uint32_t leftTrimBases2 = positionStart2;
+            const uint32_t rightTrimBases2 = readLength2 - positionEnd2;
+
+            // XXX
+            // --- START OF: Calculate the "effective" 5end and 3end hanging lengths. ---
+            // This is the minimum of the left trim bases and minimum of the right trim bases.
+            // This basically calculates the overlaping portion of the two reads that is not covered by the alignment.
+            uint32_t min5endHangingLength = 0;
+            uint32_t min3endHangingLength = 0;
+
+            if (leftTrimBases1 < leftTrimBases2) {
+                min5endHangingLength = leftTrimBases1;
+            } else {
+                min5endHangingLength = leftTrimBases2;
+            }
+
+            if (rightTrimBases1 < rightTrimBases2) {
+                min3endHangingLength = rightTrimBases1;
+            } else {
+                min3endHangingLength = rightTrimBases2;
+            }
+
+            // If the hanging lengths are too long, skip the alignment.
+            const uint32_t maxHangingLength = 1000;
+
+            if (min5endHangingLength > maxHangingLength || min3endHangingLength > maxHangingLength) {
+                // cout << orientedReadId1 << " " << orientedReadId2 << " long hanging lengths." << endl;
+                continue;
+            }
+            // XXX
+            // --- END OF: Calculate the "effective" 5end and 3end hanging lengths. ---
+            //
+
+
+            // // XXX
+            // // --- START OF: At least 80% of the overlap should be covered by the alignment. ---
+            // //
+            // const float minOverlapFraction = 0.80;
+
+            // if (overlapLength1 < minOverlapFraction * (overlapLength1 + min5endHangingLength + min3endHangingLength) || 
+            //     overlapLength2 < minOverlapFraction * (overlapLength2 + min5endHangingLength + min3endHangingLength)) 
+            // {
+            //     // cout << orientedReadId1 << " " << orientedReadId2 << " low overlap fraction." << endl;
+            //     continue;
+            // }
+            // // XXX
+            // // --- END OF: At least 80% of the overlap should be covered by the alignment. ---
+            // //
+
+            array<OrientedReadId, 2> orientedReadIds = {orientedReadId1, orientedReadId2};
+            const ProjectedAlignment projectedAlignment(
+                *this,
+                orientedReadIds,
+                alignment,
+                ProjectedAlignment::Method::QuickRaw);
+
+
+            // XXX
+            // --- START OF: Total Overlap Error Rate filtering    
+            //
+
+            float alignmentErrorRate = projectedAlignment.errorRate();
+            
+            // Skip alignments with error rate greater than 0.07.
+            if (alignmentErrorRate > 0.07) {
+                continue;
+            }
+
+            alignmentInfo.errorRate = alignmentErrorRate;
+            alignmentInfo.mismatchCount = uint32_t(projectedAlignment.mismatchCount);
+
+            // XXX
+            // --- END OF: Total Overlap Error Rate filtering    
+            //
+
+
+
+            if(orientedReadId1.getReadId() > orientedReadId2.getReadId()){
+                swap(orientedReadId1, orientedReadId2);
+                alignmentInfo.swap();
+            }
+            if(orientedReadId1.getStrand() == 1){
+                orientedReadId1.flipStrand();
+                orientedReadId2.flipStrand();
+                alignmentInfo.reverseComplement();
+            }
+
+            OrientedReadPair candidate;
+            candidate.readIds[0] = orientedReadId1.getReadId();
+            candidate.readIds[1] = orientedReadId2.getReadId();
+            candidate.isSameStrand = (orientedReadId1.getStrand() == orientedReadId2.getStrand());
+            
+            enforceTransitivityData.threadAlignmentData[threadId].push_back(AlignmentData(candidate, alignmentInfo));
+            string compressedAlignment;
+            shasta::compress(alignment, compressedAlignment);
+            enforceTransitivityData.threadCompressedAlignments[threadId]->appendVector(
+                compressedAlignment.begin(), compressedAlignment.end());
+        }
+    }
+}
+
+// XXX
+// --- END OF: Enforce transitivity of the alignments.
+//
 
 
 
@@ -506,43 +835,42 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
             elapsedTime.push_back({i, deltaT});
 #endif
 
-            // If the alignment has too few markers, skip it.
-            if(alignment.ordinals.size() < minAlignedMarkerCount) {
-                // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " too few markers." << endl;
-                continue;
-            }
+            // // If the alignment has too few markers, skip it.
+            // if(alignment.ordinals.size() < minAlignedMarkerCount) {
+            //     // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " too few markers." << endl;
+            //     continue;
+            // }
 
-            // If the aligned fraction is too small, skip it.
-            if(min(alignmentInfo.alignedFraction(0), alignmentInfo.alignedFraction(1)) < minAlignedFraction) {
-                continue;
-            }
+            // // If the aligned fraction is too small, skip it.
+            // if(min(alignmentInfo.alignedFraction(0), alignmentInfo.alignedFraction(1)) < minAlignedFraction) {
+            //     continue;
+            // }
 
-            // If the alignment has too much trim, skip it.
-            uint32_t leftTrim;
-            uint32_t rightTrim;
-            tie(leftTrim, rightTrim) = alignmentInfo.computeTrim();
-            if(leftTrim>maxTrim || rightTrim>maxTrim) {
-                // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " too much trim." << endl;
-                continue;
-            }
+            // // If the alignment has too much trim, skip it.
+            // uint32_t leftTrim;
+            // uint32_t rightTrim;
+            // tie(leftTrim, rightTrim) = alignmentInfo.computeTrim();
+            // if(leftTrim>maxTrim || rightTrim>maxTrim) {
+            //     // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " too much trim." << endl;
+            //     continue;
+            // }
 
-            // For alignment methods other than method 0, we also need to check for
-            // maxSip and maxDrift. Method 0 does that automatically.
-            if(alignmentMethod != 0) {
-                if(alignment.maxSkip() > maxSkip) {
-                    continue;
-                }
-                if(alignment.maxDrift() > maxDrift) {
-                    continue;
-                }
-            }
+            // // For alignment methods other than method 0, we also need to check for
+            // // maxSip and maxDrift. Method 0 does that automatically.
+            // if(alignmentMethod != 0) {
+            //     if(alignment.maxSkip() > maxSkip) {
+            //         continue;
+            //     }
+            //     if(alignment.maxDrift() > maxDrift) {
+            //         continue;
+            //     }
+            // }
 
-            // Skip containing alignments, if so requested.
-            if(suppressContainments and alignmentInfo.isContaining(uint32_t(maxTrim))) {
-                continue;
-            }
+            // // Skip containing alignments, if so requested.
+            // if(suppressContainments and alignmentInfo.isContaining(uint32_t(maxTrim))) {
+            //     continue;
+            // }
 
-            // If getting here, this is a good alignment.
 
             const auto orientedReadMarkers0 = markers[orientedReadIds[0].getValue()];
             const uint32_t positionStart0 = orientedReadMarkers0[alignmentInfo.data[0].firstOrdinal].position;
@@ -554,6 +882,18 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
             const uint32_t positionEnd1 = orientedReadMarkers1[alignmentInfo.data[1].lastOrdinal].position + uint32_t(assemblerInfo->k);
             const uint32_t overlapLength1 = positionEnd1 - positionStart1;
 
+            // XXX
+            // --- START OF: Require at least 1000 bases of overlap. ---
+            //
+            const uint32_t minOverlap = 1000;
+            if (overlapLength0 < minOverlap || overlapLength1 < minOverlap) {
+                continue;
+            }
+            // XXX
+            // --- END OF: Require at least 1000 bases of overlap. ---
+            //
+
+
             const uint64_t readLength0 = reads->getRead(orientedReadIds[0].getReadId()).baseCount;
             const uint64_t readLength1 = reads->getRead(orientedReadIds[1].getReadId()).baseCount;
 
@@ -563,7 +903,9 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
             const uint32_t leftTrimBases1 = positionStart1;
             const uint32_t rightTrimBases1 = readLength1 - positionEnd1;
 
-            // Calculate the "effective" 5end and 3end hanging lengths.
+            
+            // XXX
+            // --- START OF: Calculate the "effective" 5end and 3end hanging lengths. ---
             // This is the minimum of the left trim bases and minimum of the right trim bases.
             // This basically calculates the overlaping portion of the two reads that is not covered by the alignment.
             uint32_t min5endHangingLength = 0;
@@ -588,10 +930,16 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                 // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " long hanging lengths." << endl;
                 continue;
             }
+            // XXX
+            // --- END OF: Calculate the "effective" 5end and 3end hanging lengths. ---
+            //
 
-            // At least 80% of the overlap should be covered by the alignment.
-            // At least 80% of the physical span that would go into the graph
-            // must actually be aligned.
+
+
+
+            // XXX
+            // --- START OF: At least 80% of the overlap should be covered by the alignment. ---
+            //
             const float minOverlapFraction = 0.80;
 
             if (overlapLength0 < minOverlapFraction * (overlapLength0 + min5endHangingLength + min3endHangingLength) || 
@@ -600,16 +948,11 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                 // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " low overlap fraction." << endl;
                 continue;
             }
+            // XXX
+            // --- END OF: At least 80% of the overlap should be covered by the alignment. ---
+            //
 
-            // Remove alignments with short overlaps.
-            const uint32_t minOverlap = 50;
 
-            if ((overlapLength0 + min5endHangingLength + min3endHangingLength) < minOverlap || 
-                (overlapLength1 + min5endHangingLength + min3endHangingLength) < minOverlap) 
-            {
-                // cout << orientedReadIds[0] << " " << orientedReadIds[1] << " short overlap." << endl;
-                continue;
-            }
 
 
             // Compute projected alignment metrics, if requested.
@@ -630,9 +973,9 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                     ProjectedAlignment::Method::QuickRaw);
 
 
-                // ---------------------------------------------------
-                //   START OF: Total Overlap Error Rate filtering    
-                // ---------------------------------------------------
+                // XXX
+                // --- START OF: Total Overlap Error Rate filtering    
+                //
 
                 float alignmentErrorRate = projectedAlignment.errorRate();
                 
@@ -641,15 +984,15 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                     continue;
                 }
 
-                // ---------------------------------------------------
-                //   END OF: Total Overlap Error Rate filtering    
-                // ---------------------------------------------------
+                // XXX
+                // --- END OF: Total Overlap Error Rate filtering    
+                //
 
                 
 
-                // ----------------------------------------------
-                //   Sliding-window error filtering (read-0)    
-                // ----------------------------------------------
+                // XXX
+                // --- START OF: Sliding-window error filtering (read-0)    
+                //
                 
 
                 // Window length.
@@ -672,9 +1015,9 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
 
 
 
-                // ---------------------------------------------------
-                // START OF: Preparation for the chemical window filtering.
-                // ---------------------------------------------------
+                // XXX
+                // --- START OF: Preparation for the chemical window filtering.
+                //
 
                 uint64_t chemicalWindowLength = 384;
                 uint64_t dn = 2000;
@@ -695,9 +1038,9 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                 uint64_t errorsInFirstDnBases = 0;
                 uint64_t errorsInLastDnBases = 0;
 
-                // ---------------------------------------------------
-                //   END OF: Preparation for the chemical window filtering.
-                // ---------------------------------------------------
+                // XXX
+                // --- END OF: Preparation for the chemical window filtering.
+                //
 
 
                 vector<uint32_t> windowErrors(numberOfWindows, 0);
@@ -827,11 +1170,11 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                 
                 
 
-                // ---------------------------------------------------
-                //   START OF: Max Gap filtering
+                // XXX
+                // --- START OF: Max Gap filtering
                 //   - Filter out alignments with too many consecutive gaps of size >= 6 bases length (alignmentMaxGaps = 64).
                 //   - Filter out alignments with too high gap rate (alignmentMaxGapRate = 0.06).
-                // ---------------------------------------------------
+                //
 
                 // Add the hanging lengths to the total edit distance.
                 // Treat the hanging lengths as unaligned bases.
@@ -855,14 +1198,14 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                     continue;
                 }
 
-                // ---------------------------------------------------
-                //   END OF: Max Gap filtering    
-                // ---------------------------------------------------
+                // XXX
+                // --- END OF: Max Gap filtering    
+                //
 
 
 
-                // ---------------------------------------------------
-                //   START OF: Chemical Window Filtering
+                // XXX
+                // --- START OF: Chemical Window Filtering
                 //   Count for errors in the terminal regions of the read.
                 //   - ONT reads often have one bad end
                 //   - Chimeric reads may have one good end and one bad end
@@ -871,7 +1214,7 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                 //   - We have more than min_err errors (min_err = 128)
                 //   - The number of errors is greater than the error rate threshold (er = 0.36)
                 //   If both conditions are met, the alignment is discarded.
-                // ---------------------------------------------------
+                //
 
                 double er = 0.36;
                 uint64_t min_err = 128;
@@ -890,9 +1233,9 @@ void Assembler::computeAlignmentsThreadFunction(size_t threadId)
                     }
                 }
 
-                // ---------------------------------------------------
-                //   END OF: Chemical Window Filtering
-                // ---------------------------------------------------
+                // XXX
+                // --- END OF: Chemical Window Filtering
+                //
                 
             
             
@@ -953,6 +1296,9 @@ void Assembler::accessCompressedAlignments()
 // This could be made multithreaded if it becomes a bottleneck.
 void Assembler::computeAlignmentTable()
 {
+    if(alignmentTable.isOpen()) {
+        alignmentTable.remove();
+    }
     alignmentTable.createNew(largeDataName("AlignmentTable"), largeDataPageSize);
     alignmentTable.beginPass1(ReadId(2 * reads->readCount()));
     for(const AlignmentData& ad: alignmentData) {
