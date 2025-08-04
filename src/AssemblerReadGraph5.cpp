@@ -523,6 +523,189 @@ bool hasSiteStrandBiasReadGraph5(
 
 
 
+
+
+
+
+
+
+// Build a map that allows finding which ordinals on other reads
+// correspond to a given ordinal on a specified target OrientedReadId.
+void shasta::Assembler::buildOrdinalCorrespondenceMap(
+    OrientedReadId targetOrientedReadId,
+    OrdinalCorrespondenceMap& correspondenceMap
+    ) const
+{
+    // Clear any existing content.
+    correspondenceMap.clear();
+
+    // Access the pre-computed alignments for the target read.
+    const auto alignmentIds = alignmentTable[targetOrientedReadId.getValue()];
+
+    // Loop over each alignment involving the target read.
+    for (const uint32_t alignmentId : alignmentIds) {
+        const AlignmentData& thisAlignmentData = alignmentData[alignmentId];
+
+        // Get the Alignment object by decompressing it.
+        Alignment alignment;
+        shasta::decompress(compressedAlignments[alignmentId], alignment);
+
+        // Figure out which set of ordinals in the alignment belongs to the target.
+        OrientedReadId currentOrientedReadId0(thisAlignmentData.readIds[0], 0);
+        OrientedReadId currentOrientedReadId1(thisAlignmentData.readIds[1], thisAlignmentData.isSameStrand ? 0 : 1);
+        AlignmentInfo alignmentInfo = thisAlignmentData.info;
+                
+        // Swap oriented reads, if necessary.
+        if (currentOrientedReadId0.getReadId() != targetOrientedReadId.getReadId()) {
+            swap(currentOrientedReadId0, currentOrientedReadId1);
+            alignmentInfo.swap();
+            alignment.swap();
+        }
+        SHASTA_ASSERT(currentOrientedReadId0.getReadId() == targetOrientedReadId.getReadId());
+
+        // Reverse complement if necessary
+        if (currentOrientedReadId0.getStrand() != targetOrientedReadId.getStrand()) {
+            currentOrientedReadId0.flipStrand();
+            currentOrientedReadId1.flipStrand();
+            alignmentInfo.reverseComplement();
+            const uint32_t markerCount0 = markers[currentOrientedReadId0.getValue()].size();
+            const uint32_t markerCount1 = markers[currentOrientedReadId1.getValue()].size();
+            alignment.reverseComplement(markerCount0, markerCount1);
+        }
+        SHASTA_ASSERT(currentOrientedReadId0.getStrand() == targetOrientedReadId.getStrand());
+        SHASTA_ASSERT(currentOrientedReadId0 == targetOrientedReadId); // Check consistency
+                
+        // Populate the map using the aligned ordinals.
+        for (const auto& ordinalPair : alignment.ordinals) {
+            const uint32_t targetOrdinal = ordinalPair[0];
+            const uint32_t queryOrdinal  = ordinalPair[1];
+            const OrientedReadId queryOrientedReadId = currentOrientedReadId1;
+
+            correspondenceMap[targetOrdinal].push_back({queryOrientedReadId, queryOrdinal});
+        }
+    }
+}
+
+
+class MarkerAnchorCandidate{    
+    public:
+        OrientedReadId targetOrientedReadId;
+        MarkerId anchorMarkerId; // The marker ID of the anchor in the targetOrientedReadId
+        std::vector< std::pair<OrientedReadId, uint32_t> > anchorMarkerIntervalsHet0; // (OrientedReadId, ordinal)
+        std::vector< std::pair<OrientedReadId, uint32_t> > anchorMarkerIntervalsHet1; // (OrientedReadId, ordinal)
+};
+
+
+// Find the best common upstream anchor marker for a set of reads relative
+// to a target oriented read, following the user's specified logic.
+std::pair< MarkerAnchorCandidate, std::vector<shasta::MarkerId> > shasta::Assembler::findBestUpstreamAnchor(
+    OrientedReadId targetOrientedReadId,
+    uint32_t targetStartOrdinal,
+    const std::vector<OrientedReadId>& het0OrientedReads,
+    const std::vector<OrientedReadId>& het1OrientedReads,
+    uint32_t maxSearchDistance,
+    uint32_t minPosition
+    ) const
+{
+    std::vector<MarkerId> processedMarkerIds;
+
+    MarkerAnchorCandidate markerAnchorCandidate;
+    markerAnchorCandidate.targetOrientedReadId = targetOrientedReadId;
+    markerAnchorCandidate.anchorMarkerId = std::numeric_limits<MarkerId>::max();
+    markerAnchorCandidate.anchorMarkerIntervalsHet0.clear();
+    markerAnchorCandidate.anchorMarkerIntervalsHet1.clear();
+
+    // Handle the edge case of an empty allele set.
+    if (het0OrientedReads.empty() || het1OrientedReads.empty()) {
+        return {markerAnchorCandidate, processedMarkerIds};
+    }
+
+    // Pre-build the correspondence map for efficient lookups inside the loop.
+    OrdinalCorrespondenceMap correspondenceMap;
+    buildOrdinalCorrespondenceMap(targetOrientedReadId, correspondenceMap);
+    
+    // Get the markers for the target read to check against minPosition.
+    const auto targetMarkers = markers[targetOrientedReadId.getValue()];
+
+    // Loop backwards from the starting ordinal.
+    for (uint32_t offset = 0; offset < maxSearchDistance; ++offset) {
+
+        const int64_t currentTargetOrdinal64 = int64_t(targetStartOrdinal) - offset;
+        if (currentTargetOrdinal64 < 0) {
+            break; // We've walked off the start of the target read.
+        }
+
+        const uint32_t currentTargetOrdinal = uint32_t(currentTargetOrdinal64);
+
+        // Termination condition: check if we've passed the minimum position.
+        if (targetMarkers[currentTargetOrdinal].position < minPosition) {
+            break; 
+        }
+
+        // Find the list of all reads that align to the target at this specific ordinal.
+        const auto it = correspondenceMap.find(currentTargetOrdinal);
+        if (it == correspondenceMap.end()) {
+            continue; // No reads align here; consensus is impossible.
+        }
+
+        // For efficient lookups, convert this ordinal's overlap vector into a temporary map.
+        const auto& overlappingReadsAndOrdinalsVec = it->second;
+        std::map<OrientedReadId, uint32_t> overlapsMap;
+        for(const auto& p : overlappingReadsAndOrdinalsVec) {
+            overlapsMap.insert(p);
+        }
+
+        // Check if all reads from het0OrientedReads are present in the overlapsMap
+        bool allHet0ReadsPresent = true;
+        for (const auto& orientedReadId : het0OrientedReads) {
+            if (overlapsMap.find(orientedReadId) == overlapsMap.end()) {
+                allHet0ReadsPresent = false;
+                break;
+            }
+        }
+
+        // Check if all reads from het1OrientedReads are present in the overlapsMap
+        bool allHet1ReadsPresent = true;
+        for (const auto& orientedReadId : het1OrientedReads) {
+            if (overlapsMap.find(orientedReadId) == overlapsMap.end()) {
+                allHet1ReadsPresent = false;
+                break;
+            }
+        }
+
+        // If both sets of reads are present, we have found a common anchor
+        if (allHet0ReadsPresent && allHet1ReadsPresent) {
+            // Get the candidate marker from the target read
+            const auto targetKmerIds = markerKmerIds[targetOrientedReadId.getValue()];
+            const MarkerId& candidateMarkerId = targetKmerIds[currentTargetOrdinal];
+            processedMarkerIds.push_back(candidateMarkerId);
+
+            markerAnchorCandidate.anchorMarkerId = candidateMarkerId;
+
+            // Populate the anchor marker intervals for het0 reads
+            for (const auto& orientedReadId : het0OrientedReads) {
+                const uint32_t ordinal = overlapsMap.at(orientedReadId);
+                markerAnchorCandidate.anchorMarkerIntervalsHet0.push_back({orientedReadId, ordinal});
+            }
+
+            // Populate the anchor marker intervals for het1 reads
+            for (const auto& orientedReadId : het1OrientedReads) {
+                const uint32_t ordinal = overlapsMap.at(orientedReadId);
+                markerAnchorCandidate.anchorMarkerIntervalsHet1.push_back({orientedReadId, ordinal});
+            }
+
+            return {markerAnchorCandidate, processedMarkerIds}; // Success!
+        }
+    }
+
+    // If we finished the loop without success, no common anchor was found.
+    return {markerAnchorCandidate, processedMarkerIds};
+}
+
+
+
+
+
 class HaplotypeEvidence{    
     public:
         OrientedReadId orientedReadId; // The oriented read ID
@@ -530,6 +713,14 @@ class HaplotypeEvidence{
         AlignedBase baseOfOrientedRead; // Base value (0=A, 1=C, 2=G, 3=T, 4=Gap)
         uint64_t alignmentId;
         bool isInHomopolymerRegion = false;
+        std::pair<OrientedReadId, uint32_t> markerInterval0Prev;
+        std::pair<OrientedReadId, uint32_t> markerInterval0Next;
+        std::pair<OrientedReadId, uint32_t> markerInterval1Prev;
+        std::pair<OrientedReadId, uint32_t> markerInterval1Next;
+        MarkerId markerId0Prev;
+        MarkerId markerId0Next;
+        MarkerId markerId1Prev;
+        MarkerId markerId1Next;
 };
 
 
@@ -582,6 +773,8 @@ class SnpStats{
 
         AlignedBase hetBase1;
         vector<HaplotypeEvidence> hetBase1OrientedReadIdsHE;
+
+        vector<MarkerId> markerIdsAroundHetSite;
 
         uint64_t occ_0 = 0;
         uint64_t occ_1 = 0;
@@ -646,6 +839,8 @@ struct PhasingThreadDataReadGraph5 {
     vector<vector<Site> > threadSites;
     vector<bool> isReadIdContained;
 
+    vector<vector<MarkerId> > threadMarkerIdsToForbid;
+
     
 
     // Mutex for thread-safe cout if debugging is needed inside threads
@@ -666,6 +861,7 @@ struct PhasingThreadDataReadGraph5 {
         threadFirstPassHetAlignments.resize(threadCount);
         threadAlignmentsAlreadyConsidered.resize(threadCount);
         threadSites.resize(threadCount);
+        threadMarkerIdsToForbid.resize(threadCount);
 
         for (size_t i = 0; i < threadCount; ++i) {
             // Resize inner vectors
@@ -703,6 +899,8 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
     vector<Site>& sites = phasingThreadDataReadGraph5->threadSites[threadId];
     const uint64_t alignmentCount = phasingThreadDataReadGraph5->alignmentCount;
     const uint64_t orientedReadCount = phasingThreadDataReadGraph5->orientedReadCount; // Get from shared data
+
+    vector<MarkerId>& threadMarkerIdsToForbid = phasingThreadDataReadGraph5->threadMarkerIdsToForbid[threadId];
 
     // Define types for the interval map
     using Interval = boost::icl::discrete_interval<uint32_t>;
@@ -754,8 +952,13 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             //     }
             // }
 
+            // // --- Start of per-read analysis code ---
+            // if ( (readId > 40) && ((readId < 410) || (readId > 500))) {
+            //     continue;
+            // }
+
             // --- Start of per-read analysis code ---
-            if ( (readId > 40) && ((readId < 410) || (readId > 500))) {
+            if ( (readId != 21) && (readId != 0) ) {
                 continue;
             }
 
@@ -808,10 +1011,10 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
 
                 // --- Add interval to the map ---
                 Interval interval = Interval::closed(positionStart0, positionEnd0); // Create a [position0, position1] interval
-                // Create a pair with alignmentId and the correctly oriented other read
-                AlignmentInfoPair infoPair = {alignmentId, currentOrientedReadId1};
-                AlignmentInfoSet currentAlignmentInfoSet = {infoPair}; // Create a set with the pair
-                alignmentIntervals.add({interval, currentAlignmentInfoSet}); // Add to the map (handles overlaps)
+                    // Create a pair with alignmentId and the correctly oriented other read
+                    AlignmentInfoPair infoPair = {alignmentId, currentOrientedReadId1};
+                    AlignmentInfoSet currentAlignmentInfoSet = {infoPair}; // Create a set with the pair
+                    alignmentIntervals.add({interval, currentAlignmentInfoSet}); // Add to the map (handles overlaps)
                 debugOut << "Thread ID: " << threadId << " Added interval [" << positionStart0 << ", " << positionEnd0 << ") for alignment " << alignmentId << " (Other Read: " << currentOrientedReadId1 << ")" << endl;
             }
 
@@ -1066,6 +1269,16 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                             // --- Update statistics for positionInTheTargetRead ---
                             //
 
+                            const std::pair<OrientedReadId, uint32_t> markerInterval0Prev = std::make_pair(currentOrientedReadId0, segment.ordinalsA[0]);
+                            const std::pair<OrientedReadId, uint32_t> markerInterval0Next = std::make_pair(currentOrientedReadId0, segment.ordinalsB[0]);
+                            const std::pair<OrientedReadId, uint32_t> markerInterval1Prev = std::make_pair(currentOrientedReadId1, segment.ordinalsA[1]);
+                            const std::pair<OrientedReadId, uint32_t> markerInterval1Next = std::make_pair(currentOrientedReadId1, segment.ordinalsB[1]);
+
+                            const MarkerId markerId0Prev = getMarkerId(currentOrientedReadId0, segment.ordinalsA[0]);
+                            const MarkerId markerId0Next = getMarkerId(currentOrientedReadId0, segment.ordinalsB[0]);
+                            const MarkerId markerId1Prev = getMarkerId(currentOrientedReadId1, segment.ordinalsA[1]);
+                            const MarkerId markerId1Next = getMarkerId(currentOrientedReadId1, segment.ordinalsB[1]);
+
                             uint64_t positionInTheTargetRead = segment.positionsA[0] + positionWithDetectedChange0;
                             uint64_t positionInTheOtherRead = segment.positionsA[1] + positionWithDetectedChange1;
 
@@ -1075,12 +1288,22 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                             haplotypeEvidence.baseOfOrientedRead = baseAtPosition1;
                             haplotypeEvidence.alignmentId = alignmentId;
                             haplotypeEvidence.isInHomopolymerRegion = false;
+                            haplotypeEvidence.markerInterval0Prev = markerInterval0Prev;
+                            haplotypeEvidence.markerInterval0Next = markerInterval0Next;
+                            haplotypeEvidence.markerInterval1Prev = markerInterval1Prev;
+                            haplotypeEvidence.markerInterval1Next = markerInterval1Next;
+                            haplotypeEvidence.markerId0Prev = markerId0Prev;
+                            haplotypeEvidence.markerId0Next = markerId0Next;
+                            haplotypeEvidence.markerId1Prev = markerId1Prev;
+                            haplotypeEvidence.markerId1Next = markerId1Next;
+                            
+
+
 
                             // XXX
                             // --- START OF: Check if this potential het site in the other read
                             //     is in a homopolymer region.
                             //
-
                             const LongBaseSequenceView currentOrientedReadId1Sequence = reads->getRead(currentOrientedReadId1.getReadId());
 
                             uint64_t homopolymerContextLength = 12;
@@ -1102,11 +1325,12 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                                     haplotypeEvidence.isInHomopolymerRegion = true;
                                 }
                             }
-    
                             // XXX
                             // --- END OF: Check if this potential het site in the other read ---
                             //     is in a homopolymer region.
                             //
+
+                            
 
                             AlignmentPositionBaseStatsSingleEntry thisPositionStatsSingleEntry;
                             thisPositionStatsSingleEntry.positionInTargetRead = positionInTheTargetRead;
@@ -1384,6 +1608,14 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                         hetPositionStatsInTargetRead.hetBase0OrientedReadIds.push_back(orientedReadId);
                     }
 
+                    // Iterate over the markers
+                    for (const HaplotypeEvidence& haplotypeEvidence : hetPositionStatsInTargetRead.hetBase1OrientedReadIdsHE) {
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId0Prev);
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId0Next);
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId1Prev);
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId1Next);
+                    }
+
 
                     // XXX
                     // --- START OF: Check if the haplotypeEvidence in this position suggests a HPC region ---
@@ -1473,6 +1705,14 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                         hetPositionStatsInTargetRead.hetBase0OrientedReadIds.push_back(orientedReadId);
                     }
 
+                    // Iterate over the markers
+                    for (const HaplotypeEvidence& haplotypeEvidence : hetPositionStatsInTargetRead.hetBase1OrientedReadIdsHE) {
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId0Prev);
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId0Next);
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId1Prev);
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId1Next);
+                    }
+
                     // XXX
                     // --- START OF: Check if the haplotypeEvidence in this position suggests a HPC region ---
                     //
@@ -1558,6 +1798,14 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
 
                     for (const OrientedReadId& orientedReadId : orientedReadIdsSupportingTheTargetReadBase) {
                         hetPositionStatsInTargetRead.hetBase0OrientedReadIds.push_back(orientedReadId);
+                    }
+
+                    // Iterate over the markers
+                    for (const HaplotypeEvidence& haplotypeEvidence : hetPositionStatsInTargetRead.hetBase1OrientedReadIdsHE) {
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId0Prev);
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId0Next);
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId1Prev);
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId1Next);
                     }
 
                     // XXX
@@ -1648,6 +1896,14 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                         hetPositionStatsInTargetRead.hetBase0OrientedReadIds.push_back(orientedReadId);
                     }
 
+                    // Iterate over the markers
+                    for (const HaplotypeEvidence& haplotypeEvidence : hetPositionStatsInTargetRead.hetBase1OrientedReadIdsHE) {
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId0Prev);
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId0Next);
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId1Prev);
+                        hetPositionStatsInTargetRead.markerIdsAroundHetSite.push_back(haplotypeEvidence.markerId1Next);
+                    }
+
                     // XXX
                     // --- START OF: Check if the haplotypeEvidence in this position suggests a HPC region ---
                     //
@@ -1690,9 +1946,6 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
                         cc = cut_bd;
                     }
 
-                    // TODO: AUTO ADJUSTED?
-                    cc = 6;
-
                     if (hetPositionStatsInTargetRead.occ_0 >= cc) {
                         hetPositionStatsInTargetRead.hasSufficentCoverage = true;
                     }
@@ -1722,6 +1975,78 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
 
             // Clear the positionStatsOnOrientedReadId0 map
             // positionStatsOnTargetOrientedReadId.clear();
+
+
+            // XXX
+            // --- START OF: Filter out clusters of SNPs ---
+            //
+            // Sequencing error and artifacts often appear as clusters of nearby SNPs.
+            // To avoid clusters of errors, the informative SNPs need to be well-separated.
+            // Only SNPs at least 32bp apart are considered.
+            // E.g. If we have SNPs on positions: [9992, 33364, 33368, 40000]
+            // We want to keep the SNPs on positions: [9992, 40000]
+            std::vector<SnpStats> potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated;
+            const auto& inputSnps = potentialHetSitesOnTargetOrientedReadIdFiltered;
+
+            // If there are 0 or 1 SNPs, they are all "well-separated" by definition and should be kept.
+            if (inputSnps.size() < 2) {
+                potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated = inputSnps;
+            } else {
+                for (size_t i = 0; i < inputSnps.size(); ++i) {
+                    const bool hasPrev = (i > 0);
+                    const bool hasNext = (i < inputSnps.size() - 1);
+
+                    // A SNP is "too close" if the distance is > 0 and < 32.
+                    // This correctly preserves multi-allelic sites (distance == 0), which should not be filtered.
+                    const bool prevIsTooClose = hasPrev &&
+                        (inputSnps[i].positionInTargetRead > inputSnps[i-1].positionInTargetRead) &&
+                        (inputSnps[i].positionInTargetRead - inputSnps[i-1].positionInTargetRead < 32);
+
+                    // Check distance to next SNP.
+                    const bool nextIsTooClose = hasNext &&
+                        (inputSnps[i+1].positionInTargetRead > inputSnps[i].positionInTargetRead) &&
+                        (inputSnps[i+1].positionInTargetRead - inputSnps[i].positionInTargetRead < 32);
+
+                    // Only keep the SNP if it is not too close to an adjacent, different SNP.
+                    if (!prevIsTooClose && !nextIsTooClose) {
+                        potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated.push_back(inputSnps[i]);
+                    }
+                }
+            }
+
+
+            // XXX
+            // --- END OF: Filtering out clusters of SNPs ---
+            //
+
+
+
+            // XXX
+            // --- START OF: Generate the anchors for all the potential heterozygous sites ---
+            //
+
+            // Shasta.
+            #include "mode3-Anchor.hpp"
+            #include "Base.hpp"
+            #include "Marker.hpp"
+            #include "Reads.hpp"
+            using namespace shasta;
+            using namespace mode3;
+
+
+            for (const SnpStats& snpStats : potentialHetSitesOnTargetOrientedReadId) {
+                for (const MarkerId& markerId : snpStats.markerIdsAroundHetSite) {
+                    threadMarkerIdsToForbid.push_back(markerId);
+                }
+            }
+
+
+
+
+
+
+
+            continue;
 
 
 
@@ -1763,8 +2088,6 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             }
 
             debugOut << "Thread ID: " << threadId << " Finished analyzing potential heterozygous sites for read ID: " << targetReadId << endl;
-
-
             
 
             // XXX
@@ -2005,62 +2328,62 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             // --- END OF: Chain Scoring ---
             //
 
-            
 
 
 
 
-            // Print the chains keeping only the sites that have a score of 1
-            debugOut << "DP results for read " << targetOrientedReadId << ": LCG values > 1:" << endl;
-            for(const auto& chain : siteChains) {
-                bool foundGoodChain = false;
-                for(const auto& siteIndex : chain) {
-                    if(potentialHetSitesOnTargetOrientedReadId[siteIndex].score == 1){
-                        foundGoodChain = true;
-                        debugOut << "SCORE 1:  Site Index: " << siteIndex << " (Pos: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead << ") LCG: " << LCG[siteIndex] << endl;
-                    }
-                }
-                if (foundGoodChain){
-                    debugOut << endl;
-                }
-            }
 
-            for(const auto& chain : siteChains) {
-                bool foundGoodChain = false;
-                for(const auto& siteIndex : chain) {
-                    debugOut << "SCORE ALL:  Site Index: " << siteIndex << " (Pos: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead << ") LCG: " << LCG[siteIndex] << endl;
-                }
+            // // Print the chains keeping only the sites that have a score of 1
+            // debugOut << "DP results for read " << targetOrientedReadId << ": LCG values > 1:" << endl;
+            // for(const auto& chain : siteChains) {
+            //     bool foundGoodChain = false;
+            //     for(const auto& siteIndex : chain) {
+            //         if(potentialHetSitesOnTargetOrientedReadId[siteIndex].score == 1){
+            //             foundGoodChain = true;
+            //             debugOut << "SCORE 1:  Site Index: " << siteIndex << " (Pos: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead << ") LCG: " << LCG[siteIndex] << endl;
+            //         }
+            //     }
+            //     if (foundGoodChain){
+            //         debugOut << endl;
+            //     }
+            // }
+
+            // for(const auto& chain : siteChains) {
+            //     bool foundGoodChain = false;
+            //     for(const auto& siteIndex : chain) {
+            //         debugOut << "SCORE ALL:  Site Index: " << siteIndex << " (Pos: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead << ") LCG: " << LCG[siteIndex] << endl;
+            //     }
                 
-            }
+            // }
 
-            debugOut << "DP results for read " << targetOrientedReadId << ": LCG values == 1:" << endl;
-            for(const auto& chain : siteChainsIsolatedSites) {
-                bool foundGoodChain = false;
-                for(const auto& siteIndex : chain) {
-                    if(potentialHetSitesOnTargetOrientedReadId[siteIndex].score == 1){
-                        // if (potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead == 22129) {
-                        //     debugOut << "  Site Index: " << siteIndex << " hasSufficentCoverage: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].hasSufficentCoverage << " isHpcVector: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].isHpcVector << " occ_0: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].occ_0 << " occ_1: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].occ_1 << endl;
-                        // }
-                        foundGoodChain = true;
-                        debugOut << "SCORE 1:  Site Index: " << siteIndex << " (Pos: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead << ") LCG: " << LCG[siteIndex] << endl;
-                    }
-                }
-                if (foundGoodChain){
-                    debugOut << endl;
-                }
-            }
+            // debugOut << "DP results for read " << targetOrientedReadId << ": LCG values == 1:" << endl;
+            // for(const auto& chain : siteChainsIsolatedSites) {
+            //     bool foundGoodChain = false;
+            //     for(const auto& siteIndex : chain) {
+            //         if(potentialHetSitesOnTargetOrientedReadId[siteIndex].score == 1){
+            //             // if (potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead == 22129) {
+            //             //     debugOut << "  Site Index: " << siteIndex << " hasSufficentCoverage: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].hasSufficentCoverage << " isHpcVector: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].isHpcVector << " occ_0: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].occ_0 << " occ_1: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].occ_1 << endl;
+            //             // }
+            //             foundGoodChain = true;
+            //             debugOut << "SCORE 1:  Site Index: " << siteIndex << " (Pos: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead << ") LCG: " << LCG[siteIndex] << endl;
+            //         }
+            //     }
+            //     if (foundGoodChain){
+            //         debugOut << endl;
+            //     }
+            // }
 
-            for(const auto& chain : siteChainsIsolatedSites) {
-                for(const auto& siteIndex : chain) {
-                    debugOut << "SCORE ALL ISOLATED:  Site Index: " << siteIndex << " (Pos: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead << ") LCG: " << LCG[siteIndex] << endl;
-                    debugOut << "Has good coverage: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].hasSufficentCoverage << endl;
-                    debugOut << "Is HPC vector: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].isHpcVector << endl;
-                    debugOut << "Occ_0: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].occ_0 << endl;
-                    debugOut << "Occ_1: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].occ_1 << endl;
-                    debugOut << "Score: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].score << endl;
-                }
+            // for(const auto& chain : siteChainsIsolatedSites) {
+            //     for(const auto& siteIndex : chain) {
+            //         debugOut << "SCORE ALL ISOLATED:  Site Index: " << siteIndex << " (Pos: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].positionInTargetRead << ") LCG: " << LCG[siteIndex] << endl;
+            //         debugOut << "Has good coverage: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].hasSufficentCoverage << endl;
+            //         debugOut << "Is HPC vector: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].isHpcVector << endl;
+            //         debugOut << "Occ_0: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].occ_0 << endl;
+            //         debugOut << "Occ_1: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].occ_1 << endl;
+            //         debugOut << "Score: " << potentialHetSitesOnTargetOrientedReadId[siteIndex].score << endl;
+            //     }
                 
-            }
+            // }
 
 
             // Loop over all the sites of the chains and if they have a score of 1
@@ -2087,10 +2410,10 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
 
             debugOut << "Filtered vector size: " << potentialHetSitesOnTargetOrientedReadIdFiltered.size() << endl;
 
-            // Print the filtered vector
-            for (const auto& site : potentialHetSitesOnTargetOrientedReadIdFiltered) {
-                debugOut << "  Site Index: " << site.positionInTargetRead << " (Pos: " << site.positionInTargetRead << ")" << endl;
-            }
+            // // Print the filtered vector
+            // for (const auto& site : potentialHetSitesOnTargetOrientedReadIdFiltered) {
+            //     debugOut << "  Site Index: " << site.positionInTargetRead << " (Pos: " << site.positionInTargetRead << ")" << endl;
+            // }
 
             N = potentialHetSitesOnTargetOrientedReadIdFiltered.size();
             if (N == 0) {
@@ -2175,6 +2498,7 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             // Only SNPs at least 32bp apart are considered.
             // E.g. If we have SNPs on positions: [9992, 33364, 33368, 40000]
             // We want to keep the SNPs on positions: [9992, 40000]
+            
             std::vector<SnpStats> potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated;
             const auto& inputSnps = potentialHetSitesOnTargetOrientedReadIdFiltered;
 
@@ -2205,18 +2529,18 @@ void Assembler::createReadGraph5ThreadFunction(uint64_t threadId) {
             }
 
 
-            // print the size of the filtered vector and the sites
-            debugOut << "Filtered vector size after filtering out well separated SNPs: " << potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated.size() << endl;
-            for (const auto& site : potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated) {
-                debugOut << "  Site Index: " << site.positionInTargetRead << " (Pos: " << site.positionInTargetRead << ")" << endl;
-            }
+            // // print the size of the filtered vector and the sites
+            // debugOut << "Filtered vector size after filtering out well separated SNPs: " << potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated.size() << endl;
+            // for (const auto& site : potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated) {
+            //     debugOut << "  Site Index: " << site.positionInTargetRead << " (Pos: " << site.positionInTargetRead << ")" << endl;
+            // }
 
 
-            // Only if at least 2 filtered and well separated het SNPs are found, continue with the phasing.
-            if (potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated.size() < 2) {
-                debugOut << "Less than 2 filtered and well separated het SNPs found for read " << targetOrientedReadId << ", skipping DP and subsequent phasing." << endl;
-                continue;
-            }
+            // // Only if at least 2 filtered and well separated het SNPs are found, continue with the phasing.
+            // if (potentialHetSitesOnTargetOrientedReadIdFilteredWellSeparated.size() < 2) {
+            //     debugOut << "Less than 2 filtered and well separated het SNPs found for read " << targetOrientedReadId << ", skipping DP and subsequent phasing." << endl;
+            //     continue;
+            // }
 
             // XXX
             // --- END OF: Filtering out clusters of SNPs ---
@@ -2568,7 +2892,8 @@ void Assembler::createReadGraph5(
     double epsilon,
     double delta,
     double WThreshold,
-    double WThresholdForBreaks
+    double WThresholdForBreaks,
+    std::vector<MarkerId>& markerIdsToForbid
     )
 {
     cout << timestamp << "createReadGraph5 with strand separation begins" << endl;
@@ -2714,7 +3039,32 @@ void Assembler::createReadGraph5(
             sites.push_back(site);
         }
 
+        // Aggregate the markerIdsToForbid from each thread
+        for(const MarkerId& markerId : phasingThreadDataReadGraph5->threadMarkerIdsToForbid[threadId]) {
+            markerIdsToForbid.push_back(markerId);
+        }
+
     }
+
+    // Sort and unique the markerIdsToForbid
+    sort(markerIdsToForbid.begin(), markerIdsToForbid.end());
+    markerIdsToForbid.erase(unique(markerIdsToForbid.begin(), markerIdsToForbid.end()), markerIdsToForbid.end());
+
+    // XXX
+    // --- START OF: Generate anchors from het sites ---
+    //
+
+    // Shasta.
+    #include "mode3-Anchor.hpp"
+    #include "Base.hpp"
+    #include "Marker.hpp"
+    #include "Reads.hpp"
+    using namespace shasta;
+    using namespace mode3;
+
+    // XXX
+    // --- END OF: Generate anchors from het sites ---
+    //
 
 
 
@@ -2927,7 +3277,7 @@ void Assembler::createReadGraph5(
         // }
         orientedReadSites[targetOrientedReadId.getValue()].push_back(siteId);
     }
-
+    
     // Print the orientedReadSites
     for(uint64_t orientedReadId=0; orientedReadId<orientedReadSites.size(); orientedReadId++) {
         cout << "OrientedReadId: " << orientedReadId << " has " << orientedReadSites[orientedReadId].size() << " sites." << endl;

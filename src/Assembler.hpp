@@ -278,6 +278,51 @@ public:
     );
 
 
+    // // Find the best common upstream anchor marker for a set of reads relative
+    // // to a target oriented read. This is the most efficient implementation.
+    // MarkerId findBestUpstreamAnchor(
+    //     OrientedReadId targetOrientedReadId,
+    //     uint32_t targetStartOrdinal,
+    //     const std::vector<OrientedReadId>& alleleReads,
+    //     uint32_t maxSearchDistance,
+    //     uint32_t minTargetOrdinal // Stop if the search reaches an ordinal smaller than this.
+    //     ) const;
+
+    // Add this type definition near other public using statements or classes.
+    // A map from an ordinal on a target read to a list of all (queryRead, queryOrdinal)
+    // pairs that align to it. This is a pre-computed index to speed up phasing searches.
+    using OrdinalCorrespondenceMap =
+    std::map<uint32_t, std::vector<std::pair<OrientedReadId, uint32_t>>>;
+
+    // Build the OrdinalCorrespondenceMap for a given target read.
+    void buildOrdinalCorrespondenceMap(
+        OrientedReadId targetOrientedReadId,
+        OrdinalCorrespondenceMap& correspondenceMap
+        ) const;
+
+    // Find the best common upstream anchor marker for a set of reads relative
+// to a target oriented read.
+// Returns a pair:
+// - The first element is the MarkerId of the common anchor. It is set to
+//   std::numeric_limits<MarkerId>::max() if no common anchor is found.
+// - The second element is a vector of all MarkerIds that were processed
+//   during the search.
+class MarkerAnchorCandidate{
+public:
+    OrientedReadId targetOrientedReadId;
+    MarkerId anchorMarkerId; // The marker ID of the anchor in the targetOrientedReadId
+    std::vector< std::pair<OrientedReadId, uint32_t> > anchorMarkerIntervalsHet0; // (OrientedReadId, ordinal)
+    std::vector< std::pair<OrientedReadId, uint32_t> > anchorMarkerIntervalsHet1; // (OrientedReadId, ordinal)
+};
+std::pair< MarkerAnchorCandidate, std::vector<shasta::MarkerId> > findBestUpstreamAnchor(
+    OrientedReadId targetOrientedReadId,
+    uint32_t targetStartOrdinal,
+    const std::vector<OrientedReadId>& het0OrientedReads,
+    const std::vector<OrientedReadId>& het1OrientedReads,
+    uint32_t maxSearchDistance,
+    uint32_t minPosition
+    ) const;
+
 
     // Compute an alignment for each alignment candidate.
     // Store summary information for the ones that are good enough,
@@ -1088,7 +1133,8 @@ public:
         double epsilon,
         double delta,
         double WThreshold,
-        double WThresholdForBreaks
+        double WThresholdForBreaks,
+        std::vector<MarkerId>& markerIdsToForbid
         );
     void createReadGraph5ThreadFunction(uint64_t threadId);
     void createReadGraph4PhasingThreadFunction(uint64_t threadId);

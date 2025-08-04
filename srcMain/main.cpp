@@ -731,6 +731,10 @@ void shasta::main::assemble(
     }
 
 
+    #include "AssemblerReadGraph5.cpp";
+    std::vector<MarkerId> markerIdsToForbid;
+
+
     // Create the read graph.
     if(assemblerOptions.readGraphOptions.creationMethod != 2 ) {
         if(assemblerOptions.readGraphOptions.creationMethod == 0) {
@@ -754,7 +758,8 @@ void shasta::main::assemble(
             assemblerOptions.readGraphOptions.epsilon,
             assemblerOptions.readGraphOptions.delta,
             assemblerOptions.readGraphOptions.WThreshold,
-            assemblerOptions.readGraphOptions.WThresholdForBreaks
+            assemblerOptions.readGraphOptions.WThresholdForBreaks,
+            &markerIdsToForbid
             );
         }
 
